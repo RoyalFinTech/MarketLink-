@@ -9,15 +9,8 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const logger = require('./utils/logger');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
-
-let swaggerUi = null;
-let swaggerSpec = null;
-try {
-  swaggerUi = require('swagger-ui-express');
-  swaggerSpec = require('./docs/swagger');
-} catch (err) {
-  logger.warn(`API docs disabled: ${err.message}`);
-}
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./docs/swagger');
 
 const app = express();
 app.use(helmet());
@@ -54,29 +47,21 @@ app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
 const API = '/api/v1';
 const modulesDir = path.join(__dirname, 'modules');
 const mountedModules = [];
-const skippedModules = [];
 
 if (fs.existsSync(modulesDir)) {
   for (const moduleName of fs.readdirSync(modulesDir).sort()) {
     const routeFile = path.join(modulesDir, moduleName, 'routes.js');
     if (!fs.existsSync(routeFile)) continue;
-    try {
-      app.use(`${API}/${moduleName}`, require(routeFile));
-      mountedModules.push(moduleName);
-    } catch (err) {
-      skippedModules.push({ moduleName, reason: err.message });
-      logger.warn(`Skipped /api/v1/${moduleName}: ${err.message}`);
-    }
+    app.use(`${API}/${moduleName}`, require(routeFile));
+    mountedModules.push(moduleName);
   }
 }
 
 app.get('/api/v1', (req, res) => {
-  res.json({ success: true, mountedModules, skippedModules });
+  res.json({ success: true, mountedModules });
 });
 
-if (swaggerUi && swaggerSpec) {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: 'MarketLink API' }));
-}
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: 'MarketLink API' }));
 app.use(notFound);
 app.use(errorHandler);
 
