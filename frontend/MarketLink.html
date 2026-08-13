@@ -9,9 +9,11 @@
      connect-src lists every backend origin ML_API is allowed to call. The frontend never
      calls api.anthropic.com (or any AI provider) directly — AI requests go through our own
      backend's /assistant endpoint, which is the only thing that ever sees an AI API key, if
-     one is configured. If you deploy the backend somewhere other than localhost:4000, add
-     that origin here (and set window.ML_API_URL to match) or ML_API's fetch calls will be
-     silently blocked by the browser. -->
+     one is configured. If you deploy the backend somewhere other than localhost:4000,
+     replace YOUR_RENDER_BACKEND_URL in the deployment config below with the real
+     Render URL and add that same origin here, or ML_API's fetch calls will be
+     silently blocked by the browser. Example after deployment:
+     connect-src 'self' http://localhost:4000 https://your-service.onrender.com https://nominatim.openstreetmap.org; -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:4000 https://nominatim.openstreetmap.org;">
 <!-- ═══════════════════════════════════════════════════════════════════
      DEPLOYMENT CONFIGURATION — read this before publishing MarketLink.html
@@ -35,7 +37,7 @@
 (function(){
   var CONFIG = {
     // ↓↓↓ EDIT THIS for any non-local deployment ↓↓↓
-    API_URL: '',   // e.g. 'https://api.marketlink.gm' — leave '' for local dev (localhost:4000)
+    API_URL: '',   // production: replace '' with 'YOUR_RENDER_BACKEND_URL'; leave '' for local dev (localhost:4000)
     // ↑↑↑ EDIT THIS for any non-local deployment ↑↑↑
   };
 
