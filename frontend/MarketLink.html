@@ -13,8 +13,8 @@
      replace YOUR_RENDER_BACKEND_URL in the deployment config below with the real
      Render URL and add that same origin here, or ML_API's fetch calls will be
      silently blocked by the browser. Example after deployment:
-     connect-src 'self' http://localhost:4000 https://your-service.onrender.com https://nominatim.openstreetmap.org; -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:4000 https://nominatim.openstreetmap.org;">
+     connect-src 'self' https://marketlink-gambia.onrender.com https://your-service.onrender.com https://nominatim.openstreetmap.org; -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; connect-src 'self' https://marketlink-gambia.onrender.com https://nominatim.openstreetmap.org;">
 <!-- ═══════════════════════════════════════════════════════════════════
      DEPLOYMENT CONFIGURATION — read this before publishing MarketLink.html
      anywhere other than local development (GitHub Pages, Netlify, etc).
