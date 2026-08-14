@@ -48,18 +48,32 @@ app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
 const API = '/api/v1';
 const modulesDir = path.join(__dirname, 'modules');
 const mountedModules = [];
+const skippedModules = []; // module folders found with NO routes.js — logged loudly instead of silently ignored
 
 if (fs.existsSync(modulesDir)) {
   for (const moduleName of fs.readdirSync(modulesDir).sort()) {
-    const routeFile = path.join(modulesDir, moduleName, 'routes.js');
-    if (!fs.existsSync(routeFile)) continue;
+    const moduleDir = path.join(modulesDir, moduleName);
+    if (!fs.statSync(moduleDir).isDirectory()) continue;
+    const routeFile = path.join(moduleDir, 'routes.js');
+    if (!fs.existsSync(routeFile)) {
+      skippedModules.push(moduleName);
+      logger.warn(`Module "${moduleName}" has no routes.js at ${routeFile} — it will NOT be mounted at ${API}/${moduleName}.`);
+      continue;
+    }
     app.use(`${API}/${moduleName}`, require(routeFile));
     mountedModules.push(moduleName);
   }
+} else {
+  logger.error(`Modules directory not found at ${modulesDir} — no API routes were mounted.`);
+}
+
+logger.info(`Mounted modules (${mountedModules.length}): ${mountedModules.join(', ') || '(none)'}`);
+if (skippedModules.length) {
+  logger.warn(`Skipped modules with no routes.js (${skippedModules.length}): ${skippedModules.join(', ')}`);
 }
 
 app.get('/api/v1', (req, res) => {
-  res.json({ success: true, mountedModules });
+  res.json({ success: true, mountedModules, skippedModules });
 });
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: 'MarketLink API' }));
