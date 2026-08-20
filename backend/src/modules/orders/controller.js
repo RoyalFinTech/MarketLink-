@@ -1,0 +1,11 @@
+'use strict';
+const svc = require('./service');
+const w = fn => async(req,res,next) => { try { await fn(req,res); } catch(e) { next(e); } };
+exports.place        = w(async(req,res) => res.status(201).json({ success:true, data: await svc.placeOrder({ customerId:req.user.id, ...req.body }) }));
+exports.getById      = w(async(req,res) => res.json({ success:true, data: await svc.getById(req.params.id,req.user.id,req.user.roles) }));
+exports.myOrders     = w(async(req,res) => res.json({ success:true, data: await svc.listForCustomer(req.user.id,req.query) }));
+exports.vendorOrders = w(async(req,res) => res.json({ success:true, data: await svc.listForVendor(req.user.id,req.query) }));
+exports.updateStatus = w(async(req,res) => res.json({ success:true, data: await svc.updateStatus(req.params.id,req.body.status,req.user.id,req.user.roles,req.body.note) }));
+exports.vendorAccept = w(async(req,res) => res.json({ success:true, data: await svc.vendorAccept(req.params.id,req.user.id,req.user.roles) }));
+exports.vendorReject = w(async(req,res) => res.json({ success:true, data: await svc.vendorReject(req.params.id,req.user.id,req.user.roles,req.body.reason) }));
+exports.cancel       = w(async(req,res) => res.json({ success:true, data: await svc.cancel(req.params.id,req.user.id,req.user.roles,req.body.reason) }));

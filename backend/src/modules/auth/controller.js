@@ -1,0 +1,11 @@
+'use strict';
+const svc = require('./service');
+const wrap = (fn) => async (req, res, next) => { try { await fn(req, res); } catch(e) { next(e); } };
+exports.registerInitiate = wrap(async (req, res) => res.json({ success: true, ...await svc.registerInitiate(req.body) }));
+exports.registerComplete = wrap(async (req, res) => res.status(201).json({ success: true, data: await svc.registerComplete(req.body) }));
+exports.login            = wrap(async (req, res) => res.json({ success: true, data: await svc.login(req.body) }));
+exports.refreshToken     = wrap(async (req, res) => res.json({ success: true, data: await svc.refreshAccessToken(req.body.refreshToken) }));
+exports.logout           = wrap(async (req, res) => { await svc.logout(req.user.id, req.body.refreshToken); res.json({ success: true, message: 'Logged out.' }); });
+exports.requestPinReset  = wrap(async (req, res) => res.json({ success: true, ...await svc.requestPinReset(req.body.phone) }));
+exports.confirmPinReset  = wrap(async (req, res) => res.json({ success: true, ...await svc.confirmPinReset(req.body) }));
+exports.me               = (req, res) => res.json({ success: true, data: req.user });

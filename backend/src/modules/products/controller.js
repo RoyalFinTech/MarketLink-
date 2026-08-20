@@ -1,0 +1,11 @@
+'use strict';
+const svc = require('./service');
+const isAdmin = u => (u.roles||[]).some(r => ['admin','super_admin'].includes(r));
+const w = fn => async(req,res,next) => { try { await fn(req,res); } catch(e) { next(e); } };
+exports.list           = w(async(req,res) => res.json({ success:true, data: await svc.list({ page:+req.query.page||1, limit:+req.query.limit||20, ...req.query }) }));
+exports.getById        = w(async(req,res) => res.json({ success:true, data: await svc.getById(req.params.id) }));
+exports.create         = w(async(req,res) => res.status(201).json({ success:true, data: await svc.create({ vendorId:req.user.id, ...req.body }) }));
+exports.update         = w(async(req,res) => res.json({ success:true, data: await svc.update(req.params.id, req.user.id, isAdmin(req.user), req.body) }));
+exports.remove         = w(async(req,res) => { await svc.remove(req.params.id,req.user.id,isAdmin(req.user)); res.json({success:true,message:'Archived.'}); });
+exports.updateInventory= w(async(req,res) => res.json({ success:true, data: await svc.updateInventory(req.params.id,req.user.id,isAdmin(req.user),req.body) }));
+exports.updateStatus   = w(async(req,res) => res.json({ success:true, data: await svc.updateStatus(req.params.id,req.user.id,req.body) }));
