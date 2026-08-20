@@ -9,12 +9,10 @@
      connect-src lists every backend origin ML_API is allowed to call. The frontend never
      calls api.anthropic.com (or any AI provider) directly — AI requests go through our own
      backend's /assistant endpoint, which is the only thing that ever sees an AI API key, if
-     one is configured. If you deploy the backend somewhere other than localhost:4000,
-     replace YOUR_RENDER_BACKEND_URL in the deployment config below with the real
-     Render URL and add that same origin here, or ML_API's fetch calls will be
-     silently blocked by the browser. Example after deployment:
-     connect-src 'self' http://localhost:4000 https://your-service.onrender.com https://nominatim.openstreetmap.org; -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:4000 https://nominatim.openstreetmap.org;">
+     one is configured. If you deploy the backend somewhere other than localhost:4000, add
+     that origin here (and set window.ML_API_URL to match) or ML_API's fetch calls will be
+     silently blocked by the browser. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; connect-src 'self' https://marketlink-gambia.onrender.com https://nominatim.openstreetmap.org;">
 <!-- ═══════════════════════════════════════════════════════════════════
      DEPLOYMENT CONFIGURATION — read this before publishing MarketLink.html
      anywhere other than local development (GitHub Pages, Netlify, etc).
@@ -37,7 +35,7 @@
 (function(){
   var CONFIG = {
     // ↓↓↓ EDIT THIS for any non-local deployment ↓↓↓
-    API_URL: '',   // production: replace '' with 'YOUR_RENDER_BACKEND_URL'; leave '' for local dev (localhost:4000)
+    API_URL: 'https://marketlink-gambia.onrender.com',
     // ↑↑↑ EDIT THIS for any non-local deployment ↑↑↑
   };
 
@@ -792,6 +790,17 @@ button:active{opacity:0.82;}
       <button class="sheet-cls" onclick="closeSheet('sh-location')">×</button>
     </div>
     <div id="loc-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
+  </div>
+</div>
+
+<!-- Development OTP Reveal Sheet -->
+<div id="sh-otp-reveal" class="sheet-ov">
+  <div class="sheet" style="max-height:70vh;">
+    <div class="sheet-hdr">
+      <span style="color:var(--tx);font-size:15px;font-weight:700;">Your verification code</span>
+      <button class="sheet-cls" onclick="continueFromOtpReveal()">×</button>
+    </div>
+    <div id="otp-reveal-body" style="padding:6px 20px 26px;"></div>
   </div>
 </div>
 
@@ -2092,6 +2101,24 @@ function renderAuth(){
   }
 }
 function toggleAgree(){S.agreed=!S.agreed;renderAuth();}
+function renderOtpRevealCard(){
+  var body=G('otp-reveal-body'); if(!body) return;
+  var code=String(S.devOtpDisplay||'');
+  body.innerHTML=
+    '<div style="text-align:center;">'+
+    '<div style="color:rgba(255,255,255,0.5);font-size:11.5px;font-weight:600;margin-bottom:14px;">⚙️ Development mode — SMS is not configured, so here\'s your code directly.</div>'+
+    '<div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;">'+
+      code.split('').map(function(d){return '<div style="width:38px;height:48px;border-radius:10px;background:rgba(13,148,136,0.14);border:1.5px solid rgba(13,148,136,0.4);display:flex;align-items:center;justify-content:center;color:var(--tx);font-size:22px;font-weight:800;">'+sanitizeText(d)+'</div>';}).join('')+
+    '</div>'+
+    '<div style="color:rgba(255,255,255,0.55);font-size:12px;margin-bottom:20px;">Use this code to verify your phone number.</div>'+
+    '<button class="btn btn-p" style="width:100%;" onclick="continueFromOtpReveal()">Continue</button>'+
+    '</div>';
+}
+function continueFromOtpReveal(){
+  closeSheet('sh-otp-reveal');
+  var otpInput=document.querySelector('#otp-row .otpb');
+  if(otpInput) setTimeout(function(){otpInput.focus();},250);
+}
 function copyDevOtp(){
   if(!S.devOtpDisplay) return;
   var code=String(S.devOtpDisplay);
@@ -2282,6 +2309,10 @@ async function doRegister(){
     S.authMode='otp'; S.otp=['','','','','',''];
     renderAuth();
     toast('OTP sent to +220'+S.regPhone+' 📱');
+    if(S.devOtpDisplay){
+      renderOtpRevealCard();
+      openSheet('sh-otp-reveal');
+    }
   }catch(err){
     if(registerBtn){registerBtn.textContent='Continue';registerBtn.disabled=false;}
     var msg=err.error||'Registration failed. Please try again.';
