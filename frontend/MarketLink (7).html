@@ -6896,7 +6896,7 @@ window.addEventListener('unhandledrejection',function(e){
   function countries(){
     var L=lpn();
     if(L&&L.getCountries){
-      return L.getCountries().map(function(iso){return {iso:iso,name:cname(iso),flag:flag(iso),dial:L.getCountryCallingCode(iso);};}).sort(function(a,b){return a.name.localeCompare(b.name);});
+      return L.getCountries().map(function(iso){return {iso:iso,name:cname(iso),flag:flag(iso),dial:L.getCountryCallingCode(iso)};}).sort(function(a,b){return a.name.localeCompare(b.name);});
     }
     return [
       {iso:'GM',name:'The Gambia',flag:'🇬🇲',dial:'220'},{iso:'NG',name:'Nigeria',flag:'🇳🇬',dial:'234'},
