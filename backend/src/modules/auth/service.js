@@ -5,10 +5,24 @@ const crypto = require('crypto');
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { normalizePhone } = require('../../utils/phone');
 
 function signAccess(id, roles) { return jwt.sign({ sub: id, roles }, process.env.JWT_ACCESS_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }); }
 function signRefresh(id) { return jwt.sign({ sub: id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }); }
 function genOtp() { return String(crypto.randomInt(100000, 999999)); }
+
+// Single normalization call site for the whole auth module — every function
+// below routes phone input through this before it ever touches a query.
+// Defaults to Gambia when the input has no leading '+' (this is a
+// Gambia-first product), but international input with its own dial code
+// is always parsed by that code regardless of default.
+function canonicalPhone(raw) {
+  try {
+    return normalizePhone(raw, 'GM').e164;
+  } catch (e) {
+    throw new AppError(e.message || 'Please enter a valid phone number.', 400, 'INVALID_PHONE');
+  }
+}
 
 async function storeOtp(destination, channel, purpose, otp, userId = null) {
   const hash = await bcrypt.hash(otp, 8);
@@ -30,23 +44,25 @@ async function verifyOtp(destination, purpose, otp) {
 }
 
 async function registerInitiate({ fullName, phone, userType = 'customer' }) {
-  const { rows } = await query('SELECT id FROM users WHERE phone=$1', [phone]);
+  const e164 = canonicalPhone(phone);
+  const { rows } = await query('SELECT id FROM users WHERE phone=$1', [e164]);
   if (rows.length) throw new AppError('An account already exists with this phone number.', 409, 'PHONE_ALREADY_REGISTERED');
   const otp = genOtp();
-  await storeOtp(phone, 'sms', 'registration', otp);
-  logger.info('Registration OTP', { phone, dev: process.env.OTP_DEV_MODE === 'true' });
-  return { message: 'OTP sent.', ...(process.env.OTP_DEV_MODE === 'true' ? { devOtp: otp } : {}) };
+  await storeOtp(e164, 'sms', 'registration', otp);
+  logger.info('Registration OTP', { phone: e164, dev: process.env.OTP_DEV_MODE === 'true' });
+  return { message: 'OTP sent.', phone: e164, ...(process.env.OTP_DEV_MODE === 'true' ? { devOtp: otp } : {}) };
 }
 
 async function registerComplete({ fullName, phone, otp, pin, userType = 'customer' }) {
-  await verifyOtp(phone, 'registration', otp);
-  const { rows } = await query('SELECT id FROM users WHERE phone=$1', [phone]);
+  const e164 = canonicalPhone(phone);
+  await verifyOtp(e164, 'registration', otp);
+  const { rows } = await query('SELECT id FROM users WHERE phone=$1', [e164]);
   if (rows.length) throw new AppError('An account already exists with this phone number.', 409, 'PHONE_ALREADY_REGISTERED');
   const hash = await bcrypt.hash(pin, 12);
   return withTransaction(async (client) => {
     const { rows: [user] } = await client.query(
       'INSERT INTO users (full_name,phone,password_hash,pin_hash,phone_verified,status) VALUES($1,$2,$3,$4,TRUE,\'active\') RETURNING id,full_name,phone,status',
-      [fullName, phone, hash, hash]);
+      [fullName, e164, hash, hash]);
     const types = Array.isArray(userType) ? userType : [userType];
     for (const t of types) await client.query('INSERT INTO user_roles (user_id,role_id) SELECT $1,id FROM roles WHERE name=$2', [user.id, t]);
     if (types.includes('customer')) {
@@ -63,9 +79,10 @@ async function registerComplete({ fullName, phone, otp, pin, userType = 'custome
 }
 
 async function login({ phone, pin }) {
+  const e164 = canonicalPhone(phone);
   const { rows } = await query(
     'SELECT u.id,u.full_name,u.phone,u.pin_hash,u.status,array_agg(r.name) AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.phone=$1 GROUP BY u.id',
-    [phone]);
+    [e164]);
   if (!rows.length) throw new AppError('No account found with this phone number.', 401, 'USER_NOT_FOUND');
   const user = rows[0];
   if (user.status === 'suspended') throw new AppError('Account suspended. Contact support.', 403, 'ACCOUNT_SUSPENDED');
@@ -104,19 +121,21 @@ async function logout(userId, rt) {
 }
 
 async function requestPinReset(phone) {
-  const { rows } = await query('SELECT id FROM users WHERE phone=$1', [phone]);
+  const e164 = canonicalPhone(phone);
+  const { rows } = await query('SELECT id FROM users WHERE phone=$1', [e164]);
   if (rows.length) {
     const otp = genOtp();
-    await storeOtp(phone, 'sms', 'password_reset', otp, rows[0].id);
+    await storeOtp(e164, 'sms', 'password_reset', otp, rows[0].id);
     if (process.env.OTP_DEV_MODE === 'true') return { message: 'OTP sent.', devOtp: otp };
   }
   return { message: 'If an account exists with this number, an OTP has been sent.' };
 }
 
 async function confirmPinReset({ phone, otp, newPin }) {
-  await verifyOtp(phone, 'password_reset', otp);
+  const e164 = canonicalPhone(phone);
+  await verifyOtp(e164, 'password_reset', otp);
   const hash = await bcrypt.hash(newPin, 12);
-  await query('UPDATE users SET pin_hash=$1, password_hash=$1 WHERE phone=$2', [hash, phone]);
+  await query('UPDATE users SET pin_hash=$1, password_hash=$1 WHERE phone=$2', [hash, e164]);
   return { message: 'PIN reset successfully.' };
 }
 
