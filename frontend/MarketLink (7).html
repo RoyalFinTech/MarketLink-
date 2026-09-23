@@ -6945,7 +6945,7 @@ window.addEventListener('unhandledrejection',function(e){
   function ensureSheets(){
     if(!G('sh-country-picker')){
       var x=document.createElement('div');x.id='sh-country-picker';x.className='sheet-ov';
-      x.innerHTML='<div class="sheet" style="max-height:78vh;display:flex;flex-direction:column;"><div class="sheet-hdr"><span style="color:var(--tx);font-size:15px;font-weight:700;">Select country</span><button class="sheet-cls" onclick="closeSheet(\\'sh-country-picker\\')">×</button></div><div style="padding:12px 16px;"><input class="inp" id="country-picker-search" placeholder="Search country or dialing code…"></div><div id="country-picker-list" style="flex:1;overflow-y:auto;padding:0 16px 16px;"></div></div>';
+      x.innerHTML='<div class="sheet" style="max-height:78vh;display:flex;flex-direction:column;"><div class="sheet-hdr"><span style="color:var(--tx);font-size:15px;font-weight:700;">Select country</span><button class="sheet-cls" onclick="closeSheet(\'sh-country-picker\')">×</button></div><div style="padding:12px 16px;"><input class="inp" id="country-picker-search" placeholder="Search country or dialing code…"></div><div id="country-picker-list" style="flex:1;overflow-y:auto;padding:0 16px 16px;"></div></div>';
       document.body.appendChild(x);
       G('country-picker-search').oninput=function(){renderCountries();};
     }
@@ -6958,7 +6958,7 @@ window.addEventListener('unhandledrejection',function(e){
   function renderCountries(){
     var b=G('country-picker-list'),q=((G('country-picker-search')||{}).value||'').toLowerCase();if(!b)return;
     b.innerHTML=countries().filter(function(c){return !q||c.name.toLowerCase().indexOf(q)>-1||c.iso.toLowerCase().indexOf(q)>-1||c.dial.indexOf(q)>-1;}).slice(0,300).map(function(c){
-      return '<div onclick="selectPhoneCountry(\\''+c.iso+'\\')" style="display:flex;align-items:center;gap:11px;padding:12px 6px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:20px;">'+c.flag+'</span><span style="color:var(--tx);font-size:13.5px;flex:1;">'+sanitizeText(c.name)+'</span><span style="color:var(--mu);font-size:12.5px;">+'+c.dial+'</span></div>';
+      return '<div onclick="selectPhoneCountry(\''+c.iso+'\')" style="display:flex;align-items:center;gap:11px;padding:12px 6px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:20px;">'+c.flag+'</span><span style="color:var(--tx);font-size:13.5px;flex:1;">'+sanitizeText(c.name)+'</span><span style="color:var(--mu);font-size:12.5px;">+'+c.dial+'</span></div>';
     }).join('')||'<div style="color:var(--mu);font-size:12px;text-align:center;padding:20px;">No matching country.</div>';
   }
   function pick(target){window._phonePickerTarget=target;openSheet('sh-country-picker');renderCountries();setTimeout(function(){var q=G('country-picker-search');if(q){q.value='';q.focus();}},120);}
@@ -6968,7 +6968,7 @@ window.addEventListener('unhandledrejection',function(e){
   function decoratePhone(id,target){
     var inp=G(id);if(!inp||!inp.parentElement)return;
     var box=inp.parentElement, c=byIso(S[target+'Country']||'GM');
-    box.innerHTML='<button type="button" class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;flex-shrink:0;" onclick="openPhoneCountryPicker(\\''+target+'\\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="'+id+'" value="'+sanitizeText(S[target==='reg'?'regPhone':'loginPhone']||'')+'" style="flex:1;">';
+    box.innerHTML='<button type="button" class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;flex-shrink:0;" onclick="openPhoneCountryPicker(\''+target+'\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="'+id+'" value="'+sanitizeText(S[target==='reg'?'regPhone':'loginPhone']||'')+'" style="flex:1;">';
     var ni=G(id);ni.oninput=function(){S[target==='reg'?'regPhone':'loginPhone']=this.value;};
   }
   function decorateAuth(){
@@ -6992,7 +6992,7 @@ window.addEventListener('unhandledrejection',function(e){
     var b=G('reset-pin-body');if(!b)return;
     if(S.resetStep==='phone'){
       var c=byIso(S.resetCountry);
-      b.innerHTML='<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the phone number on your MarketLink account and we’ll send a code.</div><label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;" onclick="openPhoneCountryPicker(\\'reset\\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" id="reset-phone" type="tel" inputmode="tel" style="flex:1;"></div><div style="height:16px;"></div><button class="btn btn-p" style="width:100%;" onclick="requestResetCode()">Send Code</button>';
+      b.innerHTML='<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the phone number on your MarketLink account and we’ll send a code.</div><label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;" onclick="openPhoneCountryPicker(\'reset\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" id="reset-phone" type="tel" inputmode="tel" style="flex:1;"></div><div style="height:16px;"></div><button class="btn btn-p" style="width:100%;" onclick="requestResetCode()">Send Code</button>';
     }else if(S.resetStep==='otp'){
       b.innerHTML=(S.devOtpDisplay?'<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.35);border-radius:10px;padding:10px;text-align:center;margin-bottom:14px;">Development OTP: <b>'+sanitizeText(S.devOtpDisplay)+'</b></div>':'')+'<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the 6-digit code sent to '+sanitizeText(S.resetPhoneE164||'')+'.</div><div class="otpr" id="reset-otp-row"></div><button class="btn btn-p" style="width:100%;margin-top:14px;" onclick="verifyResetCode()">Continue</button>';
       otpInputs(S.resetOtp,'reset-otp-row',false);
