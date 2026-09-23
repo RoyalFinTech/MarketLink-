@@ -12,7 +12,7 @@
      one is configured. If you deploy the backend somewhere other than localhost:4000, add
      that origin here (and set window.ML_API_URL to match) or ML_API's fetch calls will be
      silently blocked by the browser. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; connect-src 'self' https://marketlink-gambia.onrender.com https://nominatim.openstreetmap.org;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https://marketlink-gambia.onrender.com https://nominatim.openstreetmap.org;">
 <!-- ═══════════════════════════════════════════════════════════════════
      DEPLOYMENT CONFIGURATION — read this before publishing MarketLink.html
      anywhere other than local development (GitHub Pages, Netlify, etc).
@@ -6858,6 +6858,209 @@ window.addEventListener('unhandledrejection',function(e){
  *  [ ] Resend / SendGrid API Key
  * ═══════════════════════════════════════════════════════════
  */
+</script>
+<script>
+/* MarketLink phone-hardening production layer.
+   Backend remains authoritative; this layer normalizes/validates for UX and
+   keeps login, registration, PIN reset, vendor and rider submissions consistent. */
+(function(){
+  var legacyRenderAuth=window.renderAuth, legacyShowDuplicate=window.showDuplicateAccountPrompt;
+  var phoneReady=(function(){
+    var existing=window['libphonenumber-js'];
+    if(existing) return Promise.resolve(existing);
+    return new Promise(function(resolve){
+      var sc=document.createElement('script');
+      sc.src='https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.13.12/libphonenumber-js.min.js';
+      sc.async=false;
+      sc.onload=function(){resolve(window['libphonenumber-js']||null);};
+      sc.onerror=function(){resolve(null);};
+      (document.head||document.documentElement).appendChild(sc);
+    });
+  })();
+
+  var GP={
+    AFRICELL:{newPrefix:'87',legacy:['2','7','40','41']},
+    QCELL:{newPrefix:'83',legacy:['3','5']},
+    COMIUM:{newPrefix:'86',legacy:['6','8']},
+    UNATTRIBUTED_9:{newPrefix:null,legacy:['9']}
+  };
+  var NP={'87':'AFRICELL','83':'QCELL','86':'COMIUM'};
+  var DN={AFRICELL:'Africell',QCELL:'QCell',COMIUM:'Comium',UNATTRIBUTED_9:null};
+
+  function lpn(){return window['libphonenumber-js']||null;}
+  function flag(iso){return iso&&iso.length===2?String.fromCodePoint.apply(String,iso.toUpperCase().split('').map(function(c){return 127397+c.charCodeAt(0);})):'';}
+  var names=null;
+  try{if(window.Intl&&Intl.DisplayNames)names=new Intl.DisplayNames(['en'],{type:'region'});}catch(e){}
+  function cname(iso){try{return names&&names.of(iso)||iso;}catch(e){return iso;}}
+
+  function countries(){
+    var L=lpn();
+    if(L&&L.getCountries){
+      return L.getCountries().map(function(iso){return {iso:iso,name:cname(iso),flag:flag(iso),dial:L.getCountryCallingCode(iso);};}).sort(function(a,b){return a.name.localeCompare(b.name);});
+    }
+    return [
+      {iso:'GM',name:'The Gambia',flag:'🇬🇲',dial:'220'},{iso:'NG',name:'Nigeria',flag:'🇳🇬',dial:'234'},
+      {iso:'SL',name:'Sierra Leone',flag:'🇸🇱',dial:'232'},{iso:'GH',name:'Ghana',flag:'🇬🇭',dial:'233'},
+      {iso:'SN',name:'Senegal',flag:'🇸🇳',dial:'221'},{iso:'LR',name:'Liberia',flag:'🇱🇷',dial:'231'},
+      {iso:'GN',name:'Guinea',flag:'🇬🇳',dial:'224'},{iso:'CI',name:'Côte d’Ivoire',flag:'🇨🇮',dial:'225'},
+      {iso:'GB',name:'United Kingdom',flag:'🇬🇧',dial:'44'},{iso:'US',name:'United States',flag:'🇺🇸',dial:'1'}
+    ];
+  }
+  function byIso(iso){var a=countries().filter(function(c){return c.iso===iso;});return a[0]||{iso:'GM',name:'The Gambia',flag:'🇬🇲',dial:'220'};}
+  function detect(n){
+    var d=String(n||'').replace(/\D/g,''), k=null;
+    if(d.length===9){k=NP[d.slice(0,2)]||(d[0]==='9'?'UNATTRIBUTED_9':null);}
+    else if(d.length===7){Object.keys(GP).some(function(op){if(GP[op].legacy.some(function(p){return d.indexOf(p)===0;})){k=op;return true;}return false;});}
+    return k?DN[k]:null;
+  }
+  function gm9(n){
+    var d=String(n||'').replace(/\D/g,'');
+    if(d.length===9)return NP[d.slice(0,2)]||d[0]==='9'?d:null;
+    if(d.length!==7)return null;
+    var k=null;
+    Object.keys(GP).some(function(op){if(GP[op].legacy.some(function(p){return d.indexOf(p)===0;})){k=op;return true;}return false;});
+    return k?(GP[k].newPrefix?GP[k].newPrefix+d:d):null;
+  }
+  function normalize(raw,iso){
+    var s=String(raw||'').trim().replace(/[\s\-().]/g,'');
+    if(!s)throw new Error('Phone number is required.');
+    if(s.indexOf('00')===0)s='+'+s.slice(2);
+    var gm=s.indexOf('+220')===0||(s.charAt(0)!=='+'&&iso==='GM');
+    if(gm){
+      var n=s.indexOf('+220')===0?s.slice(4):s.replace(/\D/g,''), m=gm9(n);
+      if(!m)throw new Error('Please check your Gambian mobile number.');
+      var e='+220'+m,L=lpn();
+      if(L&&L.isValidPhoneNumber&&!L.isValidPhoneNumber(e))throw new Error('Please check your Gambian mobile number.');
+      return {e164:e,countryIso:'GM',national:m,operator:detect(m)};
+    }
+    var L=lpn(),p=null;
+    if(L&&L.parsePhoneNumberFromString){try{p=s.charAt(0)==='+'?L.parsePhoneNumberFromString(s):L.parsePhoneNumberFromString(s,iso);}catch(e){p=null;}}
+    if(p&&!p.isValid())throw new Error('Please check your phone number.');
+    if(p)return {e164:p.number,countryIso:p.country||iso||null,national:p.nationalNumber,operator:null};
+    if(s.charAt(0)==='+'&&/^\+\d{7,15}$/.test(s))return {e164:s,countryIso:iso||null,national:s.slice(1),operator:null};
+    throw new Error('International phone validation is unavailable right now. Please try again.');
+  }
+  window.PhoneUtil={normalize:normalize,COUNTRIES:countries,byIso:byIso,detectOperator:detect,toGambianNational9:gm9};
+
+  function ensureSheets(){
+    if(!G('sh-country-picker')){
+      var x=document.createElement('div');x.id='sh-country-picker';x.className='sheet-ov';
+      x.innerHTML='<div class="sheet" style="max-height:78vh;display:flex;flex-direction:column;"><div class="sheet-hdr"><span style="color:var(--tx);font-size:15px;font-weight:700;">Select country</span><button class="sheet-cls" onclick="closeSheet(\\'sh-country-picker\\')">×</button></div><div style="padding:12px 16px;"><input class="inp" id="country-picker-search" placeholder="Search country or dialing code…"></div><div id="country-picker-list" style="flex:1;overflow-y:auto;padding:0 16px 16px;"></div></div>';
+      document.body.appendChild(x);
+      G('country-picker-search').oninput=function(){renderCountries();};
+    }
+    if(!G('sh-reset-pin')){
+      var r=document.createElement('div');r.id='sh-reset-pin';r.className='sheet-ov';
+      r.innerHTML='<div class="sheet" style="max-height:88vh;"><div class="sheet-hdr"><span style="color:var(--tx);font-size:15px;font-weight:700;">Reset PIN</span><button class="sheet-cls" onclick="closeResetPin()">×</button></div><div id="reset-pin-body" style="padding:6px 20px 26px;"></div></div>';
+      document.body.appendChild(r);
+    }
+  }
+  function renderCountries(){
+    var b=G('country-picker-list'),q=((G('country-picker-search')||{}).value||'').toLowerCase();if(!b)return;
+    b.innerHTML=countries().filter(function(c){return !q||c.name.toLowerCase().indexOf(q)>-1||c.iso.toLowerCase().indexOf(q)>-1||c.dial.indexOf(q)>-1;}).slice(0,300).map(function(c){
+      return '<div onclick="selectPhoneCountry(\\''+c.iso+'\\')" style="display:flex;align-items:center;gap:11px;padding:12px 6px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:20px;">'+c.flag+'</span><span style="color:var(--tx);font-size:13.5px;flex:1;">'+sanitizeText(c.name)+'</span><span style="color:var(--mu);font-size:12.5px;">+'+c.dial+'</span></div>';
+    }).join('')||'<div style="color:var(--mu);font-size:12px;text-align:center;padding:20px;">No matching country.</div>';
+  }
+  function pick(target){window._phonePickerTarget=target;openSheet('sh-country-picker');renderCountries();setTimeout(function(){var q=G('country-picker-search');if(q){q.value='';q.focus();}},120);}
+  window.selectPhoneCountry=function(iso){var t=window._phonePickerTarget;if(!t)return;S[t+'Country']=iso;closeSheet('sh-country-picker');renderAuth();};
+  window.openPhoneCountryPicker=pick;
+
+  function decoratePhone(id,target){
+    var inp=G(id);if(!inp||!inp.parentElement)return;
+    var box=inp.parentElement, c=byIso(S[target+'Country']||'GM');
+    box.innerHTML='<button type="button" class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;flex-shrink:0;" onclick="openPhoneCountryPicker(\\''+target+'\\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="'+id+'" value="'+sanitizeText(S[target==='reg'?'regPhone':'loginPhone']||'')+'" style="flex:1;">';
+    var ni=G(id);ni.oninput=function(){S[target==='reg'?'regPhone':'loginPhone']=this.value;};
+  }
+  function decorateAuth(){
+    ensureSheets();
+    if(!S.regCountry)S.regCountry='GM';if(!S.loginCountry)S.loginCountry='GM';
+    decoratePhone('lphone','login');decoratePhone('rphone','reg');
+  }
+  window.renderAuth=function(){legacyRenderAuth();decorateAuth();};
+
+  window.openResetPin=function(){
+    ensureSheets();S.resetCountry=S.loginCountry||'GM';S.resetPhone='';S.resetPhoneE164=null;S.resetOtp=['','','','','',''];S.resetPin=['','','',''];S.resetPinConfirm=['','','',''];S.resetOtpPending=null;S.resetStep='phone';S.devOtpDisplay=null;
+    renderReset();openSheet('sh-reset-pin');
+  };
+  window.closeResetPin=function(){closeSheet('sh-reset-pin');};
+  function resetErr(m){var b=G('reset-pin-body');if(!b)return;var e=b.querySelector('.reset-err');if(!e){e=document.createElement('div');e.className='reset-err';b.insertBefore(e,b.firstChild);}e.textContent=m;e.style.cssText='background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#EF4444;border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12.5px;';}
+  function otpInputs(arr,id,masked){
+    var b=G(id);if(!b)return;b.innerHTML='';
+    arr.forEach(function(v,i){var x=document.createElement('input');x.className='otpb';x.maxLength=1;x.inputMode='numeric';x.type=masked?'password':'text';x.value=v||'';x.oninput=function(){arr[i]=this.value.replace(/\D/g,'').slice(0,1);this.value=arr[i];if(arr[i]&&i<arr.length-1)b.children[i+1].focus();};b.appendChild(x);});
+  }
+  function renderReset(){
+    var b=G('reset-pin-body');if(!b)return;
+    if(S.resetStep==='phone'){
+      var c=byIso(S.resetCountry);
+      b.innerHTML='<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the phone number on your MarketLink account and we’ll send a code.</div><label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;" onclick="openPhoneCountryPicker(\\'reset\\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" id="reset-phone" type="tel" inputmode="tel" style="flex:1;"></div><div style="height:16px;"></div><button class="btn btn-p" style="width:100%;" onclick="requestResetCode()">Send Code</button>';
+    }else if(S.resetStep==='otp'){
+      b.innerHTML=(S.devOtpDisplay?'<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.35);border-radius:10px;padding:10px;text-align:center;margin-bottom:14px;">Development OTP: <b>'+sanitizeText(S.devOtpDisplay)+'</b></div>':'')+'<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the 6-digit code sent to '+sanitizeText(S.resetPhoneE164||'')+'.</div><div class="otpr" id="reset-otp-row"></div><button class="btn btn-p" style="width:100%;margin-top:14px;" onclick="verifyResetCode()">Continue</button>';
+      otpInputs(S.resetOtp,'reset-otp-row',false);
+    }else if(S.resetStep==='pin'){
+      b.innerHTML='<div style="color:var(--mu);font-size:12px;margin-bottom:14px;">Choose a new 4-digit PIN.</div><div class="otpr" id="reset-pin-row"></div><div style="height:14px;"></div><div style="color:var(--mu);font-size:12px;margin-bottom:14px;">Confirm your new PIN.</div><div class="otpr" id="reset-pin-confirm-row"></div><button class="btn btn-p" style="width:100%;margin-top:16px;" onclick="confirmResetPin()">Set New PIN</button>';
+      otpInputs(S.resetPin,'reset-pin-row',true);otpInputs(S.resetPinConfirm,'reset-pin-confirm-row',true);
+    }else{
+      b.innerHTML='<div style="text-align:center;padding:14px 0;"><div style="font-size:40px;">✅</div><div style="font-weight:700;color:var(--tx);margin:8px 0;">PIN reset successfully</div><div style="color:var(--mu);font-size:12px;margin-bottom:18px;">You can now sign in with your new PIN.</div><button class="btn btn-p" style="width:100%;" onclick="closeResetPin();S.loginPhone=S.resetPhone;renderAuth();">Back to Sign In</button></div>';
+    }
+  }
+  window.requestResetCode=async function(){
+    var p=G('reset-phone');S.resetPhone=p?p.value.trim():'';var n;
+    try{await phoneReady;n=normalize(S.resetPhone,S.resetCountry);}catch(e){resetErr(e.message);return;}
+    try{var r=await ML_API.auth.requestPinReset(n.e164);S.resetPhoneE164=n.e164;S.devOtpDisplay=r.devOtp||null;S.resetStep='otp';S.resetOtp=['','','','','',''];renderReset();}catch(e){resetErr(e.error||'Could not send reset code. Please try again.');}
+  };
+  window.verifyResetCode=function(){var c=S.resetOtp.join('');if(c.length!==6){resetErr('Enter all 6 digits');return;}S.resetOtpPending=c;S.resetStep='pin';S.resetPin=['','','',''];S.resetPinConfirm=['','','',''];renderReset();};
+  window.confirmResetPin=async function(){var p=S.resetPin.join(''),c=S.resetPinConfirm.join('');if(p.length!==4){resetErr('Enter a 4-digit PIN');return;}if(p!==c){resetErr('PINs do not match');return;}try{await ML_API.auth.confirmPinReset(S.resetPhoneE164,S.resetOtpPending,p);S.resetStep='success';renderReset();}catch(e){resetErr(e.error||'Could not reset PIN. Please try again.');}};
+
+  window.doLogin=async function(){
+    var p=G('lphone');if(!p)return;S.loginPhone=p.value.trim();
+    if(!S.loginPhone){authErr('Enter your phone number');return;}if(S.pin.join('').length<4){authErr('Enter your 4-digit PIN');return;}
+    var n;try{await phoneReady;n=normalize(S.loginPhone,S.loginCountry);}catch(e){authErr(e.message);return;}
+    var btn=G('lbtn');if(btn){btn.textContent='Signing in…';btn.disabled=true;}
+    try{var u=await ML_API.auth.login(n.e164,S.pin.join(''));S.user={name:u.fullName||u.full_name,phone:u.phone,id:u.id,accountStatus:'Active'};S.roles=u.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;try{var pr=await ML_API.customers.getProfile();if(pr.data){S.rewardPoints=pr.data.reward_points||0;S.walletBalance=parseFloat(pr.data.wallet_balance||0);}}catch(e){}goApp();toast('Welcome back, '+S.user.name.split(' ')[0]+'! 🎉');}
+    catch(e){if(btn){btn.textContent='Sign In';btn.disabled=false;}authErr(e.error||'Login failed. Please try again.');}
+  };
+
+  window.doRegister=async function(){
+    var n=G('rname'),p=G('rphone');if(!n||!p)return;S.regName=n.value.trim();S.regPhone=p.value.trim();
+    if(!S.regName){authErr('Enter your full name');return;}if(!S.regPhone){authErr('Enter a valid phone number');return;}if(!S.agreed){authErr('Please agree to Terms & Privacy Policy');return;}
+    var norm;try{await phoneReady;norm=normalize(S.regPhone,S.regCountry);}catch(e){authErr(e.message);return;}
+    S.regPhoneE164=norm.e164;S.regPhone=norm.e164;
+    var btn=document.querySelector('#scr-auth .btn-p');if(btn){btn.textContent='Sending OTP…';btn.disabled=true;}
+    try{var r=await ML_API.auth.registerInitiate(S.regName,norm.e164);S.devOtpDisplay=r.devOtp||null;S.authMode='otp';S.otp=['','','','','',''];renderAuth();toast('OTP sent to '+norm.e164+' 📱');if(S.devOtpDisplay){renderOtpRevealCard();openSheet('sh-otp-reveal');}}
+    catch(e){if(btn){btn.textContent='Continue';btn.disabled=false;}if(e.code==='PHONE_ALREADY_REGISTERED'){showDuplicateAccountPrompt(norm.e164);return;}authErr(e.error||'Registration failed. Please try again.');}
+  };
+  window.resendOTP=async function(){
+    var p=S.regPhoneE164||S.regPhone;if(!p){toast('No phone number on file to resend to','error');return;}
+    try{var r=await ML_API.auth.registerInitiate(S.regName||'',p);S.devOtpDisplay=r.devOtp||null;S.otp=['','','','','',''];renderAuth();toast('New OTP sent 📲');}catch(e){toast(e.error||'Could not resend OTP. Please try again.','error');}
+  };
+  window.doPin=async function(){
+    if(S.pinStep==='create'){S.pinStep='confirm';S.cpin=['','','',''];renderAuth();return;}
+    if(S.pin.join('')!==S.cpin.join('')){authErr("PINs don't match — try again");S.cpin=['','','',''];renderAuth();return;}
+    var btn=document.querySelector('#scr-auth .btn-p');if(btn){btn.textContent='Creating account…';btn.disabled=true;}
+    try{var r=await ML_API.auth.registerComplete(S.regName,S.regPhoneE164||S.regPhone,S._pendingOtp||S.otp.join(''),S.pin.join(''));var u=r.data&&r.data.user;r=r.data||r;S.user={name:u.full_name||S.regName,phone:u.phone||S.regPhone,id:u.id,accountStatus:'Active'};S.roles=r.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;if(r.accessToken&&r.refreshToken){try{sessionStorage.setItem('ml_at',r.accessToken);sessionStorage.setItem('ml_rt',r.refreshToken);}catch(e){}}setTimeout(function(){goApp();toast('Welcome, '+S.user.name.split(' ')[0]+'! 🎉');},300);}
+    catch(e){if(btn){btn.textContent='Create Account';btn.disabled=false;}var m=e.error||'Registration failed. Please try again.';if(e.code==='INVALID_OTP')m='Incorrect OTP. Tap "Resend" to get a new code.';if(e.code==='OTP_EXPIRED')m='OTP has expired. Tap "Resend" to get a new code.';authErr(m);if(e.code==='INVALID_OTP'||e.code==='OTP_EXPIRED'){S.authMode='otp';S.otp=['','','','','',''];setTimeout(renderAuth,300);}}
+  };
+
+  function vendorSubmit(){
+    var p={businessName:S.vForm.bname,businessCategory:S.vForm.cat,businessAddress:S.vForm.saddr,description:S.vForm.sname};
+    if(S.vForm.phone){try{p.phone=normalize(S.vForm.phone,S.vFormCountry||'GM').e164;}catch(e){toast(e.message,'error');return;}}
+    var b=document.querySelector('#sh-vapp .btn-p');if(b){b.textContent='Submitting…';b.disabled=true;}
+    ML_API.vendors.register(p).then(function(){closeSheet('sh-vapp');if(S.roles.indexOf('vendor')<0)S.roles.push('vendor');addRoleTabs();renderProfile();toast('Vendor application submitted! Review within 48hrs. 🎉');}).catch(function(e){if(b){b.textContent='Submit Application 🎉';b.disabled=false;}toast(e.error||'Could not submit application. Please try again.','error');});
+  }
+  function riderSubmit(){
+    if(S.rForm.phone){try{normalize(S.rForm.phone,S.rFormCountry||'GM');}catch(e){toast(e.message,'error');return;}}
+    var p={plateNumber:S.rForm.plate,licenseNumber:S.rForm.licence,emergencyContact:S.rForm.emergency,address:S.rForm.addr};
+    var b=document.querySelector('#sh-rapp .btn-pu');if(b){b.textContent='Submitting…';b.disabled=true;}
+    ML_API.riders.register(p).then(function(){closeSheet('sh-rapp');if(S.roles.indexOf('rider')<0)S.roles.push('rider');addRoleTabs();renderProfile();toast('Rider application submitted! Review within 48hrs. 🚀');}).catch(function(e){if(b){b.textContent='Submit Application 🚀';b.disabled=false;}toast(e.error||'Could not submit application. Please try again.','error');});
+  }
+  window.submitVApp=vendorSubmit;window.submitRApp=riderSubmit;
+
+  ensureSheets();
+  var oldRender=legacyRenderAuth;
+  // Wait for the library, then refresh the auth picker so all countries appear.
+  phoneReady.then(function(){try{if(S.authMode==='login'||S.authMode==='register')renderAuth();}catch(e){}});
+  if(typeof oldRender==='function')try{oldRender();decorateAuth();}catch(e){}
+})();
 </script>
 </body>
 </html>
