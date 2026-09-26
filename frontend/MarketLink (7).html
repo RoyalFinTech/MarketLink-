@@ -6976,7 +6976,25 @@ window.addEventListener('unhandledrejection',function(e){
     if(!S.regCountry)S.regCountry='GM';if(!S.loginCountry)S.loginCountry='GM';
     decoratePhone('lphone','login');decoratePhone('rphone','reg');
   }
-  window.renderAuth=function(){legacyRenderAuth();decorateAuth();};
+  window.renderAuth=function(){
+    legacyRenderAuth();
+    decorateAuth();
+    // Keep the recovery action visible on the login screen. It is inserted
+    // after the Sign In button so it remains visible on small screens and
+    // cannot be lost behind the country-picker decoration.
+    if(S.authMode==='login'){
+      var body=G('auth-body'), loginBtn=G('lbtn');
+      if(body && loginBtn && !G('forgot-pin-link')){
+        var link=document.createElement('button');
+        link.type='button';
+        link.id='forgot-pin-link';
+        link.textContent='Forgot PIN?';
+        link.onclick=function(){window.openResetPin();};
+        link.style.cssText='display:block;width:100%;margin:12px 0 0;padding:4px 0;border:0;background:transparent;color:#0D7377;font-size:13px;font-weight:600;cursor:pointer;text-align:center;';
+        loginBtn.parentNode.insertBefore(link,loginBtn.nextSibling);
+      }
+    }
+  };
 
   window.openResetPin=function(){
     ensureSheets();S.resetCountry=S.loginCountry||'GM';S.resetPhone='';S.resetPhoneE164=null;S.resetOtp=['','','','','',''];S.resetPin=['','','',''];S.resetPinConfirm=['','','',''];S.resetOtpPending=null;S.resetStep='phone';S.devOtpDisplay=null;
