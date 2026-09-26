@@ -71,7 +71,16 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', rateLimit({ windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS)||900000, max: parseInt(process.env.RATE_LIMIT_MAX)||300, standardHeaders: true, legacyHeaders: false, message: { success: false, error: 'Too many requests.' } }));
 
-app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
+app.get('/', (req, res) => res.json({
+  success: true,
+  service: 'MarketLink API',
+  status: 'ok',
+  version: process.env.npm_package_version || '1.0.0',
+  health: '/health',
+  api: '/api/v1',
+  docs: '/api-docs'
+}));
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', service: 'marketlink-api', ts: new Date() }));
 
 const API = '/api/v1';
 const modulesDir = path.join(__dirname, 'modules');
@@ -109,7 +118,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(`MarketLink API on port ${PORT} [${process.env.NODE_ENV||'development'}]`);
   logger.info(`Docs: http://localhost:${PORT}/api-docs`);
 });
