@@ -2051,7 +2051,7 @@ function renderAuth(){
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="lphone" style="flex:1;"></div>'+
+      '<input class="inp" type="tel" inputmode="tel" name="phone" autocomplete="tel-national" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="87 XXX XXXX" id="lphone" style="flex:1;"></div>'+
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:8px;">4-digit PIN</label>'+
       '<div class="pinr" id="pin-row"></div>'+
       '<button class="btn btn-p" onclick="doLogin()" id="lbtn">Sign In</button>'+
@@ -2071,7 +2071,7 @@ function renderAuth(){
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="S.regPhone=this.value;" style="flex:1;"></div>'+
+      '<input class="inp" type="tel" inputmode="tel" name="phone" autocomplete="tel-national" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="87 XXX XXXX" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="S.regPhone=this.value;" style="flex:1;"></div>'+
       '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;padding:12px;background:rgba(13,115,119,0.1);border-radius:10px;border:1px solid rgba(13,115,119,0.3);">'+
       '<div id="agree-box" onclick="toggleAgree()" style="width:20px;height:20px;border-radius:5px;border:2px solid '+(S.agreed?'#0D7377':'rgba(255,255,255,0.15)')+';background:'+(S.agreed?'#0D7377':'transparent')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;">'+(S.agreed?'<span style="color:#fff;font-size:12px;font-weight:700;">✓</span>':'')+
       '</div><div style="font-size:12px;color:var(--mu);line-height:1.5;">I agree to the <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Terms & Conditions</span> and <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Privacy Policy</span></div></div>'+
@@ -6889,6 +6889,16 @@ window.addEventListener('unhandledrejection',function(e){
 
   function lpn(){return window['libphonenumber-js']||null;}
   function flag(iso){return iso&&iso.length===2?String.fromCodePoint.apply(String,iso.toUpperCase().split('').map(function(c){return 127397+c.charCodeAt(0);})):'';}
+  function flagAsset(iso){
+    var e=flag(iso), cps=[];
+    if(iso&&iso.length===2){
+      iso.toUpperCase().split('').forEach(function(c){cps.push((127397+c.charCodeAt(0)).toString(16));});
+    }
+    var src=cps.length===2?'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/'+cps.join('-')+'.svg':'';
+    return src
+      ? '<img src="'+src+'" alt="'+e+'" title="'+cname(iso)+'" style="width:21px;height:16px;object-fit:contain;display:inline-block;vertical-align:middle;flex-shrink:0;" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline\';"><span aria-hidden="true" style="display:none;font-size:20px;line-height:1;">'+e+'</span>'
+      : '<span aria-hidden="true" style="font-size:20px;line-height:1;">'+e+'</span>';
+  }
   var names=null;
   try{if(window.Intl&&Intl.DisplayNames)names=new Intl.DisplayNames(['en'],{type:'region'});}catch(e){}
   function cname(iso){try{return names&&names.of(iso)||iso;}catch(e){return iso;}}
@@ -6958,7 +6968,7 @@ window.addEventListener('unhandledrejection',function(e){
   function renderCountries(){
     var b=G('country-picker-list'),q=((G('country-picker-search')||{}).value||'').toLowerCase();if(!b)return;
     b.innerHTML=countries().filter(function(c){return !q||c.name.toLowerCase().indexOf(q)>-1||c.iso.toLowerCase().indexOf(q)>-1||c.dial.indexOf(q)>-1;}).slice(0,300).map(function(c){
-      return '<div onclick="selectPhoneCountry(\''+c.iso+'\')" style="display:flex;align-items:center;gap:11px;padding:12px 6px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:20px;">'+c.flag+'</span><span style="color:var(--tx);font-size:13.5px;flex:1;">'+sanitizeText(c.name)+'</span><span style="color:var(--mu);font-size:12.5px;">+'+c.dial+'</span></div>';
+      return '<div onclick="selectPhoneCountry(\''+c.iso+'\')" style="display:flex;align-items:center;gap:11px;padding:12px 6px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);">'+flagAsset(c.iso)+'<span style="color:var(--tx);font-size:13.5px;flex:1;">'+sanitizeText(c.name)+'</span><span style="color:var(--mu);font-size:12.5px;">+'+c.dial+'</span></div>';
     }).join('')||'<div style="color:var(--mu);font-size:12px;text-align:center;padding:20px;">No matching country.</div>';
   }
   function pick(target){window._phonePickerTarget=target;openSheet('sh-country-picker');renderCountries();setTimeout(function(){var q=G('country-picker-search');if(q){q.value='';q.focus();}},120);}
@@ -6968,8 +6978,13 @@ window.addEventListener('unhandledrejection',function(e){
   function decoratePhone(id,target){
     var inp=G(id);if(!inp||!inp.parentElement)return;
     var box=inp.parentElement, c=byIso(S[target+'Country']||'GM');
-    box.innerHTML='<button type="button" class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;flex-shrink:0;" onclick="openPhoneCountryPicker(\''+target+'\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="'+id+'" value="'+sanitizeText(S[target==='reg'?'regPhone':'loginPhone']||'')+'" style="flex:1;">';
-    var ni=G(id);ni.oninput=function(){S[target==='reg'?'regPhone':'loginPhone']=this.value;};
+    box.innerHTML='<button type="button" class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:5px;" onclick="openPhoneCountryPicker(\''+target+'\')">'+flagAsset(c.iso)+'<span>+'+c.dial+'</span><span aria-hidden="true">▾</span></button><input class="inp" name="phone" autocomplete="tel-national" autocorrect="off" autocapitalize="none" spellcheck="false" type="tel" inputmode="tel" placeholder="87 XXX XXXX" id="'+id+'" value="'+sanitizeText(S[target==='reg'?'regPhone':'loginPhone']||'')+'" style="flex:1;">';
+    var ni=G(id);
+    ni.setAttribute('aria-label','Phone number');
+    ni.oninput=function(){this.value=this.value.replace(/[^0-9+()\\s-]/g,'');S[target==='reg'?'regPhone':'loginPhone']=this.value;};
+    // Chrome/Edge can incorrectly autofill an email into a phone field from a previously used form.
+    // Never preserve an email-like autofill value in MarketLink's phone field.
+    setTimeout(function(){if(ni.value && /@/.test(ni.value)){ni.value='';S[target==='reg'?'regPhone':'loginPhone']='';}},50);
   }
   function decorateAuth(){
     ensureSheets();
