@@ -31,12 +31,40 @@ const configuredOrigins = (process.env.CORS_ORIGIN || '')
   .filter(Boolean);
 const allowedOrigins = new Set([...localOrigins, ...configuredOrigins]);
 
+// Static frontends are commonly served from a dynamically assigned localhost
+// port, GitHub Pages, Replit, Netlify, or Vercel. Authentication is bearer-token
+// based (no cross-origin cookies), so these trusted development/static-hosting
+// patterns can be accepted without enabling credentialed cross-origin cookies.
+// Explicit CORS_ORIGIN entries still take precedence for private deployments.
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true; // file:// / non-browser requests
+  if (allowedOrigins.has(origin)) return true;
+  try {
+    const u = new URL(origin);
+    const host = u.hostname.toLowerCase();
+    const isHttp = u.protocol === 'http:' || u.protocol === 'https:';
+    if (!isHttp) return false;
+    if (u.protocol === 'http:' && (host === 'localhost' || host === '127.0.0.1' || host === '[::1]')) return true;
+    if (u.protocol === 'https:' && (
+      host === 'github.io' || host.endsWith('.github.io') ||
+      host === 'replit.dev' || host.endsWith('.replit.dev') ||
+      host.endsWith('.repl.co') ||
+      host === 'netlify.app' || host.endsWith('.netlify.app') ||
+      host === 'vercel.app' || host.endsWith('.vercel.app')
+    )) return true;
+  } catch (e) {}
+  return false;
+}
+
 app.use(cors({
-  credentials: true,
+  credentials: false,
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    if (isAllowedCorsOrigin(origin)) return callback(null, true);
     return callback(new Error(`CORS blocked origin: ${origin}`));
   },
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
 }));
 app.use(morgan('combined', { stream: { write: msg => logger.http(msg.trim()) }, skip: req => req.url==='/health' }));
 app.use(express.json({ limit: '10mb' }));
