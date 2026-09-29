@@ -172,6 +172,11 @@ async function markPaymentConfirmed(paymentId) {
 }
 
 async function processWebhook({ event, rawBody }) {
+  if (String(event?.event || '').startsWith('transfer.')) {
+    const withdrawalsSvc = require('../withdrawals/service');
+    return withdrawalsSvc.processProviderWebhook(event);
+  }
+
   if (!event || !event.event) throw new AppError('Invalid Modem Pay event.', 400, 'INVALID_WEBHOOK');
   const eventType = String(event.event);
   const payload = event.payload || {};
