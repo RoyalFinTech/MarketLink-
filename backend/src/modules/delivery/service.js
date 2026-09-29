@@ -3,6 +3,7 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const ordersService = require('../orders/service');
 
 const VALID_TRANSITIONS = {
   unassigned:  ['assigned','cancelled'],
@@ -110,7 +111,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
   if (extra.proofUrl) { updates.push(`proof_of_delivery_url = $${pi++}`); params.push(extra.proofUrl); }
   params.push(deliveryId);
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const { rows: [updated] } = await client.query(
       `UPDATE deliveries SET ${updates.join(', ')} WHERE id = $${pi} RETURNING *`, params);
     // Sync order status
@@ -136,21 +137,10 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
          VALUES ($1,$2,$3,$4,'order',$5)`,
         [o.customer_id, 'delivery_update', 'Order Update', custMsgs[newStatus], d.order_id]);
     }
-    // Pay rider on delivery
-    if (newStatus === 'delivered') {
-      const deliveryFee = 25; // D25 base — configurable via system_settings
-      const riderEarning = deliveryFee * 0.8; // 80% to rider
-      await client.query(
-        `INSERT INTO rider_earnings (rider_id, delivery_id, order_id, amount, type, description, paid_at)
-         VALUES ($1,$2,$3,$4,'delivery','Delivery completed',now())`,
-        [d.rider_id, deliveryId, d.order_id, riderEarning]);
-      await client.query(
-        `UPDATE riders SET total_deliveries = total_deliveries + 1,
-                           total_earnings = total_earnings + $1
-         WHERE user_id = $2`, [riderEarning, d.rider_id]);
-    }
     return updated;
   });
+  if (newStatus === 'delivered') await ordersService.settleOrderFinancials(d.order_id);
+  return result;
 }
 
 async function getTracking(deliveryId) {
