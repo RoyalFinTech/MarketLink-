@@ -1115,13 +1115,26 @@ var MockAPI = (function(){
     return ok({orderId:orderId, status:'Cancelled'});
   }
   async function vendorRequestPayout(amount){
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated()){
+    if(!ML_API.auth.isAuthenticated()) return fail('Please log in before requesting a payout.');
+    if(ML_API.isBackendAvailable()){
       try{
-        var res = await ML_API.req ? null : null; // withdrawal via /api/v1/vendors/withdrawals (future)
-      }catch(e){}
+        var phone = (S.profilePhone || (S.user && S.user.phone) || '').trim();
+        var res = await ML_API.vendors.requestWithdrawal({
+          amount: amount,
+          payoutMethod: 'mobile_money',
+          payoutDetails: { phone: phone }
+        });
+        return ok({
+          payoutId: res.data.id,
+          amount: Number(res.data.amount || amount),
+          status: res.data.status || 'processing',
+          etaDays: 2
+        });
+      }catch(e){
+        return fail(e.error || 'Payout request failed.');
+      }
     }
-    await delay(500);
-    return ok({payoutId:genId('PO'), amount:amount, status:'processing', etaDays:2});
+    return fail('MarketLink server is unavailable. Please try again.');
   }
 
   // ── RIDER ───────────────────────────────────────────────────
@@ -1138,16 +1151,26 @@ var MockAPI = (function(){
     return ok({deliveryId:deliveryId, step:step});
   }
   async function riderRequestWithdrawal(amount){
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated()){
+    if(!ML_API.auth.isAuthenticated()) return fail('Please log in before requesting a withdrawal.');
+    if(ML_API.isBackendAvailable()){
       try{
-        var res = await fetch((window.ML_API_URL||'http://localhost:4000')+'/api/v1/riders/me/earnings', {
-          headers:{'Authorization':'Bearer '+ML_API.getAccessToken()}
+        var phone = (S.profilePhone || (S.user && S.user.phone) || '').trim();
+        var res = await ML_API.riders.requestWithdrawal({
+          amount: amount,
+          payoutMethod: 'mobile_money',
+          payoutDetails: { phone: phone }
         });
-        if(res.ok) return ok({withdrawalId:genId('WD'), amount:amount, status:'processing', etaDays:1});
-      }catch(e){}
+        return ok({
+          withdrawalId: res.data.id,
+          amount: Number(res.data.amount || amount),
+          status: res.data.status || 'processing',
+          etaDays: 1
+        });
+      }catch(e){
+        return fail(e.error || 'Withdrawal request failed.');
+      }
     }
-    await delay(500);
-    return ok({withdrawalId:genId('WD'), amount:amount, status:'processing', etaDays:1});
+    return fail('MarketLink server is unavailable. Please try again.');
   }
 
   async function getNearbyVendors(lat, lng){
@@ -1487,17 +1510,21 @@ var ML_API = (function(){
 
   // ── VENDORS (own dashboard) ───────────────────────────────────
   var vendors = {
-    register:      function(d){   return post('/vendors/register', d); },
-    updateProfile: function(d){   return put('/vendors/profile', d); },
-    myAnalytics:   function(qs){  return get('/vendors/me/analytics', qs); },
+    register:            function(d){   return post('/vendors/register', d); },
+    updateProfile:       function(d){   return put('/vendors/profile', d); },
+    myAnalytics:         function(qs){  return get('/vendors/me/analytics', qs); },
+    withdrawals:         function(qs){  return get('/vendors/withdrawals', qs); },
+    requestWithdrawal:   function(d){   return post('/vendors/withdrawals', d); },
   };
 
   // ── RIDERS (own dashboard) ────────────────────────────────────
   var riders = {
-    register:    function(d){    return post('/riders/register', d); },
-    updateProfile:function(d){  return put('/riders/profile', d); },
-    myEarnings:  function(qs){  return get('/riders/me/earnings', qs); },
-    myDeliveries:function(qs){  return get('/riders/me/deliveries', qs); },
+    register:          function(d){    return post('/riders/register', d); },
+    updateProfile:     function(d){    return put('/riders/profile', d); },
+    myEarnings:        function(qs){    return get('/riders/me/earnings', qs); },
+    myDeliveries:      function(qs){    return get('/riders/me/deliveries', qs); },
+    withdrawals:       function(qs){    return get('/riders/me/withdrawals', qs); },
+    requestWithdrawal: function(d){     return post('/riders/me/withdrawals', d); },
   };
 
   // ── HEALTH CHECK (detect backend availability) ───────────────
