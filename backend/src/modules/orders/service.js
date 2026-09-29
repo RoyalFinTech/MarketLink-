@@ -21,18 +21,28 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
       const lt = p.price * item.quantity; sub += lt;
       lines.push({ productId:p.id, name:p.name, price:p.price, qty:item.quantity, lt });
     }
-    const fee=25; const commPct=12; const platFee=parseFloat((sub*commPct/100).toFixed(2));
+    // Transparent marketplace pricing: vendors set their own retail price.
+    // MarketLink earns 5% of discounted merchandise; delivery is a separate customer-facing fee.
+    // The delivery fee is reserved for the rider rather than hidden inside the product price.
+    const fee = Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD || 25);
+    const commPct = Number(process.env.MARKETLINK_PLATFORM_COMMISSION_PCT || 5);
+    if (!Number.isFinite(fee) || fee < 0) throw new AppError('Invalid delivery fee configuration.',500,'FEE_CONFIG_ERROR');
+    if (!Number.isFinite(commPct) || commPct < 0 || commPct > 20) throw new AppError('Invalid platform commission configuration.',500,'FEE_CONFIG_ERROR');
     if (coupon) discount = coupon.discount_type==='percent' ? parseFloat((sub*coupon.discount_value/100).toFixed(2)) : Math.min(coupon.discount_value,sub);
-    const total = Math.max(0, sub+fee-discount);
+    const discountedSubtotal = Math.max(0, sub-discount);
+    const platFee = parseFloat((discountedSubtotal*commPct/100).toFixed(2));
+    const vendorPayout = parseFloat((discountedSubtotal-platFee).toFixed(2));
+    const riderPayout = parseFloat(fee.toFixed(2));
+    const total = parseFloat((discountedSubtotal+fee).toFixed(2));
     const { rows:[order] } = await client.query(
-      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,total,coupon_id,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending','pending') RETURNING *",
-      [genNum(),customerId,vendorId,deliveryAddressId||null,paymentMethod,sub,fee,discount,platFee,total,coupon?.id||null]);
+      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending','pending') RETURNING *",
+      [genNum(),customerId,vendorId,deliveryAddressId||null,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null]);
     for (const li of lines) await client.query("INSERT INTO order_items (order_id,product_id,product_name_snapshot,unit_price_snapshot,quantity,line_total) VALUES($1,$2,$3,$4,$5,$6)",[order.id,li.productId,li.name,li.price,li.qty,li.lt]);
     for (const item of items) await client.query("UPDATE inventory SET quantity=quantity-$1 WHERE product_id=$2 AND quantity>=$1",[item.quantity,item.productId]);
     if (coupon) await client.query("INSERT INTO coupon_redemptions (coupon_id,customer_id,order_id) VALUES($1,$2,$3)",[coupon.id,customerId,order.id]);
     await client.query("INSERT INTO order_status_history (order_id,status,note) VALUES($1,'pending','Order placed')",[order.id]);
     await client.query("INSERT INTO deliveries (order_id,status) VALUES($1,'unassigned')",[order.id]);
-    await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout) VALUES($1,$2,$3,$4,$5,$6)",[order.id,vendorId,total,commPct,platFee,total-platFee]);
+    await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout,rider_payout,platform_fee_pct) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",[order.id,vendorId,total,commPct,platFee,vendorPayout,riderPayout,commPct]);
     return { order, lineItems: lines };
   });
 }
