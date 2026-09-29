@@ -123,7 +123,7 @@ async function updateStatus(orderId, status, userId, roles, note) {
   const order = await _loadOrderForMutation(orderId);
   _assertTransitionAllowed(order, status, userId, roles);
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const { rows:[o] } = await client.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *',[status,orderId]);
     await client.query('INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,$2,$3,$4)',[orderId,status,userId,note||null]);
 
@@ -150,6 +150,8 @@ async function updateStatus(orderId, status, userId, roles, note) {
     }
     return o;
   });
+  if (status === 'delivered') await settleOrderFinancials(orderId);
+  return result;
 }
 
 // Vendor-specific convenience wrappers — same authorization + transition logic as updateStatus,
