@@ -183,7 +183,7 @@ async function cancel(orderId, userId, roles, reason) {
     return updated;
   });
 }
-module.exports = { placeOrder, getById, listForCustomer, listForVendor, updateStatus, vendorAccept, vendorReject, cancel, settleOrderFinancials };async function settleOrderFinancials(orderId) {
+async function settleOrderFinancials(orderId) {
   return withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
       `SELECT o.*, d.rider_id
@@ -308,4 +308,4 @@ async function cancel(orderId, userId, roles, reason) {
     return updated;
   });
 }
-module.exports = { placeOrder, getById, listForCustomer, listForVendor, updateStatus, vendorAccept, vendorReject, cancel };
+module.exports = { placeOrder, getById, listForCustomer, listForVendor, updateStatus, vendorAccept, vendorReject, cancel, settleOrderFinancials };
