@@ -67,6 +67,7 @@ app.use(cors({
   optionsSuccessStatus: 204,
 }));
 app.use(morgan('combined', { stream: { write: msg => logger.http(msg.trim()) }, skip: req => req.url==='/health' }));
+app.use('/api/v1/payments/webhook/modempay', express.raw({ type: 'application/json', limit: '2mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', rateLimit({ windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS)||900000, max: parseInt(process.env.RATE_LIMIT_MAX)||300, standardHeaders: true, legacyHeaders: false, message: { success: false, error: 'Too many requests.' } }));
