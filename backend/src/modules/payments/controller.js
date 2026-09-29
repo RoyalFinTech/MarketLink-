@@ -29,7 +29,8 @@ exports.history = wrap(async (req,res) => {
 exports.webhook = async (req,res,next) => {
   try {
     const signature = req.headers['x-modem-signature'];
-    if (!modemPay.verifyWebhookSignature(req.rawBody, signature)) {
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : req.rawBody;
+    if (!modemPay.verifyWebhookSignature(rawBody, signature)) {
       return res.status(400).json({ success:false, error:'Invalid Modem Pay webhook signature.' });
     }
     const rawBody = Buffer.isBuffer(req.body) ? req.body : req.rawBody;
