@@ -5,7 +5,6 @@ const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const modemPay = require('../../integrations/modempay');
-const ordersService = require('../orders/service');
 
 const modemAdapter = {
   name: 'modempay',
@@ -143,11 +142,7 @@ async function confirmPayment(paymentId, actorId, roles) {
     throw new AppError('This payment is confirmed by the provider webhook.', 409, 'WEBHOOK_CONFIRMATION_REQUIRED');
   }
 
-  const confirmed = await markPaymentConfirmed(paymentId);
-  // If the order was already delivered (e.g. COD/admin confirmation after delivery),
-  // settle the vendor and rider ledgers immediately after payment confirmation.
-  await ordersService.settleOrderFinancials(payment.order_id);
-  return confirmed;
+  return markPaymentConfirmed(paymentId);
 }
 
 async function markPaymentConfirmed(paymentId) {
