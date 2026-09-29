@@ -32,10 +32,11 @@ exports.webhook = async (req,res,next) => {
     if (!modemPay.verifyWebhookSignature(req.rawBody, signature)) {
       return res.status(400).json({ success:false, error:'Invalid Modem Pay webhook signature.' });
     }
-    const event = req.body;
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : req.rawBody;
+    const event = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString('utf8')) : req.body;
     const result = await svc.processWebhook({
       event,
-      rawBody: req.rawBody,
+      rawBody,
     });
     return res.status(200).json({ received:true, data:result });
   } catch (e) {
