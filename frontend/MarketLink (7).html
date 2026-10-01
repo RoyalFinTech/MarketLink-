@@ -3014,18 +3014,21 @@ async function placeOrder(){
       return;
     }
     var order=orderRes.data;
+    // The backend is authoritative for real orders: use its calculated total.
+    var payableTotal = Number(order.total);
+    if(!Number.isFinite(payableTotal) || payableTotal <= 0) payableTotal = total;
 
     // Process payment for non-COD methods through the abstraction layer
     if(pay!=='Pay on Delivery'){
       if(placeBtn) placeBtn.textContent='Processing payment…';
-      var payRes = await MockAPI.payments.charge(pay, total, order.id||order.order_number);
+      var payRes = await MockAPI.payments.charge(pay, payableTotal, order.id||order.order_number);
       if(!payRes.success){
         toast(payRes.error,'error');
         if(placeBtn){ placeBtn.disabled=false; placeBtn.textContent='Place Order — D '+total; }
         return;
       }
       order.paymentRef=payRes.data.ref;
-      order.paymentStatus='confirmed';
+      order.paymentStatus=payRes.data.status || 'pending';
     }
 
     S.order=Object.assign({},order,{
