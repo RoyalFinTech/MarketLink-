@@ -1399,6 +1399,12 @@ var ML_API = (function(){
   };
 
   // ── CUSTOMERS ────────────────────────────────────────────────
+  var affiliates = {
+    resolve: function(code){ return get('/affiliates/resolve/'+encodeURIComponent(code)); },
+    click: function(code){ return post('/affiliates/click', {code:code}); },
+    me: function(){ return get('/affiliates/me'); },
+  };
+
   var customers = {
     getProfile:    function(){       return get('/customers/me'); },
     updateProfile: function(d){     return put('/customers/me', d); },
@@ -1542,7 +1548,7 @@ var ML_API = (function(){
   return {
     auth: auth, customers: customers, products: products,
     categories: categories, orders: orders, delivery: delivery,
-    payments: payments, notifications: notifications,
+    payments: payments, notifications: notifications, affiliates: affiliates,
     uploads: uploads, vendors: vendors, riders: riders,
     assistant: assistant,
     adminKnowledge: adminKnowledge,
@@ -1607,8 +1613,8 @@ var S = {
     {id:'TXN-002',type:'debit',desc:'Order #ML4821',amount:265,date:'Jun 15',bal:400},
     {id:'TXN-003',type:'credit',desc:'Reward points cashout',amount:30,date:'Jun 10',bal:665}
   ],
-  affiliateCode:'ML-'+Math.random().toString(36).toUpperCase().slice(2,8),
-  affiliateEarnings:0, affiliateClicks:0, affiliateOrders:0,
+  affiliateCode:null, affiliateEarnings:0, affiliateClicks:0, affiliateOrders:0,
+  referredAffiliateCode:null,
   affiliateTxns:[],
   profileName:'', profilePhone:'', profilePhoto:null,
   vOrders:[
@@ -1636,7 +1642,76 @@ var S = {
 };
 
 // ═══════════════════════════════════════════════════════════
-// DATA — CORRECTED CATEGORY MAPPINGS
+// AFFILIATE REFERRAL RECONCILIATION
+// Referral attribution is stored locally before authentication,
+// then sent to the backend with the eventual order.
+// ═══════════════════════════════════════════════════════════
+function affiliateStorageKey(){ return 'ml_affiliate_ref'; }
+function readReferralCodeFromUrl(){
+  try{
+    var u=new URL(window.location.href);
+    var q=(u.searchParams.get('ref')||'').trim().toUpperCase();
+    if(q) return q;
+    var m=u.pathname.match(/\/ref\/([A-Za-z0-9_-]{3,20})/i);
+    return m?String(m[1]).toUpperCase():null;
+  }catch(e){ return null; }
+}
+function loadAffiliateReferral(){
+  var code=readReferralCodeFromUrl();
+  try{ if(!code) code=(localStorage.getItem(affiliateStorageKey())||'').trim().toUpperCase()||null; }catch(e){}
+  if(code && /^ML[A-Z0-9_-]{2,18}$/.test(code)) S.referredAffiliateCode=code;
+  return S.referredAffiliateCode;
+}
+async function captureAffiliateReferral(){
+  var code=loadAffiliateReferral();
+  if(!code || !ML_API || !ML_API.affiliates) return;
+  try{
+    var resolved=await ML_API.affiliates.resolve(code);
+    if(!(resolved&&resolved.success&&resolved.data&&resolved.data.affiliateCode)) return;
+    code=String(resolved.data.affiliateCode).toUpperCase();
+    S.referredAffiliateCode=code;
+    try{ localStorage.setItem(affiliateStorageKey(),code); }catch(e){}
+    try{
+      var clickKey='ml_affiliate_clicked_'+code;
+      if(!sessionStorage.getItem(clickKey)){
+        await ML_API.affiliates.click(code);
+        sessionStorage.setItem(clickKey,'1');
+      }
+    }catch(e){}
+  }catch(e){}
+}
+async function syncAffiliateProfile(){
+  if(!ML_API.auth.isAuthenticated()) return null;
+  try{
+    var result=await ML_API.affiliates.me();
+    if(result&&result.success&&result.data){
+      var a=result.data;
+      S.affiliateCode=a.affiliateCode||a.affiliate_code||S.affiliateCode;
+      S.affiliateEarnings=Number(a.totalEarnings!=null?a.totalEarnings:a.total_earnings||0);
+      S.affiliateClicks=Number(a.totalClicks!=null?a.totalClicks:a.total_clicks||0);
+      S.affiliateOrders=Number(a.totalOrders!=null?a.totalOrders:a.total_orders||0);
+      return a;
+    }
+  }catch(e){}
+  return null;
+}
+function buildAffiliateShareLink(){
+  var code=S.affiliateCode;
+  if(!code) return '';
+  try{
+    var u=new URL(window.location.href);
+    u.searchParams.delete('ref');
+    u.searchParams.set('ref',code);
+    u.hash='';
+    return u.toString();
+  }catch(e){
+    return 'https://marketlink.gm/?ref='+encodeURIComponent(code);
+  }
+}
+loadAffiliateReferral();
+
+// ═══════════════════════════════════════════════════════════
+// DATA — CORRECTED CATEGORY MAPPINGSNGS
 // ═══════════════════════════════════════════════════════════
 var CATS = [
   {id:'gambian',name:'Gambian Food',emoji:'🍛',color:'#3A7D44'},
@@ -1961,6 +2036,7 @@ function goApp(){
       if(ML_API.auth.isAuthenticated()){
         syncServerNotifications();
         syncServerProfile();
+        syncAffiliateProfile();
       }
     } else {
       // Running in demo/offline mode — this stays visible for the whole session
@@ -2298,6 +2374,7 @@ async function doLogin(){
     S.user={name:user.fullName||user.full_name,phone:user.phone,id:user.id,accountStatus:'Active'};
     S.roles=user.roles||['customer'];
     S.profileName=S.user.name; S.profilePhone=S.user.phone;
+    syncAffiliateProfile();
     // Restore full profile from server
     try{
       var profile = await ML_API.customers.getProfile();
@@ -2403,6 +2480,8 @@ async function doPin(){
       S.user={name:userData.user.full_name||S.regName, phone:userData.user.phone||S.regPhone, id:userData.user.id, accountStatus:'Active'};
       S.roles=userData.roles||['customer'];
       S.profileName=S.user.name; S.profilePhone=S.user.phone;
+      if(userData.affiliateCode) S.affiliateCode=userData.affiliateCode;
+      syncAffiliateProfile();
       // registerComplete returns tokens — save them
       if(userData.accessToken && userData.refreshToken){
         // ML_API saves tokens internally via registerComplete call
@@ -3006,7 +3085,8 @@ async function placeOrder(){
     var orderRes = await MockAPI.submitOrder({
       items:items, apiItems:apiItems, vendorId:vendorId,
       total:total, addr:addr, pay:pay, paymentMethod:paymentMethod,
-      couponCode:S.appliedCoupon?S.appliedCoupon.code:null
+      couponCode:S.appliedCoupon?S.appliedCoupon.code:null,
+      affiliateCode:S.referredAffiliateCode||null
     });
     if(!orderRes.success){
       toast('Could not place order — please try again','error');
@@ -3512,11 +3592,12 @@ function walletBills(){ toast('Bill payments require utility provider integratio
 // ═══════════════════════════════════════════════════════════
 function renderAffiliatePage(){
   var el=G('profile-body'); if(!el) return;
-  var refLink='marketlink.gm/ref/'+S.affiliateCode;
+  var refLink=buildAffiliateShareLink()||'Generating your referral link…';
   el.innerHTML=profBack('🔗 Affiliate Program')+
     '<div style="padding:13px;">'+
     '<div style="background:linear-gradient(135deg,#F5A623,#FF6B2B);border-radius:18px;padding:20px;margin-bottom:16px;">'+
     '<div style="color:rgba(255,255,255,0.85);font-size:11px;margin-bottom:6px;">Your Affiliate Earnings</div>'+
+    '<div style="color:#fff;font-size:10px;margin-bottom:5px;">Earn 2% of qualifying referred merchandise — funded from MarketLink\'s 5% platform commission.</div>'+
     '<div style="color:#fff;font-size:26px;font-weight:800;">D '+S.affiliateEarnings.toLocaleString()+'</div>'+
     '<button class="btn" style="background:#fff;color:#F5A623;margin-top:12px;width:100%;font-weight:700;" onclick="affiliateWithdraw()">Withdraw Earnings</button></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">'+
@@ -3545,7 +3626,8 @@ function renderAffiliatePage(){
     '</div>';
 }
 function copyAffiliateLink(){
-  var link='marketlink.gm/ref/'+S.affiliateCode;
+  var link=buildAffiliateShareLink();
+  if(!link){toast('Your affiliate profile is still loading. Please try again.','error');return;}
   try{ navigator.clipboard.writeText(link); toast('Referral link copied! 📋'); }
   catch(e){ toast('Could not copy — long-press to copy manually','error'); }
 }
