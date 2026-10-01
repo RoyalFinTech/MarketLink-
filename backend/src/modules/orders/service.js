@@ -2,7 +2,8 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
-async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paymentMethod, couponCode }) {
+
+async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paymentMethod, couponCode, affiliateCode }) {
   for (const item of items) {
     const { rows } = await query("SELECT p.status,inv.quantity FROM products p LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL WHERE p.id=$1", [item.productId]);
     if (!rows.length || rows[0].status!=='active') throw new AppError(`Product ${item.productId} unavailable.`,400,'PRODUCT_UNAVAILABLE');
@@ -18,34 +19,53 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     let sub=0; const lines=[];
     for (const item of items) {
       const { rows:[p] } = await client.query('SELECT id,name,price FROM products WHERE id=$1',[item.productId]);
+      if (!p) throw new AppError(`Product ${item.productId} unavailable.`,400,'PRODUCT_UNAVAILABLE');
       const lt = p.price * item.quantity; sub += lt;
       lines.push({ productId:p.id, name:p.name, price:p.price, qty:item.quantity, lt });
     }
-    // Transparent marketplace pricing: vendors set their own retail price.
-    // MarketLink earns 5% of discounted merchandise; delivery is a separate customer-facing fee.
-    // The delivery fee is reserved for the rider rather than hidden inside the product price.
+
+    // Transparent marketplace pricing: vendor sets retail price; MarketLink commission is not added to checkout.
     const fee = Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD || 25);
     const commPct = Number(process.env.MARKETLINK_PLATFORM_COMMISSION_PCT || 5);
+    const affiliateDefaultPct = Number(process.env.MARKETLINK_AFFILIATE_COMMISSION_PCT || 2);
     if (!Number.isFinite(fee) || fee < 0) throw new AppError('Invalid delivery fee configuration.',500,'FEE_CONFIG_ERROR');
     if (!Number.isFinite(commPct) || commPct < 0 || commPct > 20) throw new AppError('Invalid platform commission configuration.',500,'FEE_CONFIG_ERROR');
+    if (!Number.isFinite(affiliateDefaultPct) || affiliateDefaultPct < 0 || affiliateDefaultPct > commPct) throw new AppError('Invalid affiliate commission configuration.',500,'FEE_CONFIG_ERROR');
+
     if (coupon) discount = coupon.discount_type==='percent' ? parseFloat((sub*coupon.discount_value/100).toFixed(2)) : Math.min(coupon.discount_value,sub);
     const discountedSubtotal = Math.max(0, sub-discount);
     const platFee = parseFloat((discountedSubtotal*commPct/100).toFixed(2));
+
+    // Affiliate reward is funded entirely from MarketLink's commission, never added to customer checkout.
+    let affiliate=null;
+    let affiliatePct=0;
+    if (affiliateCode) {
+      const { rows:[a] } = await client.query('SELECT user_id,affiliate_code,commission_pct FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
+      if (a && a.user_id !== customerId) {
+        affiliate=a;
+        affiliatePct=Math.min(Number(a.commission_pct || affiliateDefaultPct), commPct);
+      }
+    }
+    const affiliateAmount = affiliate ? parseFloat((discountedSubtotal*affiliatePct/100).toFixed(2)) : 0;
+    const platformNetFee = parseFloat(Math.max(0,platFee-affiliateAmount).toFixed(2));
     const vendorPayout = parseFloat((discountedSubtotal-platFee).toFixed(2));
     const riderPayout = parseFloat(fee.toFixed(2));
     const total = parseFloat((discountedSubtotal+fee).toFixed(2));
+
     const { rows:[order] } = await client.query(
-      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending','pending') RETURNING *",
-      [genNum(),customerId,vendorId,deliveryAddressId||null,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null]);
+      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_fee,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'pending','pending') RETURNING *",
+      [genNum(),customerId,vendorId,deliveryAddressId||null,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
     for (const li of lines) await client.query("INSERT INTO order_items (order_id,product_id,product_name_snapshot,unit_price_snapshot,quantity,line_total) VALUES($1,$2,$3,$4,$5,$6)",[order.id,li.productId,li.name,li.price,li.qty,li.lt]);
     for (const item of items) await client.query("UPDATE inventory SET quantity=quantity-$1 WHERE product_id=$2 AND quantity>=$1",[item.quantity,item.productId]);
     if (coupon) await client.query("INSERT INTO coupon_redemptions (coupon_id,customer_id,order_id) VALUES($1,$2,$3)",[coupon.id,customerId,order.id]);
+    if (affiliate) await client.query('UPDATE affiliates SET total_orders=total_orders+1 WHERE user_id=$1',[affiliate.user_id]);
     await client.query("INSERT INTO order_status_history (order_id,status,note) VALUES($1,'pending','Order placed')",[order.id]);
     await client.query("INSERT INTO deliveries (order_id,status) VALUES($1,'unassigned')",[order.id]);
-    await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout,rider_payout,platform_fee_pct) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",[order.id,vendorId,total,commPct,platFee,vendorPayout,riderPayout,commPct]);
+    await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout,rider_payout,platform_fee_pct,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_amount) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",[order.id,vendorId,total,commPct,platFee,vendorPayout,riderPayout,commPct,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
     return { order, lineItems: lines };
   });
 }
+
 async function getById(id, userId, roles) {
   const { rows } = await query(`SELECT o.*,u.full_name AS customer_name,v.business_name AS vendor_name,json_agg(json_build_object('name',oi.product_name_snapshot,'qty',oi.quantity,'price',oi.unit_price_snapshot,'total',oi.line_total)) AS items,d.status AS delivery_status,d.rider_id FROM orders o JOIN users u ON u.id=o.customer_id JOIN vendors v ON v.user_id=o.vendor_id JOIN order_items oi ON oi.order_id=o.id LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 GROUP BY o.id,u.full_name,v.business_name,d.status,d.rider_id`,[id]);
   if (!rows.length) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
@@ -62,185 +82,40 @@ async function listForCustomer(customerId, { page=1, limit=20, status }) {
 async function listForVendor(vendorId, { page=1, limit=20, status }) {
   const off=(page-1)*limit, conds=['o.vendor_id=$1'], params=[vendorId];
   if (status) { conds.push(`o.status=$${params.length+1}`); params.push(status); }
-  const { rows } = await query(
-    `SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.payment_status,o.placed_at,
-            u.full_name AS customer_name, d.status AS delivery_status, d.rider_id
-     FROM orders o
-     JOIN users u ON u.id=o.customer_id
-     LEFT JOIN deliveries d ON d.order_id=o.id
-     WHERE ${conds.join(' AND ')}
-     ORDER BY o.placed_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
-    [...params,limit,off]);
+  const { rows } = await query(`SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.payment_status,o.placed_at,u.full_name AS customer_name,d.status AS delivery_status,d.rider_id FROM orders o JOIN users u ON u.id=o.customer_id LEFT JOIN deliveries d ON d.order_id=o.id WHERE ${conds.join(' AND ')} ORDER BY o.placed_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,[...params,limit,off]);
   return rows;
 }
 
-// Valid forward transitions, keyed by current status → { role: [allowed next statuses] }.
-// admin/super_admin may move an order to any of the listed next statuses for any role at that step.
-const TRANSITIONS = {
-  pending:        { vendor: ['accepted','cancelled'] },
-  accepted:       { vendor: ['preparing','cancelled'] },
-  preparing:      { vendor: ['awaiting_rider'] },
-  awaiting_rider: { rider:  ['rider_assigned'] },
-  rider_assigned: { rider:  ['picked_up'] },
-  picked_up:      { rider:  ['on_the_way'] },
-  on_the_way:     { rider:  ['delivered'] },
-};
-const ALL_STATUSES = ['pending','accepted','preparing','awaiting_rider','rider_assigned','picked_up','on_the_way','delivered','cancelled'];
+const TRANSITIONS = { pending:{vendor:['accepted','cancelled']}, accepted:{vendor:['preparing','cancelled']}, preparing:{vendor:['awaiting_rider']}, awaiting_rider:{rider:['rider_assigned']}, rider_assigned:{rider:['picked_up']}, picked_up:{rider:['on_the_way']}, on_the_way:{rider:['delivered']} };
+const ALL_STATUSES=['pending','accepted','preparing','awaiting_rider','rider_assigned','picked_up','on_the_way','delivered','cancelled'];
+async function _loadOrderForMutation(orderId){const {rows}=await query(`SELECT o.*,d.id AS delivery_id,d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1`,[orderId]);if(!rows.length)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');return rows[0];}
+function _assertTransitionAllowed(order,targetStatus,userId,roles){const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));if(isAdmin){if(!ALL_STATUSES.includes(targetStatus))throw new AppError('Invalid status.',400,'INVALID_STATUS');return;}const isVendor=(roles||[]).includes('vendor')&&order.vendor_id===userId;const isRider=(roles||[]).includes('rider')&&order.rider_id===userId;if(!isVendor&&!isRider)throw new AppError('You are not authorized to modify this order.',403,'FORBIDDEN');const step=TRANSITIONS[order.status];if(!step)throw new AppError(`Order in status "${order.status}" cannot be changed further.`,400,'INVALID_STATUS_TRANSITION');const allowed=[...(isVendor?(step.vendor||[]):[]),...(isRider?(step.rider||[]):[])];if(!allowed.includes(targetStatus))throw new AppError(`Cannot move order from "${order.status}" to "${targetStatus}".`,400,'INVALID_STATUS_TRANSITION');}
 
-async function _loadOrderForMutation(orderId) {
-  const { rows } = await query(
-    `SELECT o.*, d.id AS delivery_id, d.rider_id
-     FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id
-     WHERE o.id=$1`, [orderId]);
-  if (!rows.length) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
-  return rows[0];
-}
+async function settleOrderFinancials(orderId){return withTransaction(async(client)=>{
+  const {rows:[order]}=await client.query(`SELECT o.*,d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE`,[orderId]);
+  if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+  if(order.payment_status!=='confirmed')return{settled:false,reason:'PAYMENT_NOT_CONFIRMED'};
+  const {rows:[commission]}=await client.query('SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE',[orderId]);
+  if(!commission||commission.status==='paid')return{settled:true,alreadySettled:true};
 
-// Central authorization + state-machine check. Used by every code path that mutates order status,
-// including vendor accept/reject and rider delivery-status updates — nothing bypasses this.
-function _assertTransitionAllowed(order, targetStatus, userId, roles) {
-  const isAdmin = (roles||[]).some(r=>['admin','super_admin'].includes(r));
-  if (isAdmin) {
-    if (!ALL_STATUSES.includes(targetStatus)) throw new AppError('Invalid status.',400,'INVALID_STATUS');
-    return;
-  }
-  const isVendor = (roles||[]).includes('vendor') && order.vendor_id===userId;
-  const isRider  = (roles||[]).includes('rider')  && order.rider_id===userId;
-  if (!isVendor && !isRider) throw new AppError('You are not authorized to modify this order.',403,'FORBIDDEN');
+  const vendorAmount=Number(order.vendor_payout||0),riderAmount=Number(order.rider_payout||0),affiliateAmount=Number(order.affiliate_commission_amount||0),platformNet=Number(order.platform_net_fee||0);
+  let {rows:[vendorWallet]}=await client.query('SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE',[order.vendor_id]);
+  if(!vendorWallet){({rows:[vendorWallet]}=await client.query("INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING *",[order.vendor_id]));}
+  const vendorNext=Number(vendorWallet.balance)+vendorAmount;
+  await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[vendorNext,vendorWallet.id]);
+  await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','vendor_sale',$2,$3,'order_vendor_payout',$4,'MarketLink vendor payout')`,[vendorWallet.id,vendorAmount,vendorNext,orderId]);
 
-  const step = TRANSITIONS[order.status];
-  if (!step) throw new AppError(`Order in status "${order.status}" cannot be changed further.`,400,'INVALID_STATUS_TRANSITION');
-  const allowedForVendor = isVendor ? (step.vendor||[]) : [];
-  const allowedForRider  = isRider  ? (step.rider||[])  : [];
-  const allowed = [...allowedForVendor, ...allowedForRider];
-  if (!allowed.includes(targetStatus)) {
-    throw new AppError(`Cannot move order from "${order.status}" to "${targetStatus}".`,400,'INVALID_STATUS_TRANSITION');
-  }
-}
+  if(order.rider_id&&riderAmount>0){let {rows:[riderWallet]}=await client.query('SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE',[order.rider_id]);if(!riderWallet){({rows:[riderWallet]}=await client.query("INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING *",[order.rider_id]));}const riderNext=Number(riderWallet.balance)+riderAmount;await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[riderNext,riderWallet.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','delivery_earning',$2,$3,'order_rider_payout',$4,'MarketLink delivery payout')`,[riderWallet.id,riderAmount,riderNext,orderId]);await client.query(`INSERT INTO rider_earnings (rider_id,delivery_id,order_id,amount,type,description,paid_at) VALUES($1,(SELECT id FROM deliveries WHERE order_id=$2),$2,$3,'delivery','MarketLink delivery payout',now())`,[order.rider_id,orderId,riderAmount]);await client.query('UPDATE riders SET total_earnings=COALESCE(total_earnings,0)+$1,total_deliveries=COALESCE(total_deliveries,0)+1 WHERE user_id=$2',[riderAmount,order.rider_id]);}
 
-async function settleOrderFinancials(orderId) {
-  return withTransaction(async (client) => {
-    const { rows: [order] } = await client.query(
-      `SELECT o.*, d.rider_id
-       FROM orders o
-       LEFT JOIN deliveries d ON d.order_id=o.id
-       WHERE o.id=$1
-       FOR UPDATE`, [orderId]);
-    if (!order) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
-    if (order.payment_status !== 'confirmed') return { settled:false, reason:'PAYMENT_NOT_CONFIRMED' };
+  if(order.affiliate_user_id&&affiliateAmount>0){let {rows:[affiliateWallet]}=await client.query('SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE',[order.affiliate_user_id]);if(!affiliateWallet){({rows:[affiliateWallet]}=await client.query("INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING *",[order.affiliate_user_id]));}const next=Number(affiliateWallet.balance)+affiliateAmount;await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[next,affiliateWallet.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','affiliate_commission',$2,$3,'order_affiliate_payout',$4,'MarketLink affiliate commission')`,[affiliateWallet.id,affiliateAmount,next,orderId]);await client.query('UPDATE affiliates SET total_earnings=COALESCE(total_earnings,0)+$1 WHERE user_id=$2',[affiliateAmount,order.affiliate_user_id]);}
 
-    const { rows: [commission] } = await client.query(
-      'SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE', [orderId]);
-    if (!commission || commission.status === 'paid') return { settled:true, alreadySettled:true };
+  await client.query(`INSERT INTO platform_earnings (order_id,gross_merchandise,discount_amount,commission_pct,commission_amount,status,earned_at) VALUES($1,$2,$3,$4,$5,'earned',now()) ON CONFLICT (order_id) DO UPDATE SET commission_amount=EXCLUDED.commission_amount,status='earned'`,[orderId,Number(order.subtotal),Number(order.discount_amount||0),Number(order.platform_fee_pct||0),platformNet]);
+  await client.query("UPDATE commission_records SET status='paid' WHERE id=$1",[commission.id]);
+  return{settled:true,vendorPayout:vendorAmount,riderPayout:riderAmount,affiliatePayout:affiliateAmount,platformNet:platformNet};
+});}
 
-    const vendorAmount = Number(order.vendor_payout || 0);
-    const riderAmount = Number(order.rider_payout || 0);
-
-    // Credit vendor exactly once after confirmed payment.
-    let { rows: [vendorWallet] } = await client.query(
-      'SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE', [order.vendor_id]);
-    if (!vendorWallet) {
-      ({ rows: [vendorWallet] } = await client.query(
-        'INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,\'GMD\') RETURNING *',
-        [order.vendor_id]));
-    }
-    const vendorNext = Number(vendorWallet.balance) + vendorAmount;
-    await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[vendorNext,vendorWallet.id]);
-    await client.query(
-      `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-       VALUES($1,'credit','vendor_sale',$2,$3,'order_vendor_payout',$4,'MarketLink vendor payout')`,
-      [vendorWallet.id,vendorAmount,vendorNext,orderId]);
-
-    // Credit rider with the full delivery fee. Rider earnings are separate from the vendor sale.
-    if (order.rider_id && riderAmount > 0) {
-      let { rows: [riderWallet] } = await client.query(
-        'SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE', [order.rider_id]);
-      if (!riderWallet) {
-        ({ rows: [riderWallet] } = await client.query(
-          'INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,\'GMD\') RETURNING *',
-          [order.rider_id]));
-      }
-      const riderNext = Number(riderWallet.balance) + riderAmount;
-      await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[riderNext,riderWallet.id]);
-      await client.query(
-        `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-         VALUES($1,'credit','delivery_earning',$2,$3,'order_rider_payout',$4,'MarketLink delivery payout')`,
-        [riderWallet.id,riderAmount,riderNext,orderId]);
-      await client.query(
-        `INSERT INTO rider_earnings (rider_id,delivery_id,order_id,amount,type,description,paid_at)
-         VALUES($1,(SELECT id FROM deliveries WHERE order_id=$2),$2,$3,'delivery','MarketLink delivery payout',now())`,
-        [order.rider_id,orderId,riderAmount]);
-      await client.query(
-        'UPDATE riders SET total_earnings=COALESCE(total_earnings,0)+$1,total_deliveries=COALESCE(total_deliveries,0)+1 WHERE user_id=$2',
-        [riderAmount,order.rider_id]);
-    }
-
-    await client.query("UPDATE commission_records SET status='paid' WHERE id=$1",[commission.id]);
-    return { settled:true, vendorPayout:vendorAmount, riderPayout:riderAmount };
-  });
-}
-
-async function updateStatus(orderId, status, userId, roles, note) {
-  if (!ALL_STATUSES.includes(status)) throw new AppError('Invalid status.',400,'INVALID_STATUS');
-  const order = await _loadOrderForMutation(orderId);
-  _assertTransitionAllowed(order, status, userId, roles);
-
-  return withTransaction(async (client) => {
-    const { rows:[o] } = await client.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *',[status,orderId]);
-    await client.query('INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,$2,$3,$4)',[orderId,status,userId,note||null]);
-
-    if (status==='delivered') {
-      await client.query('UPDATE orders SET delivered_at=now() WHERE id=$1',[orderId]);
-      await client.query("UPDATE deliveries SET status='delivered',delivered_at=now() WHERE order_id=$1",[orderId]);
-    }
-    if (status==='rider_assigned') {
-      await client.query("UPDATE deliveries SET status='assigned' WHERE order_id=$1",[orderId]);
-    }
-    if (status==='picked_up') {
-      await client.query("UPDATE deliveries SET status='picked_up',picked_up_at=now() WHERE order_id=$1",[orderId]);
-    }
-    if (status==='on_the_way') {
-      await client.query("UPDATE deliveries SET status='in_transit' WHERE order_id=$1",[orderId]);
-    }
-    if (status==='cancelled') {
-      // Restock: return each line item's quantity to inventory since the sale did not complete.
-      const { rows: items } = await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);
-      for (const it of items) {
-        await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND quantity IS NOT NULL',[it.quantity,it.product_id]);
-      }
-      await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered')",[orderId]);
-    }
-    return o;
-  });
-}
-
-// Vendor-specific convenience wrappers — same authorization + transition logic as updateStatus,
-// scoped to the two actions a vendor actually takes on a fresh order.
-async function vendorAccept(orderId, vendorUserId, roles) {
-  return updateStatus(orderId,'accepted',vendorUserId,roles,'Accepted by vendor');
-}
-async function vendorReject(orderId, vendorUserId, roles, reason) {
-  if (!reason || !reason.trim()) throw new AppError('A rejection reason is required.',400,'REASON_REQUIRED');
-  return updateStatus(orderId,'cancelled',vendorUserId,roles,`Rejected by vendor: ${reason}`);
-}
-
-async function cancel(orderId, userId, roles, reason) {
-  const { rows } = await query('SELECT * FROM orders WHERE id=$1',[orderId]);
-  if (!rows.length) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
-  const o=rows[0]; const adm=(roles||[]).some(r=>['admin','super_admin'].includes(r));
-  if (!adm && o.customer_id!==userId) throw new AppError('Forbidden.',403,'FORBIDDEN');
-  if (!['pending','accepted'].includes(o.status)) throw new AppError(`Cannot cancel order with status: ${o.status}.`,400,'CANNOT_CANCEL');
-  // Customer cancellation bypasses the vendor/rider transition map (it's a distinct actor path)
-  // but reuses the same status-history + restock logic via a direct transaction.
-  return withTransaction(async (client) => {
-    const { rows:[updated] } = await client.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *',['cancelled',orderId]);
-    await client.query('INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,$2,$3,$4)',[orderId,'cancelled',userId,reason||'Cancelled by customer']);
-    const { rows: items } = await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);
-    for (const it of items) {
-      await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND quantity IS NOT NULL',[it.quantity,it.product_id]);
-    }
-    await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered')",[orderId]);
-    return updated;
-  });
-}
-module.exports = { placeOrder, getById, listForCustomer, listForVendor, updateStatus, vendorAccept, vendorReject, cancel, settleOrderFinancials };
+async function updateStatus(orderId,status,userId,roles,note){if(!ALL_STATUSES.includes(status))throw new AppError('Invalid status.',400,'INVALID_STATUS');const order=await _loadOrderForMutation(orderId);_assertTransitionAllowed(order,status,userId,roles);const result=await withTransaction(async(client)=>{const {rows:[o]}=await client.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *',[status,orderId]);await client.query('INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,$2,$3,$4)',[orderId,status,userId,note||null]);if(status==='delivered'){await client.query('UPDATE orders SET delivered_at=now() WHERE id=$1',[orderId]);await client.query("UPDATE deliveries SET status='delivered',delivered_at=now() WHERE order_id=$1",[orderId]);}if(status==='rider_assigned')await client.query("UPDATE deliveries SET status='assigned' WHERE order_id=$1",[orderId]);if(status==='picked_up')await client.query("UPDATE deliveries SET status='picked_up',picked_up_at=now() WHERE order_id=$1",[orderId]);if(status==='on_the_way')await client.query("UPDATE deliveries SET status='in_transit' WHERE order_id=$1",[orderId]);if(status==='cancelled'){const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const it of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND quantity IS NOT NULL',[it.quantity,it.product_id]);await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered')",[orderId]);}return o;});if(status==='delivered')await settleOrderFinancials(orderId);return result;}
+async function vendorAccept(orderId,vendorUserId,roles){return updateStatus(orderId,'accepted',vendorUserId,roles,'Accepted by vendor');}
+async function vendorReject(orderId,vendorUserId,roles,reason){return updateStatus(orderId,'cancelled',vendorUserId,roles,reason||'Rejected by vendor');}
+async function cancel(orderId,userId,roles,reason){return updateStatus(orderId,'cancelled',userId,roles,reason||'Cancelled');}
+module.exports={placeOrder,getById,listForCustomer,listForVendor,updateStatus,vendorAccept,vendorReject,cancel,settleOrderFinancials};
