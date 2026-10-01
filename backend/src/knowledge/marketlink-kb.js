@@ -215,7 +215,7 @@ const KNOWLEDGE_BASE = [
     roles: ['vendor'],
     keywords: ['vendor earnings', 'how much do i earn', 'vendor payout', 'commission'],
     question: 'How do vendor earnings work?',
-    answer: 'Each order records a commission split: the platform takes a percentage, and the rest is your payout for that order, credited to your wallet.',
+    answer: 'MarketLink currently uses a 5% platform commission by default on the discounted merchandise subtotal. The vendor keeps the remaining merchandise value, while the customer-facing delivery fee is reserved for the rider. Your final payout and the commission amount are recorded on the order and in the wallet ledger.',
   },
   {
     id: 'vendor-withdrawals',
