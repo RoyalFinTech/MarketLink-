@@ -53,6 +53,7 @@
   var resolvedIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(resolved);
 
   window.MARKETLINK_CONFIG = CONFIG;
+  window.MARKETLINK_PRICING = { PLATFORM_COMMISSION_PCT: 5, BASE_DELIVERY_FEE_GMD: 25 };
   window.ML_API_URL = resolved;
   // True when we're clearly on a public deployment but still pointed at a
   // localhost backend — the exact "Cannot reach server" cause described in
@@ -2756,8 +2757,12 @@ function renderCart(){
       '</div><span style="color:var(--tx);font-size:12px;">'+m+'</span></div>';
   });
 
-  var discount=S.appliedCoupon?Math.round((sub+25)*S.appliedCoupon.pct/100):0;
-  var total=sub+25-discount;
+  var pricing=window.MARKETLINK_PRICING||{PLATFORM_COMMISSION_PCT:5,BASE_DELIVERY_FEE_GMD:25};
+  var deliveryFee=Number(pricing.BASE_DELIVERY_FEE_GMD||25);
+  var discount=S.appliedCoupon?Math.round(sub*S.appliedCoupon.pct/100):0;
+  var discountedSubtotal=Math.max(0,sub-discount);
+  var platformCommission=Math.round(discountedSubtotal*Number(pricing.PLATFORM_COMMISSION_PCT||5)/100*100)/100;
+  var total=discountedSubtotal+deliveryFee;
   el.innerHTML=
     '<div style="background:var(--sf);border-radius:15px;border:1px solid rgba(255,255,255,0.07);overflow:hidden;margin-bottom:12px;">'+itemsHTML+'</div>'+
     // Address with autocomplete
@@ -2779,7 +2784,8 @@ function renderCart(){
     '</div>'+
     '<div style="background:var(--sf);border-radius:15px;border:1px solid rgba(255,255,255,0.07);padding:13px;margin-bottom:16px;">'+
     '<div style="display:flex;justify-content:space-between;margin-bottom:7px;"><span style="color:var(--mu);font-size:12px;">Subtotal</span><span style="color:var(--tx);font-size:12px;">D '+sub+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="color:var(--mu);font-size:12px;">Delivery</span><span style="color:var(--tx);font-size:12px;">D 25</span></div>'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="color:var(--mu);font-size:12px;">Delivery fee</span><span style="color:var(--tx);font-size:12px;">D '+deliveryFee.toFixed(2)+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="color:var(--mu);font-size:11px;">MarketLink commission ('+Number(pricing.PLATFORM_COMMISSION_PCT||5)+'%, paid from vendor proceeds)</span><span style="color:var(--mu);font-size:11px;">D '+platformCommission.toFixed(2)+'</span></div>'+
     (discount>0?'<div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="color:#22C55E;font-size:12px;">Discount ('+S.appliedCoupon.code+')</span><span style="color:#22C55E;font-size:12px;">−D '+discount+'</span></div>':'')+
     '<div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:9px;display:flex;justify-content:space-between;">'+
     '<span style="color:var(--tx);font-size:13px;font-weight:700;">Total</span><span style="color:#0D7377;font-size:13px;font-weight:700;">D '+total+'</span></div></div>'+
@@ -2972,9 +2978,11 @@ async function placeOrder(){
   var ids=Object.keys(S.cart);
   if(ids.length===0){toast('Cart is empty','error');return;}
   var items=ids.map(function(id){return CART_ITEMS[id]||{id:id,name:'Item',price:0};});
-  var preDiscount=cartSubtotal()+25;
-  var discount=S.appliedCoupon?Math.round(preDiscount*S.appliedCoupon.pct/100):0;
-  var total=preDiscount-discount;
+  var pricing=window.MARKETLINK_PRICING||{PLATFORM_COMMISSION_PCT:5,BASE_DELIVERY_FEE_GMD:25};
+  var deliveryFee=Number(pricing.BASE_DELIVERY_FEE_GMD||25);
+  var discount=S.appliedCoupon?Math.round(cartSubtotal()*S.appliedCoupon.pct/100):0;
+  var discountedSubtotal=Math.max(0,cartSubtotal()-discount);
+  var total=discountedSubtotal+deliveryFee;
   var pay=S.selPay||'Pay on Delivery';
 
   // Build backend-compatible payload: { productId, quantity } pairs
