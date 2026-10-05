@@ -93,6 +93,23 @@ async function assignRider(deliveryId, riderId, actor) {
   });
 }
 
+async function acceptDelivery(deliveryId, riderId) {
+  return withTransaction(async (client) => {
+    const { rows:[d] } = await client.query('SELECT * FROM deliveries WHERE id=$1 FOR UPDATE',[deliveryId]);
+    if(!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    if(d.status!=='unassigned') throw new AppError('This delivery is no longer available.',409,'DELIVERY_NOT_AVAILABLE');
+    if(d.rider_id && d.rider_id!==riderId) throw new AppError('This delivery is already assigned.',409,'DELIVERY_NOT_AVAILABLE');
+    const { rows:[rider] } = await client.query("SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE",[riderId]);
+    if(!rider) throw new AppError('Rider is not approved or not online.',403,'RIDER_UNAVAILABLE');
+    const { rows:[updated] } = await client.query("UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",[riderId,deliveryId]);
+    await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
+    await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status) VALUES($1,$2,$2,'self','pending')",[deliveryId,riderId]);
+    const { rows:[o] } = await client.query('SELECT customer_id FROM orders WHERE id=$1',[updated.order_id]);
+    if(o) await client.query("INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_assigned','Rider Assigned 🛵','A rider has accepted your delivery.','delivery',$2)",[o.customer_id,deliveryId]);
+    return updated;
+  });
+}
+
 async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
   const { rows: [d] } = await query('SELECT * FROM deliveries WHERE id = $1', [deliveryId]);
   if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
