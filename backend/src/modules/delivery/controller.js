@@ -7,4 +7,5 @@ exports.list       = wrap(async (req,res) => res.json({ success:true, data: awai
 exports.getById    = wrap(async (req,res) => res.json({ success:true, data: await svc.getById(req.params.id, req.user.id, req.user.roles) }));
 exports.getTracking= wrap(async (req,res) => res.json({ success:true, data: await svc.getTracking(req.params.id) }));
 exports.assign     = wrap(async (req,res) => res.json({ success:true, data: await svc.assignRider(req.params.id, req.body.riderId, { id: req.user.id, isAuto: false }) }));
+exports.accept     = wrap(async (req,res) => res.json({ success:true, data: await svc.acceptDelivery(req.params.id, req.user.id) }));
 exports.updateStatus=wrap(async (req,res) => res.json({ success:true, data: await svc.updateStatus(req.params.id, req.body.status, req.user.id, req.user.roles, req.body) }));
