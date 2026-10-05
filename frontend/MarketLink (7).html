@@ -3022,19 +3022,39 @@ async function placeOrder(){
 // ORDER TRACKING
 // ═══════════════════════════════════════════════════════════
 function startOrderTracking(){
-  clearInterval(S.orderTimer);
-  S.orderTimer=setInterval(function(){
-    if(S.orderSI<STATUSES.length-1){S.orderSI++;renderOrders();}
-    else{clearInterval(S.orderTimer);}
-  },3000);
-  clearInterval(S.riderTimer);
-  S.riderTick=0;
-  S.riderTimer=setInterval(function(){S.riderTick++;animRiderDot();},1000);
+  clearInterval(S.orderTimer); clearInterval(S.riderTimer);
+  var statusIndex={
+    pending:0,accepted:1,preparing:2,awaiting_rider:3,
+    rider_assigned:4,picked_up:5,on_the_way:6,delivered:7
+  };
+  async function syncOrder(){
+    if(!S.order||!S.order.id||!ML_API.auth.isAuthenticated()) return;
+    try{
+      var res=await ML_API.orders.getById(S.order.id), o=res&&res.data;
+      if(!o) return;
+      S.order=Object.assign({},S.order,o);
+      var idx=statusIndex[String(o.status||'pending')];
+      if(idx!==undefined) S.orderSI=idx;
+      if(o.rider_name) S.activeRiderName=o.rider_name;
+      renderOrders();
+      if(String(o.status)==='delivered'||String(o.status)==='cancelled') clearInterval(S.orderTimer);
+      if(o.delivery_id) {
+        try {
+          var tr=await ML_API.delivery.getTracking(o.delivery_id);
+          S.order=Object.assign(S.order,{tracking:tr&&tr.data?tr.data:null});
+        }catch(e){}
+      }
+    }catch(e){}
+  }
+  syncOrder();
+  S.orderTimer=setInterval(syncOrder,5000);
 }
 function animRiderDot(){
   var dot=G('rider-dot'); if(!dot) return;
-  var rx=Math.min(18+(S.riderTick*2)%54,74), ry=Math.min(28+(S.riderTick*1.4)%34,62);
-  dot.style.top=ry+'%'; dot.style.left=rx+'%';
+  // Rider movement is driven only by real tracking data; never animate a fake position.
+  var tr=S.order&&S.order.tracking;
+  if(!tr||tr.current_lat==null||tr.current_lng==null){dot.style.display='none';return;}
+  dot.style.display='flex';
 }
 function renderOrders(){
   var el=G('orders-body'); if(!el) return;
