@@ -988,51 +988,59 @@ var MockAPI = (function(){
   // Routes to ML_API.orders.place() when backend is available,
   // falls back to local simulation so the app keeps working offline.
   async function submitOrder(orderPayload){
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated()){
-      try{
-        // Build the real API payload from the frontend order object
-        var items = (orderPayload.items||[]).map(function(item){
-          return { productId: item.id, quantity: item.qty||item.quantity||1 };
-        });
-        // If items is empty (reorder path uses total directly), use a synthetic payload
-        if(!items.length && orderPayload.total){
-          items = [{ productId: 'reorder', quantity: 1 }];
+    if(!ML_API.isBackendAvailable()) return fail('MarketLink server is unavailable. Please try again.');
+    if(!ML_API.auth.isAuthenticated()) return fail('Please log in before placing an order.');
+
+    try{
+      // Resolve display/demo cart items to real production product UUIDs.
+      var resolvedItems = [];
+      var resolvedVendorId = orderPayload.vendorId || null;
+      var sourceItems = orderPayload.items || [];
+      for(var idx=0; idx<sourceItems.length; idx++){
+        var item = sourceItems[idx];
+        var requestedQty = Number(item.qty||item.quantity||1);
+        if(!Number.isInteger(requestedQty) || requestedQty < 1) throw {code:'INVALID_QUANTITY',error:'Invalid item quantity.'};
+
+        var product = null;
+        if(typeof item.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)){
+          var direct = await ML_API.products.getById(item.id);
+          if(direct && direct.data && direct.data.status === 'active') product = direct.data;
         }
-        var vendorId = orderPayload.vendorId || (typeof S!=='undefined' && S.vOrders && S.vOrders[0] && S.vOrders[0].vendorId) || null;
-        if(!vendorId){ throw {code:'NO_VENDOR', error:'No vendor ID — using simulation'}; }
-        var result = await ML_API.orders.place({
-          vendorId:       vendorId,
-          items:          items,
-          paymentMethod:  orderPayload.pay === 'Pay on Delivery' ? 'cod' : (orderPayload.pay||'cod').toLowerCase().replace(/\s+/g,'-'),
-          couponCode:     orderPayload.couponCode || undefined,
-        });
-        NotificationCenter.push('customer','order_placed','Order '+result.data.order.order_number+' placed! 🎉');
-        NotificationCenter.push('admin','new_order','🆕 New order '+result.data.order.order_number+' — D '+result.data.order.total);
-        return ok(Object.assign({}, result.data.order, {
-          id: result.data.order.id,
-          status: 'Pending',
-          paymentStatus: result.data.order.payment_status || 'pending'
-        }));
-      }catch(err){
-        // If it's a real validation error from the backend, surface it
-        if(err.status && err.status >= 400 && err.status < 500 && err.code !== 'NO_VENDOR'){
-          return fail(err.error || 'Order failed.');
+        if(!product){
+          var searchResult = await ML_API.products.list({search:item.name||'',limit:20,sort:'newest'});
+          var candidates = (searchResult && searchResult.data && Array.isArray(searchResult.data.items)) ? searchResult.data.items : [];
+          product = candidates.find(function(p){
+            return String(p.name||'').trim().toLowerCase() === String(item.name||'').trim().toLowerCase() &&
+              Number(p.price) === Number(item.price);
+          }) || null;
         }
-        // Network / config issue — fall through to simulation
-        toast('Demo mode: order simulated (backend unreachable)', 'error');
+        if(!product) throw {code:'PRODUCT_NOT_AVAILABLE',error:'This product is not currently available for real checkout: '+(item.name||'item')+'.'};
+        if(!resolvedVendorId) resolvedVendorId = product.vendor_id;
+        if(resolvedVendorId !== product.vendor_id) throw {code:'MULTI_VENDOR_CART',error:'Please place separate orders for products from different vendors.'};
+        resolvedItems.push({id:product.id,qty:requestedQty});
       }
+
+      if(!resolvedItems.length) throw {code:'EMPTY_CART',error:'Your cart is empty.'};
+      if(!resolvedVendorId) throw {code:'NO_VENDOR',error:'Unable to determine the vendor for this order.'};
+
+      var result = await ML_API.orders.place({
+        vendorId:       resolvedVendorId,
+        items:          resolvedItems.map(function(item){return {productId:item.id,quantity:item.qty};}),
+        paymentMethod:  orderPayload.pay === 'Pay on Delivery' ? 'cod' : (orderPayload.pay||'cod').toLowerCase().replace(/\s+/g,'-'),
+        couponCode:     orderPayload.couponCode || undefined,
+        affiliateCode:  orderPayload.affiliateCode || undefined
+      });
+
+      NotificationCenter.push('customer','order_placed','Order '+result.data.order.order_number+' placed! 🎉');
+      NotificationCenter.push('admin','new_order','🆕 New order '+result.data.order.order_number+' — D '+result.data.order.total);
+      return ok(Object.assign({}, result.data.order, {
+        id: result.data.order.id,
+        status: 'Pending',
+        paymentStatus: result.data.order.payment_status || 'pending'
+      }));
+    }catch(err){
+      return fail(err.error || 'Unable to place the order. Please try again.');
     }
-    // ── Simulation fallback ──
-    await delay(450);
-    var order = Object.assign({}, orderPayload, {
-      id: genId('ORD'), order_number: genId('ORD'),
-      status: 'Pending', createdAt: new Date().toISOString(),
-      paymentStatus: orderPayload.pay==='Pay on Delivery' ? 'pending_cod' : 'pending'
-    });
-    NotificationCenter.push('customer','order_placed','Order '+order.id+' placed! Waiting for vendor confirmation.');
-    NotificationCenter.push('vendor','new_order','New order '+order.id+' received — D '+order.total);
-    NotificationCenter.push('admin','new_order','🆕 New order '+order.id+' placed — D '+order.total);
-    return ok(order);
   }
 
   // ── AUTO-ASSIGN RIDER ───────────────────────────────────────
@@ -1084,7 +1092,11 @@ var MockAPI = (function(){
           toast('Demo mode: payment simulated (backend unreachable)', 'error');
         }
       }
-      // Simulation fallback (COD or backend unreachable)
+      // Never simulate a production payment. COD is represented by the real
+      // backend payment record; online payments require a reachable provider.
+      if(window.MARKETLINK_BACKEND_MISCONFIGURED || location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
+        return fail('MarketLink payment service is unavailable. No payment was processed.');
+      }
       await delay(600);
       var success = method === 'Pay on Delivery' ? true : (Math.random() > 0.03);
       if(!success) return fail('Payment declined — please try again or choose another method.');
