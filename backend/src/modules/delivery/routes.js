@@ -12,6 +12,9 @@ router.get('/:id/tracking', authenticate, [param('id').isUUID()], validate, ctrl
 router.post('/:id/assign', authenticate, authorize(...ADMIN),
   [param('id').isUUID(), body('riderId').isUUID().withMessage('riderId is required.')],
   validate, ctrl.assign);
+router.post('/:id/accept', authenticate, authorize('rider'),
+  [param('id').isUUID()],
+  validate, ctrl.accept);
 router.patch('/:id/status', authenticate, authorize('rider',...ADMIN),
   [param('id').isUUID(),
    body('status').isIn(['picked_up','in_transit','delivered','failed','cancelled']).withMessage('Invalid status.'),
