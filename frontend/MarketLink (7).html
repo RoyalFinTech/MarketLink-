@@ -978,232 +978,108 @@ var OFFICE = {
 // are deliberately written so calling code does not need to change.
 // ═══════════════════════════════════════════════════════════
 var MockAPI = (function(){
-  // ── Simulation helpers (used as fallback when backend is unreachable) ──
-  function delay(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
-  function genId(prefix){ return prefix+'-'+Date.now().toString(36).toUpperCase().slice(-6); }
+  // Compatibility facade: production actions are server-authoritative.
   function ok(data){ return {success:true, data:data}; }
   function fail(error){ return {success:false, error:error}; }
 
-  // ── ORDERS ──────────────────────────────────────────────────
-  // Routes to ML_API.orders.place() when backend is available,
-  // falls back to local simulation so the app keeps working offline.
   async function submitOrder(orderPayload){
     if(!ML_API.isBackendAvailable()) return fail('MarketLink server is unavailable. Please try again.');
     if(!ML_API.auth.isAuthenticated()) return fail('Please log in before placing an order.');
-
     try{
-      // Resolve display/demo cart items to real production product UUIDs.
-      var resolvedItems = [];
-      var resolvedVendorId = orderPayload.vendorId || null;
-      var sourceItems = orderPayload.items || [];
-      for(var idx=0; idx<sourceItems.length; idx++){
-        var item = sourceItems[idx];
-        var requestedQty = Number(item.qty||item.quantity||1);
-        if(!Number.isInteger(requestedQty) || requestedQty < 1) throw {code:'INVALID_QUANTITY',error:'Invalid item quantity.'};
-
-        var product = null;
-        if(typeof item.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)){
-          var direct = await ML_API.products.getById(item.id);
-          if(direct && direct.data && direct.data.status === 'active') product = direct.data;
+      var resolvedItems=[], resolvedVendorId=orderPayload.vendorId||null, sourceItems=orderPayload.items||[];
+      for(var idx=0;idx<sourceItems.length;idx++){
+        var item=sourceItems[idx], requestedQty=Number(item.qty||item.quantity||1);
+        if(!Number.isInteger(requestedQty)||requestedQty<1) throw {error:'Invalid item quantity.'};
+        var product=null;
+        if(typeof item.id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)){
+          try{var direct=await ML_API.products.getById(item.id);if(direct&&direct.data&&direct.data.status==='active')product=direct.data;}catch(e){}
         }
         if(!product){
-          var searchResult = await ML_API.products.list({search:item.name||'',limit:20,sort:'newest'});
-          var candidates = (searchResult && searchResult.data && Array.isArray(searchResult.data.items)) ? searchResult.data.items : [];
-          product = candidates.find(function(p){
-            return String(p.name||'').trim().toLowerCase() === String(item.name||'').trim().toLowerCase() &&
-              Number(p.price) === Number(item.price);
-          }) || null;
+          var searchResult=await ML_API.products.list({search:item.name||'',limit:20,sort:'newest'});
+          var candidates=(searchResult&&searchResult.data&&Array.isArray(searchResult.data.items))?searchResult.data.items:[];
+          product=candidates.find(function(p){return String(p.name||'').trim().toLowerCase()===String(item.name||'').trim().toLowerCase()&&Number(p.price)===Number(item.price);})||null;
         }
-        if(!product) throw {code:'PRODUCT_NOT_AVAILABLE',error:'This product is not currently available for real checkout: '+(item.name||'item')+'.'};
-        if(!resolvedVendorId) resolvedVendorId = product.vendor_id;
-        if(resolvedVendorId !== product.vendor_id) throw {code:'MULTI_VENDOR_CART',error:'Please place separate orders for products from different vendors.'};
+        if(!product) throw {error:'This product is not currently available for real checkout: '+(item.name||'item')+'.'};
+        if(!resolvedVendorId) resolvedVendorId=product.vendor_id;
+        if(resolvedVendorId!==product.vendor_id) throw {error:'Please place separate orders for products from different vendors.'};
         resolvedItems.push({id:product.id,qty:requestedQty});
       }
-
-      if(!resolvedItems.length) throw {code:'EMPTY_CART',error:'Your cart is empty.'};
-      if(!resolvedVendorId) throw {code:'NO_VENDOR',error:'Unable to determine the vendor for this order.'};
-
-      var result = await ML_API.orders.place({
-        vendorId:       resolvedVendorId,
-        items:          resolvedItems.map(function(item){return {productId:item.id,quantity:item.qty};}),
-        paymentMethod:  orderPayload.pay === 'Pay on Delivery' ? 'cod' : (orderPayload.pay||'cod').toLowerCase().replace(/\s+/g,'-'),
-        couponCode:     orderPayload.couponCode || undefined,
-        affiliateCode:  orderPayload.affiliateCode || undefined
+      if(!resolvedItems.length) throw {error:'Your cart is empty.'};
+      if(!resolvedVendorId) throw {error:'Unable to determine the vendor for this order.'};
+      var result=await ML_API.orders.place({
+        vendorId:resolvedVendorId,
+        items:resolvedItems.map(function(item){return {productId:item.id,quantity:item.qty};}),
+        paymentMethod:orderPayload.pay==='Pay on Delivery'?'cod':(orderPayload.pay||'cod').toLowerCase().replace(/\s+/g,'-'),
+        couponCode:orderPayload.couponCode||undefined,
+        affiliateCode:orderPayload.affiliateCode||undefined
       });
-
-      NotificationCenter.push('customer','order_placed','Order '+result.data.order.order_number+' placed! 🎉');
-      NotificationCenter.push('admin','new_order','🆕 New order '+result.data.order.order_number+' — D '+result.data.order.total);
-      return ok(Object.assign({}, result.data.order, {
-        id: result.data.order.id,
-        status: 'Pending',
-        paymentStatus: result.data.order.payment_status || 'pending'
-      }));
-    }catch(err){
-      return fail(err.error || 'Unable to place the order. Please try again.');
-    }
+      return ok(Object.assign({},result.data.order,{id:result.data.order.id,status:'Pending',paymentStatus:result.data.order.payment_status||'pending'}));
+    }catch(err){ return fail(err.error||'Unable to place the order. Please try again.'); }
   }
 
-  // ── AUTO-ASSIGN RIDER ───────────────────────────────────────
-  // Server handles real assignment — this fires a check after order placement.
   async function autoAssignRider(orderId){
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated()){
-      try{
-        // Poll order status to detect server-side rider assignment
-        var result = await ML_API.orders.getById(orderId);
-        if(result.data && result.data.rider_id){
-          var riderName = result.data.rider_name || 'Your Rider';
-          NotificationCenter.push('customer','rider_assigned', riderName+' has been assigned to your order 🛵');
-          return ok({orderId:orderId, riderName:riderName, riderId:result.data.rider_id});
-        }
-      }catch(e){}
-    }
-    // Simulation fallback
-    await delay(700);
-    var riders=['Lamin S.','Ousman J.','Binta C.','Modou F.'];
-    var rider=riders[Math.floor(Math.random()*riders.length)];
-    NotificationCenter.push('rider','new_delivery','New delivery request for order '+orderId);
-    NotificationCenter.push('customer','rider_assigned',rider+' has been assigned to your order 🛵');
-    return ok({orderId:orderId, riderName:rider, riderId:genId('RDR'), assignedAt:new Date().toISOString()});
+    try{
+      if(!ML_API.auth.isAuthenticated()) return fail('Please log in.');
+      var result=await ML_API.orders.getById(orderId), d=result&&result.data;
+      if(d&&d.rider_id){
+        var riderName=d.rider_name||'Your Rider';
+        NotificationCenter.push('customer','rider_assigned',riderName+' has been assigned to your order 🛵');
+        return ok({orderId:orderId,riderName:riderName,riderId:d.rider_id});
+      }
+      return fail('Rider has not been assigned yet.');
+    }catch(e){return fail(e.error||'Unable to check rider assignment.');}
   }
 
-  // ── PAYMENTS ────────────────────────────────────────────────
-  var payments = {
-    async charge(method, amountGMD, orderId){
-      if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated() && method !== 'Pay on Delivery'){
-        try{
-          var methodKey = method.toLowerCase().replace(/\s+/g,'-');
-          var result = await ML_API.payments.initiate(orderId, methodKey, amountGMD);
-          if(result.data && result.data.action === 'redirect' && result.data.redirectUrl){
-            // Real gateway redirect — open in new tab for mobile
-            window.open(result.data.redirectUrl, '_blank');
-            return ok({ref: result.data.payment.id, method:method, amount:amountGMD, status:'pending', requiresRedirect:true});
-          }
-          NotificationCenter.push('customer','payment_confirmed','Payment of D '+amountGMD+' confirmed ('+method+') ✅');
-          return ok({ref: result.data.payment?.id || genId('PAY'), method:method, amount:amountGMD, status:'confirmed'});
-        }catch(err){
-          if(err.code === 'PROVIDER_UNAVAILABLE'){
-            // Payment provider not configured — inform user honestly
-            toast(err.error || 'Payment provider not configured','error');
-            return fail(err.error || 'Payment provider not available.');
-          }
-          if(err.status && err.status >= 400 && err.status < 500){
-            return fail(err.error || 'Payment failed.');
-          }
-          toast('Demo mode: payment simulated (backend unreachable)', 'error');
+  var payments={
+    async charge(method,amountGMD,orderId){
+      if(!ML_API.auth.isAuthenticated()) return fail('Please log in before making a payment.');
+      if(method==='Pay on Delivery') return ok({ref:null,method:method,amount:amountGMD,status:'pending'});
+      try{
+        var result=await ML_API.payments.initiate(orderId,method.toLowerCase().replace(/\s+/g,'-'),amountGMD);
+        if(result.data&&result.data.action==='redirect'&&result.data.redirectUrl){
+          window.open(result.data.redirectUrl,'_blank');
+          return ok({ref:result.data.payment.id,method:method,amount:amountGMD,status:'pending',requiresRedirect:true});
         }
-      }
-      // Never simulate a production payment. COD is represented by the real
-      // backend payment record; online payments require a reachable provider.
-      if(window.MARKETLINK_BACKEND_MISCONFIGURED || location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
-        return fail('MarketLink payment service is unavailable. No payment was processed.');
-      }
-      await delay(600);
-      var success = method === 'Pay on Delivery' ? true : (Math.random() > 0.03);
-      if(!success) return fail('Payment declined — please try again or choose another method.');
-      var ref = genId('PAY');
-      NotificationCenter.push('customer','payment_confirmed','Payment of D '+amountGMD+' confirmed ('+method+') ✅');
-      NotificationCenter.push('vendor','new_payment','Payment received for order '+orderId+' — D '+amountGMD);
-      return ok({ref:ref, method:method, amount:amountGMD, status:'confirmed'});
+        return ok({ref:result.data&&result.data.payment?result.data.payment.id:null,method:method,amount:amountGMD,status:'pending'});
+      }catch(err){return fail(err.error||'Payment could not be initiated.');}
     }
   };
 
-  // ── VENDOR ──────────────────────────────────────────────────
-  async function vendorAcceptOrder(orderId){
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated()){
-      try{
-        await ML_API.orders.updateStatus ? null : null; // vendor status update via orders module
-        NotificationCenter.push('customer','vendor_accepted','Vendor accepted order '+orderId+' 👨‍🍳');
-        return ok({orderId:orderId, status:'Preparing'});
-      }catch(e){}
-    }
-    await delay(300);
-    NotificationCenter.push('customer','vendor_accepted','Vendor accepted order '+orderId+' 👨‍🍳');
-    return ok({orderId:orderId, status:'Preparing'});
-  }
-  async function vendorRejectOrder(orderId){
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated()){
-      try{ await ML_API.orders.cancel(orderId, 'Rejected by vendor'); }catch(e){}
-    }
-    await delay(300);
-    return ok({orderId:orderId, status:'Cancelled'});
-  }
+  async function vendorAcceptOrder(orderId){try{return ok((await ML_API.orders.accept(orderId)).data);}catch(e){return fail(e.error||'Could not accept order.');}}
+  async function vendorRejectOrder(orderId){try{return ok((await ML_API.orders.reject(orderId,'Rejected by vendor')).data);}catch(e){return fail(e.error||'Could not reject order.');}}
   async function vendorRequestPayout(amount){
     if(!ML_API.auth.isAuthenticated()) return fail('Please log in before requesting a payout.');
-    if(ML_API.isBackendAvailable()){
-      try{
-        var phone = (S.profilePhone || (S.user && S.user.phone) || '').trim();
-        var res = await ML_API.vendors.requestWithdrawal({
-          amount: amount,
-          payoutMethod: 'mobile_money',
-          payoutDetails: { phone: phone }
-        });
-        return ok({
-          payoutId: res.data.id,
-          amount: Number(res.data.amount || amount),
-          status: res.data.status || 'processing',
-          etaDays: 2
-        });
-      }catch(e){
-        return fail(e.error || 'Payout request failed.');
-      }
-    }
-    return fail('MarketLink server is unavailable. Please try again.');
+    try{
+      var phone=(S.profilePhone||(S.user&&S.user.phone)||'').trim();
+      var res=await ML_API.vendors.requestWithdrawal({amount:amount,payoutMethod:'mobile_money',payoutDetails:{phone:phone}});
+      return ok({payoutId:res.data.id,amount:Number(res.data.amount||amount),status:res.data.status||'processing',etaDays:2});
+    }catch(e){return fail(e.error||'Payout request failed.');}
   }
-
-  // ── RIDER ───────────────────────────────────────────────────
-  async function riderUpdateDeliveryStep(deliveryId, step){
-    var statusMap = {picked_up:'picked_up', delivering:'in_transit', delivered:'delivered'};
-    if(ML_API.isBackendAvailable() && ML_API.auth.isAuthenticated() && statusMap[step]){
-      try{
-        await ML_API.delivery.updateStatus(deliveryId, statusMap[step]);
-      }catch(e){}
-    }
-    await delay(300);
-    var labels={picked_up:'Order picked up 📦', delivering:'Rider is on the way 🛵', delivered:'Order delivered ✅'};
+  async function riderUpdateDeliveryStep(deliveryId,step){
+    var map={picked_up:'picked_up',delivering:'in_transit',delivered:'delivered'};
+    if(map[step]){try{await ML_API.delivery.updateStatus(deliveryId,map[step]);}catch(e){return fail(e.error||'Could not update delivery status.');}}
+    var labels={picked_up:'Order picked up 📦',delivering:'Rider is on the way 🛵',delivered:'Order delivered ✅'};
     if(labels[step]) NotificationCenter.push('customer','rider_update',labels[step]);
-    return ok({deliveryId:deliveryId, step:step});
+    return ok({deliveryId:deliveryId,step:step});
   }
   async function riderRequestWithdrawal(amount){
     if(!ML_API.auth.isAuthenticated()) return fail('Please log in before requesting a withdrawal.');
-    if(ML_API.isBackendAvailable()){
-      try{
-        var phone = (S.profilePhone || (S.user && S.user.phone) || '').trim();
-        var res = await ML_API.riders.requestWithdrawal({
-          amount: amount,
-          payoutMethod: 'mobile_money',
-          payoutDetails: { phone: phone }
-        });
-        return ok({
-          withdrawalId: res.data.id,
-          amount: Number(res.data.amount || amount),
-          status: res.data.status || 'processing',
-          etaDays: 1
-        });
-      }catch(e){
-        return fail(e.error || 'Withdrawal request failed.');
-      }
-    }
-    return fail('MarketLink server is unavailable. Please try again.');
+    try{
+      var phone=(S.profilePhone||(S.user&&S.user.phone)||'').trim();
+      var res=await ML_API.riders.requestWithdrawal({amount:amount,payoutMethod:'mobile_money',payoutDetails:{phone:phone}});
+      return ok({withdrawalId:res.data.id,amount:Number(res.data.amount||amount),status:res.data.status||'processing',etaDays:1});
+    }catch(e){return fail(e.error||'Withdrawal request failed.');}
   }
-
-  async function getNearbyVendors(lat, lng){
-    await delay(400);
-    return ok(STORES.slice(0,5).map(function(s){
-      return {id:s.id, name:s.name, distanceKm:(Math.random()*4+0.5).toFixed(1)};
-    }));
-  }
-
   return {
-    submitOrder: submitOrder,
-    updateOrderStatus: async function(orderId, status){ await delay(300); return ok({id:orderId, status:status}); },
-    autoAssignRider: autoAssignRider,
-    payments: payments,
-    vendorAcceptOrder: vendorAcceptOrder,
-    vendorRejectOrder: vendorRejectOrder,
-    vendorRequestPayout: vendorRequestPayout,
-    riderUpdateDeliveryStep: riderUpdateDeliveryStep,
-    riderRequestWithdrawal: riderRequestWithdrawal,
-    getNearbyVendors: getNearbyVendors,
+    submitOrder:submitOrder,
+    updateOrderStatus:async function(id,status,note){try{return ok((await ML_API.orders.updateStatus(id,status,note)).data);}catch(e){return fail(e.error||'Could not update order.');}},
+    autoAssignRider:autoAssignRider,
+    payments:payments,
+    vendorAcceptOrder:vendorAcceptOrder,
+    vendorRejectOrder:vendorRejectOrder,
+    vendorRequestPayout:vendorRequestPayout,
+    riderUpdateDeliveryStep:riderUpdateDeliveryStep,
+    riderRequestWithdrawal:riderRequestWithdrawal
   };
 })();
 
@@ -1449,16 +1325,20 @@ var ML_API = (function(){
 
   // ── ORDERS ───────────────────────────────────────────────────
   var orders = {
-    place:    function(d){  return post('/orders', d); },
-    getById:  function(id){ return get('/orders/'+id); },
-    myOrders: function(qs){ return get('/orders/my', qs); },
-    cancel:   function(id, reason){ return post('/orders/'+id+'/cancel', {reason:reason}); },
+    place:     function(d){ return post('/orders', d); },
+    getById:   function(id){ return get('/orders/'+id); },
+    myOrders:  function(qs){ return get('/orders/my', qs); },
+    cancel:    function(id, reason){ return post('/orders/'+id+'/cancel', {reason:reason}); },
+    updateStatus:function(id,status,note){ return patch('/orders/'+id+'/status', {status:status,note:note||undefined}); },
+    accept:    function(id){ return post('/orders/'+id+'/accept'); },
+    reject:    function(id,reason){ return post('/orders/'+id+'/reject', {reason:reason||'Rejected by vendor'}); },
   };
 
   // ── DELIVERY ─────────────────────────────────────────────────
   var delivery = {
     getTracking: function(id){ return get('/delivery/'+id+'/tracking'); },
     updateStatus:function(id, status, extra){ return patch('/delivery/'+id+'/status', Object.assign({status:status}, extra||{})); },
+    accept: function(id){ return post('/delivery/'+id+'/accept'); },
     myDeliveries:function(qs){ return get('/riders/me/deliveries', qs); },
     updateLocation: function(lat, lng, deliveryId){ return post('/riders/location', {lat:lat, lng:lng, deliveryId:deliveryId||undefined}); },
     setAvailability: function(isOnline){ return patch('/riders/availability', {isOnline:isOnline}); },
@@ -4165,27 +4045,26 @@ function openVendorNotifs(){
 }
 
 async function vAccept(id){
-  S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Preparing'}):o;});
-  renderVDash(); toast('Order accepted! ✅');
-  await MockAPI.vendorAcceptOrder(id);
-  refreshNotifBadges();
+  try{
+    await ML_API.orders.accept(id);
+    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Preparing'}):o;});
+    renderVDash(); toast('Order accepted! ✅'); refreshNotifBadges();
+  }catch(e){toast(e.error||'Could not accept order.','error');}
 }
 async function vReject(id){
-  S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Cancelled'}):o;});
-  renderVDash(); toast('Order rejected.','error');
-  await MockAPI.vendorRejectOrder(id);
-  NotificationCenter.push('customer','order_cancelled','Sorry — order '+id+' was cancelled by the vendor.');
+  try{
+    await ML_API.orders.reject(id,'Rejected by vendor');
+    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Cancelled'}):o;});
+    renderVDash(); toast('Order rejected.','error');
+    NotificationCenter.push('customer','order_cancelled','Sorry — order '+id+' was cancelled by the vendor.');
+  }catch(e){toast(e.error||'Could not reject order.','error');}
 }
 async function vReqRider(id){
-  S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Awaiting Rider'}):o;});
-  renderVDash(); toast('Rider requested! 🛵');
-  var assign=await MockAPI.autoAssignRider(id);
-  if(assign.success){
-    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Rider Assigned',rider:assign.data.riderName}):o;});
-    renderVDash();
-    toast(assign.data.riderName+' assigned to '+id);
-  }
-  refreshNotifBadges();
+  try{
+    await ML_API.orders.updateStatus(id,'awaiting_rider','Vendor requested a rider.');
+    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Awaiting Rider'}):o;});
+    renderVDash(); toast('Rider requested. Waiting for an available rider. 🛵'); refreshNotifBadges();
+  }catch(e){toast(e.error||'Could not request a rider.','error');}
 }
 var AVAILABLE_RIDERS=['Lamin S.','Ousman J.','Binta C.','Modou F.','Sainey D.'];
 function vManualAssign(orderId){
@@ -6206,11 +6085,16 @@ function openRiderNotifs(){
   renderRDash();
   var el=G('notif-body'); if(el){ el.innerHTML=body; openSheet('sh-notif'); }
 }
-function rAccept(id){
-  var d=S.rDeliveries.find(function(x){return x.id===id;});
-  S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});
-  S.activeDel=d; S.delStepIdx=0; S.rSubTab='active';
-  renderRDash(); toast('Delivery accepted! 🛵 Head to the store.');
+async function rAccept(id){
+  try{
+    var res=await ML_API.delivery.accept(id), server=res.data;
+    var d=Object.assign({},S.rDeliveries.find(function(x){return x.id===id;})||{},{
+      id:server.id||id,status:server.status,rider_id:server.rider_id,order_id:server.order_id
+    });
+    S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});
+    S.activeDel=d; S.delStepIdx=0; S.rSubTab='active';
+    renderRDash(); toast('Delivery accepted! 🛵 Head to the store.');
+  }catch(e){toast(e.error||'Could not accept this delivery.','error');}
 }
 function rDecline(id){S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});renderRDash();toast('Delivery declined.','error');}
 async function rNextStep(){
