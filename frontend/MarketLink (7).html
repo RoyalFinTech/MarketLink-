@@ -1328,6 +1328,7 @@ var ML_API = (function(){
     place:     function(d){ return post('/orders', d); },
     getById:   function(id){ return get('/orders/'+id); },
     myOrders:  function(qs){ return get('/orders/my', qs); },
+    vendorOrders:function(qs){ return get('/orders/vendor', qs); },
     cancel:    function(id, reason){ return post('/orders/'+id+'/cancel', {reason:reason}); },
     updateStatus:function(id,status,note){ return patch('/orders/'+id+'/status', {status:status,note:note||undefined}); },
     accept:    function(id){ return post('/orders/'+id+'/accept'); },
@@ -3010,7 +3011,6 @@ async function placeOrder(){
       id: order.id||order.order_number||('ORD-'+Date.now().toString(36).toUpperCase())
     });
     S.appliedCoupon=null;
-    S.rewardPoints+=Math.round(total/10);
     S.cart={}; CART_ITEMS={}; updateCartBadge(); saveCartToStorage(); S.orderSI=2;
     switchTab('orders'); toast('Order placed! 🎉 Tracking live now.');
     startOrderTracking();
@@ -3875,9 +3875,37 @@ function submitAppeal(){
 // ═══════════════════════════════════════════════════════════
 // VENDOR DASHBOARD
 // ═══════════════════════════════════════════════════════════
+async function loadVendorLiveData(){
+  if(!ML_API.auth.isAuthenticated() || (S.roles||[]).indexOf('vendor')<0 || S._vendorLoading) return;
+  S._vendorLoading=true; S.vOrders=[]; S.vProds=[]; renderVDash();
+  try{
+    var results=await Promise.all([
+      ML_API.orders.vendorOrders({page:1,limit:50}),
+      ML_API.products.list({vendorId:S.user&&S.user.id||'',page:1,limit:100,sort:'newest'})
+    ]);
+    var od=results[0]&&results[0].data, pd=results[1]&&results[1].data;
+    var rows=Array.isArray(od)?od:(od&&Array.isArray(od.items)?od.items:[]);
+    S.vOrders=rows.map(function(o){return {
+      id:o.id||o.order_number, order_number:o.order_number, customer:o.customer_name||'Customer',
+      items:'Order items available in order details', total:Number(o.total||0), status:o.status||'pending',
+      rawStatus:o.status, time:o.placed_at?new Date(o.placed_at).toLocaleString():'',
+      rider:o.rider_id||null, timeline:[o.placed_at?'Order placed — '+new Date(o.placed_at).toLocaleString():'Order placed']
+    };});
+    var prows=Array.isArray(pd)?pd:(pd&&Array.isArray(pd.items)?pd.items:[]);
+    S.vProds=prows.map(function(p){return {
+      id:p.id,name:p.name,price:Number(p.price||0),emoji:'🛍️',desc:p.description||'',
+      stock:p.stock==null?null:Number(p.stock),status:p.status||'active'
+    };});
+  }catch(e){
+    S.vOrders=[]; S.vProds=[]; toast(e.error||'Could not load live vendor data.','error');
+  }finally{S._vendorLoading=false;renderVDash();}
+}
 function renderVDash(){
   var el=G('vdash-body'); if(!el) return;
-  if(!S.vProds) S.vProds=ALL_PRODS.gambian.concat(ALL_PRODS.restaurants).slice(0,8);
+  if(ML_API.auth.isAuthenticated() && (S.roles||[]).indexOf('vendor')>=0 && !S._vendorLiveLoaded){
+    S._vendorLiveLoaded=true; loadVendorLiveData();
+  }
+  if(!S.vProds) S.vProds=[];
   var earned=S.vOrders.filter(function(o){return o.status==='Delivered';}).reduce(function(a,o){return a+o.total;},0);
   var pending=S.vOrders.filter(function(o){return o.status==='Pending';}).length;
   var active=S.vOrders.filter(function(o){return o.status==='Preparing';}).length;
@@ -4146,8 +4174,26 @@ var DEL_LABELS=['Heading to Store','At Store','Order Picked Up','Delivering','De
 var DEL_BTN_LABELS=['✅ Arrived at Store','📦 Order Picked Up','🛵 Start Delivery','✅ Mark as Delivered'];
 var DEL_TOASTS=['Head to the store! 🛵','Arrived at store! Pick up order.','Picked up! Head to customer ✅','Delivering to customer…'];
 
+async function loadRiderLiveData(){
+  if(!ML_API.auth.isAuthenticated() || (S.roles||[]).indexOf('rider')<0 || S._riderLoading) return;
+  S._riderLoading=true; S.rDeliveries=[]; renderRDash();
+  try{
+    var res=await ML_API.delivery.myDeliveries({page:1,limit:50});
+    var rows=res&&res.data&&Array.isArray(res.data)?res.data:[];
+    S.rDeliveries=rows.map(function(d){return {
+      id:d.id,order_id:d.order_id,from:d.vendor_name||'Vendor',to:'Customer delivery',
+      dist:d.distance_km!=null?(Number(d.distance_km).toFixed(1)+' km'):'—',
+      pay:Number(d.earning||0),eta:d.estimated_minutes!=null?(d.estimated_minutes+' min'):'—',
+      status:d.status,order_number:d.order_number,total:d.order_total
+    };});
+  }catch(e){S.rDeliveries=[];toast(e.error||'Could not load live rider deliveries.','error');}
+  finally{S._riderLoading=false;renderRDash();}
+}
 function renderRDash(){
   var el=G('rdash-body'); if(!el) return;
+  if(ML_API.auth.isAuthenticated() && (S.roles||[]).indexOf('rider')>=0 && !S._riderLiveLoaded){
+    S._riderLiveLoaded=true; loadRiderLiveData();
+  }
   var content='';
 
   if(S.rSubTab==='requests'){
