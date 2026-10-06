@@ -14,6 +14,48 @@
     return '';
   }
   function normalizeProducts(d){return Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:[]);}
+  async function placeLiveOrder(){
+    if(!apiOk()){toast('Please sign in before placing an order.','error');return;}
+    var ids=Object.keys(S.cart||{});
+    if(!ids.length){toast('Your cart is empty.','error');return;}
+    var items=ids.map(function(id){var p=CART_ITEMS[id];return {productId:id,quantity:Number(S.cart[id]||1),vendorId:p&&p.vendorId};});
+    var vendors=items.map(function(x){return x.vendorId;}).filter(Boolean).filter(function(v,i,a){return a.indexOf(v)===i;});
+    if(vendors.length!==1){toast('Please place separate orders for products from different vendors.','error');return;}
+    var addressId=null;
+    var address=String(S.delivAddr||'').trim();
+    if(address){
+      try{
+        var ar=await ML_API.customers.addAddress({label:'Checkout',fullAddress:address,area:'The Gambia',latitude:S.delivLat||null,longitude:S.delivLng||null,isDefault:false});
+        addressId=ar.data&&ar.data.id||null;
+      }catch(e){}
+    }
+    var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId||undefined,paymentMethod:(S.selPay||'Pay on Delivery')==='Pay on Delivery'?'cod':String(S.selPay||'cod').toLowerCase().replace(/\s+/g,'-'),couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
+    try{
+      var r=await ML_API.orders.place(payload),o=r.data&&r.data.order;
+      S.order=o||r.data;S.orderSI=0;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');toast('Order placed successfully ✓');
+    }catch(e){toast(e.error||'Could not place your order.','error');}
+  }
+  async function liveSearch(q){
+    var term=String(q||'').trim();
+    if(!term){return loadLiveHome();}
+    if(!apiOk()){toast('Please sign in to search the live marketplace.','error');return;}
+    try{
+      var r=await ML_API.products.list({page:1,limit:30,search:term,sort:'top_rated'});
+      var products=normalizeProducts(r.data),root=G('tab-home');if(!root)return;
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Search results</h3><button onclick="window.ML_Premium.refresh()">← Marketplace</button></div>'+
+        (products.length?'<div class="ml-product-grid">'+products.map(productCard).join('')+'</div>':'<div class="ml-empty"><div style="font-size:30px">🔎</div><b>No live results</b><span>No approved active product matched “'+esc(term)+'”.</span></div>')+'</div>';
+    }catch(e){toast(e.error||'Search failed.','error');}
+  }
+  async function liveAdminLogin(){
+    var idEl=G('admin-staffid'),pinEl=G('admin-password');
+    var phone=(idEl&&idEl.value||'').trim(),pin=(pinEl&&pinEl.value||'').trim();
+    if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
+    try{
+      var user=await ML_API.auth.login(phone,pin),roles=user.roles||[];
+      if(!roles.some(function(r){return r==='admin'||r==='super_admin';})){await ML_API.auth.logout();throw {error:'This account is not authorized for the Admin Portal.'};}
+      AdminSession.start(phone);showScreen('scr-app');G('bnav').style.display='none';G('fab').classList.remove('fab-visible');switchTab('admindash');toast('Welcome to the Admin Portal ✓');
+    }catch(e){adminAuthErr(e.error||'Admin sign-in failed.');}
+  }
   async function loadLiveHome(){
     if(!apiOk()){liveProducts=[];liveCategories=[];renderPremiumHome();return;}
     var results=await Promise.all([
@@ -167,14 +209,18 @@
     try{var next=!S.rOnline;await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You are online and eligible for deliveries.':'You are offline.');}
     catch(e){toast(e.error||'Could not change rider availability.','error');}
   }
-  window.ML_Premium={refresh:refresh,openCategory:openCategory,openProduct:openProduct,add:add,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome};
+  window.ML_Premium={refresh:refresh,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome};
   var oldRenderHome=window.renderHome,oldRenderProfile=window.renderProfile;
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
+  window.placeOrder=placeLiveOrder;
+  window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
   window.rToggleOnline=toggleRiderOnline;
   window.editName=editProfileModal;
+  window.doAdminLogin=liveAdminLogin;
+  window.renderPremiumAdminLogin=function(){var i=G('admin-staffid'),p=G('admin-password');if(i){i.placeholder='Admin phone number';i.type='tel';i.inputMode='tel';}if(p){p.placeholder='4-digit PIN';p.maxLength=4;}};
   window.handlePhoto=function(inp){if(inp&&inp.files&&inp.files[0])saveProfilePhoto(inp.files[0]);};
   window.uploadPhoto=function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();};
   // Remove the persistent fake/offline demo banner when backend is available.
