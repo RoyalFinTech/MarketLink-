@@ -19,7 +19,7 @@ async function authenticate(req, res, next) {
     next();
   } catch (err) { next(err); }
 }
-async function authorize(...roles) {
+function authorize(...roles) {
   return async (req, res, next) => {
     try {
       if (!req.user) return next(new AppError('Not authenticated.', 401));
@@ -30,17 +30,13 @@ async function authorize(...roles) {
       // KYC approval must also exist in the database, so a pending application
       // cannot create products, accept orders, request payouts, go online, etc.
       if (roles.includes('vendor') && (req.user.roles || []).includes('vendor')) {
-        const { rows } = await query(
-          `SELECT kyc_status FROM vendors WHERE user_id = $1`, [req.user.id]
-        );
+        const { rows } = await query(`SELECT kyc_status FROM vendors WHERE user_id = $1`, [req.user.id]);
         if (!rows.length || rows[0].kyc_status !== 'approved') {
           return next(new AppError('Vendor account is pending approval.', 403, 'VENDOR_NOT_APPROVED'));
         }
       }
       if (roles.includes('rider') && (req.user.roles || []).includes('rider')) {
-        const { rows } = await query(
-          `SELECT kyc_status FROM riders WHERE user_id = $1`, [req.user.id]
-        );
+        const { rows } = await query(`SELECT kyc_status FROM riders WHERE user_id = $1`, [req.user.id]);
         if (!rows.length || rows[0].kyc_status !== 'approved') {
           return next(new AppError('Rider account is pending approval.', 403, 'RIDER_NOT_APPROVED'));
         }
