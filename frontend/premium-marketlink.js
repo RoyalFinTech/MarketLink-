@@ -216,7 +216,6 @@
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
   window.placeOrder=placeLiveOrder;
-  window.renderCart=function(){ if(typeof window.__legacyRenderCart==='undefined' && typeof renderCart==='function') window.__legacyRenderCart=renderCart; if(window.__legacyRenderCart) window.__legacyRenderCart(); };
   window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
