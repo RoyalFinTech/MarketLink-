@@ -977,7 +977,7 @@ var OFFICE = {
 // (Promises resolving to {success, data} or {success:false, error})
 // are deliberately written so calling code does not need to change.
 // ═══════════════════════════════════════════════════════════
-var MockAPI = (function(){
+var LiveAPI = (function(){
   // Compatibility facade: production actions are server-authoritative.
   function ok(data){ return {success:true, data:data}; }
   function fail(error){ return {success:false, error:error}; }
@@ -1153,7 +1153,7 @@ var NotificationCenter = (function(){
 
 // ═══════════════════════════════════════════════════════════
 // ML_API — Real backend integration layer
-// Replaces UserRegistry, OTPService, and MockAPI.
+// Replaces UserRegistry, OTPService, and LiveAPI.
 // Backend URL: set window.ML_API_URL before this script runs,
 // or it defaults to http://localhost:4000/api/v1
 // Falls back gracefully to mock behaviour when backend is unreachable.
@@ -1489,12 +1489,9 @@ var S = {
   obSlide:0, authMode:'login', pinStep:'create',
   pin:['','','',''], cpin:['','','',''], otp:['','','','','',''],
   regName:'', regPhone:'', loginPhone:'', agreed:false, devOtpDisplay:null,
-  notifRead:[false,false,false,true,true],
+  notifRead:[],
   notifSettings:{order:true,promo:true,rider:true,vendor:true,email:false,sms:true,push:true},
-  addresses:[
-    {id:1,label:'Home',addr:'14 Kairaba Avenue, Serrekunda',lat:13.4549,lng:-16.5790,def:true},
-    {id:2,label:'Work',addr:'Independence Drive, Banjul',lat:13.4531,lng:-16.5775,def:false}
-  ],
+  addresses:[],
   payments:[
     {id:1,name:'Pay on Delivery',icon:'💵',def:true},
     {id:2,name:'Wave',icon:'📱',def:false}
@@ -1594,133 +1591,11 @@ captureAffiliateReferral();
 // ═══════════════════════════════════════════════════════════
 // DATA — CORRECTED CATEGORY MAPPINGS
 // ═══════════════════════════════════════════════════════════
-var CATS = [
-  {id:'gambian',name:'Gambian Food',emoji:'🍛',color:'#3A7D44'},
-  {id:'nigerian',name:'Nigerian Food',emoji:'🥘',color:'#E63946'},
-  {id:'international',name:'International',emoji:'🌍',color:'#06B6D4'},
-  {id:'restaurants',name:'Restaurants',emoji:'🍽️',color:'#FF6B2B'},
-  {id:'groceries',name:'Groceries',emoji:'🛒',color:'#0D7377'},
-  {id:'pharmacies',name:'Pharmacies',emoji:'💊',color:'#8B5CF6'},
-  {id:'electronics',name:'Electronics',emoji:'📱',color:'#1D4ED8'},
-  {id:'fashion',name:'Fashion',emoji:'👗',color:'#EC4899'},
-  {id:'beauty',name:'Beauty',emoji:'✨',color:'#F59E0B'},
-  {id:'household',name:'Household',emoji:'🏠',color:'#78716C'}
-];
-
-var STORES = [
-  {id:1,name:'Bantaba Grill',cuisine:'Gambian Local',rating:4.9,time:'20-30 min',price:'D 80+',tag:'Top Rated',emoji:'🍖',open:true,gradient:'linear-gradient(135deg,#3a1a0a,#8B4513)',cats:['gambian','restaurants']},
-  {id:2,name:'Mama Africa Kitchen',cuisine:'Traditional Gambian',rating:4.7,time:'25-35 min',price:'D 65+',tag:'Popular',emoji:'🥘',open:true,gradient:'linear-gradient(135deg,#1a3a0a,#2d6a0a)',cats:['gambian','restaurants']},
-  {id:3,name:'Kairaba Suya Spot',cuisine:'Gambian Grill',rating:4.6,time:'15-25 min',price:'D 50+',tag:'Fast',emoji:'🍢',open:true,gradient:'linear-gradient(135deg,#3a0a0a,#8B0000)',cats:['gambian','restaurants']},
-  {id:4,name:'Naija Kitchen',cuisine:'Nigerian',rating:4.7,time:'30-40 min',price:'D 120+',tag:'New',emoji:'🥘',open:true,gradient:'linear-gradient(135deg,#1a1a3a,#4b0082)',cats:['nigerian','restaurants']},
-  {id:5,name:'Lagos Bites',cuisine:'Nigerian Street Food',rating:4.5,time:'20-30 min',price:'D 90+',tag:'Popular',emoji:'🍖',open:true,gradient:'linear-gradient(135deg,#2a1a0a,#8B4513)',cats:['nigerian','restaurants']},
-  {id:6,name:'La Parisienne',cuisine:'French-Gambian',rating:4.8,time:'25-35 min',price:'D 150+',tag:'Popular',emoji:'🥐',open:true,gradient:'linear-gradient(135deg,#1a3a2a,#2d6a4f)',cats:['international','restaurants']},
-  {id:7,name:'Sunset Seafood',cuisine:'Mediterranean Seafood',rating:4.6,time:'35-45 min',price:'D 200+',tag:'Premium',emoji:'🦐',open:false,gradient:'linear-gradient(135deg,#0a1a3a,#1e3a5f)',cats:['international','restaurants']},
-  {id:8,name:'Green Garden Café',cuisine:'Vegetarian',rating:4.5,time:'15-25 min',price:'D 60+',tag:'Healthy',emoji:'🥗',open:true,gradient:'linear-gradient(135deg,#0a2a0a,#1a5c1a)',cats:['restaurants']},
-  {id:9,name:'Kairaba Bites',cuisine:'Fast Food',rating:4.4,time:'20-30 min',price:'D 50+',tag:'Fast',emoji:'🍔',open:true,gradient:'linear-gradient(135deg,#2a0a0a,#5c0000)',cats:['restaurants']},
-  {id:10,name:'SerreKunda Market',cuisine:'Fresh Produce',rating:4.8,time:'30-45 min',price:'D 20+',tag:'Popular',emoji:'🥦',open:true,gradient:'linear-gradient(135deg,#0a2a0a,#3A7D44)',cats:['groceries']},
-  {id:11,name:'Kairaba Supermarket',cuisine:'Groceries & Essentials',rating:4.6,time:'25-40 min',price:'D 50+',tag:'Trusted',emoji:'🛒',open:true,gradient:'linear-gradient(135deg,#0a1a3a,#0D7377)',cats:['groceries']},
-  {id:12,name:'Medicare Pharmacy',cuisine:'Medicine & Health',rating:4.9,time:'20-35 min',price:'D 30+',tag:'Trusted',emoji:'💊',open:true,gradient:'linear-gradient(135deg,#1a0a3a,#8B5CF6)',cats:['pharmacies']},
-  {id:13,name:'Westfield Pharmacy',cuisine:'Pharmacy & Wellness',rating:4.7,time:'15-30 min',price:'D 25+',tag:'Popular',emoji:'🏥',open:true,gradient:'linear-gradient(135deg,#0a1a2a,#1D4ED8)',cats:['pharmacies']},
-  {id:14,name:'Techno Gambia',cuisine:'Phones & Gadgets',rating:4.5,time:'45-60 min',price:'D 200+',tag:'Popular',emoji:'📱',open:true,gradient:'linear-gradient(135deg,#0a0a2a,#1D4ED8)',cats:['electronics']},
-  {id:15,name:'Banjul Boutique',cuisine:'Clothing & Style',rating:4.6,time:'40-55 min',price:'D 100+',tag:'Trending',emoji:'👗',open:true,gradient:'linear-gradient(135deg,#2a0a1a,#EC4899)',cats:['fashion']},
-  {id:16,name:'Glow Beauty Store',cuisine:'Cosmetics & Care',rating:4.7,time:'30-45 min',price:'D 80+',tag:'Popular',emoji:'✨',open:true,gradient:'linear-gradient(135deg,#2a1a0a,#F59E0B)',cats:['beauty']},
-  {id:17,name:'Casa Gambia',cuisine:'Home & Living',rating:4.4,time:'45-60 min',price:'D 150+',tag:'New',emoji:'🏠',open:true,gradient:'linear-gradient(135deg,#1a1a1a,#78716C)',cats:['household']}
-];
-
-// PRODUCTS — correctly mapped to categories/stores
-var ALL_PRODS = {
-  gambian:[
-    {id:101,name:'Benachin',price:85,emoji:'🍚',desc:'Traditional Gambian rice with vegetables and meat'},
-    {id:102,name:'Domoda',price:75,emoji:'🥜',desc:'Rich peanut butter stew served with rice'},
-    {id:103,name:'Yassa Chicken',price:95,emoji:'🍗',desc:'Lemon-marinated chicken with caramelised onions'},
-    {id:104,name:'Superkanja',price:80,emoji:'🥬',desc:'Okra soup with fish and vegetables'},
-    {id:105,name:'Thieboudienne',price:90,emoji:'🐟',desc:'Fish and rice — the national dish of The Gambia'},
-    {id:106,name:'Afra Suya',price:65,emoji:'🍢',desc:'Spiced grilled beef skewers, Gambian style'}
-  ],
-  nigerian:[
-    {id:201,name:'Jollof Rice',price:90,emoji:'🍛',desc:'Smoky Nigerian jollof rice with chicken'},
-    {id:202,name:'Suya Skewers',price:110,emoji:'🍢',desc:'Spiced beef skewers with groundnut powder'},
-    {id:203,name:'Egusi Soup',price:95,emoji:'🥣',desc:'Melon seed soup with assorted meats'},
-    {id:204,name:'Puff Puff',price:35,emoji:'🍩',desc:'Sweet fried dough balls, classic Nigerian snack'},
-    {id:205,name:'Pepper Soup',price:85,emoji:'🍲',desc:'Spicy broth with fish or goat meat'}
-  ],
-  international:[
-    {id:301,name:'Croissant Set',price:120,emoji:'🥐',desc:'Freshly baked croissants with butter and jam'},
-    {id:302,name:'Café au Lait',price:45,emoji:'☕',desc:'Rich espresso with steamed Gambian milk'},
-    {id:303,name:'Club Sandwich',price:150,emoji:'🥪',desc:'Triple-decker sandwich with chicken and salad'},
-    {id:304,name:'Grilled Tilapia',price:200,emoji:'🐟',desc:'Fresh Atlantic tilapia grilled to perfection'},
-    {id:305,name:'Caesar Salad',price:95,emoji:'🥗',desc:'Crisp romaine with Caesar dressing and croutons'}
-  ],
-  restaurants:[
-    {id:401,name:'Benachin',price:85,emoji:'🍚',desc:'Traditional Gambian rice'},
-    {id:402,name:'Burger Combo',price:95,emoji:'🍔',desc:'Beef burger with fries and drink'},
-    {id:403,name:'Grilled Chicken',price:110,emoji:'🍗',desc:'Marinated grilled chicken with chips'},
-    {id:404,name:'Veggie Bowl',price:70,emoji:'🥗',desc:'Fresh vegetarian bowl with quinoa'},
-    {id:405,name:'Fish Tacos',price:120,emoji:'🌮',desc:'Seasoned fish in soft corn tortillas'}
-  ],
-  groceries:[
-    {id:501,name:'Fresh Tomatoes',price:25,emoji:'🍅',desc:'Locally grown vine tomatoes, per kg'},
-    {id:502,name:'Rice (5kg)',price:120,emoji:'🌾',desc:'Premium quality long-grain white rice'},
-    {id:503,name:'Cooking Oil',price:85,emoji:'🫙',desc:'Pure vegetable cooking oil, 1 litre'},
-    {id:504,name:'Onions',price:20,emoji:'🧅',desc:'Fresh yellow onions, per kg'},
-    {id:505,name:'Groundnut Oil',price:95,emoji:'🥜',desc:'100% pure groundnut oil, 1 litre'},
-    {id:506,name:'Eggs (dozen)',price:60,emoji:'🥚',desc:'Fresh farm eggs, 12 per pack'},
-    {id:507,name:'Milk (1L)',price:45,emoji:'🥛',desc:'Fresh pasteurised full-cream milk'}
-  ],
-  pharmacies:[
-    {id:601,name:'Paracetamol',price:15,emoji:'💊',desc:'500mg tablets for pain and fever, 24 pack'},
-    {id:602,name:'Vitamin C 1000mg',price:45,emoji:'🍊',desc:'Effervescent vitamin C tablets, 20 pack'},
-    {id:603,name:'First Aid Kit',price:120,emoji:'🩹',desc:'Complete first aid kit for home use'},
-    {id:604,name:'Oral Rehydration Salts',price:20,emoji:'💧',desc:'WHO formula ORS sachets, 10 pack'},
-    {id:605,name:'Antimalaria Tablets',price:65,emoji:'💊',desc:'Artemether-lumefantrine combination'},
-    {id:606,name:'Baby Vitamins',price:55,emoji:'👶',desc:'Multi-vitamin drops for infants 0-12 months'},
-    {id:607,name:'Bandages',price:25,emoji:'🩺',desc:'Sterile elastic bandages, assorted sizes'}
-  ],
-  electronics:[
-    {id:701,name:'iPhone Charger',price:180,emoji:'🔌',desc:'Fast-charge USB-C cable, 1m'},
-    {id:702,name:'Bluetooth Earbuds',price:450,emoji:'🎧',desc:'True wireless earbuds with charging case'},
-    {id:703,name:'Power Bank 20000',price:380,emoji:'🔋',desc:'20,000mAh portable charger, dual USB'},
-    {id:704,name:'Phone Case',price:85,emoji:'📱',desc:'Protective silicone case, fits most models'},
-    {id:705,name:'Screen Protector',price:45,emoji:'🖥️',desc:'Tempered glass screen protector 2-pack'}
-  ],
-  fashion:[
-    {id:801,name:"Men's Kaftan",price:350,emoji:'👘',desc:'Traditional Gambian kaftan, assorted colours'},
-    {id:802,name:"Women's Dress",price:280,emoji:'👗',desc:'Ankara print dress, various sizes'},
-    {id:803,name:'Sandals',price:150,emoji:'👡',desc:'Handcrafted leather sandals'},
-    {id:804,name:'Baseball Cap',price:95,emoji:'🧢',desc:'Embroidered cap, adjustable strap'},
-    {id:805,name:'Leather Belt',price:120,emoji:'👔',desc:'Genuine leather belt for men'},
-    {id:806,name:'Handbag',price:320,emoji:'👜',desc:'Stylish canvas handbag with zip'},
-    {id:807,name:'Wristwatch',price:480,emoji:'⌚',desc:'Classic quartz wristwatch, stainless steel'}
-  ],
-  beauty:[
-    {id:901,name:'Shea Butter Cream',price:75,emoji:'🧴',desc:'100% natural shea butter moisturising cream'},
-    {id:902,name:'Hair Relaxer Kit',price:120,emoji:'💆',desc:'Professional-grade hair relaxer with conditioner'},
-    {id:903,name:'Lipstick Set',price:95,emoji:'💄',desc:'6-shade matte lipstick collection'},
-    {id:904,name:'Face Wash',price:85,emoji:'🧼',desc:'Gentle cleansing face wash for all skin types'},
-    {id:905,name:'Perfume',price:180,emoji:'🌸',desc:'Long-lasting floral fragrance, 50ml'},
-    {id:906,name:'Hair Braiding Gel',price:45,emoji:'✨',desc:'Strong-hold braiding gel, no flaking'},
-    {id:907,name:'Foundation',price:140,emoji:'🎨',desc:'Full-coverage liquid foundation, 10 shades'}
-  ],
-  household:[
-    {id:1001,name:'Mosquito Net',price:120,emoji:'🛏️',desc:'Double-bed mosquito net, pre-treated'},
-    {id:1002,name:'Cooking Pot Set',price:280,emoji:'🍳',desc:'3-piece stainless steel cooking pot set'},
-    {id:1003,name:'Broom & Dustpan',price:65,emoji:'🧹',desc:'Household broom with dustpan set'},
-    {id:1004,name:'Dish Soap (500ml)',price:35,emoji:'🧽',desc:'Concentrated liquid dish washing soap'},
-    {id:1005,name:'Bedsheets',price:195,emoji:'🛏️',desc:'Cotton bedsheet set for double bed'},
-    {id:1006,name:'Electric Fan',price:450,emoji:'💨',desc:'16-inch stand fan with 3 speeds'}
-  ]
-};
-
-// Trending items (food from correct stores)
-var TRENDING = [
-  {id:101,name:'Benachin',price:85,store:'Bantaba Grill',emoji:'🍚',cat:'gambian'},
-  {id:201,name:'Jollof Rice',price:90,store:'Naija Kitchen',emoji:'🍛',cat:'nigerian'},
-  {id:301,name:'Croissant Set',price:120,store:'La Parisienne',emoji:'🥐',cat:'international'},
-  {id:103,name:'Yassa Chicken',price:95,store:'Bantaba Grill',emoji:'🍗',cat:'gambian'},
-  {id:202,name:'Suya Skewers',price:110,store:'Naija Kitchen',emoji:'🍢',cat:'nigerian'},
-  {id:601,name:'Paracetamol',price:15,store:'Medicare Pharmacy',emoji:'💊',cat:'pharmacies'}
-];
-
+// Live catalog is loaded exclusively from the production API.
+var CATS=[];
+var STORES=[];
+var ALL_PRODS={};
+var TRENDING=[];
 var STATUSES = ['Pending','Confirmed','Preparing','Awaiting Rider','Rider Assigned','Picked Up','On The Way','Delivered'];
 var DEL_LABELS = ['Heading to Store','At Store','Order Picked Up','Delivering','Delivered ✅'];
 var DEL_TOASTS = ['Head to the store! 🛵','Arrived at store! Pick up order.','Picked up! Head to customer ✅','Delivering…','Complete! +D '];
@@ -1920,235 +1795,7 @@ function goApp(){
         syncAffiliateProfile();
       }
     } else {
-      // Running in demo/offline mode — this stays visible for the whole session
-      // (not a transient toast) precisely because MockAPI-backed flows (orders,
-      // payments, vendor/rider actions) can still complete "successfully" while
-      // simulated. A user must always be able to tell the difference between a
-      // real MarketLink account/order/payment and a demo one.
-      if(!G('demo-mode-banner')){
-        var banner = document.createElement('div');
-        banner.id='demo-mode-banner';
-        banner.style.cssText='position:fixed;top:0;left:0;right:0;background:#F5A623;color:#1a1200;font-size:11px;font-weight:700;padding:7px 14px;z-index:99999;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;';
-        banner.innerHTML='<span>⚠️ Demo mode — not connected to a live MarketLink server. Accounts, orders, and payments are simulated.</span>'+
-          '<span onclick="this.parentNode.style.display=\'none\';" style="cursor:pointer;font-weight:800;padding:0 4px;">✕</span>';
-        document.body.appendChild(banner);
-      }
-    }
-  });
-}
-
-// Sync server notifications into the local NotificationCenter store
-async function syncServerNotifications(){
-  try{
-    var result = await ML_API.customers.getNotifications({limit:20, unreadOnly:false});
-    if(result && result.data && Array.isArray(result.data)){
-      result.data.forEach(function(n){
-        // Only add if not already tracked locally
-        NotificationCenter.pushIfNew('customer', n.type, n.title+(n.body?' — '+n.body:''), n.id, !n.read_at);
-      });
-      // Update the badge with server's accurate unread count
-      var unread = result.data.filter(function(n){ return !n.read_at; }).length;
-      var nbell = G('nbell');
-      if(nbell){
-        nbell.textContent = unread>9?'9+':String(unread);
-        nbell.style.display = unread>0?'flex':'none';
-      }
-    }
-  }catch(e){} // graceful — local notifications still work
-}
-
-// Sync profile data from server (reward points, wallet balance)
-async function syncServerProfile(){
-  try{
-    var result = await ML_API.customers.getProfile();
-    if(result && result.data){
-      if(result.data.reward_points !== undefined) S.rewardPoints = result.data.reward_points;
-      if(result.data.wallet_balance !== undefined) S.walletBalance = parseFloat(result.data.wallet_balance)||0;
-      if(result.data.full_name && !S.user.name) S.user.name = result.data.full_name;
-      renderHome(); // refresh greeting with server name
-    }
-  }catch(e){}
-}
-function switchTab(id){
-  if(id==='admindash' && !AdminSession.isAuthenticated){
-    toast('Admin access requires sign-in via the Admin Portal','error');
-    return;
-  }
-  S.curTab=id;
-  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
-  var el=G('tab-'+id);
-  if(el) el.classList.add('active');
-  document.querySelectorAll('.ntab').forEach(function(t){
-    t.classList.toggle('act',t.dataset.tab===id);
-  });
-  if(id==='cart') renderCart();
-  else if(id==='orders') renderOrders();
-  else if(id==='profile'){S.profilePage=null;renderProfile();}
-  else if(id==='vendordash') renderVDash();
-  else if(id==='riderdash') renderRDash();
-  else if(id==='admindash') renderAdminDash();
-}
-document.querySelectorAll('.ntab').forEach(function(t){
-  t.addEventListener('click',function(){switchTab(t.dataset.tab);});
-});
-
-// ═══════════════════════════════════════════════════════════
-// ONBOARDING
-// ═══════════════════════════════════════════════════════════
-var OB_SLIDES=[
-  {emoji:'🏪',title:'Discover Local Businesses',desc:'Find your favourite restaurants, groceries, pharmacies and more — all across The Gambia.',color:'#0D7377'},
-  {emoji:'⚡',title:'Fast & Trusted Deliveries',desc:'Our verified riders bring your orders quickly and safely to your doorstep.',color:'#FF6B2B'},
-  {emoji:'🇬🇲',title:'Support The Gambia 🇬🇲',desc:'Every purchase supports local vendors and grows our community economy.',color:'#3A7D44'}
-];
-function renderOnboard(){
-  var sl=OB_SLIDES[S.obSlide];
-  G('ob-slide').innerHTML=
-    '<div style="width:170px;height:170px;border-radius:50%;background:'+sl.color+'22;border:2px solid '+sl.color+'44;display:flex;align-items:center;justify-content:center;font-size:85px;margin-bottom:32px;">'+sl.emoji+'</div>'+
-    '<h2 style="color:#F8F9FA;font-size:22px;font-weight:700;margin-bottom:10px;line-height:1.2;">'+sl.title+'</h2>'+
-    '<p style="color:#8E99A4;font-size:14px;line-height:1.7;max-width:280px;margin:0;">'+sl.desc+'</p>';
-  var dots=G('ob-dots'); dots.innerHTML='';
-  OB_SLIDES.forEach(function(_,i){
-    var d=document.createElement('div');
-    d.style.cssText='width:'+(i===S.obSlide?22:8)+'px;height:8px;border-radius:99px;background:'+(i===S.obSlide?sl.color:'#2A3A4A')+';transition:all 0.3s;cursor:pointer;';
-    d.onclick=function(){S.obSlide=i;renderOnboard();};
-    dots.appendChild(d);
-  });
-  var btn=G('ob-btn');
-  if(S.obSlide<2){btn.textContent='Next →';btn.className='btn btn-gh';}
-  else{btn.textContent='Get Started 🚀';btn.className='btn btn-p';}
-}
-function obNext(){
-  if(S.obSlide<2){S.obSlide++;renderOnboard();}
-  else goAuth();
-}
-
-// ═══════════════════════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════════════════════
-function renderAuth(){
-  var b=G('auth-body');
-  var err='<div id="auth-err" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:10px 13px;color:#EF4444;font-size:12px;margin-bottom:14px;display:none;"></div>';
-  if(S.authMode==='login'){
-    b.innerHTML=
-      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">Welcome back 👋</h2>'+
-      '<p style="color:var(--mu);font-size:13px;margin-bottom:22px;">Sign in to your account</p>'+
-      err+
-      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+gmfHTML()+
-      '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" name="phone" autocomplete="tel-national" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="87 XXX XXXX" id="lphone" style="flex:1;"></div>'+
-      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:8px;">4-digit PIN</label>'+
-      '<div class="pinr" id="pin-row"></div>'+
-      '<button class="btn btn-p" onclick="doLogin()" id="lbtn">Sign In</button>'+
-      '<div style="text-align:center;margin-top:16px;"><span style="color:var(--mu);font-size:13px;">New here? </span>'+
-      '<span onclick="S.authMode=\'register\';renderAuth();" style="color:var(--pr);font-size:13px;font-weight:600;cursor:pointer;">Create account</span></div>'+
-      '<div onclick="openAdminLogin()" style="text-align:center;margin-top:22px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px;-webkit-tap-highlight-color:transparent;">'+
-      '<span style="font-size:13px;">🛡️</span><span style="color:var(--mu);font-size:12px;font-weight:600;">Admin Portal</span></div>'+
-      '<div style="text-align:center;margin-top:10px;color:rgba(255,255,255,0.2);font-size:10px;">Powered by <span style="color:#F5A623;font-weight:700;">Royal FinTech</span></div>';
-    renderPinRow('pin-row',S.pin);
-  } else if(S.authMode==='register'){
-    b.innerHTML=
-      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">Create account</h2>'+
-      '<p style="color:var(--mu);font-size:13px;margin-bottom:22px;">Join MarketLink today</p>'+
-      err+
-      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Full Name</label>'+
-      '<input class="inp" type="text" placeholder="e.g. Lamin Touray" id="rname" value="'+sanitizeText(S.regName||'')+'" oninput="S.regName=this.value;" style="margin-bottom:11px;">'+
-      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">'+gmfHTML()+
-      '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" name="phone" autocomplete="tel-national" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="87 XXX XXXX" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="S.regPhone=this.value;" style="flex:1;"></div>'+
-      '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;padding:12px;background:rgba(13,115,119,0.1);border-radius:10px;border:1px solid rgba(13,115,119,0.3);">'+
-      '<div id="agree-box" onclick="toggleAgree()" style="width:20px;height:20px;border-radius:5px;border:2px solid '+(S.agreed?'#0D7377':'rgba(255,255,255,0.15)')+';background:'+(S.agreed?'#0D7377':'transparent')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;">'+(S.agreed?'<span style="color:#fff;font-size:12px;font-weight:700;">✓</span>':'')+
-      '</div><div style="font-size:12px;color:var(--mu);line-height:1.5;">I agree to the <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Terms & Conditions</span> and <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Privacy Policy</span></div></div>'+
-      '<button class="btn btn-p" onclick="doRegister()">Continue</button>'+
-      '<div style="text-align:center;margin-top:16px;"><span style="color:var(--mu);font-size:13px;">Have an account? </span>'+
-      '<span onclick="S.authMode=\'login\';renderAuth();" style="color:var(--pr);font-size:13px;font-weight:600;cursor:pointer;">Sign in</span></div>'+
-      '<div style="text-align:center;margin-top:22px;color:rgba(255,255,255,0.2);font-size:10px;">Powered by <span style="color:#F5A623;font-weight:700;">Royal FinTech</span></div>';
-  } else if(S.authMode==='otp'){
-    b.innerHTML=
-      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">Verify number</h2>'+
-      '<p style="color:var(--mu);font-size:13px;margin-bottom:14px;">Code sent to 🇬🇲 +220 '+S.regPhone+'</p>'+
-      (S.devOtpDisplay?'<div style="background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:10px;padding:10px 13px;margin-bottom:18px;text-align:center;"><div style="color:#F5A623;font-size:10.5px;font-weight:700;letter-spacing:0.4px;">⚙️ DEVELOPMENT MODE — OTP not sent by SMS</div><div id="dev-otp-code" style="color:var(--tx);font-size:17px;font-weight:800;letter-spacing:3px;margin-top:5px;user-select:all;cursor:text;">'+S.devOtpDisplay+'</div><div onclick="copyDevOtp()" style="display:inline-block;margin-top:7px;color:#F5A623;font-size:11px;font-weight:700;cursor:pointer;border:1px solid rgba(245,166,35,0.4);border-radius:99px;padding:4px 12px;">📋 Copy OTP</div></div>':'')+
-      err+
-      '<div class="otpr" id="otp-row"></div>'+
-      '<button class="btn btn-p" onclick="doOTP()">Verify OTP</button>'+
-      '<div style="text-align:center;margin-top:12px;"><span style="color:var(--mu);font-size:12px;">Didn\'t get it? </span>'+
-      '<span onclick="resendOTP()" style="color:var(--pr);font-size:12px;cursor:pointer;">Resend</span></div>';
-    renderOTPRow();
-  } else if(S.authMode==='pin'){
-    b.innerHTML=
-      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">'+(S.pinStep==='create'?'Create PIN':'Confirm PIN')+'</h2>'+
-      '<p style="color:var(--mu);font-size:13px;margin-bottom:22px;">'+(S.pinStep==='create'?'Choose a 4-digit PIN':'Re-enter your PIN to confirm')+'</p>'+
-      err+
-      '<div class="pinr" id="pin-row"></div>'+
-      '<button class="btn btn-p" onclick="doPin()">'+(S.pinStep==='create'?'Next':'Complete Setup 🎉')+'</button>';
-    renderPinRow('pin-row',S.pinStep==='create'?S.pin:S.cpin);
-  }
-}
-function toggleAgree(){S.agreed=!S.agreed;renderAuth();}
-function renderOtpRevealCard(){
-  var body=G('otp-reveal-body'); if(!body) return;
-  var code=String(S.devOtpDisplay||'');
-  body.innerHTML=
-    '<div style="text-align:center;">'+
-    '<div style="color:rgba(255,255,255,0.5);font-size:11.5px;font-weight:600;margin-bottom:14px;">⚙️ Development mode — SMS is not configured, so here\'s your code directly.</div>'+
-    '<div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;">'+
-      code.split('').map(function(d){return '<div style="width:38px;height:48px;border-radius:10px;background:rgba(13,148,136,0.14);border:1.5px solid rgba(13,148,136,0.4);display:flex;align-items:center;justify-content:center;color:var(--tx);font-size:22px;font-weight:800;">'+sanitizeText(d)+'</div>';}).join('')+
-    '</div>'+
-    '<div style="color:rgba(255,255,255,0.55);font-size:12px;margin-bottom:20px;">Use this code to verify your phone number.</div>'+
-    '<button class="btn btn-p" style="width:100%;" onclick="continueFromOtpReveal()">Continue</button>'+
-    '</div>';
-}
-function continueFromOtpReveal(){
-  closeSheet('sh-otp-reveal');
-  var otpInput=document.querySelector('#otp-row .otpb');
-  if(otpInput) setTimeout(function(){otpInput.focus();},250);
-}
-function copyDevOtp(){
-  if(!S.devOtpDisplay) return;
-  var code=String(S.devOtpDisplay);
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(code).then(function(){toast('OTP copied 📋');}).catch(function(){toast('Could not copy — select the code manually.','error');});
-  } else {
-    // Fallback for browsers without Clipboard API: select the text so the user can copy manually.
-    var el=G('dev-otp-code');
-    if(el && window.getSelection){
-      var range=document.createRange(); range.selectNodeContents(el);
-      var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
-    }
-    toast('OTP selected — copy it manually.');
-  }
-}
-function renderPinRow(rowId,arr){
-  var row=G(rowId); if(!row) return; row.innerHTML='';
-  arr.forEach(function(v,i){
-    var inp=document.createElement('input');
-    inp.className='pinb'; inp.maxLength=1; inp.type='password'; inp.inputMode='numeric'; inp.value=arr[i];
-    if(arr[i]) inp.classList.add('filled');
-    inp.addEventListener('input',function(e){
-      var v=e.target.value.replace(/\D/,'');
-      arr[i]=v; inp.value=v; inp.classList.toggle('filled',!!v);
-      if(v&&i<3){var nx=row.children[i+1];if(nx)nx.focus();}
-    });
-    inp.addEventListener('keydown',function(e){
-      if(e.key==='Backspace'&&!arr[i]&&i>0){var pv=row.children[i-1];if(pv)pv.focus();}
-    });
-    row.appendChild(inp);
-  });
-}
-function renderOTPRow(){
-  var row=G('otp-row'); if(!row) return; row.innerHTML='';
-  S.otp.forEach(function(v,i){
-    var inp=document.createElement('input');
-    inp.className='otpb'; inp.maxLength=1; inp.inputMode='numeric'; inp.value=S.otp[i];
-    if(S.otp[i]) inp.classList.add('filled');
-    inp.addEventListener('input',function(e){
-      var v=e.target.value.replace(/\D/,'');
-      S.otp[i]=v; inp.value=v; inp.classList.toggle('filled',!!v);
-      if(v&&i<5){var nx=row.children[i+1];if(nx)nx.focus();}
-      // Auto-verify once all 6 digits are filled — no Verify button tap required
-      if(S.otp.join('').length===6 && S.otp.every(function(d){return d!=='';})){
-        setTimeout(doOTP,150);
+      // No offline/demo account mode: production actions require the live API.
       }
     });
     row.appendChild(inp);
@@ -2169,12 +1816,9 @@ function authErr(msg){var e=G('auth-err');if(e){e.textContent=msg;e.style.displa
 // Admin credentials — password is stored as a simple hash, not plaintext.
 // In production this check MUST move to a server endpoint.
 // Hash of 'MTL10010GB:admin2026' — change by computing: hashAdminCred('newpassword')
-var ADMIN_CREDENTIALS={
-  staffId:'MTL10010GB',
-  // To change password: open console, type hashAdminCred('newpassword'), paste result here
-  pwHash: (function(){var s='MTL10010GB:admin2026',h=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);h=((h<<5)-h)+c;h=h|0;}return 'h'+Math.abs(h).toString(36)+'x'+s.length;})()
-};
-function hashAdminCred(pw){ var s=ADMIN_CREDENTIALS.staffId+':'+pw,h=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);h=((h<<5)-h)+c;h=h|0;}return 'h'+Math.abs(h).toString(36)+'x'+s.length; }
+// Admin authentication is server-authoritative. No credentials are stored in frontend source.
+var ADMIN_CREDENTIALS=null;
+function hashAdminCred(){return '';}
 var AdminSession={
   isAuthenticated:false, staffId:null, loginAt:null,
   load:function(){
@@ -2961,9 +2605,9 @@ async function placeOrder(){
   if(placeBtn){ placeBtn.disabled=true; placeBtn.textContent='Placing order…'; }
 
   try {
-    // Build MockAPI payload — MockAPI.submitOrder internally routes to
+    // Build LiveAPI payload — LiveAPI.submitOrder internally routes to
     // ML_API.orders.place() when the backend is available and vendorId is known.
-    var orderRes = await MockAPI.submitOrder({
+    var orderRes = await LiveAPI.submitOrder({
       items:items, apiItems:apiItems, vendorId:vendorId,
       total:total, addr:addr, pay:pay, paymentMethod:paymentMethod,
       couponCode:S.appliedCoupon?S.appliedCoupon.code:null,
@@ -2982,7 +2626,7 @@ async function placeOrder(){
     // Process payment for non-COD methods through the abstraction layer
     if(pay!=='Pay on Delivery'){
       if(placeBtn) placeBtn.textContent='Processing payment…';
-      var payRes = await MockAPI.payments.charge(pay, payableTotal, order.id||order.order_number);
+      var payRes = await LiveAPI.payments.charge(pay, payableTotal, order.id||order.order_number);
       if(!payRes.success){
         toast(payRes.error,'error');
         if(placeBtn){ placeBtn.disabled=false; placeBtn.textContent='Place Order — D '+total; }
@@ -3005,7 +2649,7 @@ async function placeOrder(){
 
     // Auto-assign rider after brief delay (server-side or simulated)
     setTimeout(async function(){
-      var assign = await MockAPI.autoAssignRider(S.order.id);
+      var assign = await LiveAPI.autoAssignRider(S.order.id);
       if(assign.success){
         S.activeRiderName=assign.data.riderName;
         renderOrders();
@@ -4152,7 +3796,7 @@ function vToggleOnline(){S.vOnline=!S.vOnline;renderVDash();toast(S.vOnline?'Sto
 async function vRequestPayout(amount){
   if(!amount||amount<=0){toast('No balance available to pay out','error');return;}
   toast('Requesting payout…');
-  var res=await MockAPI.vendorRequestPayout(amount);
+  var res=await LiveAPI.vendorRequestPayout(amount);
   if(res.success){
     S.vPayoutsRequested=(S.vPayoutsRequested||0)+amount;
     if(!S.vPayoutHistory) S.vPayoutHistory=[];
@@ -6156,7 +5800,7 @@ async function rNextStep(){
   S.delStepIdx++;
   if(S.delStepIdx<DEL_TOASTS.length) toast(DEL_TOASTS[S.delStepIdx]);
   var stepKey=DEL_STEPS[S.delStepIdx-1];
-  if(stepKey) await MockAPI.riderUpdateDeliveryStep(S.activeDel?S.activeDel.id:'DEL-000', stepKey);
+  if(stepKey) await LiveAPI.riderUpdateDeliveryStep(S.activeDel?S.activeDel.id:'DEL-000', stepKey);
   if(S.delStepIdx>=DEL_STEPS.length){
     clearInterval(window._rdotTimer);
     toast('Delivery complete! +D '+(S.activeDel?S.activeDel.pay:0)+' earned 🎉');
@@ -6169,7 +5813,7 @@ async function rNextStep(){
 async function rRequestWithdrawal(amount){
   if(!amount||amount<=0){toast('No balance available','error');return;}
   toast('Requesting withdrawal…');
-  var res=await MockAPI.riderRequestWithdrawal(amount);
+  var res=await LiveAPI.riderRequestWithdrawal(amount);
   if(res.success){
     S.rWithdrawn=(S.rWithdrawn||0)+amount;
     if(!S.rWithdrawHistory) S.rWithdrawHistory=[];
@@ -6906,12 +6550,12 @@ window.addEventListener('unhandledrejection',function(e){
  *  [ ] Google Maps API Key
  *  [ ] Google Places API Key
  *  [x] GPS / Maps URL-scheme integration (live)
- * PAYMENTS — see MockAPI.payments.charge()
+ * PAYMENTS — see LiveAPI.payments.charge()
  *  [ ] Wave API Key
  *  [ ] AfriMoney API Key
  *  [ ] QMoney API Key
  *  [ ] Card Gateway (Stripe / Paystack)
- * ORDERS & DELIVERY — see MockAPI object
+ * ORDERS & DELIVERY — see LiveAPI object
  *  [x] Order submission flow (mock, ready)
  *  [x] Rider auto-assignment (mock, ready)
  *  [ ] Real-time GPS rider tracking (WebSocket)
