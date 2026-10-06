@@ -106,21 +106,20 @@ backend process is up. This does not by itself confirm the database is
 reachable — a registration or login attempt is the practical end-to-end
 check.
 
-## Demo mode
+## Production frontend behavior
 
-If the backend is unreachable, the app falls back to local demo behavior
-for some flows (via the pre-existing `MockAPI` object) so the UI remains
-usable for local UI development without a running backend. When this
-happens, a **persistent** banner is shown at the top of the screen (not a
-toast that disappears) reading "Demo mode — not connected to a live
-MarketLink server," specifically so a user can never mistake a simulated
-account/order/payment for a real one.
+The frontend is configured to use the live MarketLink Render backend:
 
-**Known limitation, stated honestly**: some order/payment/vendor/rider
-action flows still route through this same `MockAPI` object even when a
-real backend *is* connected, rather than the real `ML_API` calls that
-authentication, registration, orders (accept/reject), and withdrawals
-already use. This was flagged but not fixed in this round of work, since
-the requested scope was the registration bug, OTP display, and deployment
-connectivity — not a full audit of every remaining mock code path. See
-`docs/PHASE5_REPORT.md`.
+- Backend: `https://marketlink-gambia.onrender.com`
+- Frontend API URL is set in `frontend/MarketLink (7).html`.
+- The same backend origin is present in the Content Security Policy `connect-src`.
+- Customer marketplace/catalog data is loaded from the production API.
+- Vendor, rider, customer, checkout, profile, and admin operations use authenticated backend endpoints.
+- Fabricated catalog, wallet, order-history, notification, rider, and admin preview records have been removed from the production UI.
+- If the backend is unavailable, production actions fail safely instead of creating simulated accounts, orders, payments, deliveries, or financial records.
+
+For a public static deployment, publish the `frontend/` directory with its three files together:
+
+`MarketLink (7).html`, `premium-marketlink.css`, and `premium-marketlink.js`.
+
+Do not split or rename the asset files without updating the HTML references.
