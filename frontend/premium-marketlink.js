@@ -206,6 +206,53 @@
       S._riderLiveLoaded=false;renderPremiumProfile();
     }catch(e){toast(e.error||'Rider application could not be submitted.','error');}
   }
+  async function liveVendorAddProduct(){
+    if(!apiOk()){toast('Sign in required.','error');return;}
+    var n=G('vp-name'),p=G('vp-price'),s=G('vp-stock');
+    var name=n&&n.value.trim(),price=Number(p&&p.value),stock=Number(s&&s.value);
+    if(!name||!Number.isFinite(price)||price<0){toast('Enter a valid product name and price.','error');return;}
+    try{
+      var cats=liveCategories;
+      if(!cats.length){var cr=await ML_API.categories.list({page:1,limit:50});cats=normalizeProducts(cr.data);}
+      var categoryId=cats[0]&&cats[0].id;
+      if(!categoryId){toast('No live product category is available yet.','error');return;}
+      var r=await ML_API.products.create({name:name,price:price,categoryId:Number(categoryId),description:'',sku:undefined});
+      if(r.data&&r.data.id&&Number.isFinite(stock))await ML_API.products.updateInventory(r.data.id,{quantity:Math.max(0,Math.floor(stock))});
+      S._vendorLiveLoaded=false;renderVDash();toast('Product submitted to MarketLink ✓');
+    }catch(e){toast(e.error||'Could not create product.','error');}
+  }
+  async function liveVendorSaveProduct(id){
+    var n=G('vpe-name'),p=G('vpe-price'),s=G('vpe-stock');
+    var name=n&&n.value.trim(),price=Number(p&&p.value),stock=s&&s.value.trim()===''?null:Number(s.value);
+    if(!name||!Number.isFinite(price)){toast('Enter a valid product name and price.','error');return;}
+    try{
+      await ML_API.products.update(id,{name:name,price:price});
+      if(stock!==null&&Number.isFinite(stock))await ML_API.products.updateInventory(id,{quantity:Math.max(0,Math.floor(stock))});
+      S._vendorLiveLoaded=false;renderVDash();toast('Product updated ✓');
+    }catch(e){toast(e.error||'Could not update product.','error');}
+  }
+  async function liveVendorRemoveProduct(id){
+    if(!confirm('Archive this product?'))return;
+    try{await ML_API.products.remove(id);S._vendorLiveLoaded=false;renderVDash();toast('Product archived ✓');}
+    catch(e){toast(e.error||'Could not archive product.','error');}
+  }
+  async function liveVendorToggleOnline(){
+    if(!apiOk()){toast('Sign in required.','error');return;}
+    try{var next=!S.vOnline;var r=await ML_API.vendors.updateProfile({isOpen:next});S.vOnline=!!(r.data&&r.data.is_open!==undefined?r.data.is_open:next);renderVDash();toast(S.vOnline?'Store is open 🟢':'Store is closed');}
+    catch(e){toast(e.error||'Could not update store status.','error');}
+  }
+  async function liveRiderNextStep(){
+    if(!S.activeDel||!S.activeDel.id){toast('No active delivery.','error');return;}
+    var map={0:'heading_to_store',1:'at_store',2:'picked_up',3:'in_transit',4:'delivered'};
+    var idx=Math.min(Number(S.delStepIdx||0)+1,4),status=map[idx];
+    var backendStatus=status==='heading_to_store'?'assigned':status==='at_store'?'at_store':status;
+    try{
+      await ML_API.delivery.updateStatus(S.activeDel.id,backendStatus);
+      S.delStepIdx=idx;
+      if(idx>=4){S.activeDel=null;S._riderLiveLoaded=false;}
+      renderRDash();toast(idx>=4?'Delivery completed ✓':'Delivery status updated ✓');
+    }catch(e){toast(e.error||'Could not update delivery status.','error');}
+  }
   async function toggleRiderOnline(){
     if(!apiOk()){toast('Sign in required.','error');return;}
     try{var next=!S.rOnline;await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You are online and eligible for deliveries.':'You are offline.');}
@@ -216,6 +263,11 @@
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
   window.placeOrder=placeLiveOrder;
+  window.vAddProd=liveVendorAddProduct;
+  window.vSaveProdEdit=liveVendorSaveProduct;
+  window.vRemoveProd=liveVendorRemoveProduct;
+  window.vToggleOnline=liveVendorToggleOnline;
+  window.rNextStep=liveRiderNextStep;
   window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
