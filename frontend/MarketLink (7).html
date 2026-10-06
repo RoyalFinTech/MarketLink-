@@ -1315,6 +1315,10 @@ var ML_API = (function(){
   var products = {
     list:    function(qs){ return get('/products', qs); },
     getById: function(id){ return get('/products/'+id); },
+    create:  function(d){ return post('/products', d); },
+    update:  function(id,d){ return put('/products/'+id, d); },
+    remove:  function(id){ return del('/products/'+id); },
+    updateInventory:function(id,d){ return patch('/products/'+id+'/inventory', d); },
   };
 
   // ── CATEGORIES ───────────────────────────────────────────────
@@ -3572,7 +3576,7 @@ function renderVDash(){
           '<div style="color:#0D7377;font-size:13px;font-weight:700;">D '+o.total+'</div>'+
           '<div style="display:flex;gap:7px;">'+
           (o.status==='Pending'?'<button class="btn btn-ok btn-sm" onclick="vAccept(\''+o.id+'\')">✅ Accept</button><button class="btn btn-er btn-sm" onclick="vReject(\''+o.id+'\')">❌ Reject</button>':'')+
-          (o.status==='Preparing'?'<button class="btn btn-p btn-sm" onclick="vReqRider(\''+o.id+'\')">🛵 Auto-Assign</button><button class="btn btn-s btn-sm" onclick="vManualAssign(\''+o.id+'\')">👤 Pick Rider</button>':'')+
+          (o.status==='Preparing'?'<button class="btn btn-p btn-sm" onclick="vReqRider(\''+o.id+'\')">🛵 Auto-Assign</button><button style="display:none" class="btn btn-s btn-sm" onclick="vManualAssign(\''+o.id+'\')">👤 Pick Rider</button>':'')+
           (o.status==='Rider Assigned'?'<span style="color:#8B5CF6;font-size:11px;font-weight:600;">🛵 '+(o.rider||'Rider')+' en route</span>':'')+
           '</div></div></div>';
       });
