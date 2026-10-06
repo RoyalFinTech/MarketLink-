@@ -1414,21 +1414,35 @@ var ML_API = (function(){
 
   // ── VENDORS (own dashboard) ───────────────────────────────────
   var vendors = {
+    list:                function(qs){  return get('/vendors', qs); },
     register:            function(d){   return post('/vendors/register', d); },
     updateProfile:       function(d){   return put('/vendors/profile', d); },
     myAnalytics:         function(qs){  return get('/vendors/me/analytics', qs); },
     withdrawals:         function(qs){  return get('/vendors/withdrawals', qs); },
     requestWithdrawal:   function(d){   return post('/vendors/withdrawals', d); },
+    approve:             function(id,d){return post('/vendors/'+id+'/approve',d||{});},
+    reject:              function(id,d){ return post('/vendors/'+id+'/reject',d||{});},
   };
 
   // ── RIDERS (own dashboard) ────────────────────────────────────
   var riders = {
+    list:              function(qs){    return get('/riders', qs); },
     register:          function(d){    return post('/riders/register', d); },
     updateProfile:     function(d){    return put('/riders/profile', d); },
     myEarnings:        function(qs){    return get('/riders/me/earnings', qs); },
     myDeliveries:      function(qs){    return get('/riders/me/deliveries', qs); },
     withdrawals:       function(qs){    return get('/riders/me/withdrawals', qs); },
     requestWithdrawal: function(d){     return post('/riders/me/withdrawals', d); },
+    approve:           function(id,d){return post('/riders/'+id+'/approve',d||{});},
+    reject:            function(id,d){ return post('/riders/'+id+'/reject',d||{});},
+  };
+
+  var admin = {
+    dashboard: function(){return get('/admin/dashboard');},
+    analytics: function(qs){return get('/admin/analytics',qs);},
+    users: function(qs){return get('/admin/users',qs);},
+    reports: function(qs){return get('/admin/reports',qs);},
+    withdrawals: function(qs){return get('/admin/withdrawals',qs);},
   };
 
   // ── HEALTH CHECK (detect backend availability) ───────────────
@@ -1446,7 +1460,7 @@ var ML_API = (function(){
     auth: auth, customers: customers, products: products,
     categories: categories, orders: orders, delivery: delivery,
     payments: payments, notifications: notifications, affiliates: affiliates,
-    uploads: uploads, vendors: vendors, riders: riders,
+    uploads: uploads, vendors: vendors, riders: riders, admin: admin,
     assistant: assistant,
     adminKnowledge: adminKnowledge,
     checkBackend: checkBackend, isBackendAvailable: isBackendAvailable,
