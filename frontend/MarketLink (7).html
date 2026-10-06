@@ -2821,13 +2821,7 @@ function submitRating(){
 // ═══════════════════════════════════════════════════════════
 // NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════
-var NOTIFS=[
-  {id:0,icon:'🎉',title:'Welcome to MarketLink!',body:'Your account is ready. Start exploring local businesses.',time:'Just now'},
-  {id:1,icon:'🛵',title:'Free Delivery Offer',body:'Use code WELCOME on your first 3 orders.',time:'2 min ago'},
-  {id:2,icon:'🏪',title:'Bantaba Grill is nearby',body:'Top-rated Gambian restaurant delivering to you.',time:'1 hr ago'},
-  {id:3,icon:'⭐',title:'Rate your last order',body:'How was your La Parisienne experience?',time:'Yesterday'},
-  {id:4,icon:'📦',title:'Order confirmed',body:'Your order #ML2940 has been confirmed.',time:'Jun 10'}
-];
+var NOTIFS=[];
 function notifTypeIcon(type){
   var map={order_placed:'📦',new_order:'🆕',vendor_accepted:'👨‍🍳',rider_assigned:'🛵',rider_update:'🚚',
     payment_confirmed:'💳',new_payment:'💰',order_cancelled:'❌',new_delivery:'📍',delivery_completed:'✅'};
@@ -3272,15 +3266,7 @@ async function renderOrderHistPage(){
     }catch(e){}
   }
 
-  // Fallback to demo data
-  if(!hist.length){
-    hist=[
-      {id:'ML3021',store:'Bantaba Grill',items:'Benachin × 2',total:195,date:'Today, 11:30',status:'Delivered'},
-      {id:'ML2988',store:'La Parisienne',items:'Croissant Set × 1',total:145,date:'Yesterday, 08:15',status:'Delivered'},
-      {id:'ML2940',store:'Naija Kitchen',items:'Jollof Rice × 2, Suya × 1',total:290,date:'Jun 10',status:'Delivered'},
-      {id:'ML2881',store:'Bantaba Grill',items:'Yassa Chicken × 3',total:310,date:'Jun 8',status:'Delivered'}
-    ];
-  }
+  // No local fallback: an empty history is preferable to fabricated orders.
 
   var statusColor={Delivered:'#22C55E',delivered:'#22C55E',Cancelled:'#EF4444',cancelled:'#EF4444',Pending:'#F5A623',pending:'#F5A623'};
   var cards=hist.length===0
