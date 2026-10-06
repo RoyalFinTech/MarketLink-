@@ -3962,7 +3962,7 @@ function renderRDash(){
     '<div style="width:7px;height:7px;border-radius:50%;background:'+(S.rOnline?'#22C55E':'#EF4444')+';'+(S.rOnline?'animation:pulseGreen 1.5s ease-in-out infinite;':'')+'">&nbsp;</div>'+
     '<span style="color:'+(S.rOnline?'#22C55E':'#EF4444')+';font-size:12px;font-weight:700;">'+(S.rOnline?'Online':'Offline')+'</span></div></div></div>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">'+
-    [['💰','D 340','Today'],['🛵','12','Trips'],['🏆','4.9 ⭐','Rating']].map(function(s){
+    [['💰','D '+Number(S.rEarningsToday||0).toLocaleString(),'Today'],['🛵',String(Number(S.rTotalDeliveries||0)),'Trips'],['🏆',Number(S.rRating||0).toFixed(1)+' ⭐','Rating']].map(function(s){
       return '<div style="background:rgba(255,255,255,0.07);border-radius:11px;padding:10px;text-align:center;border:1px solid rgba(255,255,255,0.09);">'+
         '<div style="font-size:18px;margin-bottom:3px;">'+s[0]+'</div><div style="color:#fff;font-size:13px;font-weight:700;">'+s[1]+'</div>'+
         '<div style="color:rgba(255,255,255,0.45);font-size:9px;margin-top:1px;">'+s[2]+'</div></div>';
