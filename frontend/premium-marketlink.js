@@ -135,6 +135,8 @@
       var p=(await ML_API.products.getById(id)).data;
       if(!p)return;
       addCart(p.id,1,p.name,Number(p.price||0));
+      CART_ITEMS[p.id]=Object.assign({},CART_ITEMS[p.id]||{}, {id:p.id,name:p.name,price:Number(p.price||0),vendorId:p.vendor_id||p.vendorId||null,image:p.primary_image||null});
+      saveCartToStorage();
       toast(p.name+' added to cart ✓');
     }catch(e){toast(e.error||'Could not add product.','error');}
   }
@@ -214,6 +216,7 @@
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
   window.placeOrder=placeLiveOrder;
+  window.renderCart=function(){ if(typeof window.__legacyRenderCart==='undefined' && typeof renderCart==='function') window.__legacyRenderCart=renderCart; if(window.__legacyRenderCart) window.__legacyRenderCart(); };
   window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
