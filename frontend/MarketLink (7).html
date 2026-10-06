@@ -1427,6 +1427,7 @@ var ML_API = (function(){
   // ── RIDERS (own dashboard) ────────────────────────────────────
   var riders = {
     list:              function(qs){    return get('/riders', qs); },
+    getById:           function(id){    return get('/riders/'+id); },
     register:          function(d){    return post('/riders/register', d); },
     updateProfile:     function(d){    return put('/riders/profile', d); },
     myEarnings:        function(qs){    return get('/riders/me/earnings', qs); },
