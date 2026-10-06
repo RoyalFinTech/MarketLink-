@@ -1806,17 +1806,7 @@ function authErr(msg){var e=G('auth-err');if(e){e.textContent=msg;e.style.displa
 // ═══════════════════════════════════════════════════════════
 // ADMIN PORTAL — separate authentication & session from customer auth
 // ─────────────────────────────────────────────────────────────
-// SECURITY NOTE: this is a static, frontend-only demo build with no
-// backend, so credential validation necessarily happens client-side
-// and is visible to anyone who reads the page source. This is fine
-// for an internal demo/staging build, but MUST be replaced with real
-// server-side authentication (hashed credentials, session tokens,
-// rate limiting) before this is exposed in a production environment.
-// ═══════════════════════════════════════════════════════════
-// Admin credentials — password is stored as a simple hash, not plaintext.
-// In production this check MUST move to a server endpoint.
-// Hash of 'MTL10010GB:admin2026' — change by computing: hashAdminCred('newpassword')
-// Admin authentication is server-authoritative. No credentials are stored in frontend source.
+// Admin authentication is server-authoritative and uses the same backend identity/session layer as the rest of MarketLink.
 var ADMIN_CREDENTIALS=null;
 function hashAdminCred(){return '';}
 var AdminSession={
