@@ -228,6 +228,7 @@
   // Remove the persistent fake/offline demo banner when backend is available.
   window.ML_Premium.removeDemoBanner=function(){var b=G('demo-mode-banner');if(b)b.remove();};
   document.addEventListener('DOMContentLoaded',function(){
+    if(window.ML_Premium.renderPremiumAdminLogin)window.ML_Premium.renderPremiumAdminLogin();
     setTimeout(function(){if(apiOk())window.ML_Premium.removeDemoBanner();},1200);
   });
 })();
