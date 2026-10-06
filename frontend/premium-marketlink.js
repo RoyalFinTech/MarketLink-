@@ -243,14 +243,13 @@
   }
   async function liveRiderNextStep(){
     if(!S.activeDel||!S.activeDel.id){toast('No active delivery.','error');return;}
-    var map={0:'heading_to_store',1:'at_store',2:'picked_up',3:'in_transit',4:'delivered'};
-    var idx=Math.min(Number(S.delStepIdx||0)+1,4),status=map[idx];
-    var backendStatus=status==='heading_to_store'?'assigned':status==='at_store'?'at_store':status;
+    var current=S.activeDel.status, next={assigned:'picked_up',picked_up:'in_transit',in_transit:'delivered'}[current];
+    if(!next){toast('This delivery is not ready for the next step.','error');return;}
     try{
-      await ML_API.delivery.updateStatus(S.activeDel.id,backendStatus);
-      S.delStepIdx=idx;
-      if(idx>=4){S.activeDel=null;S._riderLiveLoaded=false;}
-      renderRDash();toast(idx>=4?'Delivery completed ✓':'Delivery status updated ✓');
+      var r=await ML_API.delivery.updateStatus(S.activeDel.id,next);
+      S.activeDel=Object.assign({},S.activeDel,r.data||{},{status:next});
+      if(next==='delivered'){S.activeDel=null;S._riderLiveLoaded=false;}
+      renderRDash();toast(next==='delivered'?'Delivery completed ✓':'Delivery status updated ✓');
     }catch(e){toast(e.error||'Could not update delivery status.','error');}
   }
   async function toggleRiderOnline(){
