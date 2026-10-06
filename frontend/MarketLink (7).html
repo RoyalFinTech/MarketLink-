@@ -3826,8 +3826,12 @@ async function loadRiderLiveData(){
   if(!ML_API.auth.isAuthenticated() || (S.roles||[]).indexOf('rider')<0 || S._riderLoading) return;
   S._riderLoading=true; S.rDeliveries=[]; renderRDash();
   try{
-    var res=await ML_API.delivery.myDeliveries({page:1,limit:50});
+    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||'')].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
+    var res=riderResults[0],earnings=riderResults[1]&&riderResults[1].data,profile=riderResults[2]&&riderResults[2].data;
     var rows=res&&res.data&&Array.isArray(res.data)?res.data:[];
+    S.rEarningsToday=Number(earnings&&earnings.summary&&earnings.summary.total_earnings||0);
+    S.rTotalDeliveries=Number(profile&&profile.total_deliveries||rows.length||0);
+    S.rRating=Number(profile&&profile.rating_avg||0);
     S.rDeliveries=rows.map(function(d){return {
       id:d.id,order_id:d.order_id,from:d.vendor_name||'Vendor',to:'Customer delivery',
       dist:d.distance_km!=null?(Number(d.distance_km).toFixed(1)+' km'):'—',
