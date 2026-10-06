@@ -104,6 +104,16 @@
       if(liveProfile){S.profileName=liveProfile.full_name||'';S.profilePhone=liveProfile.phone||'';S.profilePhoto=liveProfile.profile_photo_url||null;}
     }catch(e){}
   }
+  async function saveProfilePhoto(file){
+    if(!file||!apiOk())return;
+    try{
+      var uploaded=await ML_API.uploads.upload(file,'profile-photo');
+      var url=uploaded&&(uploaded.url||uploaded.file_url||uploaded.location||uploaded.path);
+      if(!url)throw new Error('Upload succeeded but no file URL was returned.');
+      var r=await ML_API.customers.updateProfile({profilePhotoUrl:url});
+      liveProfile=r.data||liveProfile;S.profilePhoto=url;renderPremiumProfile();toast('Profile photo updated ✓');
+    }catch(e){toast(e.error||e.message||'Could not update profile photo.','error');}
+  }
   function editProfileModal(){
     var n=liveProfile&&liveProfile.full_name||S.profileName||S.user&&S.user.name||'';
     var dob=liveProfile&&liveProfile.date_of_birth||'',gender=liveProfile&&liveProfile.gender||'';
@@ -137,7 +147,7 @@
     var f=S.vForm;
     if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.phone){toast('Complete the business details first.','error');return;}
     try{
-      var r=await ML_API.vendors.register({businessName:f.bname,shopName:f.sname,address:f.saddr,category:f.cat,phone:'+220'+f.phone,nationalIdUrl:f.idDoc||undefined,shopPhotoUrl:f.photo||undefined});
+      var r=await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:'+220'+f.phone,nationalId:f.idDoc||undefined,description:f.sname});
       closeSheet('sh-vapp');toast('Vendor application submitted. Awaiting approval ✓');if(r.data&&r.data.kyc_status)toast('KYC status: '+r.data.kyc_status);
       S._vendorLiveLoaded=false;renderPremiumProfile();
     }catch(e){toast(e.error||'Vendor application could not be submitted.','error');}
@@ -147,7 +157,7 @@
     var f=S.rForm;
     if(!f.fname||!f.phone||!f.addr||!f.plate||!f.licence){toast('Complete your rider details first.','error');return;}
     try{
-      var r=await ML_API.riders.register({fullName:f.fname,phone:'+220'+f.phone,address:f.addr,vehiclePlate:f.plate,licenseNumber:f.licence,emergencyContact:f.emergency,documentUrl:f.docs||undefined});
+      var r=await ML_API.riders.register({vehicleType:'motorcycle',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:f.emergency,address:f.addr});
       closeSheet('sh-rapp');toast('Rider application submitted. Awaiting approval ✓');if(r.data&&r.data.kyc_status)toast('KYC status: '+r.data.kyc_status);
       S._riderLiveLoaded=false;renderPremiumProfile();
     }catch(e){toast(e.error||'Rider application could not be submitted.','error');}
@@ -157,7 +167,7 @@
     try{var next=!S.rOnline;await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You are online and eligible for deliveries.':'You are offline.');}
     catch(e){toast(e.error||'Could not change rider availability.','error');}
   }
-  window.ML_Premium={refresh:refresh,openCategory:openCategory,openProduct:openProduct,add:add,editProfile:editProfileModal,saveProfile:saveProfile,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome};
+  window.ML_Premium={refresh:refresh,openCategory:openCategory,openProduct:openProduct,add:add,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome};
   var oldRenderHome=window.renderHome,oldRenderProfile=window.renderProfile;
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
@@ -165,9 +175,11 @@
   window.submitRApp=submitRider;
   window.rToggleOnline=toggleRiderOnline;
   window.editName=editProfileModal;
+  window.handlePhoto=function(inp){if(inp&&inp.files&&inp.files[0])saveProfilePhoto(inp.files[0]);};
+  window.uploadPhoto=function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();};
   // Remove the persistent fake/offline demo banner when backend is available.
   window.ML_Premium.removeDemoBanner=function(){var b=G('demo-mode-banner');if(b)b.remove();};
   document.addEventListener('DOMContentLoaded',function(){
-    setTimeout(function(){if(apiOk())window.ML_Premium.removeDemoBanner();},300);
+    setTimeout(function(){if(apiOk())window.ML_Premium.removeDemoBanner();},1200);
   });
 })();
