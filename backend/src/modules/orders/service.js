@@ -94,8 +94,30 @@ async function getById(id, userId, roles) {
 }
 async function listForCustomer(customerId, { page=1, limit=20, status }) {
   const off=(page-1)*limit, conds=['o.customer_id=$1'], params=[customerId];
-  if (status) { conds.push(`o.status=$${params.length+1}`); params.push(status); }
-  const { rows } = await query(`SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.placed_at,v.business_name AS vendor_name FROM orders o JOIN vendors v ON v.user_id=o.vendor_id WHERE ${conds.join(' AND ')} ORDER BY o.placed_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,[...params,limit,off]);
+  if (status) { conds.push(`o.status=${params.length+1}`); params.push(status); }
+  const { rows } = await query(`
+    SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.placed_at,
+           v.business_name AS vendor_name,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'product_id', oi.product_id,
+                 'name', oi.product_name_snapshot,
+                 'unit_price', oi.unit_price_snapshot,
+                 'qty', oi.quantity,
+                 'line_total', oi.line_total
+               ) ORDER BY oi.id
+             ) FILTER (WHERE oi.id IS NOT NULL),
+             '[]'::json
+           ) AS items
+    FROM orders o
+    JOIN vendors v ON v.user_id=o.vendor_id
+    LEFT JOIN order_items oi ON oi.order_id=o.id
+    WHERE ${conds.join(' AND ')}
+    GROUP BY o.id, v.business_name
+    ORDER BY o.placed_at DESC
+    LIMIT ${params.length+1} OFFSET ${params.length+2}
+  `,[...params,limit,off]);
   return rows;
 }
 async function listForVendor(vendorId, { page=1, limit=20, status }) {
