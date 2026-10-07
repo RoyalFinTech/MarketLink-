@@ -4943,9 +4943,7 @@ function adminSectionFinanceSystemHTML(tab){
   if(tab==='s-db') return adminSectionTitle('System','Database Monitoring')+adminHealthList(['Database']);
   if(tab==='s-errors'){
     return adminSectionTitle('System','Error Logs')+
-      [['12:42 PM','Payment gateway timeout (mock)','warning'],['09:15 AM','Image upload exceeded size limit','info']].map(function(e){
-        return '<div class="adm-card" style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.4);font-size:10.5px;">'+e[0]+'</span><span class="adm-tag" style="color:'+(e[2]==='warning'?'#F5A623':'#0D9488')+';background:'+(e[2]==='warning'?'rgba(245,166,35,0.15)':'rgba(13,148,136,0.15)')+';">'+e[2]+'</span></div><div style="color:#fff;font-size:12px;margin-top:5px;">'+e[1]+'</div></div>';
-      }).join('');
+      '<div class="adm-card"><div style="color:#fff;font-size:13px;font-weight:700;">Live error telemetry</div><div style="color:#91A4B4;font-size:11px;line-height:1.6;margin-top:8px;">The production API does not currently expose an administrator error-log endpoint to this frontend. No synthetic errors are displayed.</div></div>';
   }
   if(tab==='s-security'){
     return adminSectionTitle('Security','Security Logs')+
