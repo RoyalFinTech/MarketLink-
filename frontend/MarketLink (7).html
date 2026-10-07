@@ -3287,157 +3287,22 @@ async function renderOrderHistPage(){
       }).join('');
 
   el.innerHTML=profBack('Order History'+(fromServer?' ✓':''))+
-    '<div style="padding:13px;">'+(fromServer?'':'<div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:9px;padding:9px 12px;margin-bottom:12px;color:#F5A623;font-size:11px;">Demo data — connect backend to see real orders</div>')+cards+'</div>';
+    '<div style="padding:13px;">'+cards+'</div>';
 }
 
 // Payment Methods
 function renderPayPage(){
-  var el=G('profile-body');
-  var cards='';
-  S.payments.forEach(function(m){
-    cards+='<div style="background:var(--sf);border-radius:14px;padding:14px;border:1.5px solid '+(m.def?'#0D7377':'rgba(255,255,255,0.07)')+';margin-bottom:11px;display:flex;align-items:center;gap:12px;">'+
-      '<div style="font-size:24px;">'+m.icon+'</div>'+
-      '<div style="flex:1;"><div style="color:var(--tx);font-size:13px;font-weight:700;">'+m.name+'</div>'+
-      (m.def?'<div style="color:#0D7377;font-size:10px;font-weight:600;margin-top:2px;">Default</div>':'')+
-      '</div><div style="display:flex;gap:7px;">'+
-      (!m.def?'<button class="btn btn-s btn-sm" onclick="setDefPay('+m.id+')">Set Default</button>':'')+
-      (m.id!==1?'<button class="btn btn-er btn-sm" onclick="removePay('+m.id+')">Remove</button>':'')+
-      '</div></div>';
-  });
+  var el=G('profile-body'); if(!el) return;
   el.innerHTML=profBack('Payment Methods')+
     '<div style="padding:13px;">'+
-    '<button class="btn btn-p" onclick="addPay()" style="margin-bottom:14px;">+ Add Payment Method</button>'+
-    cards+'</div>';
-}
-function addPay(){
-  var opts=['Wave','AfriMoney','QMoney','APS Wallet','Visa','Mastercard','Bank Transfer'];
-  var icons={Wave:'📱',AfriMoney:'💚',QMoney:'💰','APS Wallet':'🏦',Visa:'💳',Mastercard:'💳','Bank Transfer':'🏛️'};
-  var list=opts.map(function(o,i){return (i+1)+'. '+o;}).join('\n');
-  var choice=prompt('Select payment method:\n'+list+'\nEnter number:');
-  var idx=parseInt(choice)-1;
-  if(isNaN(idx)||idx<0||idx>=opts.length) return;
-  var name=opts[idx];
-  if(S.payments.find(function(m){return m.name===name;})){toast('Already added','error');return;}
-  S.payments.push({id:Date.now(),name:name,icon:icons[name]||'💳',def:false});
-  renderPayPage(); toast('Added '+name);
-}
-function setDefPay(id){S.payments=S.payments.map(function(m){return Object.assign({},m,{def:m.id===id});});renderPayPage();}
-function removePay(id){S.payments=S.payments.filter(function(m){return m.id!==id;});renderPayPage();toast('Removed');}
-
-// Notification Settings
-function renderNotifSet(){
-  var el=G('profile-body');
-  var items=[['order','🛒','Order notifications'],['promo','📢','Promotional offers'],
-    ['rider','🛵','Rider updates'],['vendor','🏪','Vendor updates'],
-    ['email','✉️','Email notifications'],['sms','📱','SMS notifications'],['push','🔔','Push notifications']];
-  var rows='';
-  items.forEach(function(item,i){
-    var k=item[0];
-    rows+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px;'+(i<items.length-1?'border-bottom:1px solid rgba(255,255,255,0.06);':'')+'">'+
-      '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:18px;">'+item[1]+'</span><span style="color:var(--tx);font-size:13px;">'+item[2]+'</span></div>'+
-      '<div onclick="toggleNotifK(\''+k+'\')" class="tog '+(S.notifSettings[k]?'on':'')+'"><div class="tog-dot"></div></div></div>';
-  });
-  el.innerHTML=profBack('Notification Settings')+
-    '<div style="padding:13px;"><div style="background:var(--sf);border-radius:14px;border:1px solid rgba(255,255,255,0.07);overflow:hidden;">'+rows+'</div></div>';
-}
-function toggleNotifK(k){S.notifSettings[k]=!S.notifSettings[k];renderNotifSet();toast(S.notifSettings[k]?'Enabled':'Disabled');}
-
-// Privacy Settings
-function renderPrivacySet(){
-  var el=G('profile-body');
-  var items=[
-    {icon:'📄',title:'Privacy Policy',desc:'Read our full privacy policy',fn:'S.profilePage=\'privPolicy\';renderProfile();'},
-    {icon:'✅',title:'Manage Consent',desc:'Control how we use your data',fn:'alert(\'Consent: You have agreed to order processing, analytics, and support communications.\')'},
-    {icon:'📢',title:'Marketing Preferences',desc:'Manage marketing communications',fn:'alert(\'Marketing preferences saved. You can opt out anytime.\')'},
-    {icon:'🗑️',title:'Request Data Deletion',desc:'Request deletion of your account data',fn:'if(confirm(\'Submit data deletion request?\')){toast(\'Request submitted. Confirmation within 30 days.\')}'},
-    {icon:'📥',title:'Download My Data',desc:'Get a copy of your personal data',fn:'toast(\'Data export will be emailed within 48 hours.\')'},
-    {icon:'🔐',title:'Review Permissions',desc:'Manage app permissions',fn:'alert(\'Active permissions:\\n✅ Location (delivery)\\n✅ Notifications\\n⬜ Camera (optional)\')'}
-  ];
-  var rows='';
-  items.forEach(function(item,i){
-    rows+='<div onclick="'+item.fn+'" style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer;">'+
-      '<div style="font-size:22px;width:32px;text-align:center;">'+item.icon+'</div>'+
-      '<div style="flex:1;"><div style="color:var(--tx);font-size:13px;font-weight:600;">'+item.title+'</div>'+
-      '<div style="color:var(--mu);font-size:11px;margin-top:2px;">'+item.desc+'</div></div>'+
-      '<span style="color:var(--mu);font-size:14px;">›</span></div>';
-  });
-  el.innerHTML=profBack('Privacy Settings')+'<div style="padding:13px;">'+rows+'</div>';
-}
-
-// Privacy Policy
-function renderPrivPolicy(){
-  var el=G('profile-body');
-  var sections=[
-    ['Information We Collect','We collect your name, phone number, delivery addresses, order history, device information, payment preferences, and documents submitted for vendor or rider registration.'],
-    ['How We Use Your Information','Your information is used to process orders, improve our services, provide customer support, prevent fraud, personalise your experience, and comply with legal obligations under Gambian law.'],
-    ['Your Rights','You have the right to access your personal data, correct inaccurate information, request deletion, withdraw consent at any time, and download a copy of your data.'],
-    ['Data Sharing','We do not sell your personal data. We share information only with delivery riders (for order fulfilment) and payment processors (for transactions).'],
-    ['Security','MarketLink uses industry-standard encryption and security measures to protect your information.'],
-    ['Contact Us','marketlinkgambia@gmail.com\nAddress: [Office Address — To Be Confirmed]\nPowered by Royal FinTech Company, The Gambia.']
-  ];
-  var html=profBack('Privacy Policy')+'<div style="padding:13px;">'+
-    '<div style="background:rgba(13,115,119,0.1);border:1px solid rgba(13,115,119,0.3);border-radius:12px;padding:12px;margin-bottom:16px;">'+
-    '<div style="color:#0D7377;font-size:11px;font-weight:600;">Last updated: June 2026</div></div>';
-  sections.forEach(function(s,i){
-    html+='<div style="margin-bottom:16px;"><h4 style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:7px;">'+(i+1)+'. '+s[0]+'</h4>'+
-      '<div style="color:var(--mu);font-size:12px;line-height:1.7;white-space:pre-line;">'+s[1]+'</div></div>';
-  });
-  el.innerHTML=html+'</div>';
-}
-
-// Help Centre
-function renderHelp(){
-  var el=G('profile-body');
-  var faqs=[
-    ['How do I track my order?','Go to the Orders tab to see live tracking with real-time rider location.'],
-    ['Can I cancel an order?','Cancel within 2 minutes of placing. After that, contact support via 💬.'],
-    ['How do I add a delivery address?','Profile → Saved Addresses → + Add New Address.'],
-    ['What payment methods are accepted?','Pay on Delivery, Wave, AfriMoney, QMoney, APS Wallet, Visa, Mastercard, Bank Transfer.'],
-    ['How do I become a vendor?','Tap "Become a Vendor" on Home or Profile and complete the 3-step application.'],
-    ['What areas do you deliver to?','Serrekunda, Banjul, Kololi, Bakau, Brikama and surrounding areas.'],
-    ['How long does delivery take?','Typically 20-45 minutes depending on your location and restaurant.'],
-    ['How do I contact support?','Call or WhatsApp: 4071510, or tap the 💬 support button.']
-  ];
-  var faqHTML='';
-  faqs.forEach(function(f,i){
-    faqHTML+='<div style="background:var(--sf);border-radius:13px;border:1px solid rgba(255,255,255,0.07);margin-bottom:9px;overflow:hidden;">'+
-      '<div onclick="toggleFAQ('+i+')" style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;">'+
-      '<span style="color:var(--tx);font-size:12px;font-weight:600;flex:1;padding-right:8px;">'+f[0]+'</span>'+
-      '<span id="faq-arrow-'+i+'" style="color:var(--mu);font-size:14px;">›</span></div>'+
-      '<div id="faq-body-'+i+'" style="display:none;padding:0 14px 13px;color:var(--mu);font-size:12px;line-height:1.6;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;">'+f[1]+'</div></div>';
-  });
-  el.innerHTML=profBack('Help Centre')+
-    '<div style="padding:13px;">'+
-    (S.user&&S.user.accountStatus==='Suspended'?renderSuspendedBanner():'')+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'+
-    '<div onclick="openSheet(\'sh-sup\')" style="background:var(--sf);border-radius:13px;padding:14px 12px;border:1px solid rgba(255,255,255,0.07);text-align:center;cursor:pointer;"><div style="font-size:26px;margin-bottom:6px;">💬</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Contact Support</div></div>'+
-    '<a href="tel:+2204071510" style="background:var(--sf);border-radius:13px;padding:14px 12px;border:1px solid rgba(255,255,255,0.07);text-align:center;cursor:pointer;text-decoration:none;"><div style="font-size:26px;margin-bottom:6px;">📞</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Call: 4071510</div></a>'+
+    '<div style="background:var(--sf);border-radius:14px;padding:15px;border:1px solid rgba(255,255,255,0.07);margin-bottom:14px;">'+
+    '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:6px;">Payment at checkout</div>'+
+    '<div style="color:var(--mu);font-size:11px;line-height:1.55;">Payment options shown during checkout are controlled by the live MarketLink backend. This screen does not create or store simulated payment methods.</div>'+
     '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">'+
-    '<div onclick="openComplaintForm(\'complaint\')" style="background:rgba(239,68,68,0.08);border-radius:13px;padding:14px 12px;border:1px solid rgba(239,68,68,0.25);text-align:center;cursor:pointer;"><div style="font-size:24px;margin-bottom:6px;">🚨</div><div style="color:#EF4444;font-size:11.5px;font-weight:600;">Submit Complaint</div></div>'+
-    '<div onclick="openComplaintForm(\'feedback\')" style="background:rgba(13,115,119,0.08);border-radius:13px;padding:14px 12px;border:1px solid rgba(13,115,119,0.25);text-align:center;cursor:pointer;"><div style="font-size:24px;margin-bottom:6px;">💡</div><div style="color:#0D9488;font-size:11.5px;font-weight:600;">Send Feedback</div></div>'+
-    '<div onclick="openComplaintForm(\'vendor\')" style="background:rgba(245,166,35,0.08);border-radius:13px;padding:14px 12px;border:1px solid rgba(245,166,35,0.25);text-align:center;cursor:pointer;"><div style="font-size:24px;margin-bottom:6px;">🏪</div><div style="color:#F5A623;font-size:11.5px;font-weight:600;">Report Vendor</div></div>'+
-    '<div onclick="openComplaintForm(\'rider\')" style="background:rgba(124,58,237,0.08);border-radius:13px;padding:14px 12px;border:1px solid rgba(124,58,237,0.25);text-align:center;cursor:pointer;"><div style="font-size:24px;margin-bottom:6px;">🛵</div><div style="color:#7C3AED;font-size:11.5px;font-weight:600;">Report Rider</div></div>'+
-    '</div>'+
-    '<h4 style="color:var(--tx);font-size:14px;font-weight:700;margin-bottom:11px;">Frequently Asked Questions</h4>'+
-    faqHTML+'</div>';
-}
-function renderSuspendedBanner(){
-  var st=S.user.suspensionInfo||{reason:'Account under review',appealStatus:'none'};
-  return '<div style="background:rgba(239,68,68,0.1);border:1.5px solid rgba(239,68,68,0.35);border-radius:14px;padding:15px;margin-bottom:16px;">'+
-    '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;"><span style="font-size:20px;">⛔</span><span style="color:#EF4444;font-size:13px;font-weight:800;">Account Suspended</span></div>'+
-    '<div style="color:rgba(255,255,255,0.75);font-size:12px;line-height:1.5;margin-bottom:6px;">Reason: '+st.reason+'</div>'+
-    '<div style="color:rgba(255,255,255,0.5);font-size:11.5px;margin-bottom:12px;">Appeal status: <b style="color:#F5A623;">'+(st.appealStatus==='none'?'Not yet submitted':st.appealStatus)+'</b></div>'+
-    '<button class="btn btn-p btn-sm" style="width:100%;" onclick="openAppealForm()">📝 Submit an Appeal</button>'+
+    '<div style="background:var(--sf);border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:12px;">'+
+    '<div style="font-size:24px;">💵</div><div style="flex:1;"><div style="color:var(--tx);font-size:13px;font-weight:700;">Pay on Delivery</div><div style="color:#0D7377;font-size:10px;font-weight:600;margin-top:2px;">Available where enabled by the live order service</div></div></div>'+
     '</div>';
 }
-function toggleFAQ(i){
-  var body=G('faq-body-'+i), arrow=G('faq-arrow-'+i);
-  var open=body.style.display==='none'||body.style.display==='';
-  body.style.display=open?'block':'none';
-  if(arrow) arrow.style.transform=open?'rotate(90deg)':'none';
-}
-
 // ═══════════════════════════════════════════════════════════
 // CUSTOMER COMPLAINTS / FEEDBACK / REPORTS — feed live into Admin → Complaints Center
 // ═══════════════════════════════════════════════════════════
