@@ -569,3 +569,74 @@ Never claim "production-ready" until live deployment and functional tests are ve
 11. Add intentionally generated realistic promotional imagery.
 12. Run browser/device QA and document the results in GitHub.
 13. Keep commits small, reviewable, and reversible.
+
+
+
+## 2026-10-07 Production Continuation — Live Wiring Milestone
+
+This continuation was performed against the current `main` branch after reading and auditing this handover.
+
+### Route / API / data-source matrix
+| Role | Frontend action | Backend endpoint | Primary production data source |
+|---|---|---|---|
+| Customer | Dashboard | `GET /products`, `GET /categories/tree`, `GET /customers/me`, `GET /customers/me/orders`, `GET /customers/me/wallet`, `GET /customers/me/notifications` | `products`, `categories`, `users/customers`, `orders`, `wallets`, `transactions`, `notifications` |
+| Customer | Search / category / product | `GET /products?search=...`, `GET /products?categoryId=...`, `GET /products/:id` | Live `products`, vendor/category joins |
+| Customer | Cart / checkout | `GET /products/:id`, `POST /orders`, `POST /payments/initiate` | Live `products`, inventory, `orders`, `order_items`, payments |
+| Customer | Addresses | `GET/POST/PUT/DELETE /customers/me/addresses...` | Customer address records |
+| Customer | Orders / tracking | `GET /customers/me/orders`, `GET /orders/:id`, `GET /delivery/:id/tracking` | `orders`, `order_items`, `deliveries`, tracking/location |
+| Customer | Profile / photo | `GET/PUT /customers/me`, `POST /uploads` | User/customer profile + upload storage |
+| Customer | Wishlist / wallet / notifications | `GET/POST/DELETE /customers/me/wishlist...`, `GET /customers/me/wallet...`, `GET /customers/me/notifications` | Wishlist, `wallets`, `transactions`, `notifications` |
+| Customer | AI | `POST /assistant/ask`, `GET /assistant/stats` | Assistant + backend knowledge/context |
+| Vendor | Application / KYC | `POST /vendors/register` | `vendors`, user roles/KYC |
+| Vendor | Dashboard / orders | `GET /orders/vendor` | Vendor-owned `orders` / `order_items` |
+| Vendor | Products / inventory | `GET /products?vendorId=...`, `POST /products`, `PUT/DELETE /products/:id`, `PATCH /products/:id/inventory` | Vendor-owned `products` / inventory |
+| Vendor | Analytics / profile | `GET /vendors/me/analytics`, `GET /vendors/:id`, `PUT /vendors/profile` | Vendor profile + production aggregates |
+| Vendor | Order operations | `POST /orders/:id/accept`, `POST /orders/:id/reject`, `PATCH /orders/:id/status` | Authoritative order workflow |
+| Vendor | Withdrawals | `GET/POST /vendors/withdrawals` | `wallets`, `withdrawals`, `transactions` |
+| Rider | Application / KYC | `POST /riders/register`, admin approval | `riders`, user roles/KYC |
+| Rider | Availability / delivery queue | `PATCH /riders/availability`, `GET /riders/me/deliveries` | Rider state + `deliveries` |
+| Rider | Acceptance / lifecycle | `POST /delivery/:id/accept`, `PATCH /delivery/:id/status` | `deliveries` + linked `orders` |
+| Rider | GPS / earnings / withdrawals | `POST /riders/location`, `GET /riders/me/earnings`, `GET/POST /riders/me/withdrawals` | Tracking + production earnings + wallet/withdrawals |
+| Admin | Login / dashboard / users | Auth + `GET /admin/dashboard`, `GET /admin/users` | Auth/session, `users`, platform aggregates |
+| Admin | Approvals | Vendor/rider approve/reject routes | `vendors`, `riders`, KYC |
+| Admin | Analytics / reports | `GET /admin/analytics`, `GET /admin/reports` | Production order/revenue/signup reports |
+| Admin | Withdrawals | `GET /admin/withdrawals` + admin actions | `withdrawals`, `wallets`, `transactions` |
+| Admin | AI / settings / audit | `POST /assistant/ask`, `GET /assistant/stats`, `GET/PUT /admin/settings...`, `GET /admin/audit-logs` | Assistant knowledge, settings, `admin_action_logs` |
+
+### Completed in this milestone
+- Premium checkout preserves real UUID product IDs and refreshes cart item metadata from live products.
+- Mixed-vendor carts are blocked rather than silently merged.
+- Checkout requires a real saved delivery address ID and sends `deliveryAddressId`; no synthetic checkout address is created.
+- Supported payment options are backend-supported only, and order checkout calls backend payment initiation.
+- Saved addresses use backend add/edit/set-default/delete operations.
+- Premium admin analytics, revenue, payouts and AI views consume backend data and show zero/unavailable states where feeds are absent.
+- Fixed the premium admin target to `adash-body` and fixed the admin fallback override recursion.
+- Added frontend admin settings/audit API methods.
+- Preserved UUIDs in legacy vendor product edit/remove handlers.
+- Routed vendor/rider withdrawals through real backend withdrawal APIs.
+- Removed rider decline as a fake local state mutation; current backend has no separate decline endpoint.
+- Replaced active rider map decoration with a truthful live-location state when GPS is unavailable.
+- Disabled legacy browser-only vendor promotion creation where no backend promotion endpoint exists.
+
+### Verification
+- `frontend/premium-marketlink.js` passes JavaScript compilation via `new Function(...)`.
+- Premium source contains zero `Number(p.id)` conversions.
+- Premium source contains zero stale `G('adm-content')` references.
+- Checkout source contains real payment initiation and saved-address ID wiring.
+- No production marketplace records were inserted.
+
+### Remaining risks
+- Legacy empty seed variables and old render functions remain in the monolithic HTML and need caller-by-caller migration before deletion.
+- Full legacy vendor/rider UI cleanup remains.
+- Additional legacy admin sections remain and must be routed to real APIs or honest unavailable states.
+- Full hosted browser/device QA is still outstanding.
+- Render service deployment verification is blocked because the connected Render workspace is not selected; this milestone is not being labeled as a verified Render deployment.
+
+### Commits
+- `fd5803a84dc8eed38a3c5e10711fed8041b93348`
+- `7004942386dc71ec0af0c38c025b42119dd62b93`
+- `2454ed8dd54dc6fc04d87d9821b74f63ed61b38d`
+- `72b1ea63b0ff8d898a0a5cb4dc891ba48c9087f5`
+- `85887585bcdb94d6e933c01af66524aaa6b6bd0e`
+- `b39c887464529a07ab845ce0e8d331a3cd04b90e`
+- `1d87d426949b5e1415de9873edb082ada3f86fce`
