@@ -465,14 +465,73 @@
   async function refreshAdmin(){
     try{var d=await liveAdminData();if(!d){toast('Admin session required.','error');return;}var root=G('adm-content');if(root)root.innerHTML=liveAdminOverview(d);}catch(e){toast(e.error||'Could not load live admin data.','error');}
   }
+  async function renderLiveAdminAnalytics(period){
+    var root=G('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live analytics</div><div class="ml-hero-sub">Loading production analytics…</div></div>';
+    try{
+      var r=await ML_API.admin.analytics({period:period||'30d'}),d=r.data||{};
+      var daily=Array.isArray(d.dailyRevenue)?d.dailyRevenue:[],statusRows=Array.isArray(d.ordersByStatus)?d.ordersByStatus:[],signups=Array.isArray(d.signups)?d.signups:[];
+      var totalOrders=statusRows.reduce(function(a,x){return a+Number(x.count||0);},0);
+      var totalRevenue=daily.reduce(function(a,x){return a+Number(x.revenue||0);},0);
+      var maxRev=Math.max.apply(null,daily.map(function(x){return Number(x.revenue||0);}).concat([1]));
+      var revBars=daily.slice(-14).map(function(x){var v=Number(x.revenue||0),h=Math.max(4,Math.round(v/maxRev*120));return '<div title="'+esc(String(x.day||''))+': '+money(v)+'" style="flex:1;min-width:9px;height:'+h+'px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#42D2C9,#0D7377);"></div>';}).join('');
+      var statusHtml=statusRows.length?statusRows.map(function(x){return '<div class="ml-profile-row"><div class="ico">📦</div><div class="copy"><b>'+esc(x.status||'Unknown')+'</b><span>Orders in selected period</span></div><strong>'+Number(x.count||0)+'</strong></div>';}).join(''):'<div class="ml-empty"><b>No order activity yet</b><span>The selected period contains no production orders.</span></div>';
+      var signupHtml=signups.length?signups.slice(-10).map(function(x){return '<div class="ml-profile-row"><div class="ico">👥</div><div class="copy"><b>'+esc(String(x.day||'').slice(0,10))+'</b><span>New user registrations</span></div><strong>'+Number(x.users||0)+'</strong></div>';}).join(''):'<div class="ml-empty"><b>No customer growth data yet</b><span>No registrations were recorded in the selected period.</span></div>';
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">MarketLink Operations</div><h3 style="margin:4px 0">Live analytics</h3></div><button onclick="window.ML_Premium.refreshAdminAnalytics()">Refresh</button></div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Orders</div><div class="ml-stat-value">'+totalOrders+'</div></div><div class="ml-stat"><div class="ml-stat-label">Revenue</div><div class="ml-stat-value">'+money(totalRevenue)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Signup days</div><div class="ml-stat-value">'+signups.length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Period</div><div class="ml-stat-value">'+esc(period||'30d')+'</div></div></div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Revenue by day</h3><span style="color:#91A4B4;font-size:10px">Live backend data</span></div><div style="height:150px;display:flex;align-items:flex-end;gap:5px;padding:12px 4px 4px">'+(revBars||'<div class="ml-empty"><b>No revenue data</b></div>')+'</div></div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Order status</h3></div>'+statusHtml+'</div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Customer growth</h3></div>'+signupHtml+'</div></div>';
+    }catch(e){root.innerHTML='<div class="ml-empty" style="margin:20px"><b>Live analytics unavailable</b><span>'+esc(e.error||'The backend did not return analytics.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshAdminAnalytics()">Retry</button></div>';}
+  }
+  async function renderLiveAdminRevenue(){
+    var root=G('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live revenue</div><div class="ml-hero-sub">Loading delivered-order revenue from the production database…</div></div>';
+    try{
+      var r=await ML_API.admin.reports({type:'revenue'}),rows=normalizeProducts(r.data),sum=rows.reduce(function(a,x){return a+Number(x.revenue||0);},0);
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Live revenue</h3><button onclick="window.ML_Premium.refreshAdminRevenue()">Refresh</button></div><div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Delivered-order revenue</div><div class="ml-stat-value">'+money(sum)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Report days</div><div class="ml-stat-value">'+rows.length+'</div></div></div>'+
+      (rows.length?'<div class="ml-profile-card" style="margin-top:12px">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">💰</div><div class="copy"><b>'+esc(String(x.day||'').slice(0,10))+'</b><span>'+Number(x.orders||0)+' delivered order(s) · platform fees '+money(x.platform_fees||0)+'</span></div><strong>'+money(x.revenue||0)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty" style="margin-top:12px"><b>No order activity yet</b><span>No delivered orders were returned for the current report.</span></div>')+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Live revenue unavailable</b><span>'+esc(e.error||'The backend did not return a revenue report.')+'</span></div>';}
+  }
+  async function renderLiveAdminPayouts(){
+    var root=G('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live payouts</div><div class="ml-hero-sub">Loading pending withdrawals from the production database…</div></div>';
+    try{
+      var r=await ML_API.admin.withdrawals({page:1,limit:100}),rows=normalizeProducts(r.data);
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending payouts</h3><button onclick="window.ML_Premium.refreshAdminPayouts()">Refresh</button></div>'+
+      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">💸</div><div class="copy"><b>'+esc(x.full_name||'Account')+'</b><span>'+esc(x.user_type||'account')+' · '+esc(x.payout_method||'Payout')+' · '+esc(x.status||'processing')+'</span></div><strong>'+money(x.amount||0)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No pending payouts</b><span>The production database has no withdrawal requests awaiting admin action.</span></div>')+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Live payouts unavailable</b><span>'+esc(e.error||'The backend did not return withdrawal data.')+'</span></div>';}
+  }
+  function renderAdminUnavailable(title,detail){
+    var root=G('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>'+esc(title)+'</b><span>'+esc(detail)+'</span></div></div>';
+  }
   function adminGoToLive(tab){
     if(tab==='overview'){refreshAdmin();return;}
+    if(tab==='analytics'){renderLiveAdminAnalytics('30d');return;}
+    if(tab==='f-revenue'){renderLiveAdminRevenue();return;}
+    if(tab==='f-payouts'){renderLiveAdminPayouts();return;}
+    if(tab==='f-transactions'){renderAdminUnavailable('Transactions not exposed by current admin API','The current backend does not expose a general admin transaction feed. No synthetic transactions are shown.');return;}
+    if(tab==='f-failed'){renderAdminUnavailable('Failed payments not exposed by current admin API','The current backend has payment records and provider webhook processing, but no dedicated admin failed-payment feed. No fabricated records are shown.');return;}
+    if(tab==='ai'){
+      (async function(){
+        var root=G('adash-body');if(!root)return;
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">MarketLink AI Operations</div><div class="ml-hero-sub">Summarizing live backend activity…</div></div>';
+        try{
+          var dr=await ML_API.admin.dashboard(),ar=await ML_API.admin.analytics({period:'30d'}),d=dr.data||{},a=ar.data||{},ss=d.stats||{};
+          var prompt='Summarize these actual MarketLink production metrics without inventing facts. State zero-data clearly. Metrics: '+JSON.stringify({stats:ss,pendingApprovals:d.pendingApprovals||{},recentOrders:d.recentOrders||[],dailyRevenue:a.dailyRevenue||[],ordersByStatus:a.ordersByStatus||[],signups:a.signups||[]});
+          var ai=await ML_API.assistant.ask(prompt),answer=ai&&ai.data&&(ai.data.answer||ai.data.message||ai.data.text)||ai.answer||ai.message||'No AI summary was returned.';
+          root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>MarketLink AI Operations</h3><button onclick="adminGoTo(\'overview\')">← Overview</button></div><div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🤖</div><div class="copy"><b>Live-data summary</b><span>Generated from current backend metrics. No fabricated figures are supplied.</span></div></div><div style="padding:14px;color:#DCE8ED;font-size:12px;line-height:1.7">'+esc(answer)+'</div></div></div>';
+        }catch(e){root.innerHTML='<div class="ml-empty"><b>AI summary unavailable</b><span>'+esc(e.error||'The assistant could not summarize current backend data.')+'</span></div>';}
+      })();
+      return;
+    }
+    if(tab==='o-active'||tab==='deliveries'){renderAdminUnavailable('General live order/delivery list unavailable','The current backend exposes dashboard recent orders and authorized delivery lookup, but no general admin order feed. No fake records are shown.');return;}
     if(tab==='appr-pv'||tab==='appr-pr'){
       var kind=tab==='appr-pv'?'vendor':'rider';
       var call=kind==='vendor'?ML_API.vendors.list({page:1,limit:100,kycStatus:'pending'}):ML_API.riders.list({page:1,limit:100,kycStatus:'pending'});
       Promise.resolve(call).then(function(r){
-        var items=(r.data&&r.data.items)||r.data||[];
-        var root=G('adm-content');if(!root)return;
+        var items=(r.data&&r.data.items)||r.data||[],root=G('adm-content');if(!root)return;
         root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Live '+(kind==='vendor'?'Vendor':'Rider')+' Approvals</h3><button onclick="window.ML_Premium.refreshAdmin()">← Overview</button></div>'+
           (items.length?items.map(function(a){var id=a.id||a.user_id;return '<div class="ml-profile-card" style="margin-bottom:10px;padding:14px"><div style="display:flex;gap:12px;align-items:center"><div class="ml-avatar" style="width:48px;height:48px;border-radius:14px">'+(kind==='vendor'?'🏪':'🛵')+'</div><div style="flex:1"><b style="color:#fff">'+esc(a.business_name||a.full_name||'Application')+'</b><div style="font-size:10px;color:#8195A4;margin-top:3px">'+esc(a.phone||a.business_address||a.address||'')+'</div><div style="font-size:9px;color:#F5B83D;margin-top:4px">KYC: '+esc(a.kyc_status||'pending')+'</div></div></div><div style="display:flex;gap:8px;margin-top:12px"><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approveApplicant(\''+esc(id)+'\',\''+kind+'\')">Approve</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectApplicant(\''+esc(id)+'\',\''+kind+'\')">Reject</button></div></div>';}).join(''):'<div class="ml-empty"><b>No pending '+kind+' applications</b><span>The production database has no records awaiting approval.</span></div>')+'</div>';
       }).catch(function(e){toast(e.error||'Could not load approvals.','error');});
@@ -480,6 +539,7 @@
     }
     if(typeof window.__ML_ORIGINAL_ADMIN_GOTO==='function') return window.__ML_ORIGINAL_ADMIN_GOTO(tab);
   }
+
   async function approveApplicant(id,kind){
     try{await (kind==='vendor'?ML_API.vendors.approve(id,{notes:'Approved from MarketLink admin dashboard'}):ML_API.riders.approve(id,{notes:'Approved from MarketLink admin dashboard'}));toast((kind==='vendor'?'Vendor':'Rider')+' approved ✓');adminGoToLive(kind==='vendor'?'appr-pv':'appr-pr');}
     catch(e){toast(e.error||'Approval failed.','error');}
@@ -507,7 +567,7 @@
   window.adminGoTo=adminGoToLiveSafe;
   window.__ML_ORIGINAL_ADMIN_GOTO=window.adminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
