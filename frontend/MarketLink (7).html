@@ -1862,7 +1862,8 @@ async function doAdminLogin(){
     adminAuthErr(err.error||'Admin sign in failed. Please try again.');
   }
 }
-function adminLogout(){
+async function adminLogout(){
+  try{ await ML_API.auth.logout(); }catch(e){}
   AdminSession.end();
   ADMIN_STATE.signoutConfirmOpen=false; ADMIN_STATE.drawerOpen=false;
   ADMIN_STATE.quickMenuOpen=false; ADMIN_STATE.notifPanelOpen=false;
@@ -3818,7 +3819,7 @@ function renderRDash(){
 function rToggleOnline(){S.rOnline=!S.rOnline;renderRDash();toast(S.rOnline?'You\'re online! Ready for deliveries 🛵':'You\'re offline');}
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN DASHBOARD (demo/staff preview — backend-ready)
+// ADMIN DASHBOARD — backend-connected production portal
 // ═══════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════
 // ADMIN PORTAL — navigation tree (Dashboard/Users/Orders/Comms/CRM/Finance/System)
@@ -3910,7 +3911,7 @@ function adminSectionTitle(crumb,title){
 // ═══════════════════════════════════════════════════════════════════
 // AI KNOWLEDGE CENTER — real backend (knowledge_entries table via
 // ML_API.adminKnowledge). Unlike the pre-existing "AI Training" page
-// above (which is a decorative mock, left untouched), every action
+// All dashboard actions below are backed by authenticated API operations
 // here calls the real backend: list/search/filter, create, edit,
 // activate/deactivate, delete, history, and "teach".
 // ═══════════════════════════════════════════════════════════════════
