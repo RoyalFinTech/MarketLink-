@@ -4947,9 +4947,7 @@ function adminSectionFinanceSystemHTML(tab){
   }
   if(tab==='s-security'){
     return adminSectionTitle('Security','Security Logs')+
-      [['Just now','Admin login successful — '+(AdminSession.staffId||'')],['Today','Account #4821 auto-flagged for fraud review'],['Yesterday','3 failed admin login attempts from unknown device']].map(function(l){
-        return '<div class="adm-card" style="margin-bottom:7px;"><div style="color:#fff;font-size:12px;">'+l[1]+'</div><div style="color:rgba(255,255,255,0.35);font-size:10.5px;margin-top:4px;">'+l[0]+'</div></div>';
-      }).join('');
+      '<div class="adm-card"><div style="color:#fff;font-size:13px;font-weight:700;">Live security telemetry</div><div style="color:#91A4B4;font-size:11px;line-height:1.6;margin-top:8px;">The production API does not currently expose administrator security-log records to this frontend. No fabricated login or fraud events are shown.</div></div>';
   }
   if(tab==='s-settings'){
     var st=s.settings, sf=s.settingsTab||'general';
