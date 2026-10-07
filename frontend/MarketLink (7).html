@@ -3161,10 +3161,10 @@ function renderAffiliatePage(){
       return '<div onclick="'+(p[2]?'shareAffiliateLink('+JSON.stringify(p[2])+')':'toast(\'Copy your link and share it manually on '+p[1]+'\')')+'" style="background:var(--sf);border-radius:12px;padding:12px 6px;text-align:center;cursor:pointer;border:1px solid rgba(255,255,255,0.07);"><div style="font-size:18px;margin-bottom:3px;">'+p[0]+'</div><div style="color:var(--tx);font-size:9.5px;font-weight:600;">'+p[1]+'</div></div>';
     }).join('')+'</div>'+
     '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);">'+
-    '<div style="color:var(--tx);font-size:12.5px;font-weight:700;margin-bottom:9px;">🏆 Top Affiliates This Month</div>'+
-    [['Modou C.',2840],['Fatou J.',2105],['You',S.affiliateEarnings],['Lamin T.',980]].sort(function(a,b){return b[1]-a[1];}).map(function(a,i){
-      return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:var(--tx);font-size:12px;'+(a[0]==='You'?'font-weight:800;color:#F5A623;':'')+'">'+(i+1)+'. '+a[0]+'</span><span style="color:var(--mu);font-size:12px;">D '+a[1].toLocaleString()+'</span></div>';
-    }).join('')+'</div>'+
+    '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);">'+
+    '<div style="color:var(--tx);font-size:12.5px;font-weight:700;margin-bottom:9px;">📊 Your live referral performance</div>'+
+    '<div style="color:var(--mu);font-size:11px;line-height:1.55;">MarketLink only displays referral statistics returned for your account. Other affiliates’ earnings are not fabricated or hardcoded.</div>'+
+    '</div>'+
     '<div style="color:rgba(255,255,255,0.3);font-size:10px;text-align:center;margin-top:14px;">Click/order tracking and commission payouts require a connected backend for live data.</div>'+
     '</div>';
 }
