@@ -3470,39 +3470,19 @@ function renderVDash(){
           '<span style="color:#F5A623;font-size:11px;">'+p.status+'</span></div>';
       }).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:10px;">No payouts yet</div>')+
       '</div>';
-  } else if(S.vSubTab==='reviews'){
-    var revs=[{name:'Lamin T.',stars:5,text:'Fast delivery, food was hot and fresh!'},{name:'Fatou J.',stars:4,text:'Great taste, portion could be bigger.'},{name:'Awa S.',stars:5,text:'Best Domoda in Serrekunda 🥜'}];
-    content='<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;text-align:center;">'+
-      '<div style="color:#F5A623;font-size:24px;font-weight:800;">4.8 ⭐</div><div style="color:var(--mu);font-size:11px;margin-top:2px;">Based on 124 reviews</div></div>'+
-      revs.map(function(r){
-        return '<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;">'+
-          '<div style="display:flex;justify-content:space-between;"><span style="color:var(--tx);font-size:12px;font-weight:600;">'+r.name+'</span><span style="color:#F5A623;font-size:11px;">'+'⭐'.repeat(r.stars)+'</span></div>'+
-          '<div style="color:var(--mu);font-size:11px;margin-top:5px;">'+r.text+'</div></div>';
-      }).join('');
-  } else if(S.vSubTab==='promo'){
-    content='<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:13px;">'+
-      '<div style="color:var(--tx);font-size:12px;font-weight:700;margin-bottom:10px;">🏷️ Create Discount</div>'+
-      '<input class="inp" placeholder="Discount name (e.g. Weekend Special)" id="vpromo-name" style="margin-bottom:8px;">'+
-      '<div style="display:flex;gap:7px;">'+
-      '<input class="inp" placeholder="% off" id="vpromo-pct" inputmode="numeric" style="flex:1;margin-bottom:9px;">'+
-      '<input class="inp" placeholder="Code" id="vpromo-code" style="flex:1;margin-bottom:9px;"></div>'+
-      '<button class="btn btn-p" onclick="vAddPromo()">Create Promotion</button></div>'+
-      (S.vPromos&&S.vPromos.length>0?S.vPromos.map(function(p){
-        return '<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'+
-          '<div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+p.name+'</div><div style="color:#0D7377;font-size:11px;font-weight:700;">'+p.pct+'% off · '+p.code+'</div></div>'+
-          '<button class="btn btn-er btn-sm" onclick="vRemovePromo('+p.id+')">Remove</button></div>';
-      }).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:10px;">No active promotions</div>');
+  } else if(S.vSubTab==='reviews' || S.vSubTab==='promo'){
+    content='<div class="ml-empty" style="margin-top:4px;"><div style="font-size:30px;">🧩</div><b>Feature not connected</b><span>This feature is intentionally hidden from production until its backend workflow is available. No sample data is shown.</span></div>';
   } else if(S.vSubTab==='analytics') {
     var a=S.vAnalytics&&S.vAnalytics.summary||{};
     var top=S.vAnalytics&&S.vAnalytics.topProducts||[];
     content='<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">📊 Live sales · '+esc(String(S.vAnalytics&&S.vAnalytics.period||'30d'))+'</div>'+
+      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">📊 Live sales · '+sanitizeText(String(S.vAnalytics&&S.vAnalytics.period||'30d'))+'</div>'+
       [['Revenue','D '+Number(a.total_revenue||0).toLocaleString()],['Total Orders',Number(a.total_orders||0)],['Completed',Number(a.completed_orders||0)],['Cancelled',Number(a.cancelled_orders||0)],['Average Order','D '+Number(a.avg_order_value||0).toLocaleString()]].map(function(r){
         return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:var(--mu);font-size:12px;">'+r[0]+'</span><span style="color:var(--tx);font-size:13px;font-weight:700;">'+r[1]+'</span></div>';
       }).join('')+'</div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);">'+
       '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">🏆 Top products</div>'+
-      (top.length?top.map(function(p){return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="font-size:18px;">🛍️</span><span style="color:var(--tx);font-size:12px;flex:1;">'+esc(p.name)+'</span><span style="color:var(--mu);font-size:11px;">'+Number(p.units_sold||0)+' sold</span></div>';}).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:14px;">No completed product sales yet.</div>')+
+      (top.length?top.map(function(p){return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="font-size:18px;">🛍️</span><span style="color:var(--tx);font-size:12px;flex:1;">'+sanitizeText(p.name)+'</span><span style="color:var(--mu);font-size:11px;">'+Number(p.units_sold||0)+' sold</span></div>';}).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:14px;">No completed product sales yet.</div>')+
       '</div>';
   } else {
     content='<div class="ml-empty" style="margin-top:4px;"><div style="font-size:30px;">🧩</div><b>Feature not connected</b><span>Promotions and review management are not currently exposed by the production API, so no sample content is shown here.</span></div>';
