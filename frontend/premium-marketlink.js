@@ -175,6 +175,21 @@
       toast(p.name+' added to cart ✓');
     }catch(e){toast(e.error||'Could not add product.','error');}
   }
+  var _searchTimer=null;
+  async function searchMarketplace(q){
+    q=String(q||'').trim();
+    clearTimeout(_searchTimer);
+    if(!q){return loadLiveHome();}
+    _searchTimer=setTimeout(async function(){
+      try{
+        var res=await ML_API.products.list({search:q,page:1,limit:30,sort:'newest'});
+        var products=normalizeProducts(res.data),root=G('tab-home');
+        if(!root)return;
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Search results</h3><button onclick="window.ML_Premium.refresh()">← Marketplace</button></div><div style="color:#91A4B4;font-size:11px;margin:-4px 0 14px">Live results for “'+esc(q)+'”</div>'+
+          (products.length?'<div class="ml-product-grid">'+products.map(productCard).join('')+'</div>':'<div class="ml-empty"><div style="font-size:30px">🔎</div><b>No live products found</b><span>Try another product name or browse the published categories.</span></div>')+'</div>';
+      }catch(e){toast(e.error||'Search failed.','error');}
+    },280);
+  }
   async function refresh(){await loadLiveHome();}
   async function loadProfile(){
     if(!apiOk())return;
@@ -295,6 +310,9 @@
   window.ML_Premium={refresh:refresh,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   var oldRenderHome=window.renderHome,oldRenderProfile=window.renderProfile;
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
+  window.openCategory=function(cat){if(cat&&cat.id){return openCategory(cat.id,cat.name||'Category');}return loadLiveHome();};
+  window.openProductDetail=function(id){return openProduct(id);};
+  window.doSearch=function(q){return searchMarketplace(q);};
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
   window.renderAdminDash=function(){loadAdminDashboard().catch(function(e){toast(e.error||'Could not load the admin dashboard.','error');});};
   window.placeOrder=placeLiveOrder;
