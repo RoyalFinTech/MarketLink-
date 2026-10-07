@@ -242,7 +242,7 @@
     if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.phone){toast('Complete the business details first.','error');return;}
     try{
       var r=await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:'+220'+f.phone,nationalId:f.idDoc||undefined,description:f.sname});
-      closeSheet('sh-vapp');toast('Vendor application submitted. Awaiting approval ✓');if(r.data&&r.data.kyc_status)toast('KYC status: '+r.data.kyc_status);
+      closeSheet('sh-vapp');toast('Vendor application submitted. Awaiting admin approval ✓');
       S._vendorLiveLoaded=false;renderPremiumProfile();
     }catch(e){toast(e.error||'Vendor application could not be submitted.','error');}
   }
@@ -251,8 +251,8 @@
     var f=S.rForm;
     if(!f.fname||!f.phone||!f.addr||!f.plate||!f.licence){toast('Complete your rider details first.','error');return;}
     try{
-      var r=await ML_API.riders.register({vehicleType:'motorcycle',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:f.emergency,address:f.addr});
-      closeSheet('sh-rapp');toast('Rider application submitted. Awaiting approval ✓');if(r.data&&r.data.kyc_status)toast('KYC status: '+r.data.kyc_status);
+      var r=await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:f.emergency,address:f.addr});
+      closeSheet('sh-rapp');toast('Rider application submitted. Awaiting admin approval ✓');
       S._riderLiveLoaded=false;renderPremiumProfile();
     }catch(e){toast(e.error||'Rider application could not be submitted.','error');}
   }
