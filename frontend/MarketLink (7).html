@@ -1439,6 +1439,9 @@ var ML_API = (function(){
     users: function(qs){return get('/admin/users',qs);},
     reports: function(qs){return get('/admin/reports',qs);},
     withdrawals: function(qs){return get('/admin/withdrawals',qs);},
+    settings: function(){return get('/admin/settings');},
+    setSetting: function(key,value){return put('/admin/settings/'+encodeURIComponent(key),{value:value});},
+    auditLogs: function(qs){return get('/admin/audit-logs',qs);},
   };
 
   // ── HEALTH CHECK (detect backend availability) ───────────────
@@ -3439,7 +3442,7 @@ function renderVDash(){
           '<input class="inp" id="vpe-price" value="'+p.price+'" inputmode="numeric" style="flex:1;margin-bottom:0;">'+
           '<input class="inp" id="vpe-emoji" value="'+p.emoji+'" style="width:60px;text-align:center;font-size:18px;margin-bottom:0;"></div>'+
           '<input class="inp" id="vpe-stock" value="'+(p.stock!=null?p.stock:'')+'" placeholder="Stock quantity" inputmode="numeric" style="margin-bottom:9px;">'+
-          '<div style="display:flex;gap:7px;"><button class="btn btn-p btn-sm" style="flex:1;" onclick="vSaveProdEdit('+p.id+')">💾 Save</button><button class="btn btn-s btn-sm" style="flex:1;" onclick="S.vEditingProdId=null;renderVDash();">Cancel</button></div></div>';
+          '<div style="display:flex;gap:7px;"><button class="btn btn-p btn-sm" style="flex:1;" onclick="vSaveProdEdit(\''+p.id+'\')">💾 Save</button><button class="btn btn-s btn-sm" style="flex:1;" onclick="S.vEditingProdId=null;renderVDash();">Cancel</button></div></div>';
       } else {
         var lowStock=p.stock!=null && p.stock<=5;
         content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid '+(lowStock?'rgba(239,68,68,0.35)':'rgba(255,255,255,0.07)')+';margin-bottom:8px;display:flex;align-items:center;gap:11px;">'+
@@ -3448,8 +3451,8 @@ function renderVDash(){
           '<div style="color:#0D7377;font-size:11px;font-weight:700;">D '+p.price+'</div>'+
           (p.stock!=null?'<div style="color:'+(lowStock?'#EF4444':'var(--mu)')+';font-size:10px;margin-top:2px;">'+(lowStock?'⚠️ Low stock: ':'Stock: ')+p.stock+'</div>':'')+
           '</div>'+
-          '<button class="btn btn-s btn-sm" onclick="S.vEditingProdId='+p.id+';renderVDash();">✏️ Edit</button>'+
-          '<button class="btn btn-er btn-sm" onclick="vRemoveProd('+p.id+')">Remove</button></div>';
+          '<button class="btn btn-s btn-sm" onclick="S.vEditingProdId=\''+p.id+'\';renderVDash();">✏️ Edit</button>'+
+          '<button class="btn btn-er btn-sm" onclick="vRemoveProd(\''+p.id+'\')">Remove</button></div>';
       }
     });
   } else if(S.vSubTab==='wallet'){
