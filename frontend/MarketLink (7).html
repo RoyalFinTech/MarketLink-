@@ -561,7 +561,7 @@ button:active{opacity:0.82;}
     <label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:6px;">Staff ID</label>
     <input class="inp" type="text" autocapitalize="characters" placeholder="+220 7xx xxxx" id="admin-staffid" style="margin-bottom:16px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;">
     <label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:6px;">Password</label>
-    <input class="inp" type="password" placeholder="Enter password" id="admin-password" style="margin-bottom:22px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    <input class="inp" type="password" placeholder="Enter 4-digit PIN" id="admin-password" style="margin-bottom:22px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;" onkeydown="if(event.key==='Enter')doAdminLogin()">
     <button class="btn" style="width:100%;background:linear-gradient(135deg,#7C3AED,#4C1D95);color:#fff;" onclick="doAdminLogin()" id="admin-lbtn">🔐 Sign In to Admin Portal</button>
     <div style="text-align:center;margin-top:18px;color:rgba(255,255,255,0.25);font-size:10.5px;line-height:1.6;">Authorized MarketLink staff only.<br>Unauthorized access attempts are logged.</div>
   </div>
@@ -1818,30 +1818,10 @@ function authErr(msg){var e=G('auth-err');if(e){e.textContent=msg;e.style.displa
 // ADMIN PORTAL — separate authentication & session from customer auth
 // ─────────────────────────────────────────────────────────────
 // Admin authentication is server-authoritative and uses the same backend identity/session layer as the rest of MarketLink.
+// Admin authentication is backend-authoritative.
+// The frontend never stores or validates a static admin password.
 var ADMIN_CREDENTIALS=null;
-function hashAdminCred(){return '';}
-var AdminSession={
-  isAuthenticated:false, staffId:null, loginAt:null,
-  load:function(){
-    try{
-      var raw=sessionStorage.getItem('ml_admin_session');
-      if(raw){
-        var data=JSON.parse(raw);
-        this.isAuthenticated=true; this.staffId=data.staffId; this.loginAt=data.loginAt;
-      }
-    }catch(e){}
-  },
-  start:function(staffId){
-    this.isAuthenticated=true; this.staffId=staffId; this.loginAt=new Date().toISOString();
-    try{ sessionStorage.setItem('ml_admin_session', JSON.stringify({staffId:staffId, loginAt:this.loginAt})); }catch(e){}
-  },
-  end:function(){
-    this.isAuthenticated=false; this.staffId=null; this.loginAt=null;
-    try{ sessionStorage.removeItem('ml_admin_session'); }catch(e){}
-  }
-};
-AdminSession.load();
-
+function hashAdminCred(){ return null; }
 function openAdminLogin(){
   var e=G('admin-auth-err'); if(e) e.style.display='none';
   var idEl=G('admin-staffid'), pwEl=G('admin-password');
@@ -1855,29 +1835,32 @@ function adminAuthErr(msg){
   var e=G('admin-auth-err');
   if(e){ e.textContent=msg; e.style.display='block'; }
 }
-function doAdminLogin(){
+async function doAdminLogin(){
   var idEl=G('admin-staffid'), pwEl=G('admin-password');
   if(!idEl||!pwEl) return;
-  var staffId=idEl.value.trim();
-  var password=pwEl.value;
-  if(!staffId){ adminAuthErr('Enter your Staff ID'); return; }
-  if(!password){ adminAuthErr('Enter your password'); return; }
+  var phone=idEl.value.trim(), pin=pwEl.value;
+  if(!phone){ adminAuthErr('Enter the admin phone number'); return; }
+  if(!pin){ adminAuthErr('Enter your PIN'); return; }
   var btn=G('admin-lbtn'); if(btn){ btn.disabled=true; btn.textContent='Verifying…'; }
-  setTimeout(function(){
-    // Role security: this gate is independent of S.user / S.roles entirely —
-    // a logged-in customer, vendor, or rider session has no bearing on admin access.
-    if(staffId===ADMIN_CREDENTIALS.staffId && hashAdminCred(password)===ADMIN_CREDENTIALS.pwHash){
-      AdminSession.start(staffId);
-      showScreen('scr-app');
-      G('bnav').style.display='none'; // admin portal has its own nav, not the customer bottom nav
-      G('fab').classList.remove('fab-visible'); // customer AI assistant FAB hidden in admin context
-      switchTab('admindash');
-      toast('Welcome to the Admin Portal 🛡️');
-    } else {
-      if(btn){ btn.disabled=false; btn.textContent='🔐 Sign In to Admin Portal'; }
-      adminAuthErr('Invalid Staff ID or password');
+  try{
+    var data=await ML_API.auth.login(phone,pin);
+    var roles=data.roles||[];
+    if(roles.indexOf('admin')<0 && roles.indexOf('super_admin')<0 && roles.indexOf('moderator')<0){
+      await ML_API.auth.logout();
+      throw {code:'FORBIDDEN',error:'This account is not authorised for the Admin Portal.'};
     }
-  }, 700);
+    S.user={name:data.fullName||data.full_name,phone:data.phone,id:data.id,accountStatus:'Active'};
+    S.roles=roles;
+    AdminSession.start(data.id);
+    showScreen('scr-app');
+    G('bnav').style.display='none';
+    G('fab').classList.remove('fab-visible');
+    switchTab('admindash');
+    toast('Welcome to the Admin Portal 🛡️');
+  }catch(err){
+    if(btn){btn.disabled=false;btn.textContent='🔐 Sign In to Admin Portal';}
+    adminAuthErr(err.error||'Admin sign in failed. Please try again.');
+  }
 }
 function adminLogout(){
   AdminSession.end();
