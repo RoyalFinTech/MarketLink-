@@ -343,6 +343,24 @@
     try{var next=!S.rOnline;await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You are online and eligible for deliveries.':'You are offline.');}
     catch(e){toast(e.error||'Could not change rider availability.','error');}
   }
+  async function reorderLive(orderId,itemsDesc,total,rawItems){
+    if(!apiOk()){toast('Please sign in first.','error');return;}
+    var lines=Array.isArray(rawItems)?rawItems:[];
+    if(!lines.length){toast('This order has no reorderable live items.','error');return;}
+    var added=0,missing=0;
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i],pid=line.product_id||line.productId;
+      if(!pid)continue;
+      try{
+        var r=await ML_API.products.getById(pid),p=r.data;
+        if(!p||p.status!=='active'){missing++;continue;}
+        addCart(p.id,Number(line.qty||line.quantity||1),p.name,Number(p.price||line.unit_price||0));added++;
+      }catch(e){missing++;}
+    }
+    if(added){toast(added+' live item'+(added===1?'':'s')+' added to cart 🛒');switchTab('cart');}
+    else toast('None of the original products are currently available.','error');
+    if(missing)toast(missing+' item'+(missing===1?' is':'s are')+' no longer available; those were not added.','info');
+  }
   window.ML_Premium={refresh:refresh,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   var oldRenderHome=window.renderHome,oldRenderProfile=window.renderProfile;
   window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
@@ -362,6 +380,12 @@
   window.submitRApp=submitRider;
   window.rToggleOnline=toggleRiderOnline;
   window.editName=editProfileModal;
+  window.reorderPastOrder=reorderLive;
+  window.renderAddrPage=renderAddresses;
+  window.addAddr=function(){renderAddresses();};
+  window.saveNewAddr=addAddress;
+  window.setDefAddr=setDefaultAddress;
+  window.delAddr=deleteAddress;
   window.doAdminLogin=liveAdminLogin;
   window.renderPremiumAdminLogin=function(){var i=G('admin-staffid'),p=G('admin-password');if(i){i.placeholder='Admin phone number';i.type='tel';i.inputMode='tel';}if(p){p.placeholder='4-digit PIN';p.maxLength=4;}};
   window.handlePhoto=function(inp){if(inp&&inp.files&&inp.files[0])saveProfilePhoto(inp.files[0]);};
