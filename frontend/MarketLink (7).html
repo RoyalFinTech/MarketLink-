@@ -1444,7 +1444,7 @@ var ML_API = (function(){
   var _backendAvailable = null;
   async function checkBackend(){
     try{
-      var r = await fetch((window.ML_API_URL || 'http://localhost:4000') + '/health', {method:'GET'});
+      var r = await fetch((window.ML_API_URL || 'https://marketlink-gambia.onrender.com') + '/health', {method:'GET'});
       _backendAvailable = r.ok;
     }catch(e){ _backendAvailable = false; }
     return _backendAvailable;
@@ -3631,7 +3631,15 @@ function vSaveProdEdit(id){
   renderVDash(); toast('Product updated ✅');
 }
 function vRemoveProd(id){S.vProds=S.vProds.filter(function(p){return p.id!==id;});renderVDash();toast('Product removed.');}
-function vToggleOnline(){S.vOnline=!S.vOnline;renderVDash();toast(S.vOnline?'Store is now Open 🟢':'Store is now Closed 🔴');}
+async function vToggleOnline(){
+  if(!ML_API.auth.isAuthenticated()){toast('Please sign in first.','error');return;}
+  var next=!S.vOnline;
+  try{
+    await ML_API.vendors.updateProfile({isOpen:next});
+    S.vOnline=next; renderVDash();
+    toast(next?'Store is now Open 🟢':'Store is now Closed 🔴');
+  }catch(e){toast(e.error||'Could not update store status.','error');}
+}
 
 async function vRequestPayout(amount){
   if(!amount||amount<=0){toast('No balance available to pay out','error');return;}
