@@ -56,7 +56,7 @@
       AdminSession.start(phone);showScreen('scr-app');G('bnav').style.display='none';G('fab').classList.remove('fab-visible');switchTab('admindash');toast('Welcome to the Admin Portal ✓');
     }catch(e){adminAuthErr(e.error||'Admin sign-in failed.');}
   }
-  async async function loadAdminDashboard(){
+  async function loadAdminDashboard(){
     if(!apiOk()){toast('Admin session requires backend sign-in.','error');return;}
     try{
       var r=await ML_API.admin.dashboard(),d=r.data||{},s=d.stats||{},p=d.pendingApprovals||{};
@@ -72,7 +72,7 @@
       '<div style="display:flex;gap:8px;margin-top:14px"><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="window.ML_Premium.adminUsers()">Users</button><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="adminLogout()">Sign out</button></div></div>';
     }catch(e){toast(e.error||'Could not load the admin dashboard.','error');}
   }
-  async async function adminApprovals(kind){
+  async function adminApprovals(kind){
     try{
       var r=kind==='vendor'?await ML_API.vendors.list({page:1,limit:50,kycStatus:'pending'}):await ML_API.riders.list({page:1,limit:50,kycStatus:'pending'});
       var rows=normalizeProducts(r.data),root=G('adash-body');if(!root)return;
@@ -80,11 +80,11 @@
       (rows.length?'<div class="ml-profile-card">'+rows.map(function(a){var id=a.user_id||a.id;return '<div class="ml-profile-row"><div class="ico">'+(kind==='vendor'?'🏪':'🛵')+'</div><div class="copy"><b>'+esc(a.business_name||a.full_name||'Applicant')+'</b><span>'+esc(a.business_category||a.vehicle_type||'')+' · KYC: '+esc(a.kyc_status||'pending')+'</span></div><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(\''+esc(id)+'\',\''+kind+'\')">Approve</button></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No pending applications</b><span>The live database has no pending '+(kind==='vendor'?'vendor':'rider')+' applications.</span></div>')+'</div>';
     }catch(e){toast(e.error||'Could not load approvals.','error');}
   }
-  async async function approveAdmin(id,kind){
+  async function approveAdmin(id,kind){
     try{if(kind==='vendor')await ML_API.vendors.approve(id,{notes:'Approved from MarketLink Admin Control Center'});else await ML_API.riders.approve(id,{notes:'Approved from MarketLink Admin Control Center'});toast('Application approved ✓');loadAdminDashboard();}
     catch(e){toast(e.error||'Approval failed.','error');}
   }
-  async async function adminUsers(){
+  async function adminUsers(){
     try{
       var r=await ML_API.admin.users({page:1,limit:50}),d=r.data||{},rows=d.items||[],root=G('adash-body');
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Users</h3><button onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div>'+
@@ -241,7 +241,7 @@
       S._riderLiveLoaded=false;renderPremiumProfile();
     }catch(e){toast(e.error||'Rider application could not be submitted.','error');}
   }
-  async async function liveVendorAddProduct(){
+  async function liveVendorAddProduct(){
     if(!apiOk()){toast('Sign in required.','error');return;}
     var n=G('vp-name'),p=G('vp-price'),s=G('vp-stock');
     var name=n&&n.value.trim(),price=Number(p&&p.value),stock=Number(s&&s.value);
@@ -256,7 +256,7 @@
       S._vendorLiveLoaded=false;renderVDash();toast('Product submitted to MarketLink ✓');
     }catch(e){toast(e.error||'Could not create product.','error');}
   }
-  async async function liveVendorSaveProduct(id){
+  async function liveVendorSaveProduct(id){
     var n=G('vpe-name'),p=G('vpe-price'),s=G('vpe-stock');
     var name=n&&n.value.trim(),price=Number(p&&p.value),stock=s&&s.value.trim()===''?null:Number(s.value);
     if(!name||!Number.isFinite(price)){toast('Enter a valid product name and price.','error');return;}
@@ -266,17 +266,17 @@
       S._vendorLiveLoaded=false;renderVDash();toast('Product updated ✓');
     }catch(e){toast(e.error||'Could not update product.','error');}
   }
-  async async function liveVendorRemoveProduct(id){
+  async function liveVendorRemoveProduct(id){
     if(!confirm('Archive this product?'))return;
     try{await ML_API.products.remove(id);S._vendorLiveLoaded=false;renderVDash();toast('Product archived ✓');}
     catch(e){toast(e.error||'Could not archive product.','error');}
   }
-  async async function liveVendorToggleOnline(){
+  async function liveVendorToggleOnline(){
     if(!apiOk()){toast('Sign in required.','error');return;}
     try{var next=!S.vOnline;var r=await ML_API.vendors.updateProfile({isOpen:next});S.vOnline=!!(r.data&&r.data.is_open!==undefined?r.data.is_open:next);renderVDash();toast(S.vOnline?'Store is open 🟢':'Store is closed');}
     catch(e){toast(e.error||'Could not update store status.','error');}
   }
-  async async function liveRiderNextStep(){
+  async function liveRiderNextStep(){
     if(!S.activeDel||!S.activeDel.id){toast('No active delivery.','error');return;}
     var current=S.activeDel.status, next={assigned:'picked_up',picked_up:'in_transit',in_transit:'delivered'}[current];
     if(!next){toast('This delivery is not ready for the next step.','error');return;}
