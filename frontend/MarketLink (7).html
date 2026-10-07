@@ -3131,7 +3131,7 @@ function renderAffiliatePage(){
     '<div style="color:rgba(255,255,255,0.85);font-size:11px;margin-bottom:6px;">Your Affiliate Earnings</div>'+
     '<div style="color:#fff;font-size:10px;margin-bottom:5px;">Earn 2% of qualifying referred merchandise — funded from MarketLink\'s 5% platform commission.</div>'+
     '<div style="color:#fff;font-size:26px;font-weight:800;">D '+S.affiliateEarnings.toLocaleString()+'</div>'+
-    '<button class="btn" style="background:#fff;color:#F5A623;margin-top:12px;width:100%;font-weight:700;" onclick="affiliateWithdraw()">Withdraw Earnings</button></div>'+
+    '</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">'+
     [['👆',S.affiliateClicks,'Clicks'],['🛒',S.affiliateOrders,'Orders'],['📈',S.affiliateOrders>0?Math.round(S.affiliateOrders/Math.max(S.affiliateClicks,1)*100)+'%':'0%','Conversion']].map(function(s){
       return '<div style="background:var(--sf);border-radius:12px;padding:12px 6px;text-align:center;border:1px solid rgba(255,255,255,0.07);"><div style="font-size:16px;">'+s[0]+'</div><div style="color:var(--tx);font-size:15px;font-weight:800;margin-top:3px;">'+s[1]+'</div><div style="color:var(--mu);font-size:9.5px;margin-top:1px;">'+s[2]+'</div></div>';
