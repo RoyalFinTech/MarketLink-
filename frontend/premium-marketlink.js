@@ -415,6 +415,23 @@
     try{var reason=window.prompt('Reason for rejection:','Please review your submitted information and documents.');if(!reason)return;await (kind==='vendor'?ML_API.vendors.reject(id,{reason:reason}):ML_API.riders.reject(id,{reason:reason}));toast((kind==='vendor'?'Vendor':'Rider')+' rejected.','error');adminGoToLive(kind==='vendor'?'appr-pv':'appr-pr');}
     catch(e){toast(e.error||'Rejection failed.','error');}
   }
+  function obNextLive(){
+    var slide=G('ob-slide'), dots=G('ob-dots'), btn=G('ob-btn');
+    var slides=[
+      ['🛍️','Shop trusted local products','Discover products from MarketLink vendors across The Gambia.'],
+      ['🛵','Track every delivery','Follow real order and rider updates from checkout to delivery.'],
+      ['🇬🇲','Built for The Gambia','A connected marketplace for customers, vendors and riders.']
+    ];
+    var i=Number(S.obSlide||0); if(i>=slides.length-1){goAuth();return;} i++;S.obSlide=i;
+    if(slide)slide.innerHTML='<div style="font-size:64px;margin:30px 0 16px">'+slides[i][0]+'</div><h2 style="color:#fff;margin:0 0 8px">'+slides[i][1]+'</h2><p style="color:#91A4B4;line-height:1.6;font-size:12px">'+slides[i][2]+'</p>';
+    if(dots)dots.innerHTML=slides.map(function(_,n){return '<span style="width:7px;height:7px;border-radius:50%;background:'+(n===i?'#11A8A1':'#40515E')+'"></span>';}).join('');
+    if(btn)btn.textContent=i===slides.length-1?'Get started →':'Next →';
+  }
+  function continueOtpLive(){closeSheet('sh-otp-reveal');}
+  function adminGoToLiveSafe(tab){adminGoToLive(tab);}
+  window.obNext=obNextLive;
+  window.continueFromOtpReveal=continueOtpLive;
+  window.adminGoTo=adminGoToLiveSafe;
   window.__ML_ORIGINAL_ADMIN_GOTO=window.adminGoTo;
   window.adminGoTo=adminGoToLive;
     window.ML_Premium={refresh:refresh,refreshAdmin:refreshAdmin,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
