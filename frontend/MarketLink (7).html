@@ -1409,6 +1409,7 @@ var ML_API = (function(){
   // ── VENDORS (own dashboard) ───────────────────────────────────
   var vendors = {
     list:                function(qs){  return get('/vendors', qs); },
+    getById:             function(id){   return get('/vendors/'+id); },
     register:            function(d){   return post('/vendors/register', d); },
     updateProfile:       function(d){   return put('/vendors/profile', d); },
     myAnalytics:         function(qs){  return get('/vendors/me/analytics', qs); },
@@ -3358,9 +3359,17 @@ async function loadVendorLiveData(){
   try{
     var results=await Promise.all([
       ML_API.orders.vendorOrders({page:1,limit:50}),
-      ML_API.products.list({vendorId:S.user&&S.user.id||'',page:1,limit:100,sort:'newest'})
-    ]);
+      ML_API.products.list({vendorId:S.user&&S.user.id||'',page:1,limit:100,sort:'newest'}),
+      ML_API.vendors.myAnalytics({period:'30d'}),
+      ML_API.vendors.getById(S.user&&S.user.id||''),
+      ML_API.vendors.withdrawals({page:1,limit:50})
+    ].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
     var od=results[0]&&results[0].data, pd=results[1]&&results[1].data;
+    S.vAnalytics=results[2]&&results[2].data||null;
+    S.vProfile=results[3]&&results[3].data||null;
+    S.vWallet=results[4]&&results[4].data&&results[4].data.wallet||null;
+    S.vPayoutHistory=results[4]&&results[4].data&&results[4].data.withdrawals||[];
+    if(S.vProfile) S.vOnline=!!S.vProfile.is_open;
     var rows=Array.isArray(od)?od:(od&&Array.isArray(od.items)?od.items:[]);
     S.vOrders=rows.map(function(o){return {
       id:o.id||o.order_number, order_number:o.order_number, customer:o.customer_name||'Customer',
@@ -3444,7 +3453,7 @@ function renderVDash(){
       }
     });
   } else if(S.vSubTab==='wallet'){
-    var available=earned-(S.vPayoutsRequested||0);
+    var available=Number(S.vWallet&&S.vWallet.balance||0);
     content='<div style="background:linear-gradient(135deg,#0D7377,#0A5C60);border-radius:16px;padding:18px;margin-bottom:14px;text-align:center;">'+
       '<div style="color:rgba(255,255,255,0.7);font-size:11px;margin-bottom:4px;">Available Balance</div>'+
       '<div style="color:#fff;font-size:28px;font-weight:800;">D '+available+'</div>'+
@@ -3483,32 +3492,24 @@ function renderVDash(){
           '<div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+p.name+'</div><div style="color:#0D7377;font-size:11px;font-weight:700;">'+p.pct+'% off · '+p.code+'</div></div>'+
           '<button class="btn btn-er btn-sm" onclick="vRemovePromo('+p.id+')">Remove</button></div>';
       }).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:10px;">No active promotions</div>');
-  } else {
+  } else if(S.vSubTab==='analytics') {
+    var a=S.vAnalytics&&S.vAnalytics.summary||{};
+    var top=S.vAnalytics&&S.vAnalytics.topProducts||[];
     content='<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">📊 Sales</div>'+
-      [['Today','D 950','↑ 12%','#22C55E'],['This Week','D 4,320','↑ 8%','#22C55E'],['This Month','D 18,600','↓ 3%','#EF4444']].map(function(r){
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'+
-          '<span style="color:var(--mu);font-size:12px;">'+r[0]+'</span>'+
-          '<div style="display:flex;gap:10px;align-items:center;"><span style="color:var(--tx);font-size:13px;font-weight:700;">'+r[1]+'</span><span style="color:'+r[3]+';font-size:11px;">'+r[2]+'</span></div></div>';
-      }).join('')+'</div>'+
-      '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">📦 Orders</div>'+
-      [['Total Orders','47'],['Completed','38'],['Cancelled','3'],['Average Order','D 198']].map(function(r){
-        return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'+
-          '<span style="color:var(--mu);font-size:12px;">'+r[0]+'</span><span style="color:var(--tx);font-size:13px;font-weight:700;">'+r[1]+'</span></div>';
+      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">📊 Live sales · '+esc(String(S.vAnalytics&&S.vAnalytics.period||'30d'))+'</div>'+
+      [['Revenue','D '+Number(a.total_revenue||0).toLocaleString()],['Total Orders',Number(a.total_orders||0)],['Completed',Number(a.completed_orders||0)],['Cancelled',Number(a.cancelled_orders||0)],['Average Order','D '+Number(a.avg_order_value||0).toLocaleString()]].map(function(r){
+        return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:var(--mu);font-size:12px;">'+r[0]+'</span><span style="color:var(--tx);font-size:13px;font-weight:700;">'+r[1]+'</span></div>';
       }).join('')+'</div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">🏆 Top Products</div>'+
-      (S.vProds||[]).slice(0,4).map(function(p,i){
-        var soldEst=[23,18,14,9][i]||5;
-        return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'+
-          '<span style="font-size:18px;">'+p.emoji+'</span><span style="color:var(--tx);font-size:12px;flex:1;">'+p.name+'</span>'+
-          '<span style="color:var(--mu);font-size:11px;">'+soldEst+' sold</span></div>';
-      }).join('')+'</div>';
+      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">🏆 Top products</div>'+
+      (top.length?top.map(function(p){return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="font-size:18px;">🛍️</span><span style="color:var(--tx);font-size:12px;flex:1;">'+esc(p.name)+'</span><span style="color:var(--mu);font-size:11px;">'+Number(p.units_sold||0)+' sold</span></div>';}).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:14px;">No completed product sales yet.</div>')+
+      '</div>';
+  } else {
+    content='<div class="ml-empty" style="margin-top:4px;"><div style="font-size:30px;">🧩</div><b>Feature not connected</b><span>Promotions and review management are not currently exposed by the production API, so no sample content is shown here.</span></div>';
   }
 
-  var tabs=['orders','products','analytics','wallet','reviews','promo'];
-  var tabLabels=['📋 Orders','🛍️ Products','📊 Analytics','💰 Wallet','⭐ Reviews','🏷️ Promos'];
+  var tabs=['orders','products','analytics','wallet'];
+  var tabLabels=['📋 Orders','🛍️ Products','📊 Analytics','💰 Wallet'];
   el.innerHTML=
     '<div style="background:linear-gradient(160deg,#0F1923,#0A5C60);padding:50px 16px 18px;position:relative;">'+
     '<div class="fb" style="position:absolute;top:0;left:0;right:0;"><div class="g"></div><div class="r"></div><div class="b"></div></div>'+
