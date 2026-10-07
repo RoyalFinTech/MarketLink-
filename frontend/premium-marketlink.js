@@ -230,11 +230,27 @@
     await loadProfile();
     var root=G('profile-body');if(!root)return;
     var p=liveProfile||{},name=p.full_name||S.user&&S.user.name||'MarketLink user',phone=p.phone||S.user&&S.user.phone||'';
+    var applicationHtml='';
+    if(S.user&&S.user.id){
+      var apps=await Promise.all([
+        ML_API.vendors.getById(S.user.id).catch(function(){return null;}),
+        ML_API.riders.getById(S.user.id).catch(function(){return null;})
+      ]);
+      var appNames=[['Vendor application',apps[0]],['Rider application',apps[1]]];
+      appNames.forEach(function(a){
+        if(a[1]&&a[1].kyc_status){
+          var st=String(a[1].kyc_status).toLowerCase(), label=st==='approved'?'Approved':st==='rejected'?'Rejected':st==='suspended'?'Suspended':'Pending review';
+          var icon=st==='approved'?'✓':st==='rejected'?'!':st==='suspended'?'!':'⏳';
+          var cls=st==='approved'?'color:#42D2C9':st==='rejected'||st==='suspended'?'color:#FF8A7A':'color:#FFD778';
+          applicationHtml+='<div class="ml-profile-row"><div class="ico">'+icon+'</div><div class="copy"><b>'+a[0]+'</b><span>'+label+' · operational access is controlled by admin approval</span></div><b style="'+cls+'">'+label+'</b></div>';
+        }
+      });
+    }
     var photo=p.profile_photo_url||S.profilePhoto;
     var avatar=photo?'<img src="'+esc(photo)+'" alt="Profile">':esc(name.trim().charAt(0).toUpperCase()||'M');
     var roles=(S.roles||[]).map(function(r){return '<span style="font-size:9px;padding:4px 8px;border-radius:99px;background:rgba(13,115,119,.14);color:#42D2C9">'+esc(r)+'</span>';}).join('');
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-profile-hero"><div class="ml-avatar">'+avatar+'</div><div><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">🇬🇲 '+esc(phone)+'</div><div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">'+roles+'<span style="font-size:9px;padding:4px 8px;border-radius:99px;background:rgba(245,184,61,.1);color:#FFD778">Verified account</span></div></div><button class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🪪</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div><div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Phone number</b><span>'+esc(phone)+'</span></div></div><div class="ml-profile-row"><div class="ico">💰</div><div class="copy"><b>Wallet balance</b><span>'+money(p.wallet_balance||0)+'</span></div></div><div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>Orders completed</b><span>'+Number(p.total_orders||0)+' orders · '+money(p.total_spent||0)+' spent</span></div></div><div class="ml-profile-row" onclick="S.profilePage=\'orders\';renderProfile();" style="cursor:pointer"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>View your real orders and delivery status</span></div><b style="color:#42D2C9">›</b></div><div class="ml-profile-row" onclick="S.profilePage=\'addresses\';renderProfile();" style="cursor:pointer"><div class="ico">📍</div><div class="copy"><b>Saved addresses</b><span>Manage your delivery locations</span></div><b style="color:#42D2C9">›</b></div><div class="ml-profile-row" onclick="doLogout()" style="cursor:pointer"><div class="ico">↪</div><div class="copy"><b>Sign out</b><span>End this session securely</span></div></div></div></div>';
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🪪</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div>'+applicationHtml+'<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Phone number</b><span>'+esc(phone)+'</span></div></div><div class="ml-profile-row"><div class="ico">💰</div><div class="copy"><b>Wallet balance</b><span>'+money(p.wallet_balance||0)+'</span></div></div><div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>Orders completed</b><span>'+Number(p.total_orders||0)+' orders · '+money(p.total_spent||0)+' spent</span></div></div><div class="ml-profile-row" onclick="S.profilePage=\'orders\';renderProfile();" style="cursor:pointer"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>View your real orders and delivery status</span></div><b style="color:#42D2C9">›</b></div><div class="ml-profile-row" onclick="S.profilePage=\'addresses\';renderProfile();" style="cursor:pointer"><div class="ico">📍</div><div class="copy"><b>Saved addresses</b><span>Manage your delivery locations</span></div><b style="color:#42D2C9">›</b></div><div class="ml-profile-row" onclick="doLogout()" style="cursor:pointer"><div class="ico">↪</div><div class="copy"><b>Sign out</b><span>End this session securely</span></div></div></div></div>';
   }
   async function submitVendor(){
     if(!apiOk()){toast('Please sign in first.','error');return;}
