@@ -2328,13 +2328,13 @@ function renderCart(){
     sub+=total;
     itemsHTML+='<div style="padding:12px 13px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,0.06);">'+
       '<div style="flex:1;">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:600;">'+p.name+'</div>'+
-      '<div style="color:#0D7377;font-size:12px;font-weight:700;">D '+p.price+' × '+S.cart[id]+'</div>'+
+      '<div style="color:var(--tx);font-size:13px;font-weight:600;">'+esc(p.name)+'</div>'+
+      '<div style="color:#0D7377;font-size:12px;font-weight:700;">D '+Number(p.price||0).toLocaleString()+' × '+S.cart[id]+'</div>'+
       '</div>'+
       '<div style="display:flex;align-items:center;gap:7px;">'+
-      '<div onclick="addCart('+id+',-1,\''+p.name+'\','+p.price+');renderCart();" style="width:26px;height:26px;border-radius:50%;background:var(--sfl);display:flex;align-items:center;justify-content:center;color:var(--tx);font-size:15px;cursor:pointer;">−</div>'+
+      '<button onclick="addCart('+JSON.stringify(id)+',-1,'+JSON.stringify(p.name)+','+Number(p.price||0)+');renderCart();" style="width:26px;height:26px;border-radius:50%;background:var(--sfl);display:flex;align-items:center;justify-content:center;color:var(--tx);font-size:15px;cursor:pointer;border:0;">−</button>'+
       '<span style="color:var(--tx);font-weight:700;min-width:13px;text-align:center;">'+S.cart[id]+'</span>'+
-      '<div onclick="addCart('+id+',1,\''+p.name+'\','+p.price+');renderCart();" style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#0D7377,#FF6B2B);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;cursor:pointer;">+</div>'+
+      '<button onclick="addCart('+JSON.stringify(id)+',1,'+JSON.stringify(p.name)+','+Number(p.price||0)+');renderCart();" style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#0D7377,#FF6B2B);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;cursor:pointer;border:0;">+</button>'+
       '</div></div>';
   });
 
