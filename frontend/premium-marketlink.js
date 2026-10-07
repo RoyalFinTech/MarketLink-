@@ -425,6 +425,53 @@
     try{var next=!S.rOnline;await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You are online and eligible for deliveries.':'You are offline.');}
     catch(e){toast(e.error||'Could not change rider availability.','error');}
   }
+  async function liveVendorRequestPayout(amount){
+    amount=Number(amount||0);
+    if(!(amount>0)){toast('No balance available to pay out.','error');return;}
+    var method=window.prompt('Payout method (wave or afrimoney):','wave');
+    if(method===null)return;
+    method=String(method).trim().toLowerCase();
+    if(['wave','afrimoney'].indexOf(method)<0){toast('Use Wave or AfriMoney for the configured payout integration.','error');return;}
+    var account=window.prompt('Payout phone/account number:','');
+    if(account===null||!String(account).trim()){toast('A payout account is required.','error');return;}
+    try{
+      await ML_API.vendors.requestWithdrawal({amount:amount,payoutMethod:method,payoutDetails:{accountNumber:String(account).trim()}});
+      toast('Withdrawal request submitted ✓');S._vendorLiveLoaded=false;renderVDash();
+    }catch(e){toast(e.error||'Could not request the withdrawal.','error');}
+  }
+  async function liveRiderRequestWithdrawal(amount){
+    amount=Number(amount||0);
+    if(!(amount>0)){toast('No balance available.','error');return;}
+    var method=window.prompt('Payout method (wave or afrimoney):','wave');
+    if(method===null)return;
+    method=String(method).trim().toLowerCase();
+    if(['wave','afrimoney'].indexOf(method)<0){toast('Use Wave or AfriMoney for the configured payout integration.','error');return;}
+    var account=window.prompt('Payout phone/account number:','');
+    if(account===null||!String(account).trim()){toast('A payout account is required.','error');return;}
+    try{
+      await ML_API.riders.requestWithdrawal({amount:amount,payoutMethod:method,payoutDetails:{accountNumber:String(account).trim()}});
+      toast('Withdrawal request submitted ✓');S._riderLiveLoaded=false;renderRDash();
+    }catch(e){toast(e.error||'Could not request the withdrawal.','error');}
+  }
+  async function liveRiderDecline(id){
+    toast('Delivery decline is not exposed as a separate backend action; the request remains available until accepted.','info');
+  }
+  function sanitizeRiderMap(){
+    var map=G('rider-amap');
+    if(!map)return;
+    var tr=S.activeDel&&S.activeDel.tracking;
+    var hasGps=tr&&tr.current_lat!=null&&tr.current_lng!=null;
+    map.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;box-sizing:border-box;background:linear-gradient(160deg,#07151F,#102A35);">'+
+      '<div><div style="font-size:28px;margin-bottom:8px">📍</div><b style="color:#EAF2F5;font-size:13px">'+(hasGps?'Live location connected':'Live location unavailable')+'</b><div style="color:#91A4B4;font-size:11px;line-height:1.5;margin-top:5px">'+(hasGps?'Showing the latest backend-provided rider location.':'No current GPS point is available from the backend for this delivery.')+'</div></div></div>';
+  }
+  var baseRenderRDash=window.renderRDash;
+  window.renderRDash=function(){
+    if(typeof baseRenderRDash==='function')baseRenderRDash();
+    sanitizeRiderMap();
+    document.querySelectorAll('#rdash-body button').forEach(function(btn){
+      if((btn.textContent||'').indexOf('Decline')>=0) btn.remove();
+    });
+  };
   async function reorderLive(orderId,itemsDesc,total,rawItems){
     if(!apiOk()){toast('Please sign in first.','error');return;}
     var lines=Array.isArray(rawItems)?rawItems:[];
@@ -623,6 +670,11 @@
   window.vRemoveProd=liveVendorRemoveProduct;
   window.vToggleOnline=liveVendorToggleOnline;
   window.rNextStep=liveRiderNextStep;
+  window.rRequestWithdrawal=liveRiderRequestWithdrawal;
+  window.rDecline=liveRiderDecline;
+  window.vRequestPayout=liveVendorRequestPayout;
+  window.vAddPromo=function(){toast('Vendor promotions are not exposed by the current backend. No local promotion is created.','info');};
+  window.vRemovePromo=function(){toast('Vendor promotions are not exposed by the current backend.','info');};
   window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
