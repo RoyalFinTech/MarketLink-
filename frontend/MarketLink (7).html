@@ -3644,11 +3644,15 @@ async function loadRiderLiveData(){
   if(!ML_API.auth.isAuthenticated() || (S.roles||[]).indexOf('rider')<0 || S._riderLoading) return;
   S._riderLoading=true; S.rDeliveries=[]; renderRDash();
   try{
-    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||'')].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
-    var res=riderResults[0],earnings=riderResults[1]&&riderResults[1].data,profile=riderResults[2]&&riderResults[2].data;
-    var rows=res&&res.data&&Array.isArray(res.data)?res.data:[];
-    S.rEarningsToday=Number(earnings&&earnings.summary&&earnings.summary.total_earnings||0);
-    S.rTotalDeliveries=Number(profile&&profile.total_deliveries||rows.length||0);
+    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||''),ML_API.riders.withdrawals({page:1,limit:50})].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
+    var res=riderResults[0],earnings=riderResults[1]&&riderResults[1].data,profile=riderResults[2]&&riderResults[2].data,wd=riderResults[3]&&riderResults[3].data;
+    var rows=res&&res.data&&Array.isArray(res.data)?res.data:(res&&res.data&&Array.isArray(res.data.items)?res.data.items:[]);
+    S.rEarningsSummary=earnings&&earnings.summary||{};
+    S.rEarningsEntries=earnings&&earnings.entries||[];
+    S.rWallet=wd&&wd.wallet||null;
+    S.rWithdrawHistory=wd&&wd.withdrawals||[];
+    S.rOnline=!!(profile&&profile.is_online);
+    S.rTotalDeliveries=Number(profile&&profile.completed_deliveries||rows.filter(function(d){return d.status==='delivered';}).length||0);
     S.rRating=Number(profile&&profile.rating_avg||0);
     S.rDeliveries=rows.map(function(d){return {
       id:d.id,order_id:d.order_id,from:d.vendor_name||'Vendor',to:'Customer delivery',
@@ -3723,26 +3727,17 @@ function renderRDash(){
           '<div style="color:#22C55E;font-size:15px;font-weight:700;">Delivery Complete!</div>'+
           '<div style="color:#F5A623;font-size:13px;margin-top:4px;">+D '+d.pay+' earned</div></div>')+
         '</div>';
-      // Animate rider dot
-      clearTimeout(window._rdotTimer);
-      window._rdotTimer=setInterval(function(){
-        var dot=G('rdot'); if(!dot){clearInterval(window._rdotTimer);return;}
-        var t=28+((Date.now()/1200)%30|0), l=14+((Date.now()/800)%55|0);
-        dot.style.top=t+'%'; dot.style.left=l+'%';
-      },1000);
-    }
   } else if(S.rSubTab==='wallet'){
-    var todayE=S.rEarningsToday||340;
-    var weekE=todayE*5+120;
-    var monthE=weekE*4+300;
-    var available=todayE+weekE-(S.rWithdrawn||0);
+    var total30=Number(S.rEarningsSummary&&S.rEarningsSummary.total_earnings||0);
+    var pending30=Number(S.rEarningsSummary&&S.rEarningsSummary.pending_earnings||0);
+    var available=Number(S.rWallet&&S.rWallet.balance||0);
     content='<div style="background:linear-gradient(135deg,#7C3AED,#4C1D95);border-radius:16px;padding:18px;margin-bottom:14px;text-align:center;">'+
       '<div style="color:rgba(255,255,255,0.7);font-size:11px;margin-bottom:4px;">Available Balance</div>'+
-      '<div style="color:#fff;font-size:28px;font-weight:800;">D '+Math.max(0,available)+'</div>'+
+      '<div style="color:#fff;font-size:28px;font-weight:800;">D '+Math.max(0,available).toLocaleString()+'</div>'+
       '<button class="btn" style="background:#fff;color:#7C3AED;margin-top:12px;width:100%;font-weight:700;" onclick="rRequestWithdrawal('+Math.max(0,available)+')">Withdraw Funds</button>'+
       '</div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-      [['Today','D '+todayE],['This Week','D '+weekE],['This Month','D '+monthE]].map(function(r){
+      [['30-Day Earnings','D '+total30.toLocaleString()],['Pending Earnings','D '+pending30.toLocaleString()],['Currency',String((S.rWallet&&S.rWallet.currency)||'GMD')]].map(function(r){
         return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'+
           '<span style="color:var(--mu);font-size:12px;">'+r[0]+'</span><span style="color:var(--tx);font-size:13px;font-weight:700;">'+r[1]+'</span></div>';
       }).join('')+'</div>'+
@@ -3754,22 +3749,14 @@ function renderRDash(){
           '<span style="color:#A78BFA;font-size:11px;">'+w.status+'</span></div>';
       }).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:10px;">No withdrawals yet</div>')+'</div>';
   } else {
-    // History
-    [
-      {id:'DEL-099',to:'Kololi',pay:85,d:'Today, 10:22'},
-      {id:'DEL-098',to:'Bakau',pay:110,d:'Today, 08:14'},
-      {id:'DEL-097',to:'Brikama',pay:130,d:'Yesterday'},
-      {id:'DEL-096',to:'Serrekunda',pay:75,d:'Yesterday'},
-      {id:'DEL-095',to:'Kanifing',pay:95,d:'Jun 10'}
-    ].forEach(function(h){
+    // History — derived only from live delivery records.
+    (S.rDeliveries||[]).filter(function(d){return d.status==='delivered';}).forEach(function(h){
       content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'+
-        '<div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+h.id+'</div>'+
-        '<div style="color:var(--mu);font-size:10px;margin-top:2px;">📍 '+h.to+' · '+h.d+'</div></div>'+
-        '<div style="display:flex;align-items:center;gap:8px;">'+
-        '<div style="color:#F5A623;font-size:13px;font-weight:700;">D '+h.pay+'</div>'+
-        '<div style="color:#22C55E;font-size:11px;">✓</div></div></div>';
+        '<div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+sanitizeText(h.order_number||h.id)+'</div>'+
+        '<div style="color:var(--mu);font-size:10px;margin-top:2px;">📍 '+sanitizeText(h.from||'Vendor')+' · Delivered</div></div>'+
+        '<div style="color:#F5A623;font-size:13px;font-weight:700;">D '+Number(h.pay||0).toLocaleString()+'</div></div>';
     });
-  }
+
 
   var subTabs=[['requests','📩 Requests'],['active','🛵 Active'],['wallet','💰 Wallet'],['history','📋 History']];
   el.innerHTML=
@@ -3797,7 +3784,12 @@ function renderRDash(){
     '<div style="padding:13px;">'+content+'</div>';
 }
 
-function rToggleOnline(){S.rOnline=!S.rOnline;renderRDash();toast(S.rOnline?'You\'re online! Ready for deliveries 🛵':'You\'re offline');}
+async function rToggleOnline(){
+  if(!ML_API.auth.isAuthenticated()){toast('Please sign in first.','error');return;}
+  var next=!S.rOnline;
+  try{await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You\'re online! Ready for deliveries 🛵':'You\'re offline');}
+  catch(e){toast(e.error||'Could not change availability.','error');}
+}
 
 // ═══════════════════════════════════════════════════════════
 // ADMIN DASHBOARD — backend-connected production portal
