@@ -967,15 +967,9 @@ var OFFICE = {
 };
 
 // ═══════════════════════════════════════════════════════════
-// LIVE API COMPATIBILITY LAYER — all operations delegate to ML_API/backend.
+// LIVE API COMPATIBILITY LAYER — production operations delegate to ML_API/backend.
 // ─────────────────────────────────────────────────────────────
-// This is a backend-abstraction layer. Every function here simulates
-// a network call (id generation, latency, success/failure) using only
-// localStorage + in-memory state. To connect a real backend (Firebase,
-// Supabase, Node/Express, etc.), replace the body of each method with
-// a real fetch()/SDK call — the call signatures and return shapes
-// (Promises resolving to {success, data} or {success:false, error})
-// are deliberately written so calling code does not need to change.
+// This is a backend-abstraction layer. Production actions are server-authoritative; when the backend is unavailable the UI reports an unavailable state instead of fabricating records.
 // ═══════════════════════════════════════════════════════════
 var LiveAPI = (function(){
   // Compatibility facade: production actions are server-authoritative.
@@ -3177,10 +3171,6 @@ function copyAffiliateLink(){
 function shareAffiliateLink(baseUrl){
   var link='marketlink.gm/ref/'+S.affiliateCode;
   openExternal(baseUrl+encodeURIComponent(link));
-}
-function affiliateWithdraw(){
-  if(S.affiliateEarnings<=0){toast('No earnings available to withdraw yet','error');return;}
-  toast('Withdrawal requires a connected payout method — coming soon 💸');
 }
 
 // Saved Addresses
@@ -6068,7 +6058,7 @@ window.addEventListener('unhandledrejection',function(e){
  *  [ ] SMS OTP Provider (Termii / Africa's Talking)
  * NOTIFICATIONS
  *  [ ] Firebase Cloud Messaging (FCM)
- *  [x] In-app NotificationCenter (mock, ready to wire)
+ *  [x] In-app NotificationCenter (local UI state synced from backend)
  *  [ ] SMS gateway hookup (Africa's Talking)
  * MAPS & LOCATION
  *  [ ] Google Maps API Key
@@ -6080,8 +6070,8 @@ window.addEventListener('unhandledrejection',function(e){
  *  [ ] QMoney API Key
  *  [ ] Card Gateway (Stripe / Paystack)
  * ORDERS & DELIVERY — see LiveAPI object
- *  [x] Order submission flow (mock, ready)
- *  [x] Rider auto-assignment (mock, ready)
+ *  [x] Order submission flow (backend-connected)
+ *  [x] Rider assignment/status (backend-connected)
  *  [ ] Real-time GPS rider tracking (WebSocket)
  * STORAGE & DATABASE
  *  [ ] Supabase / Firebase Storage Bucket
