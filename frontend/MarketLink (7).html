@@ -1156,10 +1156,10 @@ var NotificationCenter = (function(){
 // Replaces UserRegistry, OTPService, and LiveAPI.
 // Backend URL: set window.ML_API_URL before this script runs,
 // or it defaults to http://localhost:4000/api/v1
-// Falls back gracefully to mock behaviour when backend is unreachable.
+// Does not fabricate data when the backend is unreachable; production screens show an explicit unavailable state.
 // ═══════════════════════════════════════════════════════════
 var ML_API = (function(){
-  var BASE = (window.ML_API_URL || 'http://localhost:4000') + '/api/v1';
+  var BASE = (window.ML_API_URL || 'https://marketlink-gambia.onrender.com') + '/api/v1';
   var _accessToken  = null;
   var _refreshToken = null;
   var _refreshing   = null; // pending refresh promise — prevents parallel refreshes
@@ -5072,11 +5072,11 @@ function adminSectionFinanceSystemHTML(tab){
       '</div>'+
       '<div class="adm-card"><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:10px;">Active Gateways</div>'+
       ['Wave','AfriMoney','QMoney','APS Wallet','Visa','Mastercard'].map(function(g){
-        return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:rgba(255,255,255,0.6);font-size:12px;">'+g+'</span><span style="color:#F5A623;font-size:10.5px;">Mock — needs API key</span></div>';
+        return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:rgba(255,255,255,0.6);font-size:12px;">'+g+'</span><span style="color:#91A4B4;font-size:10.5px;">Not connected</span></div>';
       }).join('')+'</div>';
   }
 
-  if(tab==='s-api') return adminSectionTitle('System','API Health')+adminHealthList(['API']);
+  if(tab==='s-api'){var ap=adminSectionTitle('System','API Health')+adminHealthList(['API']);setTimeout(refreshAdminHealth,0);return ap;}
   if(tab==='s-db') return adminSectionTitle('System','Database Monitoring')+adminHealthList(['Database']);
   if(tab==='s-errors'){
     return adminSectionTitle('System','Error Logs')+
