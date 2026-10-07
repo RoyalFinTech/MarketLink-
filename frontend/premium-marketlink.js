@@ -14,27 +14,72 @@
     return '';
   }
   function normalizeProducts(d){return Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:[]);}
+  function liveProductId(id){return id==null?'':String(id);}
+  function livePaymentOptions(){return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];}
+  function liveCategoryName(id){
+    var hit=liveCategories.find(function(c){return liveProductId(c.id)===liveProductId(id);});
+    return hit&&hit.name?hit.name:'Category';
+  }
+  async function refreshCartMetadata(){
+    var ids=Object.keys(S.cart||{}),out=[];
+    for(var i=0;i<ids.length;i++){
+      var oldKey=liveProductId(ids[i]);
+      try{
+        var r=await ML_API.products.getById(oldKey),p=r&&r.data;
+        if(!p||!p.id)throw new Error('Product not found');
+        var key=liveProductId(p.id);
+        if(key!==oldKey){
+          var qty=Number(S.cart[oldKey]||0);
+          delete S.cart[oldKey];if(qty>0)S.cart[key]=(Number(S.cart[key]||0)+qty);
+          delete CART_ITEMS[oldKey];
+        }
+        CART_ITEMS[key]={id:key,name:p.name,price:Number(p.price||0),vendorId:p.vendor_id||p.vendorId||null,vendorName:p.vendor_name||p.vendorName||'',image:p.primary_image||p.image||null,stock:p.stock==null?null:Number(p.stock),status:p.status||null};
+        out.push(CART_ITEMS[key]);
+      }catch(e){out.push(null);}
+    }
+    saveCartToStorage();updateCartBadge();return out;
+  }
   async function placeLiveOrder(){
     if(!apiOk()){toast('Please sign in before placing an order.','error');return;}
     var ids=Object.keys(S.cart||{});
     if(!ids.length){toast('Your cart is empty.','error');return;}
-    var items=ids.map(function(id){var p=CART_ITEMS[id];return {productId:id,quantity:Number(S.cart[id]||1),vendorId:p&&p.vendorId};});
-    var vendors=items.map(function(x){return x.vendorId;}).filter(Boolean).filter(function(v,i,a){return a.indexOf(v)===i;});
-    if(vendors.length!==1){toast('Please place separate orders for products from different vendors.','error');return;}
-    var addressId=null;
-    var address=String(S.delivAddr||'').trim();
-    if(address){
-      try{
-        var ar=await ML_API.customers.addAddress({label:'Checkout',fullAddress:address,area:'The Gambia',latitude:S.delivLat||null,longitude:S.delivLng||null,isDefault:false});
-        addressId=ar.data&&ar.data.id||null;
-      }catch(e){}
+    var liveItems=await refreshCartMetadata();
+    if(liveItems.some(function(p){return !p||!p.id||String(p.status||'').toLowerCase()!=='active';})){
+      toast('One or more cart items is no longer available. Refresh the cart.','error');
+      renderLiveCart();return;
     }
-    var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId||undefined,paymentMethod:(S.selPay||'Pay on Delivery')==='Pay on Delivery'?'cod':String(S.selPay||'cod').toLowerCase().replace(/\s+/g,'-'),couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
+    var items=ids.map(function(id){var key=liveProductId(id),p=CART_ITEMS[key];return {productId:key,quantity:Number(S.cart[key]||1),vendorId:p&&p.vendorId};});
+    var vendors=items.map(function(x){return x.vendorId;}).filter(Boolean).filter(function(v,i,a){return a.indexOf(v)===i;});
+    if(vendors.length!==1){toast(vendors.length===0?'Cart items are missing live vendor information. Refresh the cart.':'Please place separate orders for products from different vendors.','error');return;}
+    var addressId=String(S.delivAddressId||S.deliveryAddressId||'').trim()||null;
+    if(!addressId){
+      try{var ar=await ML_API.customers.getAddresses(),addresses=normalizeProducts(ar.data),def=addresses.find(function(x){return x.is_default;});if(def){addressId=String(def.id);S.delivAddressId=addressId;S.deliveryAddressId=addressId;S.delivAddr=def.full_address||S.delivAddr||'';}}catch(e){}
+    }
+    if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
+    var payLabel=S.selPay||'Pay on Delivery',payMethod=payLabel==='Pay on Delivery'?'cod':String(payLabel).toLowerCase().replace(/\s+/g,'-');
+    var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
+    var placeBtn=document.querySelector('#cart-body button[data-ml-place-order]');
+    if(placeBtn){placeBtn.disabled=true;placeBtn.textContent='Creating secure order…';}
     try{
-      var r=await ML_API.orders.place(payload),o=r.data&&r.data.order;
-      S.order=o||r.data;S.orderSI=0;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');toast('Order placed successfully ✓');
-    }catch(e){toast(e.error||'Could not place your order.','error');}
+      var orderRes=await ML_API.orders.place(payload),order=orderRes&&orderRes.data&&orderRes.data.order?orderRes.data.order:orderRes.data;
+      if(!order||!order.id)throw {error:'The backend did not return a valid order.'};
+      S.order=order;S.orderSI=0;
+      var paymentRes=await ML_API.payments.initiate(order.id,payMethod,Number(order.total)),paymentData=paymentRes&&paymentRes.data?paymentRes.data:paymentRes;
+      S.order=Object.assign({},S.order,{payment:paymentData});
+      if(payMethod!=='cod'){
+        var redirect=paymentData&&paymentData.redirectUrl;
+        if(!redirect)throw {error:'Payment was initiated without a payment page. Please try again.'};
+        try{sessionStorage.setItem('ml_pending_order_id',String(order.id));}catch(e){}
+        var popup=window.open(redirect,'_blank','noopener,noreferrer');
+        toast(popup?'Payment page opened. Complete payment to confirm your order.':'Payment page blocked. Allow pop-ups to complete payment.','info');
+      }else toast('Order placed — Pay on Delivery selected ✓','success');
+      S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');startOrderTracking();
+    }catch(e){
+      if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
+      toast(e.error||'Could not place your order.','error');
+    }
   }
+
   async function liveSearch(q){
     var term=String(q||'').trim();
     if(!term){return loadLiveHome();}
@@ -123,15 +168,7 @@
       return '<div class="ml-cat" onclick="window.ML_Premium.openCategory('+Number(c.id)+','+JSON.stringify(c.name||'')+')"><div class="ml-cat-icon">'+esc(icon)+'</div><div class="ml-cat-name">'+esc(c.name)+'</div></div>';
     }).join('');
     if(!catHtml) catHtml='<div class="ml-empty" style="width:100%;box-sizing:border-box;"><b>Categories are being prepared</b><span>Live categories will appear here as soon as they are published.</span></div>';
-    var prodHtml=liveProducts.map(function(p){
-      var stock=p.stock==null?null:Number(p.stock);
-      return '<article class="ml-product" onclick="window.ML_Premium.openProduct('+Number(p.id)+')">'+
-        '<div class="ml-product-img">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div>'+
-        '<div class="ml-product-body"><div class="ml-product-vendor">'+esc(p.vendor_name||'MarketLink vendor')+'</div>'+
-        '<div class="ml-product-name">'+esc(p.name)+'</div><div class="ml-product-meta"><div><div class="ml-price">'+money(p.price)+'</div>'+
-        '<div class="ml-stock">'+(stock==null?'Available':stock>0?(stock+' in stock'):'Out of stock')+'</div></div>'+
-        '<button class="ml-add" '+(stock===0?'disabled':'')+' onclick="event.stopPropagation();window.ML_Premium.add('+Number(p.id)+')">+</button></div></div></article>';
-    }).join('');
+    var prodHtml=liveProducts.map(function(p){return productCard(p);}).join('');
     var orderCount=liveProfile?Number(liveProfile.total_orders||0):0;
     var spent=liveProfile?Number(liveProfile.total_spent||0):0;
     var wallet=liveWallet?Number(liveWallet.balance||0):Number(S.walletBalance||0);
@@ -156,21 +193,23 @@
     }catch(e){toast(e.error||'Could not load this category.','error');}
   }
   function productCard(p){
-    return '<article class="ml-product" onclick="window.ML_Premium.openProduct('+Number(p.id)+')"><div class="ml-product-img">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div><div class="ml-product-body"><div class="ml-product-vendor">'+esc(p.vendor_name||'MarketLink vendor')+'</div><div class="ml-product-name">'+esc(p.name)+'</div><div class="ml-product-meta"><div class="ml-price">'+money(p.price)+'</div><button class="ml-add" onclick="event.stopPropagation();window.ML_Premium.add('+Number(p.id)+')">+</button></div></div></article>';
+    var pid=liveProductId(p.id),stock=p.stock==null?null:Number(p.stock);
+    return '<article class="ml-product" onclick="window.ML_Premium.openProduct(\''+esc(pid)+'\')"><div class="ml-product-img">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div><div class="ml-product-body"><div class="ml-product-vendor">'+esc(p.vendor_name||p.vendorName||'MarketLink vendor')+'</div><div class="ml-product-name">'+esc(p.name)+'</div><div class="ml-product-meta"><div><div class="ml-price">'+money(p.price)+'</div><div class="ml-stock">'+(stock==null?'Available':stock>0?stock+' in stock':'Out of stock')+'</div></div><button class="ml-add" '+(stock===0?'disabled':'')+' onclick="event.stopPropagation();window.ML_Premium.add(\''+esc(pid)+'\')">+</button></div></div></article>';
   }
   async function openProduct(id){
     try{
       var res=await ML_API.products.getById(id),p=res.data;if(!p)throw new Error('Product not found');
       var root=G('tab-home');root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Product</h3><button onclick="window.ML_Premium.refresh()">← Marketplace</button></div>'+
-        '<div class="ml-profile-card" style="padding:18px"><div class="ml-product-img" style="height:300px;border-radius:15px">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div><div style="padding-top:16px"><div class="ml-product-vendor">'+esc(p.vendor_name||'MarketLink vendor')+'</div><h2 style="color:#fff;margin:6px 0;font-size:23px">'+esc(p.name)+'</h2><div class="ml-price" style="font-size:22px">'+money(p.price)+'</div><p style="color:#91A4B4;font-size:12px;line-height:1.6">'+esc(p.description||'Product details will appear here when provided by the vendor.')+'</p><button class="ml-btn ml-btn-primary" style="width:100%" onclick="window.ML_Premium.add('+Number(p.id)+')">Add to cart</button></div></div></div>';
+        '<div class="ml-profile-card" style="padding:18px"><div class="ml-product-img" style="height:300px;border-radius:15px">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div><div style="padding-top:16px"><div class="ml-product-vendor">'+esc(p.vendor_name||'MarketLink vendor')+'</div><h2 style="color:#fff;margin:6px 0;font-size:23px">'+esc(p.name)+'</h2><div class="ml-price" style="font-size:22px">'+money(p.price)+'</div><p style="color:#91A4B4;font-size:12px;line-height:1.6">'+esc(p.description||'Product details will appear here when provided by the vendor.')+'</p><button class="ml-btn ml-btn-primary" style="width:100%" onclick="window.ML_Premium.add('+liveProductId(p.id)+')">Add to cart</button></div></div></div>';
     }catch(e){toast(e.error||'Could not load product.','error');}
   }
   async function add(id){
     try{
       var p=(await ML_API.products.getById(id)).data;
       if(!p)return;
-      addCart(p.id,1,p.name,Number(p.price||0));
-      CART_ITEMS[p.id]=Object.assign({},CART_ITEMS[p.id]||{}, {id:p.id,name:p.name,price:Number(p.price||0),vendorId:p.vendor_id||p.vendorId||null,image:p.primary_image||null});
+      var key=liveProductId(p.id);
+      addCart(key,1,p.name,Number(p.price||0));
+      CART_ITEMS[key]=Object.assign({},CART_ITEMS[key]||{}, {id:key,name:p.name,price:Number(p.price||0),vendorId:p.vendor_id||p.vendorId||null,vendorName:p.vendor_name||p.vendorName||'',image:p.primary_image||p.image||null,stock:p.stock==null?null:Number(p.stock),status:p.status||null});
       saveCartToStorage();
       toast(p.name+' added to cart ✓');
     }catch(e){toast(e.error||'Could not add product.','error');}
@@ -191,6 +230,38 @@
     },280);
   }
   async function refresh(){await loadLiveHome();}
+  async function loadLiveAddresses(){
+    var r=await ML_API.customers.getAddresses(),rows=normalizeProducts(r.data);
+    var selected=rows.find(function(a){return String(a.id)===String(S.delivAddressId||S.deliveryAddressId);})||rows.find(function(a){return a.is_default;});
+    if(selected){S.delivAddressId=String(selected.id);S.deliveryAddressId=String(selected.id);S.delivAddr=selected.full_address||S.delivAddr||'';}
+    return rows;
+  }
+  async function renderLiveCart(){
+    var root=G('cart-body');if(!root)return;
+    if(!apiOk()){root.innerHTML='<div class="ml-empty"><b>Sign in to use your cart</b><span>Checkout uses your authenticated MarketLink account and saved addresses.</span></div>';return;}
+    if(!Object.keys(S.cart||{}).length){root.innerHTML='<div class="ml-empty"><div style="font-size:30px">🛒</div><b>Your cart is empty</b><span>Add an active product from the live marketplace to begin checkout.</span></div>';return;}
+    root.innerHTML='<div class="ml-loading">Loading live cart…</div>';
+    var metadata=await refreshCartMetadata();
+    if(metadata.some(function(p){return !p;})){root.innerHTML='<div class="ml-empty"><b>Some cart items are unavailable</b><span>Remove unavailable items and add them again from the live marketplace.</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshCart()">Retry</button></div>';return;}
+    var ids=Object.keys(S.cart||{}),vendorIds=metadata.map(function(p){return p&&p.vendorId;}).filter(Boolean).filter(function(v,i,a){return a.indexOf(v)===i;});
+    var sub=ids.reduce(function(t,id){var p=CART_ITEMS[id];return t+Number(p&&p.price||0)*Number(S.cart[id]||0);},0);
+    var addresses;try{addresses=await loadLiveAddresses();}catch(e){root.innerHTML='<div class="ml-empty"><b>Saved addresses unavailable</b><span>'+esc(e.error||'Could not load your saved addresses.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshCart()">Retry</button></div>';return;}
+    var addressHtml=addresses.length?addresses.map(function(a){var selected=String(a.id)===String(S.delivAddressId||S.deliveryAddressId);return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectAddress(\''+esc(String(a.id))+'\')"><div class="ico">📍</div><div class="copy"><b>'+esc(a.label||'Address')+'</b><span>'+esc(a.full_address||'')+(a.area?' · '+esc(a.area):'')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join(''):'<div class="ml-empty"><b>No saved delivery addresses</b><span>Add your first address in Profile → Saved addresses.</span></div>';
+    var paymentHtml=livePaymentOptions().map(function(opt){var selected=(S.selPay||'Pay on Delivery')===opt[0];return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment('+JSON.stringify(opt[0])+')"><div class="ico">💳</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+(opt[1]==='cod'?'Pay when your order arrives.':'Payment is initiated through the configured MarketLink provider.')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join('');
+    var itemsHtml=ids.map(function(id){var p=CART_ITEMS[id],qty=Number(S.cart[id]||0);return '<div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>'+esc(p.name)+'</b><span>'+money(p.price)+' × '+qty+' · '+esc(p.vendorName||'Vendor')+'</span></div><strong style="color:#FFD778">'+money(Number(p.price||0)*qty)+'</strong></div>';}).join('');
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Your cart</h3><button onclick="window.ML_Premium.refreshCart()">Refresh</button></div><div class="ml-profile-card"><div class="ml-section-head"><h3>Items</h3><span style="color:#91A4B4;font-size:10px">'+vendorIds.length+' vendor'+(vendorIds.length===1?'':'s')+'</span></div>'+itemsHtml+'</div>'+
+      (vendorIds.length>1?'<div class="ml-empty" style="margin-top:10px"><b>Multiple vendors in cart</b><span>MarketLink currently requires one vendor per checkout. Remove items from other vendors.</span></div>':'')+
+      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Delivery address</h3><button onclick="window.ML_Premium.manageAddresses()">Manage</button></div>'+addressHtml+'</div>'+
+      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Payment</h3><span style="color:#91A4B4;font-size:10px">Live provider options</span></div>'+paymentHtml+'</div>'+
+      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Coupon</h3><span style="color:#91A4B4;font-size:10px">Validated by backend</span></div><div style="display:flex;gap:8px"><input id="ml-cart-coupon" class="inp" placeholder="Optional coupon code" value="'+esc((S.appliedCoupon&&S.appliedCoupon.code)||'')+'" style="margin:0;flex:1"><button class="ml-btn ml-btn-secondary" type="button" onclick="window.ML_Premium.setCoupon()">Apply</button></div></div>'+
+      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-profile-row"><div class="copy"><b>Subtotal</b><span>Current live product prices; final totals are validated by the backend.</span></div><strong>'+money(sub)+'</strong></div><div class="ml-profile-row"><div class="copy"><b>Delivery</b><span>Calculated by MarketLink server.</span></div><strong>At checkout</strong></div><div class="ml-profile-row"><div class="copy"><b>Total</b><span>The backend confirms the final payable amount.</span></div><strong style="color:#42D2C9">Server-calculated</strong></div></div>'+
+      (addresses.length&&String(S.delivAddressId||S.deliveryAddressId)?'<button class="ml-btn ml-btn-primary" data-ml-place-order style="width:100%;margin-top:12px" onclick="window.ML_Premium.placeOrder()">Place Order</button>':'<button class="ml-btn ml-btn-primary" style="width:100%;margin-top:12px" disabled>Select a delivery address first</button>')+
+      '</div>';
+  }
+  function selectAddress(id){S.delivAddressId=String(id);S.deliveryAddressId=String(id);renderLiveCart();}
+  function selectPayment(label){S.selPay=label;renderLiveCart();}
+  function setCoupon(){var el=G('ml-cart-coupon'),code=el&&el.value.trim().toUpperCase();S.appliedCoupon=code?{code:code}:null;toast(code?'Coupon will be validated securely at order placement.':'Coupon removed.','info');renderLiveCart();}
+  function manageAddresses(){switchTab('profile');renderAddresses();}
   async function loadProfile(){
     if(!apiOk())return;
     try{
@@ -354,7 +425,9 @@
       try{
         var r=await ML_API.products.getById(pid),p=r.data;
         if(!p||p.status!=='active'){missing++;continue;}
-        addCart(p.id,Number(line.qty||line.quantity||1),p.name,Number(p.price||line.unit_price||0));added++;
+        var key=liveProductId(p.id);
+        S.cart[key]=Number(S.cart[key]||0)+Number(line.qty||line.quantity||1);
+        CART_ITEMS[key]={id:key,name:p.name,price:Number(p.price||0),vendorId:p.vendor_id||p.vendorId||null,vendorName:p.vendor_name||p.vendorName||'',image:p.primary_image||p.image||null,stock:p.stock==null?null:Number(p.stock),status:p.status||null};added++;
       }catch(e){missing++;}
     }
     if(added){toast(added+' live item'+(added===1?'':'s')+' added to cart 🛒');switchTab('cart');}
@@ -434,7 +507,7 @@
   window.adminGoTo=adminGoToLiveSafe;
   window.__ML_ORIGINAL_ADMIN_GOTO=window.adminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={refresh:refresh,refreshAdmin:refreshAdmin,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
@@ -471,6 +544,9 @@
   window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
   window.renderAdminDash=function(){loadAdminDashboard().catch(function(e){toast(e.error||'Could not load the admin dashboard.','error');});};
   window.placeOrder=placeLiveOrder;
+  window.renderCart=renderLiveCart;
+  window.applyCoupon=setCoupon;
+  window.removeCoupon=function(){S.appliedCoupon=null;renderLiveCart();};
   window.vAddProd=liveVendorAddProduct;
   window.vSaveProdEdit=liveVendorSaveProduct;
   window.vRemoveProd=liveVendorRemoveProduct;
