@@ -3250,7 +3250,7 @@ async function renderOrderHistPage(){
           '<div style="display:flex;justify-content:space-between;align-items:center;">'+
           '<div><span style="color:var(--tx);font-size:13px;font-weight:700;">D '+h.total+'</span>'+
           '<span style="color:var(--mu);font-size:11px;"> · '+h.date+'</span></div>'+
-          '<button class="btn btn-p btn-sm" onclick="reorderPastOrder('+JSON.stringify(h.id)+','+JSON.stringify(h.items)+','+h.total+')">↻ Reorder</button>'+
+          '<button class="btn btn-p btn-sm" onclick="reorderPastOrder('+JSON.stringify(h.raw&&h.raw.id||h.id)+','+JSON.stringify(h.items)+','+h.total+','+JSON.stringify(h.raw&&h.raw.items||[])+')">↻ Reorder</button>'+
           '</div></div>';
       }).join('');
 
