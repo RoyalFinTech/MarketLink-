@@ -3080,7 +3080,7 @@ function renderComparePage(){
 // ═══════════════════════════════════════════════════════════
 // ROYAL WALLET
 // ═══════════════════════════════════════════════════════════
-async function renderWalletPage(){
+async async function renderWalletPage(){
   var el=G('profile-body'); if(!el) return;
   // Show immediately with local state while fetching
   var balance=S.walletBalance||0;
@@ -3107,15 +3107,12 @@ async function renderWalletPage(){
 
   el.innerHTML=profBack('💰 Royal Wallet'+(fromServer?' ✓':''))+
     '<div style="padding:13px;">'+
-    (fromServer?'':'<div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:9px;padding:9px 12px;margin-bottom:12px;color:#F5A623;font-size:11px;">Demo data — connect backend for live wallet balance</div>')+
+    ''+
     '<div style="background:linear-gradient(135deg,#0D7377,#7C3AED);border-radius:18px;padding:22px;margin-bottom:16px;text-align:center;position:relative;overflow:hidden;">'+
     '<div style="color:rgba(255,255,255,0.7);font-size:11px;margin-bottom:6px;">Available Balance</div>'+
     '<div style="color:#fff;font-size:30px;font-weight:800;">D '+balance.toLocaleString()+'</div>'+
     '<div style="color:rgba(255,255,255,0.6);font-size:10.5px;margin-top:6px;">⭐ '+S.rewardPoints+' reward points</div></div>'+
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px;">'+
-    [['💵','Top Up','walletTopUp'],['📤','Send','walletSend'],['📲','Airtime','walletAirtime'],['🧾','Bills','walletBills']].map(function(a){
-      return '<div onclick="'+a[2]+'()" style="background:var(--sf);border-radius:13px;padding:12px 6px;text-align:center;cursor:pointer;border:1px solid rgba(255,255,255,0.07);"><div style="font-size:20px;margin-bottom:4px;">'+a[0]+'</div><div style="color:var(--tx);font-size:10px;font-weight:600;">'+a[1]+'</div></div>';
-    }).join('')+'</div>'+
+    '<div style="background:var(--sf);border-radius:13px;padding:12px 14px;margin-bottom:18px;border:1px solid rgba(255,255,255,0.07);color:var(--mu);font-size:11px;">Wallet funding, transfers, airtime and bill payments are only shown when the corresponding production provider is connected. No simulated transactions or dead actions are presented.</div>'+
     '<h4 style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:11px;">Transaction History</h4>'+
     (txns.length===0
       ? '<div style="text-align:center;color:var(--mu);font-size:12px;padding:20px;">No transactions yet</div>'
@@ -3127,7 +3124,7 @@ async function renderWalletPage(){
             '<div style="color:'+(isCredit?'#22C55E':'#EF4444')+';font-size:13px;font-weight:700;">'+(isCredit?'+':'-')+'D '+t.amount+'</div></div>';
         }).join(''))+
     '<div style="color:rgba(255,255,255,0.3);font-size:10px;text-align:center;margin-top:14px;">'+
-    (fromServer?'Live wallet data from MarketLink server.':'Connect to Royal FinTech backend for live transactions.')+
+    (fromServer?'Live wallet data from MarketLink server.':'No live wallet data is currently available.')+
     '</div></div>';
 }
 function walletTopUp(){ toast('Top-up flow requires a connected payment gateway (Wave/AfriMoney/Card) — coming soon 💳'); }
@@ -3289,7 +3286,7 @@ async function renderOrderHistPage(){
           '</div></div>';
       }).join('');
 
-  el.innerHTML=profBack('Order History'+(fromServer?' ✓':' (demo)'))+
+  el.innerHTML=profBack('Order History'+(fromServer?' ✓':''))+
     '<div style="padding:13px;">'+(fromServer?'':'<div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:9px;padding:9px 12px;margin-bottom:12px;color:#F5A623;font-size:11px;">Demo data — connect backend to see real orders</div>')+cards+'</div>';
 }
 
@@ -4052,14 +4049,7 @@ var ADMIN_STATE={
 function adminHealthCriticalCount(){
   return ADMIN_HEALTH.filter(function(h){return h.status==='critical';}).length;
 }
-var ADMIN_HEALTH=[
-  {name:'API',status:'healthy',detail:'All endpoints responding normally (mock)'},
-  {name:'Database',status:'healthy',detail:'Read/write latency nominal (mock)'},
-  {name:'Server',status:'healthy',detail:'Uptime 99.98% (mock)'},
-  {name:'Payment Gateway',status:'warning',detail:'2 failed transactions in last hour (mock)'},
-  {name:'Notification Service',status:'healthy',detail:'Push/in-app delivering normally (mock)'},
-  {name:'AI Service',status:'healthy',detail:'Browser-based — no external dependency'}
-];
+var ADMIN_HEALTH=[];
 
 function adminWidget(icon,value,label,color){
   return '<div class="adm-widget"><div style="font-size:22px;margin-bottom:6px;">'+icon+'</div>'+
@@ -4534,7 +4524,7 @@ function adminOpenApplicantModal(id,kind,state){
     (a.docs||[]).map(function(d){
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'+
         '<span style="color:#fff;font-size:12px;">📎 '+d+'</span>'+
-        '<div style="display:flex;gap:6px;"><button class="btn btn-s btn-sm" onclick="adminViewDocFullscreen('+JSON.stringify(d)+')">🔍 View</button><button class="btn btn-s btn-sm" onclick="toast(\'Download started (mock) — connect file storage for real downloads\')">⬇️ Download</button></div></div>';
+        '<div style="display:flex;gap:6px;"><button class="btn btn-s btn-sm" onclick="adminViewDocFullscreen('+JSON.stringify(d)+')">🔍 View</button><button class="btn btn-s btn-sm" onclick="toast(\'Document download is unavailable until production file storage is connected\')">⬇️ Download</button></div></div>';
     }).join('')+'</div>'+
     '<div class="adm-card" style="margin-bottom:12px;"><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:10px;">🕓 Action History</div>'+
     (a.actionHistory||[]).map(function(h){return '<div style="color:rgba(255,255,255,0.6);font-size:11.5px;padding:5px 0;">• '+h+'</div>';}).join('')+'</div>'+
@@ -4548,8 +4538,8 @@ function adminOpenApplicantModal(id,kind,state){
 function adminViewDocFullscreen(docName){
   var bodyHTML='<div style="text-align:center;padding:30px 10px;">'+
     '<div style="width:100%;aspect-ratio:3/4;max-width:320px;margin:0 auto 16px;background:repeating-linear-gradient(45deg,#161E2B,#161E2B 10px,#1C2636 10px,#1C2636 20px);border-radius:12px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.1);">'+
-    '<div><div style="font-size:40px;margin-bottom:10px;">📄</div><div style="color:rgba(255,255,255,0.5);font-size:12px;">'+docName+'</div><div style="color:rgba(255,255,255,0.3);font-size:10px;margin-top:6px;">Preview placeholder — connect file storage for real document rendering</div></div></div>'+
-    '<button class="btn btn-s" onclick="toast(\'Download started (mock)\')">⬇️ Download</button>'+
+    '<div><div style="font-size:40px;margin-bottom:10px;">📄</div><div style="color:rgba(255,255,255,0.5);font-size:12px;">'+docName+'</div><div style="color:rgba(255,255,255,0.3);font-size:10px;margin-top:6px;">Document preview requires a production file-storage URL</div></div></div>'+
+    '<button class="btn btn-s" onclick="toast(\'Document download is unavailable until production file storage is connected\')">⬇️ Download</button>'+
     '</div>';
   openAdmModal('🔍 '+docName, bodyHTML);
 }
@@ -5340,10 +5330,20 @@ function adminSectionFinanceSystemHTML(tab){
   return null;
 }
 function adminHealthList(names){
-  return ADMIN_HEALTH.filter(function(h){return names.indexOf(h.name)>-1;}).map(function(h){
-    var c=h.status==='healthy'?'#22C55E':h.status==='warning'?'#F5A623':'#EF4444';
-    return '<div class="adm-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="color:#fff;font-size:13px;font-weight:700;">'+h.name+'</span><span class="health-dot '+h.status+'"></span></div><div style="color:'+c+';font-size:11px;font-weight:700;">'+h.status+'</div><div style="color:rgba(255,255,255,0.4);font-size:11px;margin-top:6px;">'+h.detail+'</div></div>';
+  var wanted=names||[];
+  return wanted.map(function(name){
+    var supported=(name==='API');
+    return '<div class="adm-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="color:#fff;font-size:13px;font-weight:700;">'+name+'</span><span class="health-dot" id="health-'+name.replace(/\\s+/g,'-').toLowerCase()+'"></span></div><div id="health-status-'+name.replace(/\\s+/g,'-').toLowerCase()+'" style="color:#91A4B4;font-size:11px;font-weight:700;">Checking live status…</div><div id="health-detail-'+name.replace(/\\s+/g,'-').toLowerCase()+'" style="color:rgba(255,255,255,0.4);font-size:11px;margin-top:6px;">'+(supported?'Checking the production MarketLink API.':'Live telemetry for this subsystem is not exposed by the current backend API; no synthetic status is shown.')+'</div></div>';
   }).join('');
+}
+function refreshAdminHealth(){
+  if(!window.ML_API||!ML_API.checkBackend)return;
+  ML_API.checkBackend().then(function(ok){
+    var s=G('health-status-api'),d=G('health-detail-api'),dot=G('health-api');
+    if(s)s.textContent=ok?'healthy':'unavailable';
+    if(d)d.textContent=ok?'Production API responded successfully.':'The production API did not respond.';
+    if(dot)dot.className='health-dot '+(ok?'healthy':'critical');
+  }).catch(function(){});
 }
 function adminSettingField(label,path,value){
   return '<div style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">'+label+'</label>'+
