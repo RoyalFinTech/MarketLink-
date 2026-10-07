@@ -3152,7 +3152,7 @@ function renderAffiliatePage(){
     '<div style="background:var(--sfl);border-radius:9px;padding:10px 12px;color:#0D7377;font-size:12px;font-weight:600;margin-bottom:9px;word-break:break-all;">'+refLink+'</div>'+
     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'+
     '<button class="btn btn-s btn-sm" onclick="copyAffiliateLink()">📋 Copy Link</button>'+
-    '<button class="btn btn-s btn-sm" onclick="toast(\'QR code generation requires a QR library — coming soon 📱\')">📱 QR Code</button>'+
+
     '</div>'+
     '<div style="color:var(--mu);font-size:11px;margin-top:9px;">Code: <b style="color:var(--tx);">'+S.affiliateCode+'</b></div></div>'+
     '<div style="color:var(--tx);font-size:12.5px;font-weight:700;margin-bottom:10px;">📣 Share & Earn</div>'+
@@ -4727,7 +4727,7 @@ function adminSectionCommsCrmHTML(tab){
       '<select id="comm-channel" style="width:100%;padding:11px;border-radius:10px;background:#161E2B;color:#fff;border:1px solid rgba(255,255,255,0.1);font-size:12.5px;margin-bottom:9px;">'+
       '<option value="inapp"'+(defaultChannel==='inapp'?' selected':'')+'>🔔 In-App Notification</option><option value="sms"'+(defaultChannel==='sms'?' selected':'')+'>📱 SMS</option><option value="email">📧 Email</option></select>'+
       '<textarea id="comm-msg" placeholder="Write your message…" style="width:100%;height:80px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:#161E2B;color:#fff;font-size:12.5px;outline:none;resize:none;margin-bottom:9px;"></textarea>'+
-      '<div style="display:flex;gap:7px;"><button class="btn btn-p btn-sm" style="flex:1;" onclick="adminSendBroadcast()">📤 Send Now</button><button class="btn btn-s btn-sm" style="flex:1;" onclick="toast(\'Scheduling requires a backend — coming soon\')">🗓️ Schedule</button></div>'+
+      '<div style="display:flex;gap:7px;"><button class="btn btn-p btn-sm" style="flex:1;" onclick="adminSendBroadcast()">📤 Send Now</button></div>'+
       '<div style="margin-top:9px;color:rgba(255,255,255,0.35);font-size:10px;">Templates: <span style="color:#0D9488;cursor:pointer;" onclick="adminUseTemplate(\'promo\')">Promo</span> · <span style="color:#0D9488;cursor:pointer;" onclick="adminUseTemplate(\'maintenance\')">Maintenance</span> · <span style="color:#0D9488;cursor:pointer;" onclick="adminUseTemplate(\'welcome\')">Welcome</span></div>'+
       '</div>'+
       '<div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:9px;">📜 Delivery Tracking</div>'+
