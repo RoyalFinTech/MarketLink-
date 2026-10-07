@@ -4208,7 +4208,7 @@ function adminSectionHTML(){
       adminWidget('⏳',s.pendingVendors.length+s.pendingRiders.length,'Pending Approvals','#FF6B2B')+adminWidget('🟢',64,'Active Users','#22C55E')+
       '</div>'+
       '<div class="adm-row-grid">'+
-      '<div class="adm-card" style="cursor:pointer;" onclick="adminGoTo(\'ai\')"><div style="font-size:20px;margin-bottom:8px;">🤖</div><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:4px;">AI Summary</div><div style="color:rgba(255,255,255,0.45);font-size:10.5px;line-height:1.4;">Vendor signups +18% this week →</div></div>'+
+      '<div class="adm-card" style="cursor:pointer;" onclick="adminGoTo(\'ai\')"><div style="font-size:20px;margin-bottom:8px;">🤖</div><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:4px;">AI Summary</div><div style="color:rgba(255,255,255,0.45);font-size:10.5px;line-height:1.4;">Open live AI insights →</div></div>'+
       '<div class="adm-card" style="cursor:pointer;" onclick="adminGoTo(\'health\')"><div style="font-size:20px;margin-bottom:8px;">🛠</div><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:4px;">Platform Health</div><div style="color:'+healthColor+';font-size:11px;font-weight:700;">'+healthLabel+'</div></div>'+
       '<div class="adm-card" style="cursor:pointer;" onclick="adminGoTo(\'adm-notifs\')"><div style="font-size:20px;margin-bottom:8px;">🔔</div><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:4px;">Notifications</div><div style="color:rgba(255,255,255,0.45);font-size:10.5px;">'+NotificationCenter.unreadCount('admin')+' unread →</div></div>'+
       '<div class="adm-card" style="cursor:pointer;" onclick="adminGoTo(\'live\')"><div style="font-size:20px;margin-bottom:8px;">📡</div><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:4px;">Recent Activity</div><div style="color:rgba(255,255,255,0.45);font-size:10.5px;">'+(s.activityFeed[0]||'No recent activity')+'</div></div>'+
@@ -4219,7 +4219,7 @@ function adminSectionHTML(){
         return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:rgba(255,255,255,0.5);font-size:12px;">'+r[0]+'</span><span style="color:#fff;font-size:13px;font-weight:700;">'+r[1]+'</span></div>';
       }).join('')+'</div>'+
       '<div class="adm-card"><div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:12px;">💳 Payment Mix</div>'+
-      [['Pay on Delivery','42%'],['Wave','27%'],['AfriMoney','15%'],['Cards','11%'],['Other','5%']].map(function(r){
+      [['Pay on Delivery','Live data unavailable'],['Wave','Live data unavailable'],['AfriMoney','Live data unavailable'],['Cards','Live data unavailable'],['Other','Live data unavailable']].map(function(r){
         return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:rgba(255,255,255,0.5);font-size:12px;">'+r[0]+'</span><span style="color:#fff;font-size:12px;font-weight:700;">'+r[1]+'</span></div>';
       }).join('')+'</div></div>';
   }
@@ -4243,29 +4243,13 @@ function adminSectionHTML(){
           '<div style="color:rgba(255,255,255,0.4);font-size:10.5px;">'+h.detail+'</div></div>';
       }).join('')+'</div>'+
       '<div class="adm-card"><div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:12px;">⚠️ Recent Failures</div>'+
-      [['Failed API calls','0 in last hour'],['Failed payments','2 in last hour'],['Failed notifications','0 in last hour'],['Failed SMS deliveries','N/A — gateway not connected'],['Failed orders',failedOrders+' this month'],['Failed image uploads','0 in last hour']].map(function(r){
+      [['Failed API calls','Live failure telemetry unavailable'],['Failed payments','Live failure telemetry unavailable'],['Failed notifications','Live failure telemetry unavailable'],['Failed SMS deliveries','Live failure telemetry unavailable'],['Failed orders','Live failure telemetry unavailable'],['Failed image uploads','Live failure telemetry unavailable']].map(function(r){
         return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:rgba(255,255,255,0.5);font-size:12px;">'+r[0]+'</span><span style="color:#fff;font-size:12px;font-weight:600;">'+r[1]+'</span></div>';
       }).join('')+'</div>';
   }
   if(tab==='ai'){
     return adminSectionTitle('AI Insights','AI Business Intelligence')+
-      '<div style="background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(13,115,119,0.12));border:1px solid rgba(124,58,237,0.3);border-radius:14px;padding:16px;margin-bottom:14px;">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:18px;">🤖</span><span style="color:#fff;font-size:13px;font-weight:700;">AI Business Intelligence — Daily Report</span></div>'+
-      '<div style="color:rgba(255,255,255,0.5);font-size:11px;">Auto-generated from current platform activity. Connect a real analytics/AI backend for live, continuously-updated insights.</div></div>'+
-      [['📈 Daily Summary','Orders are up today with 9 completed deliveries and zero failed transactions so far.'],
-       ['📈 Weekly Summary','Vendor registrations increased by 18% this week, led by Gambian Food and Electronics categories.'],
-       ['📈 Monthly Summary','Order completion rate improved by 12% month-over-month, with average delivery time down to 32 minutes.'],
-       ['📊 Revenue Trends','Gross revenue is trending upward, driven primarily by Wave and AfriMoney payments.'],
-       ['📊 Growth Trends','312 active customers, +12 new registrations this week — steady organic growth.'],
-       ['🏪 Vendor Performance','Bantaba Grill and Glow Beauty Store are the top performers by order volume this month.'],
-       ['🛵 Rider Performance','Average rider rating is 4.8★ across 9 active riders; on-time delivery rate is 94%.'],
-       ['👥 Customer Activity','Most active region: Greater Banjul Area, with Serrekunda generating the highest order density.'],
-       ['🔍 Anomaly Detection','1 account flagged for unusual order velocity (#4821) — under fraud review.'],
-       ['📉 Churn Risk','3 customers haven\'t ordered in 30+ days — consider a win-back promotion.'],
-       ['🩺 Platform Health','All core systems nominal — no elevated error rates or failed-payment spikes detected.']
-      ].map(function(c){
-        return '<div class="adm-card" style="margin-bottom:9px;"><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:6px;">'+c[0]+'</div><div style="color:rgba(255,255,255,0.6);font-size:12px;line-height:1.5;">'+c[1]+'</div></div>';
-      }).join('');
+      '<div class="adm-card" style="padding:18px;text-align:center;"><div style="font-size:34px;margin-bottom:8px;">🤖</div><div style="color:#fff;font-size:14px;font-weight:700;margin-bottom:6px;">Live AI insights</div><div style="color:rgba(255,255,255,0.5);font-size:11.5px;line-height:1.6;">Hardcoded business intelligence has been removed. The live admin AI view reads current dashboard and analytics data from the backend.</div></div>';
   }
   return adminSectionUsersOrdersHTML(tab) || adminSectionCommsCrmHTML(tab) || adminSectionFinanceSystemHTML(tab) || '<div class="adm-card">Section not found.</div>';
 }
@@ -4850,13 +4834,7 @@ function adminSectionFinanceSystemHTML(tab){
   var s=ADMIN_STATE;
   if(tab==='f-revenue'){
     return adminSectionTitle('Finance','Revenue')+adminSubnavHTML()+
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:11px;margin-bottom:16px;">'+
-      adminWidget('💰','D 18,600','This Month','#F5A623')+adminWidget('📈','D 4,320','This Week','#22C55E')+adminWidget('💵','D 950','Today','#0D9488')+adminWidget('📊','D '+Math.round(18600*s.settings.commissionPct/100),'Commission Earned','#7C3AED')+
-      '</div>'+
-      '<div class="adm-card"><div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:11px;">Revenue by Category</div>'+
-      [['Gambian Food','D 6,200'],['Beauty','D 3,800'],['Electronics','D 2,900'],['Fashion','D 2,400'],['Other','D 3,300']].map(function(r){
-        return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="color:rgba(255,255,255,0.5);font-size:12px;">'+r[0]+'</span><span style="color:#fff;font-size:12px;font-weight:700;">'+r[1]+'</span></div>';
-      }).join('')+'</div>';
+      '<div class="adm-card" style="padding:18px;text-align:center;"><div style="font-size:34px;margin-bottom:8px;">💳</div><div style="color:#fff;font-size:14px;font-weight:700;margin-bottom:6px;">Live finance view</div><div style="color:rgba(255,255,255,0.5);font-size:11.5px;line-height:1.6;">Seeded finance totals have been removed. Use the live Payments/Revenue view backed by the MarketLink admin API.</div></div>';
   }
   if(tab==='f-transactions'){
     return adminSectionTitle('Finance','Transactions')+adminSubnavHTML()+
