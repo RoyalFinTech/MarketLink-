@@ -155,3 +155,27 @@
   .ml-promo-bottom-note{right:11px;top:10px;max-width:155px;font-size:7px}
   .ml-promo-carousel-foot{padding:10px 14px 13px}
 }
+
+#scr-onboard .ml-ob-topbar-right{display:flex;align-items:center;gap:14px}
+#scr-onboard .ml-ob-topbar-right>span{font-size:8px;font-weight:900;letter-spacing:.12em;color:#7f98a5}
+.ml-affiliate-hero{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:22px;overflow:hidden;margin-top:18px;border:1px solid rgba(245,184,61,.3);border-radius:24px;padding:clamp(20px,4vw,34px);background:radial-gradient(circle at 85% 20%,rgba(16,168,161,.24),transparent 35%),linear-gradient(130deg,#071b2a,#0b454c 68%,#102836)}
+.ml-affiliate-label{font-size:9px;letter-spacing:.14em;font-weight:900;color:#8ce5dd}
+.ml-affiliate-big{color:#ffc451;font-size:clamp(62px,8vw,86px);font-weight:950;letter-spacing:-.08em;line-height:.97;margin:14px 0}
+.ml-affiliate-big span{font-size:.5em;vertical-align:top;margin-left:5px}
+.ml-affiliate-hero-copy h4{margin:0 0 9px;color:#fff;font-size:18px}
+.ml-affiliate-hero-copy p{max-width:590px;margin:0;color:#cad8de;font-size:12px;line-height:1.7}
+.ml-affiliate-hero-copy small{display:block;max-width:600px;color:#8fa8b1;font-size:9px;line-height:1.6;margin-top:12px}
+.ml-affiliate-hero-art{align-self:center;justify-self:center;display:flex;flex-direction:column;align-items:center;gap:7px;width:142px;padding:18px 13px;border:1px solid rgba(255,255,255,.17);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.13),rgba(255,255,255,.035));transform:rotate(4deg);box-shadow:0 20px 35px rgba(0,0,0,.15)}
+.ml-affiliate-link-icon{width:60px;height:60px;display:grid;place-items:center;border-radius:20px;background:linear-gradient(135deg,#0b9e9a,#f5b83d);font-size:30px}
+.ml-affiliate-hero-art span,.ml-affiliate-hero-art b,.ml-affiliate-hero-art em{font-style:normal;font-size:9px;font-weight:950;letter-spacing:.17em;color:#dbecef}
+.ml-affiliate-hero-art b{color:#72e0d5}.ml-affiliate-hero-art em{color:#ffc451}
+.ml-affiliate-stats{margin-top:13px}
+.ml-affiliate-link-card{padding:18px}
+.ml-affiliate-link-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ml-affiliate-link-head b{display:block;color:#eff8fa;font-size:13px}.ml-affiliate-link-head span{display:block;color:#8ca2ad;font-size:10px;line-height:1.5;margin-top:5px}
+.ml-affiliate-link-head>span{font-size:22px}
+.ml-affiliate-link-field{display:flex;gap:8px;margin-top:15px}
+.ml-affiliate-link-field input{min-width:0;flex:1;border-radius:10px;padding:12px;background:#071823;border:1px solid rgba(255,255,255,.12);color:#b9cbd2;font-size:10px}
+.ml-affiliate-link-field button{white-space:nowrap}
+.ml-affiliate-footnote{color:#78929e;font-size:9px;line-height:1.6;margin-top:12px}
+@media(max-width:560px){.ml-affiliate-hero{grid-template-columns:1fr;padding:20px;gap:8px}.ml-affiliate-hero-art{position:absolute;right:22px;top:24px;transform:scale(.72) rotate(4deg);transform-origin:top right;opacity:.84}.ml-affiliate-hero-copy{position:relative;z-index:2}.ml-affiliate-big{font-size:68px}.ml-affiliate-hero-copy h4{max-width:215px}.ml-affiliate-hero-copy p{max-width:100%;padding-right:0}.ml-affiliate-link-field{flex-direction:column}.ml-affiliate-link-field button{width:100%}}
