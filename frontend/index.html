@@ -1876,7 +1876,137 @@ async function adminLogout(){
   S.authMode='login'; renderAuth();
   toast('Admin session ended');
 }
-async function doLogin(){
+async function renderAuth(){
+  var b=G('auth-body');
+  var err='<div id="auth-err" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:10px 13px;color:#EF4444;font-size:12px;margin-bottom:14px;display:none;"></div>';
+  if(S.authMode==='login'){
+    b.innerHTML=
+      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">Welcome back 👋</h2>'+
+      '<p style="color:var(--mu);font-size:13px;margin-bottom:22px;">Sign in to your account</p>'+
+      err+
+      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+gmfHTML()+
+      '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
+      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="lphone" style="flex:1;"></div>'+
+      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:8px;">4-digit PIN</label>'+
+      '<div class="pinr" id="pin-row"></div>'+
+      '<button class="btn btn-p" onclick="doLogin()" id="lbtn">Sign In</button>'+
+      '<div style="text-align:center;margin-top:16px;"><span style="color:var(--mu);font-size:13px;">New here? </span>'+
+      '<span onclick="S.authMode=\'register\';renderAuth();" style="color:var(--pr);font-size:13px;font-weight:600;cursor:pointer;">Create account</span></div>'+
+      '<div onclick="openAdminLogin()" style="text-align:center;margin-top:22px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px;-webkit-tap-highlight-color:transparent;">'+
+      '<span style="font-size:13px;">🛡️</span><span style="color:var(--mu);font-size:12px;font-weight:600;">Admin Portal</span></div>'+
+      '<div style="text-align:center;margin-top:10px;color:rgba(255,255,255,0.2);font-size:10px;">Powered by <span style="color:#F5A623;font-weight:700;">Royal FinTech</span></div>';
+    renderPinRow('pin-row',S.pin);
+  } else if(S.authMode==='register'){
+    b.innerHTML=
+      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">Create account</h2>'+
+      '<p style="color:var(--mu);font-size:13px;margin-bottom:22px;">Join MarketLink today</p>'+
+      err+
+      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Full Name</label>'+
+      '<input class="inp" type="text" placeholder="e.g. Lamin Touray" id="rname" value="'+sanitizeText(S.regName||'')+'" oninput="S.regName=this.value;" style="margin-bottom:11px;">'+
+      '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">'+gmfHTML()+
+      '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
+      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="S.regPhone=this.value;" style="flex:1;"></div>'+
+      '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;padding:12px;background:rgba(13,115,119,0.1);border-radius:10px;border:1px solid rgba(13,115,119,0.3);">'+
+      '<div id="agree-box" onclick="toggleAgree()" style="width:20px;height:20px;border-radius:5px;border:2px solid '+(S.agreed?'#0D7377':'rgba(255,255,255,0.15)')+';background:'+(S.agreed?'#0D7377':'transparent')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;">'+(S.agreed?'<span style="color:#fff;font-size:12px;font-weight:700;">✓</span>':'')+
+      '</div><div style="font-size:12px;color:var(--mu);line-height:1.5;">I agree to the <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Terms & Conditions</span> and <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Privacy Policy</span></div></div>'+
+      '<button class="btn btn-p" onclick="doRegister()">Continue</button>'+
+      '<div style="text-align:center;margin-top:16px;"><span style="color:var(--mu);font-size:13px;">Have an account? </span>'+
+      '<span onclick="S.authMode=\'login\';renderAuth();" style="color:var(--pr);font-size:13px;font-weight:600;cursor:pointer;">Sign in</span></div>'+
+      '<div style="text-align:center;margin-top:22px;color:rgba(255,255,255,0.2);font-size:10px;">Powered by <span style="color:#F5A623;font-weight:700;">Royal FinTech</span></div>';
+  } else if(S.authMode==='otp'){
+    b.innerHTML=
+      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">Verify number</h2>'+
+      '<p style="color:var(--mu);font-size:13px;margin-bottom:14px;">Code sent to 🇬🇲 +220 '+S.regPhone+'</p>'+
+      (S.devOtpDisplay?'<div style="background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:10px;padding:10px 13px;margin-bottom:18px;text-align:center;"><div style="color:#F5A623;font-size:10.5px;font-weight:700;letter-spacing:0.4px;">⚙️ DEVELOPMENT MODE — OTP not sent by SMS</div><div id="dev-otp-code" style="color:var(--tx);font-size:17px;font-weight:800;letter-spacing:3px;margin-top:5px;user-select:all;cursor:text;">'+S.devOtpDisplay+'</div><div onclick="copyDevOtp()" style="display:inline-block;margin-top:7px;color:#F5A623;font-size:11px;font-weight:700;cursor:pointer;border:1px solid rgba(245,166,35,0.4);border-radius:99px;padding:4px 12px;">📋 Copy OTP</div></div>':'')+
+      err+
+      '<div class="otpr" id="otp-row"></div>'+
+      '<button class="btn btn-p" onclick="doOTP()">Verify OTP</button>'+
+      '<div style="text-align:center;margin-top:12px;"><span style="color:var(--mu);font-size:12px;">Didn\'t get it? </span>'+
+      '<span onclick="resendOTP()" style="color:var(--pr);font-size:12px;cursor:pointer;">Resend</span></div>';
+    renderOTPRow();
+  } else if(S.authMode==='pin'){
+    b.innerHTML=
+      '<h2 style="color:var(--tx);font-size:21px;font-weight:700;margin-bottom:4px;">'+(S.pinStep==='create'?'Create PIN':'Confirm PIN')+'</h2>'+
+      '<p style="color:var(--mu);font-size:13px;margin-bottom:22px;">'+(S.pinStep==='create'?'Choose a 4-digit PIN':'Re-enter your PIN to confirm')+'</p>'+
+      err+
+      '<div class="pinr" id="pin-row"></div>'+
+      '<button class="btn btn-p" onclick="doPin()">'+(S.pinStep==='create'?'Next':'Complete Setup 🎉')+'</button>';
+    renderPinRow('pin-row',S.pinStep==='create'?S.pin:S.cpin);
+  }
+}
+function toggleAgree(){S.agreed=!S.agreed;renderAuth();}
+function renderOtpRevealCard(){
+  var body=G('otp-reveal-body'); if(!body) return;
+  var code=String(S.devOtpDisplay||'');
+  body.innerHTML=
+    '<div style="text-align:center;">'+
+    '<div style="color:rgba(255,255,255,0.5);font-size:11.5px;font-weight:600;margin-bottom:14px;">⚙️ Development mode — SMS is not configured, so here\'s your code directly.</div>'+
+    '<div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;">'+
+      code.split('').map(function(d){return '<div style="width:38px;height:48px;border-radius:10px;background:rgba(13,148,136,0.14);border:1.5px solid rgba(13,148,136,0.4);display:flex;align-items:center;justify-content:center;color:var(--tx);font-size:22px;font-weight:800;">'+sanitizeText(d)+'</div>';}).join('')+
+    '</div>'+
+    '<div style="color:rgba(255,255,255,0.55);font-size:12px;margin-bottom:20px;">Use this code to verify your phone number.</div>'+
+    '<button class="btn btn-p" style="width:100%;" onclick="continueFromOtpReveal()">Continue</button>'+
+    '</div>';
+}
+function continueFromOtpReveal(){
+  closeSheet('sh-otp-reveal');
+  var otpInput=document.querySelector('#otp-row .otpb');
+  if(otpInput) setTimeout(function(){otpInput.focus();},250);
+}
+function copyDevOtp(){
+  if(!S.devOtpDisplay) return;
+  var code=String(S.devOtpDisplay);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(function(){toast('OTP copied 📋');}).catch(function(){toast('Could not copy — select the code manually.','error');});
+  } else {
+    // Fallback for browsers without Clipboard API: select the text so the user can copy manually.
+    var el=G('dev-otp-code');
+    if(el && window.getSelection){
+      var range=document.createRange(); range.selectNodeContents(el);
+      var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    }
+    toast('OTP selected — copy it manually.');
+  }
+}
+function renderPinRow(rowId,arr){
+  var row=G(rowId); if(!row) return; row.innerHTML='';
+  arr.forEach(function(v,i){
+    var inp=document.createElement('input');
+    inp.className='pinb'; inp.maxLength=1; inp.type='password'; inp.inputMode='numeric'; inp.value=arr[i];
+    if(arr[i]) inp.classList.add('filled');
+    inp.addEventListener('input',function(e){
+      var v=e.target.value.replace(/\D/,'');
+      arr[i]=v; inp.value=v; inp.classList.toggle('filled',!!v);
+      if(v&&i<3){var nx=row.children[i+1];if(nx)nx.focus();}
+    });
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='Backspace'&&!arr[i]&&i>0){var pv=row.children[i-1];if(pv)pv.focus();}
+    });
+    row.appendChild(inp);
+  });
+}
+function renderOTPRow(){
+  var row=G('otp-row'); if(!row) return; row.innerHTML='';
+  S.otp.forEach(function(v,i){
+    var inp=document.createElement('input');
+    inp.className='otpb'; inp.maxLength=1; inp.inputMode='numeric'; inp.value=S.otp[i];
+    if(S.otp[i]) inp.classList.add('filled');
+    inp.addEventListener('input',function(e){
+      var v=e.target.value.replace(/\D/,'');
+      S.otp[i]=v; inp.value=v; inp.classList.toggle('filled',!!v);
+      if(v&&i<5){var nx=row.children[i+1];if(nx)nx.focus();}
+      // Auto-verify once all 6 digits are filled — no Verify button tap required
+      if(S.otp.join('').length===6 && S.otp.every(function(d){return d!=='';})){
+        setTimeout(doOTP,150);
+      }
+    });
+    row.appendChild(inp);
+  });
+}
+
+function doLogin(){
   var p=G('lphone'); if(!p) return;
   S.loginPhone=p.value.trim();
   if(!S.loginPhone){authErr('Enter your phone number');return;}
