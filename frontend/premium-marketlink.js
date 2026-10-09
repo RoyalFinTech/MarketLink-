@@ -59,7 +59,10 @@
   }
   function startPromoAutoplay(){
     if(mlPromoTimer)clearInterval(mlPromoTimer);
-    mlPromoTimer=setInterval(function(){if(!document.hidden&&G('ml-promo-carousel'))paintPromoCarousel(mlPromoIndex+1);},3000);
+    mlPromoTimer=setInterval(function(){
+      var tab=G('tab-home');
+      if(!document.hidden&&tab&&tab.offsetParent!==null&&G('ml-promo-carousel'))paintPromoCarousel(mlPromoIndex+1);
+    },3000);
   }
   function promoAction(kind){
     if(kind==='shop'){if(typeof switchTab==='function')switchTab('home');var search=G('hsearch');if(search)setTimeout(function(){search.focus();},150);return;}
@@ -704,12 +707,8 @@
     btn.innerHTML=(S.obSlide===mlOnboardSlides.length-1?'Get started':'Continue')+' <span>→</span>';
     var skip=screen.querySelector('.ml-ob-topbar button');
     if(skip){skip.className='ml-ob-skip';skip.textContent='Skip';}
-    if(resetAutoplay!==false){
-      if(mlOnboardTimer)clearInterval(mlOnboardTimer);
-      mlOnboardTimer=setInterval(function(){
-        if(!document.hidden&&G('scr-onboard')&&G('scr-onboard').classList.contains('active'))goOnboardTo((Number(S.obSlide)||0)+1);
-      },3000);
-    }
+    if(mlOnboardTimer){clearInterval(mlOnboardTimer);mlOnboardTimer=null;}
+    // Onboarding is user-controlled so new users have enough time to read each step.
   }
   function goOnboardPremium(){S.obSlide=0;showScreen('scr-onboard');renderPremiumOnboarding(true);}
   function obNextLive(){
