@@ -528,15 +528,15 @@ button:active{opacity:0.82;}
 </div>
 
 <!-- ═══ ONBOARDING ═══ -->
-<div id="scr-onboard" class="screen">
+<div id="scr-onboard" class="screen ml-onboard-screen">
   <div class="fb"><div class="g"></div><div class="r"></div><div class="b"></div></div>
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;">
-    <div id="ob-logo"></div>
-    <button onclick="goAuth()" style="background:none;border:none;color:#8E99A4;font-size:13px;cursor:pointer;">Skip</button>
-  </div>
-  <div id="ob-slide" style="display:flex;flex-direction:column;align-items:center;padding:20px 28px;text-align:center;"></div>
-  <div id="ob-dots" style="display:flex;justify-content:center;gap:8px;margin-bottom:22px;"></div>
-  <div style="padding:0 18px 44px;"><button class="btn btn-gh" id="ob-btn" onclick="obNext()">Next →</button></div>
+  <header class="ml-ob-topbar">
+    <div id="ob-logo" class="ml-ob-logo"></div>
+    <div class="ml-ob-topbar-right"><span>🇬🇲 MADE FOR THE GAMBIA</span><button class="ml-ob-skip" onclick="goAuth()">Skip</button></div>
+  </header>
+  <div id="ob-slide" class="ml-ob-slide"></div>
+  <div id="ob-dots" class="ml-ob-dots"></div>
+  <footer class="ml-ob-footer"><button class="btn btn-gh ml-ob-next" id="ob-btn" onclick="obNext()">Continue <span>→</span></button></footer>
 </div>
 
 <!-- ═══ AUTH ═══ -->
