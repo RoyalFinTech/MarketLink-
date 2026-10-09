@@ -179,3 +179,8 @@
 .ml-affiliate-link-field button{white-space:nowrap}
 .ml-affiliate-footnote{color:#78929e;font-size:9px;line-height:1.6;margin-top:12px}
 @media(max-width:560px){.ml-affiliate-hero{grid-template-columns:1fr;padding:20px;gap:8px}.ml-affiliate-hero-art{position:absolute;right:22px;top:24px;transform:scale(.72) rotate(4deg);transform-origin:top right;opacity:.84}.ml-affiliate-hero-copy{position:relative;z-index:2}.ml-affiliate-big{font-size:68px}.ml-affiliate-hero-copy h4{max-width:215px}.ml-affiliate-hero-copy p{max-width:100%;padding-right:0}.ml-affiliate-link-field{flex-direction:column}.ml-affiliate-link-field button{width:100%}}
+
+@media(prefers-reduced-motion:reduce){
+  .ml-ob-visual,.ml-promo-panel{animation:none!important}
+  .ml-ob-copy h1,.ml-ob-next span,.ml-promo-dots button{transition:none!important}
+}
