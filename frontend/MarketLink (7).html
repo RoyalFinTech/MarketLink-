@@ -1876,7 +1876,7 @@ async function adminLogout(){
   S.authMode='login'; renderAuth();
   toast('Admin session ended');
 }
-async function renderAuth(){
+function renderAuth(){
   var b=G('auth-body');
   var err='<div id="auth-err" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:10px 13px;color:#EF4444;font-size:12px;margin-bottom:14px;display:none;"></div>';
   if(S.authMode==='login'){
@@ -2006,7 +2006,7 @@ function renderOTPRow(){
   });
 }
 
-function doLogin(){
+async function doLogin(){
   var p=G('lphone'); if(!p) return;
   S.loginPhone=p.value.trim();
   if(!S.loginPhone){authErr('Enter your phone number');return;}
