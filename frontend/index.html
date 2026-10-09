@@ -432,7 +432,7 @@ button:active{opacity:0.82;}
 .lm .fab-ai{box-shadow:0 4px 20px rgba(13,115,119,0.4);}
 
 </style>
-<link rel="stylesheet" href="./premium-marketlink.css"><script src="./premium-marketlink.js" defer></script></head>
+<link rel="stylesheet" href="./premium-marketlink.css?v=onboarding-20261009-r2"><script src="./premium-marketlink.js?v=onboarding-20261009-r2" defer></script></head>
 <body>
 <div id="app">
 <div id="toast"></div>
@@ -1769,7 +1769,7 @@ function injectLogos(){
   },35);
   setTimeout(function(){rider.style.left='42%';},800);
   setTimeout(function(){rider.style.transition='left 1s ease-in';rider.style.left='115%';},3200);
-  setTimeout(goOnboard,4800);
+  setTimeout(function(){if(typeof window.goOnboard==='function')window.goOnboard();},4800);
 })();
 
 // ═══════════════════════════════════════════════════════════
@@ -6264,6 +6264,69 @@ window.addEventListener('unhandledrejection',function(e){
   // Wait for the library, then refresh the auth picker so all countries appear.
   phoneReady.then(function(){try{if(S.authMode==='login'||S.authMode==='register')renderAuth();}catch(e){}});
   if(typeof oldRender==='function')try{oldRender();decorateAuth();}catch(e){}
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+  var slides=[
+    {eyebrow:'SHOP THE LOCAL MARKET',title:'Your market.',accent:'Your phone.',body:'Find fresh produce, groceries and everyday essentials from local sellers across The Gambia.',chips:['Local vendors','Everyday essentials','Easy ordering'],image:'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1600&q=85',alt:'Fresh produce at a local market',symbol:'🛍️',visualTitle:'Fresh picks, closer to home',visualNote:'Discover what local sellers have today.'},
+    {eyebrow:'BUILT FOR GAMBIAN BUSINESSES',title:'Bring your shop',accent:'to more customers.',body:'Showcase your products, manage real orders and reach more shoppers with one connected marketplace.',chips:['Your products','Your customers','One dashboard'],image:'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=1600&q=85',alt:'Retail shopping and products',symbol:'🏪',visualTitle:'Your business, online',visualNote:'Reach shoppers beyond your storefront.'},
+    {eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link.',accent:'Earn 2%.',body:'Share your personal affiliate link. Earn a reward equal to 2% of eligible discounted merchandise when a referred order is successfully delivered.',chips:['Share on WhatsApp','Eligible purchases','Rewards after delivery'],image:'https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1600&q=85',alt:'Shopping and sharing a product online',symbol:'🔗',visualTitle:'Your network has value',visualNote:'Earn on eligible merchandise after delivery.'}
+  ];
+  var index=0;
+  function byId(id){return document.getElementById(id);}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function showOnly(id){
+    document.querySelectorAll('.screen').forEach(function(el){el.classList.remove('active');});
+    var target=byId(id);if(target)target.classList.add('active');
+  }
+  function toAuth(){
+    showOnly('scr-auth');
+    try{if(typeof window.renderAuth==='function')window.renderAuth();}
+    catch(e){console.error('[MarketLink onboarding] Login screen render failed:',e);}
+  }
+  function render(){
+    var screen=byId('scr-onboard'),stage=byId('ob-slide'),dots=byId('ob-dots'),btn=byId('ob-btn');
+    if(!screen||!stage||!dots||!btn)return;
+    screen.classList.add('ml-onboard-screen');
+    stage.className='ml-ob-slide';
+    var s=slides[index];
+    try{
+      stage.innerHTML='<div class="ml-ob-layout ml-ob-layout-runtime"><div class="ml-ob-copy"><span class="ml-ob-eyebrow"><i></i>'+esc(s.eyebrow)+'</span>'+
+        '<h1>'+esc(s.title)+'<em>'+esc(s.accent)+'</em></h1><p class="ml-ob-description">'+esc(s.body)+'</p>'+
+        '<div class="ml-ob-chips">'+s.chips.map(function(x){return '<span><b>✓</b>'+esc(x)+'</span>';}).join('')+'</div>'+
+        '<div class="ml-ob-inline-meta"><span class="ml-ob-meta-logo">'+s.symbol+'</span><span><b>MarketLink Gambia</b><small>Your local market, connected.</small></span></div></div>'+
+        '<div class="ml-ob-visual ml-ob-visual-runtime"><img class="ml-ob-photo" src="'+esc(s.image)+'" alt="'+esc(s.alt)+'" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'ml-ob-photo-fallback\')">'+
+        '<div class="ml-ob-photo-overlay" aria-hidden="true"></div><div class="ml-ob-visual-top"><span>🇬🇲 MADE FOR THE GAMBIA</span><span class="ml-ob-live"><i></i> LOCAL OPPORTUNITY</span></div>'+
+        '<div class="ml-ob-visual-bottom"><span class="ml-ob-visual-symbol">'+s.symbol+'</span><h2>'+esc(s.visualTitle)+'</h2><p>'+esc(s.visualNote)+'</p>'+
+        (index===2?'<div class="ml-ob-reward"><strong>2%</strong><span>affiliate reward<small>eligible merchandise subtotal</small></span></div>':'<div class="ml-ob-visual-pills"><span>SHOP</span><span>SELL</span><span>DELIVER</span></div>')+
+        '</div></div></div>';
+      dots.className='ml-ob-dots';
+      dots.innerHTML=slides.map(function(_,i){return '<button type="button" aria-label="Go to onboarding slide '+(i+1)+'" data-ml-ob-dot="'+i+'" class="'+(i===index?'active':'')+'"></button>';}).join('');
+      dots.querySelectorAll('button').forEach(function(dot){dot.addEventListener('click',function(){index=Number(dot.getAttribute('data-ml-ob-dot'))||0;render();});});
+      btn.className='btn btn-gh ml-ob-next';
+      btn.innerHTML=(index===slides.length-1?'Go to login':'Continue')+' <span>→</span>';
+      btn.onclick=function(){if(index>=slides.length-1){toAuth();return;}index++;render();};
+    }catch(e){
+      console.error('[MarketLink onboarding] Slide render failed:',e);
+      stage.innerHTML='<div class="ml-ob-recovery"><span>🇬🇲 MARKETLINK GAMBIA</span><h1>Shop local.<em>Grow together.</em></h1><p>Discover local products, sell to more customers and earn eligible affiliate rewards.</p><button type="button" id="ml-ob-recovery-login">Continue to login →</button></div>';
+      var fallback=byId('ml-ob-recovery-login');if(fallback)fallback.onclick=toAuth;
+      btn.onclick=toAuth;btn.textContent='Go to login →';
+    }
+  }
+  function goOnboard(){index=0;showOnly('scr-onboard');render();}
+  document.addEventListener('DOMContentLoaded',function(){
+    window.goOnboard=goOnboard;
+    window.renderOnboard=render;
+    window.obNext=function(){if(index>=slides.length-1){toAuth();return;}index++;render();};
+    window.goAuth=toAuth;
+    var skip=document.querySelector('#scr-onboard .ml-ob-skip, #scr-onboard button[onclick*="goAuth"]');
+    if(skip)skip.onclick=toAuth;
+    // Render immediately while the splash is still visible to guarantee first-slide readiness.
+    render();
+    console.info('[MarketLink onboarding] recovery bootstrap ready; login route connected.');
+  });
 })();
 </script>
 </body>
