@@ -1176,18 +1176,30 @@ var ML_API = (function(){
   // ── Core fetch wrapper ──────────────────────────────────────
   async function req(method, path, body, opts){
     opts = opts || {};
+    // Most API calls should fail clearly instead of waiting forever. Sign-in
+    // gets a longer window to accommodate a sleeping Render Free instance.
+    var timeoutMs = Number(opts.timeoutMs) || 25000;
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    var timedOut = false, timeoutId = null;
     var url = BASE + path;
     var headers = { 'Content-Type': 'application/json' };
     if(_accessToken) headers['Authorization'] = 'Bearer ' + _accessToken;
 
     var fetchOpts = { method: method, headers: headers };
     if(body && method !== 'GET') fetchOpts.body = JSON.stringify(body);
+    if(controller){
+      fetchOpts.signal = controller.signal;
+      timeoutId = setTimeout(function(){ timedOut = true; controller.abort(); }, timeoutMs);
+    }
+    // Invalid credentials and other public auth flows must return their own
+    // server error; do not replace "Incorrect PIN" with a stale-token refresh.
+    var skipRefresh = /^\/auth\/(?:login|register\/(?:initiate|complete)|refresh|pin-reset\/(?:request|confirm))$/.test(path);
 
     try {
       var res = await fetch(url, fetchOpts);
 
-      // 401 + we have a refresh token → try refresh once
-      if(res.status === 401 && _refreshToken && !opts._retried){
+      // 401 + we have a refresh token → try refresh once for protected routes only
+      if(res.status === 401 && _refreshToken && !opts._retried && !skipRefresh){
         var refreshed = await _doRefresh();
         if(refreshed){
           // Retry original request with new token
@@ -1209,6 +1221,9 @@ var ML_API = (function(){
       }
       return data;
     } catch(err){
+      if(timedOut || (err && err.name === 'AbortError')){
+        throw { code: 'REQUEST_TIMEOUT', error: 'MarketLink is taking too long to respond. Its server may be waking up; please try again.' };
+      }
       if(err.code) throw err; // already formatted
       // Network error — fetch() throws a generic TypeError for both "truly
       // unreachable" and "reachable but blocked by the browser (e.g. CORS)";
@@ -1221,7 +1236,9 @@ var ML_API = (function(){
       if(window.MARKETLINK_BACKEND_MISCONFIGURED){
         throw { code: 'MISCONFIGURED_BACKEND', error: 'MarketLink server is not configured for this deployment. The app is still pointed at a local development address, which only works on the developer\'s own machine.' };
       }
-      throw { code: 'NETWORK_ERROR', error: 'Cannot reach MarketLink server. It may be offline, or the browser blocked the request (e.g. CORS). Check the browser console for details.' };
+      throw { code: 'NETWORK_ERROR', error: 'MarketLink could not be reached. Check your connection and retry. If the problem continues, contact MarketLink support.' };
+    } finally {
+      if(timeoutId !== null) clearTimeout(timeoutId);
     }
   }
 
@@ -1252,7 +1269,7 @@ var ML_API = (function(){
   }
 
   var get    = function(path, qs){ return req('GET',    path + (qs ? '?'+new URLSearchParams(qs) : '')); };
-  var post   = function(path, b)  { return req('POST',   path, b); };
+  var post   = function(path, b, opts) { return req('POST', path, b, opts); };
   var put    = function(path, b)  { return req('PUT',    path, b); };
   var patch  = function(path, b)  { return req('PATCH',  path, b); };
   var del    = function(path)     { return req('DELETE', path); };
@@ -1264,7 +1281,8 @@ var ML_API = (function(){
     // Step 2: verify OTP + set PIN
     registerComplete: function(fullName, phone, otp, pin){ return post('/auth/register/complete', {fullName:fullName, phone:phone, otp:otp, pin:pin}); },
     login: async function(phone, pin){
-      var data = await post('/auth/login', {phone:phone, pin:pin});
+      // Render Free web services can take about a minute to wake after idle.
+      var data = await post('/auth/login', {phone:phone, pin:pin}, {timeoutMs:65000});
       saveTokens(data.data.accessToken, data.data.refreshToken);
       return data.data;
     },
@@ -6371,7 +6389,7 @@ window.addEventListener('unhandledrejection',function(e){
     if(!S.loginPhone){authErr('Enter your phone number');return;}if(S.pin.join('').length<4){authErr('Enter your 4-digit PIN');return;}
     var n;try{await phoneReady;n=normalize(S.loginPhone,S.loginCountry);}catch(e){authErr(e.message);return;}
     var btn=G('lbtn');if(btn){btn.textContent='Signing in…';btn.disabled=true;}
-    try{var u=await ML_API.auth.login(n.e164,S.pin.join(''));S.user={name:u.fullName||u.full_name,phone:u.phone,id:u.id,accountStatus:'Active'};S.roles=u.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;try{var pr=await ML_API.customers.getProfile();if(pr.data){S.rewardPoints=pr.data.reward_points||0;S.walletBalance=parseFloat(pr.data.wallet_balance||0);}}catch(e){}goApp();toast('Welcome back, '+S.user.name.split(' ')[0]+'! 🎉');}
+    try{var u=await ML_API.auth.login(n.e164,S.pin.join(''));S.user={name:u.fullName||u.full_name,phone:u.phone,id:u.id,accountStatus:'Active'};S.roles=u.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;goApp();toast('Welcome back, '+S.user.name.split(' ')[0]+'! 🎉');ML_API.customers.getProfile().then(function(pr){if(pr&&pr.data){S.rewardPoints=pr.data.reward_points||0;S.walletBalance=parseFloat(pr.data.wallet_balance||0);}}).catch(function(err){console.warn('[MarketLink] Profile sync after sign-in deferred:',err&&err.code||'API_ERROR');});}
     catch(e){if(btn){btn.textContent='Sign In';btn.disabled=false;}authErr(e.error||'Login failed. Please try again.');}
   };
 
