@@ -795,6 +795,8 @@
     nav.addEventListener('click',function(event){
       var item=event.target&&event.target.closest?event.target.closest('.ntab[data-tab]'):null;
       if(!item||!nav.contains(item))return;
+      // Role tabs created by the legacy application keep their own route handler.
+      if(typeof item.onclick==='function')return;
       event.preventDefault();
       var tab=item.dataset.tab;
       if(tab==='catpage'){S.activeCategoryId=null;S.activeCategoryName=null;}
