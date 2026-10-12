@@ -432,7 +432,7 @@ button:active{opacity:0.82;}
 .lm .fab-ai{box-shadow:0 4px 20px rgba(13,115,119,0.4);}
 
 </style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=onboarding-20261009-r3"><script src="./premium-marketlink.js?v=onboarding-20261009-r3" defer></script></head>
+<link rel="stylesheet" href="./premium-marketlink.css?v=dashboard-20261012-r4"><script src="./premium-marketlink.js?v=dashboard-20261012-r4" defer></script></head>
 <body>
 <div id="app">
 <div id="toast"></div>
@@ -469,13 +469,14 @@ button:active{opacity:0.82;}
   <button class="btn btn-er btn-sm" onclick="G('fab-settings').style.display='none'" style="width:100%;">Close</button>
 </div>
 
-<!-- BOTTOM NAV -->
-<div id="bnav">
+<!-- BOTTOM NAV: all fixed tabs are delegated to the live MarketLink tab controller -->
+<nav id="bnav" aria-label="MarketLink main navigation">
   <div class="ntab act" data-tab="home"><div class="ni">🏠</div><div class="nl">Home</div></div>
+  <div class="ntab" data-tab="catpage"><div class="ni">🛍️</div><div class="nl">Categories</div></div>
   <div class="ntab" data-tab="orders"><div class="ni">📦</div><div class="nl">Orders</div></div>
   <div class="ntab" data-tab="cart"><div class="ni">🛒<span class="nbadge" id="cbadge" style="display:none">0</span></div><div class="nl">Cart</div></div>
   <div class="ntab" data-tab="profile"><div class="ni">👤</div><div class="nl">Profile</div></div>
-</div>
+</nav>
 
 <!-- ═══ SPLASH ═══ -->
 <div id="scr-splash" class="screen active">
