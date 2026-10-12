@@ -29,7 +29,12 @@ const configuredOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
-const allowedOrigins = new Set([...localOrigins, ...configuredOrigins]);
+// Exact production static-site origin for the MarketLink frontend on Render.
+// Keep this explicit; do not wildcard arbitrary *.onrender.com sites.
+const deployedFrontendOrigins = new Set([
+  'https://marketlink-gambia-frontend.onrender.com',
+]);
+const allowedOrigins = new Set([...localOrigins, ...configuredOrigins, ...deployedFrontendOrigins]);
 
 // Static frontends are commonly served from a dynamically assigned localhost
 // port, GitHub Pages, Replit, Netlify, or Vercel. Authentication is bearer-token
