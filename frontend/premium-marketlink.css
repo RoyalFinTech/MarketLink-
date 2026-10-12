@@ -221,3 +221,45 @@
   #scr-onboard .ml-ob-layout-runtime{display:flex;flex-direction:column}
   #scr-onboard .ml-ob-visual-runtime{min-height:280px}
 }
+
+
+/* Real MarketLink logo, first-party campaign imagery, and photographic category tiles */
+.ml-dashboard-brand{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:14px;min-height:35px}
+.ml-dashboard-brand .ml-brand-wordmark{display:block;width:112px;max-width:28vw;height:auto;max-height:30px;object-fit:contain;object-position:left center}
+.ml-dashboard-brand>span{color:#7894a3;font-size:9px;font-weight:650;letter-spacing:.04em;border-left:1px solid rgba(255,255,255,.13);padding-left:10px}
+.ml-home-top{align-items:center}
+.ml-home-discovery{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 16px}
+.ml-promo-official{position:absolute;left:clamp(18px,3vw,32px);top:15px;z-index:3;display:flex;align-items:center;gap:7px;max-width:180px;opacity:.96;filter:drop-shadow(0 2px 5px rgba(0,0,0,.2))}
+.ml-promo-official .ml-promo-wordmark{display:block;width:90px;max-height:27px;object-fit:contain;object-position:left center}
+.ml-promo-shop .ml-promo-art-stamp{display:none}
+.ml-promo-shop .ml-promo-copy{padding-top:clamp(52px,7vw,78px)}
+.ml-promo-carousel-head{align-items:center}
+.ml-cat{appearance:none;-webkit-appearance:none;display:flex;flex-direction:column;gap:8px;align-items:stretch;overflow:hidden;padding:0;min-width:110px;max-width:150px;border-radius:15px;color:inherit;text-align:left}
+.ml-cat-photo,.ml-category-photo{display:block;width:100%;aspect-ratio:1.3;background-image:url("./assets/marketlink-category-atlas.webp");background-size:300% 200%;background-repeat:no-repeat;background-position:var(--ml-category-position,0% 0%);background-color:#112b38}
+.ml-cat-photo{flex:0 0 auto;min-height:74px;border-radius:12px 12px 0 0}
+.ml-cat-name{display:block;color:#e3edf0;font-size:10px;font-weight:800;line-height:1.35;padding:0 9px 11px;min-height:25px;text-align:left}
+.ml-cat:hover .ml-cat-photo,.ml-category-card:hover .ml-category-photo{filter:saturate(1.08);transform:scale(1.025)}
+.ml-cat-photo,.ml-category-photo{transition:filter .2s ease,transform .2s ease}
+.ml-category-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:13px}
+.ml-category-card{min-width:0;appearance:none;-webkit-appearance:none;display:flex;flex-direction:column;gap:9px;padding:0;overflow:hidden;border:1px solid var(--ml-line);border-radius:16px;background:rgba(255,255,255,.045);text-align:left;cursor:pointer;color:inherit;transition:transform .2s,border-color .2s,box-shadow .2s}
+.ml-category-card:hover{transform:translateY(-3px);border-color:rgba(17,168,161,.45);box-shadow:0 12px 30px rgba(0,0,0,.17)}
+.ml-category-photo{aspect-ratio:1.5;border-radius:0;background-size:300% 200%}
+.ml-category-card-name{padding:0 11px 12px;color:#f0f6f8;font-size:12px;font-weight:800;line-height:1.35}
+#bnav .ntab{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;min-width:0}
+#bnav .ntab:focus-visible{outline:2px solid #f5b83d;outline-offset:-3px;border-radius:12px}
+#bnav .ntab .ni{transition:transform .16s ease}
+#bnav .ntab:active .ni{transform:scale(.92)}
+@media(max-width:680px){
+ .ml-home-top{align-items:flex-start}
+ .ml-home-top .ml-live-dot{font-size:9px;white-space:nowrap}
+ .ml-dashboard-brand{gap:7px;margin-bottom:10px}
+ .ml-dashboard-brand .ml-brand-wordmark{width:99px}
+ .ml-dashboard-brand>span{font-size:8px;padding-left:7px}
+ .ml-promo-official .ml-promo-wordmark{width:78px}
+ .ml-promo-shop .ml-promo-copy{padding-top:57px}
+ .ml-category-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .ml-cat{min-width:102px}
+}
+@media(prefers-reduced-motion:reduce){
+ .ml-cat-photo,.ml-category-photo,#bnav .ntab .ni{transition:none!important}
+}
