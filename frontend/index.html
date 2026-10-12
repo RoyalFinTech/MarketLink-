@@ -1245,18 +1245,29 @@ var ML_API = (function(){
   async function _doRefresh(){
     if(_refreshing) return _refreshing;
     _refreshing = (async function(){
+      var refreshController = typeof AbortController === 'function' ? new AbortController() : null;
+      var refreshTimeoutId = null;
       try{
-        var res = await fetch(BASE + '/auth/refresh', {
+        var refreshOpts = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken: _refreshToken })
-        });
+        };
+        // A refresh runs only after the API has replied, so keep it bounded too.
+        if(refreshController){
+          refreshOpts.signal = refreshController.signal;
+          refreshTimeoutId = setTimeout(function(){ refreshController.abort(); }, 15000);
+        }
+        var res = await fetch(BASE + '/auth/refresh', refreshOpts);
         if(!res.ok){ clearTokens(); return false; }
         var data = await res.json();
         saveTokens(data.data.accessToken, data.data.refreshToken);
         return true;
       } catch(e){ clearTokens(); return false; }
-      finally{ _refreshing = null; }
+      finally{
+        if(refreshTimeoutId !== null) clearTimeout(refreshTimeoutId);
+        _refreshing = null;
+      }
     })();
     return _refreshing;
   }
