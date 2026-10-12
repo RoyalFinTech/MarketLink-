@@ -432,7 +432,7 @@ button:active{opacity:0.82;}
 .lm .fab-ai{box-shadow:0 4px 20px rgba(13,115,119,0.4);}
 
 </style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=dashboard-20261012-r4"><script src="./premium-marketlink.js?v=dashboard-20261012-r4" defer></script></head>
+<link rel="stylesheet" href="./premium-marketlink.css?v=dashboard-20261012-r5"><script src="./premium-marketlink.js?v=dashboard-20261012-r5" defer></script></head>
 <body>
 <div id="app">
 <div id="toast"></div>
@@ -5579,13 +5579,13 @@ function addRoleTabs(){
   if(S.roles.indexOf('vendor')>-1&&!G('ntab-vendor')){
     var t=document.createElement('div'); t.className='ntab'; t.id='ntab-vendor'; t.dataset.tab='vendordash';
     t.innerHTML='<div class="ni">🏪</div><div class="nl">Vendor</div>';
-    t.onclick=function(){switchTab('vendordash');};
+    t.setAttribute('role','button'); t.setAttribute('tabindex','0'); t.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();t.click();}}; t.onclick=function(){switchTab('vendordash');};
     nav.insertBefore(t, profTab);
   }
   if(S.roles.indexOf('rider')>-1&&!G('ntab-rider')){
     var r=document.createElement('div'); r.className='ntab'; r.id='ntab-rider'; r.dataset.tab='riderdash';
     r.innerHTML='<div class="ni">🛵</div><div class="nl">Rider</div>';
-    r.onclick=function(){switchTab('riderdash');};
+    r.setAttribute('role','button'); r.setAttribute('tabindex','0'); r.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();r.click();}}; r.onclick=function(){switchTab('riderdash');};
     nav.insertBefore(r, profTab);
   }
 }
