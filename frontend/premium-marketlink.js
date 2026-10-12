@@ -18,13 +18,15 @@
   function livePaymentOptions(){return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];}
   var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null;
   var mlPromoSlides=[
-    {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Market day, made easier.',accent:'Shop local. Live better.',body:'Fresh produce, pantry essentials and everyday finds from sellers around The Gambia.',pill:'SHOP THE LOCAL MARKET',image:'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1500&q=82',cta:'Browse products'},
-    {kind:'sell',eyebrow:'FOR LOCAL BUSINESSES',title:'Turn your products into orders.',accent:'Grow with MarketLink.',body:'Bring your shop online, reach more customers and manage your real orders in one place.',pill:'SELL ON MARKETLINK',image:'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=1500&q=82',cta:'Become a vendor'},
-    {kind:'affiliate',eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link. Earn 2%.',accent:'Your network has value.',body:'Share your affiliate link on WhatsApp. Earn 2% of the eligible discounted merchandise subtotal when a referred order is successfully delivered.',pill:'EARN ON ELIGIBLE PURCHASES',image:'https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1500&q=82',cta:'Explore affiliate'}
+    {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
+    {kind:'sell',eyebrow:'FOR LOCAL BUSINESSES',title:'Your shop. More customers.',accent:'Grow with MarketLink.',body:'Bring your business online, showcase your real products and manage incoming orders in one place.',pill:'SELL ON MARKETLINK',image:'./assets/promo-shopping.webp',cta:'Become a vendor'},
+    {kind:'affiliate',eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link.',accent:'Earn 2%.',body:'Share your affiliate link. Earn 2% of eligible discounted merchandise when a referred order is successfully delivered.',pill:'EARN ON ELIGIBLE PURCHASES',image:'./assets/promo-shopping.webp',cta:'Explore affiliate'}
   ];
   function promoSlideMarkup(index,cls){
     var p=mlPromoSlides[(Number(index)||0)%mlPromoSlides.length];
+    var officialMark=(typeof logoSVG==='function'?logoSVG(25):'')+(typeof LOGO_WORDMARK_URI!=='undefined'?'<img class="ml-promo-wordmark" src="'+LOGO_WORDMARK_URI+'" alt="MarketLink">':'<b>MarketLink</b>');
     return '<article class="ml-promo-panel ml-promo-'+p.kind+(cls?' '+cls:'')+'" style="background-image:linear-gradient(90deg,rgba(5,18,30,.97) 0%,rgba(5,18,30,.88) 43%,rgba(5,18,30,.38) 73%,rgba(5,18,30,.10) 100%),url(&quot;'+esc(p.image)+'&quot;)">'+
+      '<div class="ml-promo-official">'+officialMark+'</div>'+
       '<div class="ml-promo-copy"><span class="ml-promo-eyebrow"><i></i>'+esc(p.eyebrow)+'</span><span class="ml-promo-kicker">'+esc(p.pill)+'</span>'+
       '<h3>'+esc(p.title)+'<em>'+esc(p.accent)+'</em></h3><p>'+esc(p.body)+'</p>'+
       '<button class="ml-promo-cta" onclick="window.ML_Premium.promoAction(\''+p.kind+'\')">'+esc(p.cta)+' <b>↗</b></button></div>'+
@@ -33,7 +35,7 @@
   }
   function promoCarouselMarkup(){
     return '<section class="ml-promo-carousel" id="ml-promo-carousel" aria-label="MarketLink promotions">'+
-      '<div class="ml-promo-carousel-head"><div><span class="ml-eyebrow">DISCOVER MARKETLINK</span><h3>Local shopping. More opportunity.</h3></div><span class="ml-promo-autoplay"><i></i> Updates every 3 seconds</span></div>'+
+      '<div class="ml-promo-carousel-head"><div><span class="ml-eyebrow">DISCOVER MARKETLINK</span><h3>Local shopping. More opportunity.</h3></div><span class="ml-promo-autoplay"><i></i> Updates every 5 seconds</span></div>'+
       '<div class="ml-promo-stage" id="ml-promo-stage">'+promoSlideMarkup(mlPromoIndex)+'</div>'+
       '<div class="ml-promo-carousel-foot"><div class="ml-promo-dots" id="ml-promo-dots">'+mlPromoSlides.map(function(_,i){return '<button type="button" aria-label="Show promotion '+(i+1)+'" class="'+(i===mlPromoIndex?'active':'')+'" onclick="window.ML_Premium.goPromoTo('+i+')"></button>';}).join('')+'</div>'+
       '<div class="ml-promo-arrows"><span id="ml-promo-counter">'+String(mlPromoIndex+1).padStart(2,'0')+' / '+String(mlPromoSlides.length).padStart(2,'0')+'</span><button type="button" aria-label="Previous promotion" onclick="window.ML_Premium.promoPrev()">‹</button><button type="button" aria-label="Next promotion" onclick="window.ML_Premium.promoNext()">›</button></div></div></section>';
@@ -62,7 +64,7 @@
     mlPromoTimer=setInterval(function(){
       var tab=G('tab-home');
       if(!document.hidden&&tab&&tab.offsetParent!==null&&G('ml-promo-carousel'))paintPromoCarousel(mlPromoIndex+1);
-    },3000);
+    },5000);
   }
   function promoAction(kind){
     if(kind==='shop'){if(typeof switchTab==='function')switchTab('home');var search=G('hsearch');if(search)setTimeout(function(){search.focus();},150);return;}
@@ -217,11 +219,55 @@
     }
     renderPremiumHome();
   }
+  function mlOfficialBrandMarkup(){
+    var icon=typeof logoSVG==='function'?logoSVG(34):'';
+    var word=(typeof LOGO_WORDMARK_URI!=='undefined')?'<img class="ml-brand-wordmark" src="'+LOGO_WORDMARK_URI+'" alt="MarketLink">':'<strong>MarketLink</strong>';
+    return '<div class="ml-dashboard-brand">'+icon+word+'<span>The Gambia’s local marketplace</span></div>';
+  }
+  function mlCategoryPosition(name){
+    var n=String(name||'').toLowerCase();
+    if(/onion/.test(n))return '50% 0%';
+    if(/rice|grain|cereal/.test(n))return '100% 0%';
+    if(/cook|oil|spice|pantry|grocery|grocer/.test(n))return '0% 100%';
+    if(/carrot|fresh|leaf|green|vegetable/.test(n))return '50% 100%';
+    if(/tomato|fruit|produce/.test(n))return '0% 0%';
+    return '100% 100%';
+  }
+  async function renderLiveCategoriesPage(){
+    var root=G('catpage-content');if(!root)return;
+    if(S.activeCategoryId){await renderLiveCategoryProducts(S.activeCategoryId,S.activeCategoryName||'Category');return;}
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">FIND YOUR ESSENTIALS</div><h3>Shop by category</h3></div><button type="button" onclick="switchTab(\'home\')">← Home</button></div><div class="ml-loading">Loading live categories…</div></div>';
+    try{
+      if(!Array.isArray(liveCategories)||!liveCategories.length){
+        var response=await ML_API.categories.getTree();
+        liveCategories=Array.isArray(response.data)?response.data:[];
+      }
+      var cards=liveCategories.map(function(cat){
+        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'"><span class="ml-category-photo" style="--ml-category-position:'+mlCategoryPosition(cat.name)+'"></span><span class="ml-category-card-name">'+esc(cat.name||'Category')+'</span></button>';
+      }).join('');
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">FIND YOUR ESSENTIALS</div><h3>Shop by category</h3></div><button type="button" onclick="switchTab(\'home\')">← Home</button></div>'+
+        (cards?'<div class="ml-category-grid">'+cards+'</div>':'<div class="ml-empty"><b>No live categories yet</b><span>Categories will appear when published by MarketLink.</span></div>')+'</div>';
+      root.querySelectorAll('[data-ml-category-id]').forEach(function(card){card.addEventListener('click',function(){openCategory(card.getAttribute('data-ml-category-id'),card.getAttribute('data-ml-category-name'));});});
+    }catch(e){
+      root.innerHTML='<div class="ml-empty"><b>Categories unavailable</b><span>'+esc(e.error||e.message||'Could not load live categories.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.renderCategories()">Retry</button></div>';
+    }
+  }
+  async function renderLiveCategoryProducts(id,name){
+    var root=G('catpage-content');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">LIVE MARKETPLACE</div><h3>'+esc(name||'Category')+'</h3></div><button type="button" onclick="window.ML_Premium.renderCategories()">← Categories</button></div><div class="ml-loading">Loading active products…</div></div>';
+    try{
+      var res=await ML_API.products.list({page:1,limit:40,categoryId:id,sort:'newest'});
+      var products=normalizeProducts(res.data);
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">LIVE MARKETPLACE</div><h3>'+esc(name||'Category')+'</h3></div><button type="button" onclick="window.ML_Premium.renderCategories()">← Categories</button></div>'+
+        (products.length?'<div class="ml-product-grid">'+products.map(productCard).join('')+'</div>':'<div class="ml-empty"><div style="font-size:30px">📦</div><b>No active products in this category</b><span>This category is live but has no approved active products yet.</span></div>')+'</div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-empty"><b>Category products unavailable</b><span>'+esc(e.error||e.message||'Could not load this category.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.renderCategories()">Back to categories</button></div>';
+    }
+  }
   function renderPremiumHome(){
     var root=G('tab-home');if(!root)return;
     var catHtml=liveCategories.slice(0,12).map(function(c){
-      var icon=c.icon||'🛍️';
-      return '<div class="ml-cat" onclick="window.ML_Premium.openCategory(\''+esc(liveProductId(c.id))+'\')"><div class="ml-cat-icon">'+esc(icon)+'</div><div class="ml-cat-name">'+esc(c.name)+'</div></div>';
+      return '<button type="button" class="ml-cat" data-ml-category-id="'+esc(liveProductId(c.id))+'" data-ml-category-name="'+esc(c.name||'Category')+'"><span class="ml-cat-photo" style="--ml-category-position:'+mlCategoryPosition(c.name)+'"></span><span class="ml-cat-name">'+esc(c.name)+'</span></button>';
     }).join('');
     if(!catHtml) catHtml='<div class="ml-empty" style="width:100%;box-sizing:border-box;"><b>Categories are being prepared</b><span>Live categories will appear here as soon as they are published.</span></div>';
     var prodHtml=liveProducts.map(function(p){return productCard(p);}).join('');
@@ -230,8 +276,8 @@
     var wallet=liveWallet?Number(liveWallet.balance||0):Number(S.walletBalance||0);
     root.innerHTML=
       '<div class="ml-premium-home">'+
-      '<div class="ml-home-top"><div><div class="ml-eyebrow">MarketLink • The Gambia</div><div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover verified local products, order securely and track every step from one premium marketplace.</div></div><div class="ml-live-dot">Live marketplace</div></div>'+
-      '<section class="ml-hero"><div class="ml-hero-copy"><div class="ml-hero-kicker">🇬🇲 BUILT FOR THE GAMBIAN MARKET</div><h2 style="margin:0;color:#fff;font-size:clamp(25px,4vw,38px);line-height:1.08;">Shop local. Sell smarter. Deliver with confidence.</h2><p style="color:#A9BBC6;max-width:560px;line-height:1.6;font-size:12px;margin:12px 0 0;">Your marketplace dashboard is connected to live MarketLink services. Product availability, wallet data, orders and account information come from your account.</p><div class="ml-hero-actions"><button class="ml-btn ml-btn-primary" onclick="document.getElementById(\'hsearch\')&&document.getElementById(\'hsearch\').focus()">Search marketplace</button><button class="ml-btn ml-btn-secondary" onclick="switchTab(\'orders\')">Track my orders</button></div></div></section>'+
+      '<div class="ml-home-top"><div>'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-live-dot">Live marketplace</div></div>'+
+      '<div class="ml-home-discovery"><button type="button" class="ml-btn ml-btn-primary" onclick="var s=document.getElementById(\'hsearch\');if(s)s.focus()">🔎 Search marketplace</button><button type="button" class="ml-btn ml-btn-secondary" onclick="switchTab(\'orders\')">📦 Track my orders</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.renderCategories()">🛍️ Browse categories</button></div>'+
       promoCarouselMarkup()+
       '<div class="ml-promo-strip"><div class="ml-promo"><strong>⚡ Verified marketplace</strong><span>Shop products published by approved vendors.</span></div><div class="ml-promo"><strong>🛵 Delivery network</strong><span>Follow your order through the real delivery workflow.</span></div><div class="ml-promo"><strong>💳 Secure checkout</strong><span>Use supported MarketLink payment methods at checkout.</span></div></div>'+
       '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Orders</div><div class="ml-stat-value">'+orderCount+'</div></div><div class="ml-stat"><div class="ml-stat-label">Wallet</div><div class="ml-stat-value">'+money(wallet)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Total spent</div><div class="ml-stat-value">'+money(spent)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Reward points</div><div class="ml-stat-value">'+Number(S.rewardPoints||0).toLocaleString()+'</div></div></div>'+
@@ -240,15 +286,15 @@
       (prodHtml?'<div class="ml-product-grid">'+prodHtml+'</div>':'<div class="ml-empty"><div style="font-size:30px">🛍️</div><b>No live products yet</b><span>When an approved vendor publishes an active product, it will appear here automatically. No demo products are being shown.</span></div>')+
       '</div>';
     setTimeout(initPromoCarousel,0);
+    var homeRoot=G('tab-home');
+    if(homeRoot)homeRoot.querySelectorAll('[data-ml-category-id]').forEach(function(card){
+      card.addEventListener('click',function(){openCategory(card.getAttribute('data-ml-category-id'),card.getAttribute('data-ml-category-name'));});
+    });
   }
   async function openCategory(id,name){
-    try{
-      var res=await ML_API.products.list({page:1,limit:40,categoryId:id,sort:'newest'});
-      var products=normalizeProducts(res.data);
-      var root=G('tab-home');if(!root)return;
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>'+esc(name)+'</h3><button onclick="window.ML_Premium.refresh()">← Marketplace</button></div>'+
-        (products.length?'<div class="ml-product-grid">'+products.map(productCard).join('')+'</div>':'<div class="ml-empty"><div style="font-size:30px">📦</div><b>No active products in this category</b><span>This category is live but currently has no approved products.</span></div>')+'</div>';
-    }catch(e){toast(e.error||'Could not load this category.','error');}
+    S.activeCategoryId=String(id||'');
+    S.activeCategoryName=String(name||'Category');
+    switchTab('catpage');
   }
   function productCard(p){
     var pid=liveProductId(p.id),stock=p.stock==null?null:Number(p.stock);
@@ -257,7 +303,7 @@
   async function openProduct(id){
     try{
       var res=await ML_API.products.getById(id),p=res.data;if(!p)throw new Error('Product not found');
-      var root=G('tab-home');root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Product</h3><button onclick="window.ML_Premium.refresh()">← Marketplace</button></div>'+
+      var root=S.curTab==='catpage'?G('catpage-content'):G('tab-home');if(!root)return;root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Product</h3><button onclick="S.curTab===\'catpage\'?window.ML_Premium.openCategory(S.activeCategoryId,S.activeCategoryName):window.ML_Premium.refresh()">← Back</button></div>'+
         '<div class="ml-profile-card" style="padding:18px"><div class="ml-product-img" style="height:300px;border-radius:15px">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div><div style="padding-top:16px"><div class="ml-product-vendor">'+esc(p.vendor_name||'MarketLink vendor')+'</div><h2 style="color:#fff;margin:6px 0;font-size:23px">'+esc(p.name)+'</h2><div class="ml-price" style="font-size:22px">'+money(p.price)+'</div><p style="color:#91A4B4;font-size:12px;line-height:1.6">'+esc(p.description||'Product details will appear here when provided by the vendor.')+'</p><button class="ml-btn ml-btn-primary" style="width:100%" onclick="window.ML_Premium.add(\''+esc(liveProductId(p.id))+'\')">Add to cart</button></div></div></div>';
     }catch(e){toast(e.error||'Could not load product.','error');}
   }
@@ -724,18 +770,41 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
     var target=G('tab-'+tab);if(target)target.style.display='block';
     var nav=G('bnav');if(nav)nav.style.display=tab==='admindash'?'none':'flex';
-    if(tab==='home')renderHome(); else if(tab==='cart')renderCart(); else if(tab==='orders'){renderOrders();if(typeof startOrderTracking==='function'&&S.order)startOrderTracking();}
-    else if(tab==='profile')renderProfile(); else if(tab==='vendordash')renderVDash(); else if(tab==='riderdash')renderRDash(); else if(tab==='admindash')renderAdminDash();
-    else if(tab==='catpage'&&typeof renderCatProdCtrl==='function')renderCatProdCtrl(); else if(tab==='store'&&typeof renderStoreProdCtrl==='function')renderStoreProdCtrl();
-    document.querySelectorAll('.ntab').forEach(function(n){n.classList.toggle('sel',n.dataset.tab===tab);});
+    if(tab==='home')renderHome();
+    else if(tab==='cart')renderCart();
+    else if(tab==='orders'){renderOrders();if(typeof startOrderTracking==='function'&&S.order)startOrderTracking();}
+    else if(tab==='profile')renderProfile();
+    else if(tab==='vendordash')renderVDash();
+    else if(tab==='riderdash')renderRDash();
+    else if(tab==='admindash')renderAdminDash();
+    else if(tab==='catpage')renderLiveCategoriesPage();
+    else if(tab==='store'&&typeof renderStoreProdCtrl==='function')renderStoreProdCtrl();
+    document.querySelectorAll('.ntab').forEach(function(n){n.classList.toggle('act',n.dataset.tab===tab);n.classList.toggle('sel',n.dataset.tab===tab);n.setAttribute('aria-current',n.dataset.tab===tab?'page':'false');});
   }
   window.switchTab=switchTab;
+  function bindMarketLinkBottomNav(){
+    var nav=G('bnav');if(!nav||nav.dataset.mlNavBound==='1')return;
+    nav.dataset.mlNavBound='1';
+    nav.addEventListener('click',function(event){
+      var item=event.target&&event.target.closest?event.target.closest('.ntab[data-tab]'):null;
+      if(!item||!nav.contains(item))return;
+      event.preventDefault();
+      var tab=item.dataset.tab;
+      if(tab==='catpage'){S.activeCategoryId=null;S.activeCategoryName=null;}
+      if(tab&&typeof window.switchTab==='function')window.switchTab(tab);
+    });
+    nav.querySelectorAll('.ntab[data-tab]').forEach(function(item){
+      item.setAttribute('role','button');item.setAttribute('tabindex','0');
+      item.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();item.click();}});
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindMarketLinkBottomNav,{once:true});else bindMarketLinkBottomNav();
   async function renderAdminDash(){
     var el=G('adash-body');if(!el)return;
     el.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">MarketLink Operations</div><div class="ml-hero-title">Live Control Center</div><div class="ml-hero-sub">Loading production metrics…</div></div>';
