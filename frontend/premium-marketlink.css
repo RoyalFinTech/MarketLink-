@@ -233,6 +233,10 @@
 .ml-promo-official .ml-promo-wordmark{display:block;width:90px;max-height:27px;object-fit:contain;object-position:left center}
 .ml-promo-shop .ml-promo-art-stamp{display:none}
 .ml-promo-shop .ml-promo-copy{padding-top:clamp(52px,7vw,78px)}
+/* Generated campaign atlas uses local-market art on the left and affiliate/sharing art on the right. */
+.ml-promo-sell{background-size:cover,200% 100%!important;background-position:center,left center!important}
+.ml-promo-affiliate{background-size:cover,200% 100%!important;background-position:center,right center!important}
+
 .ml-promo-carousel-head{align-items:center}
 .ml-cat{appearance:none;-webkit-appearance:none;display:flex;flex-direction:column;gap:8px;align-items:stretch;overflow:hidden;padding:0;min-width:110px;max-width:150px;border-radius:15px;color:inherit;text-align:left}
 .ml-cat-photo,.ml-category-photo{display:block;width:100%;aspect-ratio:1.3;background-image:url("./assets/marketlink-category-atlas.webp");background-size:300% 200%;background-repeat:no-repeat;background-position:var(--ml-category-position,0% 0%);background-color:#112b38}
