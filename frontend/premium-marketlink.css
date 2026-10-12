@@ -271,3 +271,27 @@
 .ml-home-search button{flex:0 0 auto;border:0;border-radius:10px;padding:10px 16px;background:linear-gradient(110deg,#078d89,#14aaa0);color:#fff;font-size:10px;font-weight:850;cursor:pointer}
 .ml-home-search:focus-within{border-color:rgba(31,193,185,.7);box-shadow:0 0 0 3px rgba(20,168,160,.1)}
 @media(max-width:480px){.ml-home-search{gap:7px}.ml-home-search button{padding:10px 11px}.ml-home-search input{font-size:11px}}
+
+
+/* Live customer order history / details */
+.ml-live-order-list{display:grid;gap:12px;margin-top:12px}
+.ml-live-order-card{min-width:0;padding:16px;border-radius:17px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(17,39,53,.97),rgba(8,23,34,.98));box-shadow:0 12px 28px rgba(0,0,0,.12)}
+.ml-live-order-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ml-live-order-id{display:block;color:#f3fafb;font-size:12px;font-weight:900;overflow-wrap:anywhere}
+.ml-live-order-date{margin-top:5px;color:#829ba8;font-size:10px}
+.ml-live-order-status{display:inline-flex;align-items:center;justify-content:center;max-width:46%;padding:6px 9px;border-radius:999px;background:rgba(21,168,153,.13);border:1px solid rgba(21,168,153,.28);color:#8ce8de;font-size:9px;font-weight:850;text-align:center}
+.ml-live-order-status.delivered{background:rgba(39,174,96,.12);border-color:rgba(39,174,96,.28);color:#91e5b1}
+.ml-live-order-status.closed{background:rgba(244,107,91,.1);border-color:rgba(244,107,91,.23);color:#ffafa3}
+.ml-live-order-vendor{margin-top:14px;color:#e0edf1;font-size:11px;font-weight:800}
+.ml-live-order-items{margin-top:7px;color:#95aab5;font-size:10px;line-height:1.65;overflow-wrap:anywhere}
+.ml-live-order-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;margin-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+.ml-live-order-bottom>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.ml-live-order-bottom>div>span,.ml-live-order-bottom small{color:#8198a5;font-size:9px}
+.ml-live-order-bottom strong{color:#ffc652;font-size:17px;font-weight:950}
+.ml-live-order-bottom button{width:auto;white-space:nowrap}
+@media(max-width:480px){
+ .ml-live-order-card{padding:13px;border-radius:14px}
+ .ml-live-order-bottom{align-items:stretch;flex-direction:column}
+ .ml-live-order-bottom button{width:100%}
+ .ml-live-order-status{font-size:8px;padding:5px 7px}
+}
