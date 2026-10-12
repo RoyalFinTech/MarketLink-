@@ -429,7 +429,7 @@ button:active{opacity:0.82;}
 .lm .fab-ai{box-shadow:0 4px 20px rgba(13,115,119,0.4);}
 
 </style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=market-assets-20261012-r1"><script src="./premium-marketlink.js?v=market-assets-20261012-r1" defer></script></head>
+<link rel="stylesheet" href="./premium-marketlink.css?v=market-assets-20261012-r2"><script src="./premium-marketlink.js?v=market-assets-20261012-r2" defer></script></head>
 <body>
 <div id="app">
 <div id="toast"></div>
@@ -1710,7 +1710,7 @@ function logoBlock(size,tagline,animateWing,floatAndFlyIn){
     '</div>';
 }
 function gambiaFlagMarkup(){
-  return '<svg class=\"gmf-svg\" role=\"img\" aria-label=\"Flag of The Gambia\" title=\"The Gambia\" viewBox=\"0 0 18 12\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\">'+
+  return '<svg class=\"gmf-svg\" role=\"img\" aria-label=\"Flag of The Gambia\" title=\"The Gambia\" viewBox=\"0 0 18 12\" xmlns=\"http://www.w3.org/2000/svg\" width=\"26\" height=\"18\" viewBox=\"0 0 18 12\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" style=\"width:26px;height:18px;display:inline-block;vertical-align:middle;flex-shrink:0;border-radius:2px;overflow:hidden;\">'+
     '<rect width=\"18\" height=\"12\" fill=\"#FFFFFF\"/>'+
     '<rect x=\"0\" y=\"0\" width=\"18\" height=\"4\" fill=\"#CE1126\"/>'+
     '<rect x=\"0\" y=\"4.6667\" width=\"18\" height=\"2.6666\" fill=\"#0C1C8C\"/>'+
@@ -6227,14 +6227,14 @@ window.addEventListener('unhandledrejection',function(e){
       return L.getCountries().map(function(iso){return {iso:iso,name:cname(iso),flag:flag(iso),dial:L.getCountryCallingCode(iso)};}).sort(function(a,b){return a.name.localeCompare(b.name);});
     }
     return [
-      {iso:'GM',name:'The Gambia',flag:'🇬🇲',dial:'220'},{iso:'NG',name:'Nigeria',flag:'🇳🇬',dial:'234'},
+      {iso:'GM',name:'The Gambia',flag:'',dial:'220'},{iso:'NG',name:'Nigeria',flag:'🇳🇬',dial:'234'},
       {iso:'SL',name:'Sierra Leone',flag:'🇸🇱',dial:'232'},{iso:'GH',name:'Ghana',flag:'🇬🇭',dial:'233'},
       {iso:'SN',name:'Senegal',flag:'🇸🇳',dial:'221'},{iso:'LR',name:'Liberia',flag:'🇱🇷',dial:'231'},
       {iso:'GN',name:'Guinea',flag:'🇬🇳',dial:'224'},{iso:'CI',name:'Côte d’Ivoire',flag:'🇨🇮',dial:'225'},
       {iso:'GB',name:'United Kingdom',flag:'🇬🇧',dial:'44'},{iso:'US',name:'United States',flag:'🇺🇸',dial:'1'}
     ];
   }
-  function byIso(iso){var a=countries().filter(function(c){return c.iso===iso;});return a[0]||{iso:'GM',name:'The Gambia',flag:'🇬🇲',dial:'220'};}
+  function byIso(iso){var a=countries().filter(function(c){return c.iso===iso;});return a[0]||{iso:'GM',name:'The Gambia',flag:'',dial:'220'};}
   function detect(n){
     var d=String(n||'').replace(/\D/g,''), k=null;
     if(d.length===9){k=NP[d.slice(0,2)]||(d[0]==='9'?'UNATTRIBUTED_9':null);}
@@ -6343,7 +6343,7 @@ window.addEventListener('unhandledrejection',function(e){
     var b=G('reset-pin-body');if(!b)return;
     if(S.resetStep==='phone'){
       var c=byIso(S.resetCountry);
-      b.innerHTML='<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the phone number on your MarketLink account and we’ll send a code.</div><label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;" onclick="openPhoneCountryPicker(\'reset\')">'+c.flag+' +'+c.dial+' ▾</button><input class="inp" id="reset-phone" type="tel" inputmode="tel" style="flex:1;"></div><div style="height:16px;"></div><button class="btn btn-p" style="width:100%;" onclick="requestResetCode()">Send Code</button>';
+      b.innerHTML='<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the phone number on your MarketLink account and we’ll send a code.</div><label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-s" style="width:auto;min-width:88px;padding:10px 9px;" onclick="openPhoneCountryPicker(\'reset\')">'+flagAsset(c.iso)+' <span>+'+c.dial+'</span> <span aria-hidden=\"true\">▾</span></button><input class="inp" id="reset-phone" type="tel" inputmode="tel" style="flex:1;"></div><div style="height:16px;"></div><button class="btn btn-p" style="width:100%;" onclick="requestResetCode()">Send Code</button>';
     }else if(S.resetStep==='otp'){
       b.innerHTML=(S.devOtpDisplay?'<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.35);border-radius:10px;padding:10px;text-align:center;margin-bottom:14px;">Development OTP: <b>'+sanitizeText(S.devOtpDisplay)+'</b></div>':'')+'<div style="color:var(--mu);font-size:12px;margin-bottom:16px;">Enter the 6-digit code sent to '+sanitizeText(S.resetPhoneE164||'')+'.</div><div class="otpr" id="reset-otp-row"></div><button class="btn btn-p" style="width:100%;margin-top:14px;" onclick="verifyResetCode()">Continue</button>';
       otpInputs(S.resetOtp,'reset-otp-row',false);
