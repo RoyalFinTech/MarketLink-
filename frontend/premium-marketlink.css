@@ -263,3 +263,11 @@
 @media(prefers-reduced-motion:reduce){
  .ml-cat-photo,.ml-category-photo,#bnav .ntab .ni{transition:none!important}
 }
+
+.ml-home-search{display:flex;align-items:center;gap:10px;margin:0 0 17px;padding:6px 7px 6px 13px;border:1px solid rgba(255,255,255,.14);border-radius:15px;background:rgba(255,255,255,.055);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.ml-home-search>span{flex:0 0 auto;font-size:17px;color:#92a9b7}
+.ml-home-search input{min-width:0;flex:1;border:0!important;outline:none!important;box-shadow:none!important;background:transparent!important;color:#f3f8fa!important;font-size:12px;padding:10px 0!important}
+.ml-home-search input::placeholder{color:#8198a6;opacity:1}
+.ml-home-search button{flex:0 0 auto;border:0;border-radius:10px;padding:10px 16px;background:linear-gradient(110deg,#078d89,#14aaa0);color:#fff;font-size:10px;font-weight:850;cursor:pointer}
+.ml-home-search:focus-within{border-color:rgba(31,193,185,.7);box-shadow:0 0 0 3px rgba(20,168,160,.1)}
+@media(max-width:480px){.ml-home-search{gap:7px}.ml-home-search button{padding:10px 11px}.ml-home-search input{font-size:11px}}
