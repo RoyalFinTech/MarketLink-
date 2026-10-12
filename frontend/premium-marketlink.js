@@ -264,6 +264,59 @@
       root.innerHTML='<div class="ml-empty"><b>Category products unavailable</b><span>'+esc(e.error||e.message||'Could not load this category.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.renderCategories()">Back to categories</button></div>';
     }
   }
+  function mlOrderStatusLabel(status){
+    var map={pending:'Pending',accepted:'Accepted',preparing:'Preparing',awaiting_rider:'Waiting for rider',rider_assigned:'Rider assigned',picked_up:'Picked up',on_the_way:'On the way',delivered:'Delivered',cancelled:'Cancelled',failed:'Failed',refunded:'Refunded'};
+    return map[String(status||'').toLowerCase()]||String(status||'Status unavailable').replace(/_/g,' ');
+  }
+  function mlOrderDate(value){
+    if(!value)return 'Date unavailable';
+    var date=new Date(value);
+    return Number.isNaN(date.getTime())?'Date unavailable':date.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+  }
+  async function renderLiveOrders(){
+    var root=G('orders-body');if(!root)return;
+    if(!apiOk()){
+      root.innerHTML='<div class="ml-empty"><div style="font-size:32px">🔐</div><b>Sign in to view your orders</b><span>Your order history is securely linked to your MarketLink account.</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="goAuth()">Sign in</button></div>';
+      return;
+    }
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">YOUR MARKETLINK ACCOUNT</div><h2 class="ml-hero-title">Order history</h2><div class="ml-loading">Loading orders from your account…</div></div>';
+    try{
+      var response=await ML_API.customers.getOrders({page:1,limit:30});
+      var rows=normalizeProducts(response&&response.data);
+      if(!rows.length){
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">YOUR MARKETLINK ACCOUNT</div><h2>Order history</h2></div><button type="button" onclick="switchTab(\'home\')">Shop now</button></div><div class="ml-empty"><div style="font-size:36px">📦</div><b>No orders yet</b><span>Your confirmed MarketLink orders will appear here with their real status, vendor, items and total.</span></div></div>';
+        return;
+      }
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">YOUR MARKETLINK ACCOUNT</div><h2>Order history</h2><p class="ml-hero-sub">'+rows.length+' recent order'+(rows.length===1?'':'s')+' from your account</p></div><button type="button" onclick="window.ML_Premium.openOrders()">↻ Refresh</button></div>'+
+        '<div class="ml-live-order-list">'+rows.map(function(o){
+          var status=String(o.status||'pending').toLowerCase();
+          var tone=status==='delivered'?'delivered':status==='cancelled'||status==='failed'||status==='refunded'?'closed':'active';
+          var items=Array.isArray(o.items)?o.items:[];
+          var summary=items.slice(0,3).map(function(it){return esc(it.name||it.product_name_snapshot||'Item')+' × '+Number(it.qty||it.quantity||1);}).join(' · ');
+          if(!summary)summary='Order details available';
+          return '<article class="ml-live-order-card"><div class="ml-live-order-top"><div><span class="ml-live-order-id">'+esc(o.order_number||o.id||'MarketLink order')+'</span><div class="ml-live-order-date">'+mlOrderDate(o.placed_at||o.created_at)+'</div></div><span class="ml-live-order-status '+tone+'">'+esc(mlOrderStatusLabel(status))+'</span></div>'+
+            '<div class="ml-live-order-vendor">🏪 '+esc(o.vendor_name||'MarketLink vendor')+'</div><div class="ml-live-order-items">'+summary+(items.length>3?' · +'+(items.length-3)+' more':'')+'</div>'+
+            '<div class="ml-live-order-bottom"><div><span>Total</span><strong>'+money(o.total||0)+'</strong><small>'+esc(String(o.payment_method||'').replace(/_/g,' ').toUpperCase()||'Payment method not listed')+'</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||''))+'\')">View details →</button></div></article>';
+        }).join('')+'</div></div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-empty"><div style="font-size:32px">📦</div><b>Order history unavailable</b><span>'+esc(e.error||e.message||'MarketLink could not load your order history.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Retry</button></div>';
+    }
+  }
+  async function openOrderDetail(id){
+    var root=G('orders-body');if(!root)return;
+    if(!id){renderLiveOrders();return;}
+    root.innerHTML='<div class="ml-loading">Loading order details…</div>';
+    try{
+      var response=await ML_API.orders.getById(id),o=response&&response.data&&response.data.order?response.data.order:response&&response.data;
+      if(!o)throw new Error('Order details were not returned.');
+      var items=Array.isArray(o.items)?o.items:Array.isArray(o.order_items)?o.order_items:[];
+      var status=mlOrderStatusLabel(o.status);
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">ORDER DETAILS</div><h2>'+esc(o.order_number||'MarketLink order')+'</h2><p class="ml-hero-sub">'+mlOrderDate(o.placed_at||o.created_at)+'</p></div><button type="button" onclick="window.ML_Premium.openOrders()">← All orders</button></div>'+
+        '<div class="ml-live-order-card"><div class="ml-live-order-top"><b>Status</b><span class="ml-live-order-status active">'+esc(status)+'</span></div><div class="ml-profile-row"><div class="ico">🏪</div><div class="copy"><b>Vendor</b><span>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>Payment</b><span>'+esc(String(o.payment_method||'Not listed').replace(/_/g,' '))+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</span></div></div><div class="ml-profile-row"><div class="ico">📦</div><div class="copy"><b>Items</b><span>'+(items.length?items.map(function(it){return esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1);}).join('<br>'):'Item details unavailable')+'</span></div></div><div class="ml-live-order-bottom"><div><span>Total</span><strong>'+money(o.total||0)+'</strong></div><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openOrders()">Back to history</button></div></div></div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-empty"><b>Could not open this order</b><span>'+esc(e.error||e.message||'The order may no longer be available.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Back to order history</button></div>';
+    }
+  }
   function renderPremiumHome(){
     var root=G('tab-home');if(!root)return;
     var catHtml=liveCategories.slice(0,12).map(function(c){
@@ -771,7 +824,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
@@ -779,7 +832,7 @@
     var nav=G('bnav');if(nav)nav.style.display=tab==='admindash'?'none':'flex';
     if(tab==='home')renderHome();
     else if(tab==='cart')renderCart();
-    else if(tab==='orders'){renderOrders();if(typeof startOrderTracking==='function'&&S.order)startOrderTracking();}
+    else if(tab==='orders'){renderLiveOrders();if(typeof startOrderTracking==='function'&&S.order)startOrderTracking();}
     else if(tab==='profile')renderProfile();
     else if(tab==='vendordash')renderVDash();
     else if(tab==='riderdash')renderRDash();
