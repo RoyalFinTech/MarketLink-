@@ -147,7 +147,8 @@ async function upload(file, purpose, uploaderId) {
     [uploaderId || null, stored.storedUrl, fileType, purpose, Math.round(file.size/1024)]
   );
   const url = stored.publicUrl || (publicApiBase() + '/api/v1/uploads/' + record.id + '/content');
-  return {url, record};
+  const responseRecord = Object.assign({}, record, {file_url:url});
+  return {url, record:responseRecord};
 }
 function privateDocumentType(file,purpose) {
   const p=String(purpose || '').toLowerCase();
@@ -203,10 +204,18 @@ async function getFile(fileId, requesterId, roles) {
   const ref=parseSupabaseRef(f.file_url);
   if(ref) {
     const config=supabaseConfig();
-    const result=await supabaseRequest(config.url + '/storage/v1/object/' + encodeURIComponent(ref.bucket) + '/' + encodeObjectPath(ref.key), {
-      method:'GET',headers:authHeaders(config)
-    },'download');
-    return {buffer:Buffer.from(await result.response.arrayBuffer()),contentType:f.file_type==='document'?'application/octet-stream':'application/octet-stream'};
+    let response;
+    try {
+      response=await fetch(config.url + '/storage/v1/object/' + encodeURIComponent(ref.bucket) + '/' + encodeObjectPath(ref.key), {method:'GET',headers:authHeaders(config)});
+    } catch(err) {
+      throw new AppError('Secure file storage could not be reached.',503,'STORAGE_UNAVAILABLE');
+    }
+    if(!response.ok) {
+      logger.warn('Supabase Storage file download failed',{fileId,status:response.status});
+      throw new AppError('File content is temporarily unavailable.',503,'STORAGE_DOWNLOAD_FAILED');
+    }
+    const contentType=response.headers.get('content-type') || 'application/octet-stream';
+    return {buffer:Buffer.from(await response.arrayBuffer()),contentType};
   }
   let pathname='';
   try { pathname=new URL(f.file_url,publicApiBase()).pathname; } catch(e) { pathname=String(f.file_url); }
