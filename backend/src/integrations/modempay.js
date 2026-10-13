@@ -27,6 +27,7 @@ function resolveBaseUrl() {
 const BASE_URL = resolveBaseUrl();
 
 function isH2H() { return API_MODE === 'h2h'; }
+function isH2HApproved() { return !isH2H() || String(process.env.MODEM_PAY_H2H_APPROVED||'').trim().toLowerCase()==='true'; }
 
 function isConfigured() {
   const key=String(process.env.MODEM_PAY_API_KEY||'').trim();
@@ -177,5 +178,5 @@ function verifyWebhookSignature(rawBody, signature) {
 
 module.exports = {
   createPaymentIntent, confirmCharge, finalizeCharge, getTransaction,
-  initiateTransfer, verifyWebhookSignature, isH2H, isConfigured,
+  initiateTransfer, verifyWebhookSignature, isH2H, isConfigured, isH2HApproved,
 };
