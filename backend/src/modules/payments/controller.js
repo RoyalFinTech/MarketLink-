@@ -31,9 +31,12 @@ exports.webhook = async (req,res,next) => {
     const signature=req.headers['x-modem-signature'];
     const rawBody=Buffer.isBuffer(req.body)?req.body:req.rawBody;
     if(!rawBody) return res.status(400).json({success:false,error:'Webhook body is missing.'});
-    if(!modemPay.verifyWebhookSignature(rawBody,signature)) return res.status(400).json({success:false,error:'Invalid Modem Pay webhook signature.'});
     const event=Buffer.isBuffer(req.body)?JSON.parse(req.body.toString('utf8')):req.body;
-    const result=await svc.processWebhook({event,rawBody});
+    // Modem Pay documents HMAC over JSON.stringify(parsedBody), so canonicalize
+    // the parsed event the same way rather than signing request whitespace.
+    const signatureBody=JSON.stringify(event);
+    if(!modemPay.verifyWebhookSignature(signatureBody,signature)) return res.status(400).json({success:false,error:'Invalid Modem Pay webhook signature.'});
+    const result=await svc.processWebhook({event,rawBody:signatureBody});
     return res.status(200).json({received:true,data:result});
   } catch(e) { logger.error('Modem Pay webhook processing failed',{error:e.message}); next(e); }
 };
