@@ -11,6 +11,8 @@ const ADMIN = ['admin','super_admin','moderator'];
 router.get('/me',              authenticate, ctrl.getMyProfile);
 router.put('/me',              authenticate, [
   body('fullName').optional().trim().notEmpty().isLength({ max: 150 }),
+  body('displayName').optional({ nullable: true }).trim().isLength({ max: 80 }),
+  body('bio').optional({ nullable: true }).trim().isLength({ max: 280 }),
   body('dateOfBirth').optional({ nullable: true }).isISO8601().withMessage('Invalid date.'),
   body('gender').optional({ nullable: true }).isIn(['male','female','other','prefer_not_to_say']),
   body('profilePhotoUrl').optional({ nullable: true }).isURL(),
