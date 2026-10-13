@@ -46,6 +46,9 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
     throw new AppError('Choose a supported MarketLink payment method.', 400, 'UNSUPPORTED_METHOD');
   }
   method = String(method).toLowerCase();
+  if(method!=='cod'&&!modemPay.isConfigured()) throw new AppError('Modem Pay is not configured yet. Choose Pay on Delivery or try again later.',503,'PROVIDER_UNAVAILABLE');
+  if(method!=='cod'&&modemPay.isH2H()&&!modemPay.isH2HApproved()) throw new AppError('Direct mobile-money checkout is waiting for Modem Pay H2H partner approval.',503,'PROVIDER_UNAVAILABLE');
+  if(modemPay.isH2H()&&!['cod','wave','afrimoney','qmoney'].includes(method)) throw new AppError('Choose Wave, AfriMoney or QMoney for direct mobile-money checkout.',400,'UNSUPPORTED_METHOD');
   const requestedAmount = Number(amount);
   if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) throw new AppError('Payment amount must be greater than zero.', 400, 'INVALID_AMOUNT');
   if (method!=='cod'&&!modemPay.isH2H()&&requestedAmount<10) throw new AppError('Modem Pay checkout requires a minimum payment of D 10.00.',400,'BELOW_PROVIDER_MINIMUM');
@@ -76,10 +79,11 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
       return { payment, order, cashOnDelivery: true };
     }
 
-    const idempotencyKey = 'marketlink-payment-' + payment.id;
+    const paymentId = crypto.randomUUID();
+    const idempotencyKey = 'marketlink-payment-' + paymentId;
     const { rows: [payment] } = await client.query(
-      "INSERT INTO payments (order_id, method, provider_ref, amount, currency, status) VALUES ($1,$2,$3,$4,'GMD','pending') RETURNING *",
-      [orderId, method, idempotencyKey, requestedAmount]
+      "INSERT INTO payments (id, order_id, method, provider_ref, amount, currency, status) VALUES ($1,$2,$3,$4,$5,'GMD','pending') RETURNING *",
+      [paymentId, orderId, method, idempotencyKey, requestedAmount]
     );
     return { payment, order, idempotencyKey };
   });
