@@ -234,7 +234,12 @@
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
     var payLabel=S.selPay||'Pay on Delivery',payMethod=payLabel==='Pay on Delivery'?'cod':String(payLabel).toLowerCase().replace(/\s+/g,'-');
     var accountNumber='';
-    if(['wave','afrimoney','qmoney'].indexOf(payMethod)>-1){
+    var activePaymentCaps=S.paymentCapabilities||{configured:false,directMobileMoney:false};
+    if(payMethod!=='cod'&&!activePaymentCaps.configured){
+      toast('Mobile-money payment setup is not complete yet. Choose Pay on Delivery or try again later.','warning');
+      renderLiveCart();return;
+    }
+    if(['wave','afrimoney','qmoney'].indexOf(payMethod)>-1&&activePaymentCaps.directMobileMoney){
       var mobileInput=G('ml-mobile-money-number');
       accountNumber=String(mobileInput&&mobileInput.value||S.paymentAccountNumber||'').replace(/\D/g,'');
       if(!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit mobile-money number for the selected payment method.','error');if(mobileInput)mobileInput.focus();return;}
@@ -574,9 +579,26 @@
     var sub=ids.reduce(function(t,id){var p=CART_ITEMS[id];return t+Number(p&&p.price||0)*Number(S.cart[id]||0);},0);
     var addresses;try{addresses=await loadLiveAddresses();}catch(e){root.innerHTML='<div class="ml-empty"><b>Saved addresses unavailable</b><span>'+esc(e.error||'Could not load your saved addresses.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshCart()">Retry</button></div>';return;}
     var addressHtml=addresses.length?addresses.map(function(a){var selected=String(a.id)===String(S.delivAddressId||S.deliveryAddressId);return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectAddress(\''+esc(String(a.id))+'\')"><div class="ico">📍</div><div class="copy"><b>'+esc(a.label||'Address')+'</b><span>'+esc(a.full_address||'')+(a.area?' · '+esc(a.area):'')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join(''):'<div class="ml-empty"><b>No saved delivery addresses</b><span>Add your first address in Profile → Saved addresses.</span></div>';
+    try{
+      var capabilityResponse=await ML_API.payments.methods();
+      var capabilityData=capabilityResponse&&capabilityResponse.data?capabilityResponse.data:capabilityResponse;
+      S.paymentCapabilities={
+        configured:Boolean(capabilityData&&capabilityData.configured),
+        mode:String(capabilityData&&capabilityData.mode||'merchant'),
+        directMobileMoney:Boolean(capabilityData&&capabilityData.directMobileMoney),
+        hostedCheckout:Boolean(capabilityData&&capabilityData.hostedCheckout)
+      };
+    }catch(capabilityError){
+      S.paymentCapabilities=S.paymentCapabilities||{configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
+    }
     var chosenPaymentLabel=S.selPay||'Pay on Delivery';
-    var paymentHtml=livePaymentOptions().map(function(opt){var selected=chosenPaymentLabel===opt[0];return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\''+esc(opt[0])+'\')"><div class="ico">'+(opt[1]==='cod'?'💵':opt[1]==='wave'?'📱':opt[1]==='afrimoney'?'📲':'💳')+'</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+(opt[1]==='cod'?'Pay when your order arrives.':'Enter the number linked to this mobile-money account. MarketLink will show the provider’s next step before asking you to approve payment.')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join('');
-    var mobileMoneySelected=['Wave','AfriMoney','QMoney'].indexOf(chosenPaymentLabel)>-1;
+    var paymentCaps=S.paymentCapabilities||{configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
+    var paymentHtml=livePaymentOptions().map(function(opt){
+      var selected=chosenPaymentLabel===opt[0],isCod=opt[1]==='cod',unavailable=!isCod&&!paymentCaps.configured;
+      var subText=isCod?'Pay when your order arrives.':unavailable?'Temporarily unavailable while Modem Pay setup is completed.':paymentCaps.directMobileMoney?'Enter your mobile-money number. MarketLink will show the provider’s next step before you approve the payment.':'Continue to Modem Pay’s secure checkout to complete the payment.';
+      return '<button type="button" class="ml-profile-row ml-payment-option'+(unavailable?' ml-payment-option-disabled':'')+'" '+(unavailable?'disabled aria-disabled="true"':'')+' style="width:100%;text-align:left;cursor:'+(unavailable?'not-allowed':'pointer')+';border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\''+esc(opt[0])+'\')"><div class="ico">'+(isCod?'💵':opt[1]==='wave'?'📱':opt[1]==='afrimoney'?'📲':'💳')+'</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+esc(subText)+'</span></div>'+(unavailable?'<span class="ml-payment-unavailable">Setup pending</span>':selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';
+    }).join('');
+    var mobileMoneySelected=Boolean(paymentCaps.directMobileMoney)&&['Wave','AfriMoney','QMoney'].indexOf(chosenPaymentLabel)>-1;
     var mobileMoneyInputHtml=mobileMoneySelected?'<div class="ml-mobile-money-field"><label for="ml-mobile-money-number">Mobile-money number</label><input id="ml-mobile-money-number" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" pattern="[0-9]{7}" placeholder="Enter 7-digit number" value="'+esc(S.paymentAccountNumber||'')+'"><small>Use the local 7-digit number, without +220. Never enter your wallet PIN on this screen.</small></div>':'';
     var itemsHtml=ids.map(function(id){var p=CART_ITEMS[id],qty=Number(S.cart[id]||0);return '<div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>'+esc(p.name)+'</b><span>'+money(p.price)+' × '+qty+' · '+esc(p.vendorName||'Vendor')+'</span></div><strong style="color:#FFD778">'+money(Number(p.price||0)*qty)+'</strong></div>';}).join('');
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Your cart</h3><button onclick="window.ML_Premium.refreshCart()">Refresh</button></div><div class="ml-profile-card"><div class="ml-section-head"><h3>Items</h3><span style="color:#91A4B4;font-size:10px">'+vendorIds.length+' vendor'+(vendorIds.length===1?'':'s')+'</span></div>'+itemsHtml+'</div>'+
@@ -589,7 +611,16 @@
       '</div>';
   }
   function selectAddress(id){S.delivAddressId=String(id);S.deliveryAddressId=String(id);renderLiveCart();}
-  function selectPayment(label){var previous=G('ml-mobile-money-number');if(previous)S.paymentAccountNumber=String(previous.value||'').replace(/\D/g,'').slice(0,7);S.selPay=label;renderLiveCart();}
+  function selectPayment(label){
+    var previous=G('ml-mobile-money-number');
+    if(previous)S.paymentAccountNumber=String(previous.value||'').replace(/\D/g,'').slice(0,7);
+    var method=label==='Pay on Delivery'?'cod':String(label).toLowerCase().replace(/\s+/g,'-');
+    if(method!=='cod'&&!(S.paymentCapabilities&&S.paymentCapabilities.configured)){
+      toast('Mobile-money payments are not available yet. MarketLink is waiting for Modem Pay configuration.','warning');
+      return;
+    }
+    S.selPay=label;renderLiveCart();
+  }
   function setCoupon(){var el=G('ml-cart-coupon'),code=el&&el.value.trim().toUpperCase();S.appliedCoupon=code?{code:code}:null;toast(code?'Coupon will be validated securely at order placement.':'Coupon removed.','info');renderLiveCart();}
   function manageAddresses(){switchTab('profile');renderAddresses();}
   async function loadProfile(){
