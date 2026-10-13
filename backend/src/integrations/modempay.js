@@ -161,8 +161,13 @@ async function initiateTransfer({ amount, currency='GMD', network, accountNumber
 
 function verifyWebhookSignature(rawBody, signature) {
   const crypto = require('crypto');
-  const secret = process.env.MODEM_PAY_WEBHOOK_SECRET || process.env.MODEM_PAY_SECRET_HASH;
-  if (!secret) throw new AppError('Modem Pay webhook secret is not configured.', 503, 'PROVIDER_UNAVAILABLE');
+  // Per-payment callback URLs use the SHA-256-hashed API secret. Dashboard-level
+  // webhooks use the dedicated webhook signing secret. Do not mix the two keys.
+  const hasPerPaymentCallback=Boolean(String(process.env.MODEM_PAY_CALLBACK_URL||'').trim());
+  const secret=hasPerPaymentCallback
+    ? process.env.MODEM_PAY_SECRET_HASH
+    : (process.env.MODEM_PAY_WEBHOOK_SECRET || process.env.MODEM_PAY_SECRET_HASH);
+  if (!secret) throw new AppError('Modem Pay webhook signing configuration is missing.', 503, 'PROVIDER_UNAVAILABLE');
   if (!signature || !rawBody) return false;
   const expected = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
   const a = Buffer.from(expected);
