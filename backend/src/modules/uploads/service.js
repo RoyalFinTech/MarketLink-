@@ -1,90 +1,256 @@
 // src/modules/uploads/service.js
-// Storage abstraction: local (dev) + cloud (prod).
-// Cloud: set STORAGE_PROVIDER=s3|cloudinary|backblaze and matching env vars.
+// Durable Supabase Storage in production, local storage for development only.
 'use strict';
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
+const crypto = require('crypto');
 const { query } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg','image/png','image/webp','image/gif'];
-const ALLOWED_DOC_TYPES   = ['application/pdf','image/jpeg','image/png'];
-const MAX_IMAGE_SIZE = 5  * 1024 * 1024; // 5MB
-const MAX_DOC_SIZE   = 10 * 1024 * 1024; // 10MB
+const ALLOWED_DOC_TYPES = ['application/pdf','image/jpeg','image/png'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_DOC_SIZE = 10 * 1024 * 1024;
+const EXT_BY_MIME = {'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp','image/gif':'.gif','application/pdf':'.pdf'};
 
 function validateFile(file, purpose) {
-  const isDoc = purpose.includes('document') || purpose.includes('doc');
+  const p = String(purpose || 'general').toLowerCase();
+  const isDoc = p.includes('document') || p.includes('doc') || file.mimetype === 'application/pdf';
   const allowed = isDoc ? ALLOWED_DOC_TYPES : ALLOWED_IMAGE_TYPES;
   const maxSize = isDoc ? MAX_DOC_SIZE : MAX_IMAGE_SIZE;
-  if (!allowed.includes(file.mimetype))
-    throw new AppError(`File type ${file.mimetype} is not allowed for ${purpose}.`, 400, 'INVALID_FILE_TYPE');
-  if (file.size > maxSize)
-    throw new AppError(`File too large. Maximum size is ${maxSize/1024/1024}MB.`, 400, 'FILE_TOO_LARGE');
+  if (!allowed.includes(file.mimetype)) throw new AppError('This file type is not supported for this upload.', 400, 'INVALID_FILE_TYPE');
+  if (!Number.isFinite(Number(file.size)) || file.size <= 0) throw new AppError('The selected file is empty or invalid.', 400, 'INVALID_FILE');
+  if (file.size > maxSize) throw new AppError('File is too large. Maximum size is ' + (maxSize / 1024 / 1024) + 'MB.', 400, 'FILE_TOO_LARGE');
 }
 
-async function uploadLocal(file, purpose, uploaderId) {
-  const uploadsDir = path.join(process.cwd(), 'uploads', purpose);
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  const ext = path.extname(file.originalname).toLowerCase();
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-  const filepath = path.join(uploadsDir, filename);
-  fs.writeFileSync(filepath, file.buffer);
-  const url = `/uploads/${purpose}/${filename}`;
-  logger.info('File stored locally', { url, purpose, uploaderId });
-  return url;
+function publicApiBase() {
+  return String(process.env.API_PUBLIC_URL || process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || 'https://marketlink-gambia.onrender.com').replace(/\/+$/, '');
 }
-
-async function uploadCloud(file, purpose) {
-  const provider = process.env.STORAGE_PROVIDER;
-  if (provider === 's3') {
-    if (!process.env.AWS_S3_BUCKET)
-      throw new AppError('AWS_S3_BUCKET not configured. Add it to .env', 503, 'STORAGE_NOT_CONFIGURED');
-    // const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-    // const s3 = new S3Client({ region: process.env.AWS_REGION });
-    // const key = `${purpose}/${Date.now()}-${file.originalname}`;
-    // await s3.send(new PutObjectCommand({ Bucket: process.env.AWS_S3_BUCKET, Key: key, Body: file.buffer, ContentType: file.mimetype }));
-    // return `https://${process.env.AWS_S3_BUCKET}.s3.amazonaws.com/${key}`;
-    throw new AppError('S3 requires @aws-sdk/client-s3 package and AWS credentials in .env', 503, 'STORAGE_NOT_CONFIGURED');
+function supabaseConfig() {
+  const url = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const bucket = String(process.env.SUPABASE_STORAGE_BUCKET || 'marketlink-uploads').trim();
+  return {url, key, bucket, privateBucket:String(process.env.SUPABASE_PRIVATE_STORAGE_BUCKET || (bucket + '-private')).trim()};
+}
+function getStorageProvider() {
+  const configured = String(process.env.STORAGE_PROVIDER || '').trim().toLowerCase();
+  if (configured) return configured;
+  const s = supabaseConfig();
+  if (s.url && s.key) return 'supabase';
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    throw new AppError('Profile-photo storage is not configured for production. Configure Supabase Storage on the backend service.', 503, 'STORAGE_NOT_CONFIGURED');
   }
-  if (provider === 'cloudinary') {
-    if (!process.env.CLOUDINARY_CLOUD_NAME)
-      throw new AppError('Cloudinary credentials not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to .env', 503, 'STORAGE_NOT_CONFIGURED');
-    throw new AppError('Cloudinary requires cloudinary package and credentials in .env', 503, 'STORAGE_NOT_CONFIGURED');
-  }
-  throw new AppError(`STORAGE_PROVIDER "${provider}" is not supported. Use: s3, cloudinary, or leave unset for local.`, 503, 'STORAGE_NOT_CONFIGURED');
+  return 'local';
 }
-
+function encodeObjectPath(value) {
+  return String(value).split('/').map(encodeURIComponent).join('/');
+}
+function safePurpose(value) {
+  return String(value || 'general').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'general';
+}
+function authHeaders(config, contentType) {
+  const h = {'apikey':config.key, 'Authorization':'Bearer ' + config.key};
+  if (contentType) h['Content-Type'] = contentType;
+  return h;
+}
+async function supabaseRequest(url, options, operation) {
+  let response;
+  try { response = await fetch(url, options); }
+  catch (err) {
+    logger.error('Supabase Storage request failed', {operation, error:err.message});
+    throw new AppError('Secure image storage could not be reached. Please try again shortly.', 503, 'STORAGE_UNAVAILABLE');
+  }
+  const text = await response.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch(e) {}
+  if (!response.ok) {
+    logger.error('Supabase Storage rejected request', {operation, status:response.status, message:data.message || data.error || ''});
+    throw new AppError(response.status === 413 ? 'The selected file is too large.' : 'Secure file storage could not complete the request. Please contact support if this continues.', response.status === 413 ? 413 : 503, 'STORAGE_REQUEST_FAILED');
+  }
+  return {response, data};
+}
+async function ensureBucket(config, bucket, isPublic) {
+  const base = config.url + '/storage/v1/bucket/' + encodeURIComponent(bucket);
+  let existing;
+  try {
+    const response = await fetch(base, {headers:authHeaders(config)});
+    if (response.ok) existing = await response.json();
+    else if (response.status !== 404) {
+      const body = await response.text();
+      logger.error('Could not inspect Supabase Storage bucket', {bucket, status:response.status, message:body.slice(0,180)});
+      throw new AppError('Storage configuration needs attention. Please contact support.', 503, 'STORAGE_BUCKET_ERROR');
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError('Secure file storage could not be reached.', 503, 'STORAGE_UNAVAILABLE');
+  }
+  if (existing) {
+    if (Boolean(existing.public) !== Boolean(isPublic)) {
+      throw new AppError('The configured Supabase Storage bucket has the wrong privacy setting. Check the bucket configuration.', 503, 'STORAGE_BUCKET_PRIVACY_MISMATCH');
+    }
+    return;
+  }
+  const createUrl = config.url + '/storage/v1/bucket';
+  const payload = {id:bucket,name:bucket,public:Boolean(isPublic),file_size_limit:MAX_DOC_SIZE,allowed_mime_types:isPublic?ALLOWED_IMAGE_TYPES:ALLOWED_DOC_TYPES};
+  let response;
+  try {
+    response = await fetch(createUrl, {method:'POST',headers:authHeaders(config,'application/json'),body:JSON.stringify(payload)});
+  } catch (err) { throw new AppError('Secure file storage could not be reached.', 503, 'STORAGE_UNAVAILABLE'); }
+  if (!response.ok && response.status !== 409) {
+    const body = await response.text();
+    logger.error('Could not create Supabase Storage bucket', {bucket,status:response.status,message:body.slice(0,180)});
+    throw new AppError('The required Supabase Storage bucket is not available. Check storage credentials and bucket permissions.', 503, 'STORAGE_BUCKET_ERROR');
+  }
+}
+async function uploadSupabase(file, purpose) {
+  const config = supabaseConfig();
+  if (!config.url || !config.key) throw new AppError('Supabase Storage credentials are missing on the backend.', 503, 'STORAGE_NOT_CONFIGURED');
+  const privateFile = String(purpose).toLowerCase().includes('document') || String(purpose).toLowerCase().includes('doc') || file.mimetype === 'application/pdf';
+  const bucket = privateFile ? config.privateBucket : config.bucket;
+  await ensureBucket(config, bucket, !privateFile);
+  const key = safePurpose(purpose) + '/' + Date.now() + '-' + crypto.randomUUID() + (EXT_BY_MIME[file.mimetype] || '.bin');
+  const endpoint = config.url + '/storage/v1/object/' + encodeURIComponent(bucket) + '/' + encodeObjectPath(key);
+  await supabaseRequest(endpoint, {
+    method:'POST',
+    headers:Object.assign(authHeaders(config,file.mimetype), {'x-upsert':'false','cache-control':'3600'}),
+    body:file.buffer,
+  }, 'upload');
+  if (privateFile) return {storedUrl:'supabase://' + bucket + '/' + key, publicUrl:null, privateFile:true};
+  return {
+    storedUrl:config.url + '/storage/v1/object/public/' + encodeURIComponent(bucket) + '/' + encodeObjectPath(key),
+    publicUrl:config.url + '/storage/v1/object/public/' + encodeURIComponent(bucket) + '/' + encodeObjectPath(key),
+    privateFile:false,
+  };
+}
+async function uploadLocal(file, purpose) {
+  const uploadsDir = path.join(process.cwd(), 'uploads', safePurpose(purpose));
+  fs.mkdirSync(uploadsDir, {recursive:true});
+  const filename = Date.now() + '-' + crypto.randomUUID() + (EXT_BY_MIME[file.mimetype] || '.bin');
+  fs.writeFileSync(path.join(uploadsDir, filename), file.buffer, {flag:'wx'});
+  const relative = '/uploads/' + safePurpose(purpose) + '/' + filename;
+  logger.info('File stored locally', {purpose});
+  return {storedUrl:publicApiBase() + relative, publicUrl:publicApiBase() + relative, privateFile:false};
+}
 async function upload(file, purpose, uploaderId) {
   validateFile(file, purpose);
-  const useCloud = !!process.env.STORAGE_PROVIDER;
-  const url = useCloud
-    ? await uploadCloud(file, purpose)
-    : await uploadLocal(file, purpose, uploaderId);
-
-  const { rows: [record] } = await query(
-    `INSERT INTO file_uploads (uploaded_by, file_url, file_type, purpose, file_size_kb)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [uploaderId||null, url,
-     ALLOWED_IMAGE_TYPES.includes(file.mimetype) ? 'image' : 'document',
-     purpose, Math.round(file.size/1024)]);
-
-  return { url, record };
-}
-
-async function deleteFile(fileId, requesterId, roles) {
-  const { rows: [f] } = await query('SELECT * FROM file_uploads WHERE id = $1', [fileId]);
-  if (!f) throw new AppError('File not found.', 404, 'FILE_NOT_FOUND');
-  const isAdmin = (roles||[]).some(r => ['admin','super_admin'].includes(r));
-  if (!isAdmin && f.uploaded_by !== requesterId)
-    throw new AppError('Not authorised to delete this file.', 403, 'FORBIDDEN');
-
-  if (!process.env.STORAGE_PROVIDER && f.file_url.startsWith('/uploads/')) {
-    const localPath = path.join(process.cwd(), f.file_url);
-    if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+  const provider = getStorageProvider();
+  let stored;
+  if (provider === 'supabase') stored = await uploadSupabase(file,purpose);
+  else if (provider === 'local') stored = await uploadLocal(file,purpose);
+  else {
+    throw new AppError('The configured storage provider is not implemented. Use Supabase Storage for production uploads.',503,'STORAGE_NOT_CONFIGURED');
   }
-  await query('UPDATE file_uploads SET deleted_at = now() WHERE id = $1', [fileId]);
-  return { deleted: true, id: fileId };
+  const fileType = privateDocumentType(file,purpose);
+  const {rows:[record]} = await query(
+    'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+    [uploaderId || null, stored.storedUrl, fileType, purpose, Math.round(file.size/1024)]
+  );
+  const url = stored.publicUrl || (publicApiBase() + '/api/v1/uploads/' + record.id + '/content');
+  return {url, record};
 }
-
-module.exports = { upload, deleteFile, validateFile };
+function privateDocumentType(file,purpose) {
+  const p=String(purpose || '').toLowerCase();
+  return file.mimetype === 'application/pdf' || p.includes('document') || p.includes('doc') ? 'document' : 'image';
+}
+async function storageDelete(storedUrl) {
+  const raw = String(storedUrl || '');
+  if (raw.startsWith('supabase://')) {
+    const config=supabaseConfig();
+    const rest=raw.slice('supabase://'.length);
+    const sep=rest.indexOf('/');
+    if (sep < 1) throw new AppError('Stored file reference is invalid.',500,'INVALID_STORAGE_REFERENCE');
+    const bucket=rest.slice(0,sep), key=rest.slice(sep+1);
+    if (!config.url || !config.key) throw new AppError('Supabase Storage credentials are missing.',503,'STORAGE_NOT_CONFIGURED');
+    await supabaseRequest(config.url + '/storage/v1/object/' + encodeURIComponent(bucket) + '/' + encodeObjectPath(key), {
+      method:'DELETE',headers:authHeaders(config)
+    },'delete');
+    return;
+  }
+  const config=supabaseConfig();
+  if (config.url && config.key && raw.startsWith(config.url + '/storage/v1/object/public/')) {
+    const pathPart=raw.slice((config.url + '/storage/v1/object/public/').length);
+    const sep=pathPart.indexOf('/');
+    if (sep < 1) return;
+    const bucket=decodeURIComponent(pathPart.slice(0,sep));
+    const key=pathPart.slice(sep+1).split('/').map(decodeURIComponent).join('/');
+    await supabaseRequest(config.url + '/storage/v1/object/' + encodeURIComponent(bucket) + '/' + encodeObjectPath(key), {
+      method:'DELETE',headers:authHeaders(config)
+    },'delete');
+    return;
+  }
+  let pathname='';
+  try { pathname = new URL(raw, publicApiBase()).pathname; } catch(e) { pathname=raw; }
+  if (pathname.startsWith('/uploads/')) {
+    const root=path.resolve(process.cwd(),'uploads');
+    const target=path.resolve(process.cwd(),'.' + pathname);
+    if (target === root || !target.startsWith(root + path.sep)) return;
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+  }
+}
+function parseSupabaseRef(storedUrl) {
+  const raw=String(storedUrl || '');
+  if(!raw.startsWith('supabase://')) return null;
+  const rest=raw.slice('supabase://'.length),sep=rest.indexOf('/');
+  if(sep<1) return null;
+  return {bucket:rest.slice(0,sep),key:rest.slice(sep+1)};
+}
+async function getFile(fileId, requesterId, roles) {
+  const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL',[fileId]);
+  if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
+  const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
+  if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to access this file.',403,'FORBIDDEN');
+  const ref=parseSupabaseRef(f.file_url);
+  if(ref) {
+    const config=supabaseConfig();
+    const result=await supabaseRequest(config.url + '/storage/v1/object/' + encodeURIComponent(ref.bucket) + '/' + encodeObjectPath(ref.key), {
+      method:'GET',headers:authHeaders(config)
+    },'download');
+    return {buffer:Buffer.from(await result.response.arrayBuffer()),contentType:f.file_type==='document'?'application/octet-stream':'application/octet-stream'};
+  }
+  let pathname='';
+  try { pathname=new URL(f.file_url,publicApiBase()).pathname; } catch(e) { pathname=String(f.file_url); }
+  if (!pathname.startsWith('/uploads/')) throw new AppError('File content is not available from this server.',404,'FILE_NOT_FOUND');
+  const root=path.resolve(process.cwd(),'uploads'), target=path.resolve(process.cwd(),'.'+pathname);
+  if(target===root || !target.startsWith(root+path.sep) || !fs.existsSync(target)) throw new AppError('File content is no longer available.',404,'FILE_NOT_FOUND');
+  return {buffer:fs.readFileSync(target),contentType:EXT_CONTENT_TYPE(target)};
+}
+function EXT_CONTENT_TYPE(filePath) {
+  const ext=path.extname(filePath).toLowerCase();
+  return ({'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.pdf':'application/pdf'})[ext] || 'application/octet-stream';
+}
+async function deleteFile(fileId, requesterId, roles) {
+  const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL',[fileId]);
+  if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
+  const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
+  if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to delete this file.',403,'FORBIDDEN');
+  await storageDelete(f.file_url);
+  await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[fileId]);
+  return {deleted:true,id:fileId};
+}
+async function deleteFileByUrl(url, requesterId) {
+  const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE file_url=$1 AND uploaded_by=$2 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1',[url,requesterId]);
+  if(!f) return {deleted:false,reason:'NOT_OWNED_OR_NOT_FOUND'};
+  const {rows:[refs]}=await query(
+    'SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, ' +
+    'EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1) AS rider_ref, ' +
+    'EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1) AS vendor_ref',
+    [url]
+  );
+  if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref)) return {deleted:false,reason:'STILL_IN_USE'};
+  await storageDelete(f.file_url);
+  await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[f.id]);
+  return {deleted:true,id:f.id};
+}
+async function removeProfilePhoto(requesterId) {
+  const {rows:[customer]}=await query('SELECT profile_photo_url FROM customers WHERE user_id=$1',[requesterId]);
+  if(!customer) throw new AppError('Customer profile not found.',404,'CUSTOMER_NOT_FOUND');
+  const oldUrl=customer.profile_photo_url;
+  await query('UPDATE customers SET profile_photo_url=NULL WHERE user_id=$1',[requesterId]);
+  if(oldUrl) {
+    try { await deleteFileByUrl(oldUrl,requesterId); }
+    catch(err) { logger.warn('Profile image removed from account but old stored file could not be cleaned up',{requesterId,error:err.message}); }
+  }
+  return {removed:true,profilePhotoUrl:null};
+}
+module.exports={upload,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,validateFile};
