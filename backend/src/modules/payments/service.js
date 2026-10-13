@@ -144,9 +144,85 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
     providerStatus: chargeResult.providerStatus || 'pending',
   };
 }
+async function findOwnedPayment(paymentId, actorId, roles) {
+  const { rows: [payment] } = await query(
+    'SELECT p.*, o.customer_id FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.id=$1',
+    [paymentId]
+  );
+  if (!payment) throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+  const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));
+  if (!isAdmin && String(payment.customer_id)!==String(actorId)) throw new AppError('You are not allowed to view this payment.',403,'FORBIDDEN');
+  return payment;
+}
+
+async function continuePayment(paymentId, { action, pin }, actorId, roles) {
+  const payment = await findOwnedPayment(paymentId, actorId, roles);
+  if (payment.status === 'confirmed') return { payment, status:'completed', confirmed:true };
+  if (payment.status !== 'pending') throw new AppError('This payment attempt is no longer active. Start a new payment from checkout.',409,'PAYMENT_NOT_ACTIVE');
+  if (!modemPay.isH2H()) throw new AppError('This payment requires the configured hosted Modem Pay checkout.',409,'PAYMENT_FLOW_MISMATCH');
+
+  let providerResponse;
+  if (action === 'confirm') providerResponse = await modemPay.confirmCharge(payment.provider_ref);
+  else if (action === 'pin') providerResponse = await modemPay.finalizeCharge(payment.provider_ref, pin);
+  else throw new AppError('Choose a valid payment confirmation action.',400,'INVALID_PAYMENT_ACTION');
+
+  // A confirm/finalize response is not proof that the customer has paid. Reconcile
+  // against the provider transaction endpoint, then wait for the signed webhook if pending.
+  let statusData = null;
+  try { statusData = await getPaymentStatus(paymentId, actorId, roles); }
+  catch (err) {
+    logger.warn('Modem Pay status check deferred after customer confirmation',{paymentId,error:err.message});
+  }
+  return {
+    submitted:true,
+    providerStatus:String((providerResponse && providerResponse.status) || 'processing').toLowerCase(),
+    status:statusData ? statusData.status : 'pending',
+    payment:statusData ? statusData.payment : payment,
+  };
+}
+
+async function getPaymentStatus(paymentId, actorId, roles) {
+  let payment = await findOwnedPayment(paymentId, actorId, roles);
+  if (payment.status !== 'pending' || !modemPay.isH2H()) {
+    return { payment, status:payment.status === 'confirmed' ? 'completed' : payment.status };
+  }
+
+  const transaction = await modemPay.getTransaction(payment.provider_ref);
+  const providerStatus = String(transaction && transaction.status || 'pending').toLowerCase();
+  if (providerStatus === 'completed') {
+    const amount = Number(transaction.amount);
+    const currency = String(transaction.currency || '').toUpperCase();
+    const metadataOrderId = transaction.external_reference || transaction.metadata && transaction.metadata.orderId;
+    if (!Number.isFinite(amount) || Math.abs(amount - Number(payment.amount)) > 0.01 || currency !== 'GMD') {
+      logger.error('Modem Pay transaction mismatch during status reconciliation',{
+        paymentId,orderId:payment.order_id,expectedAmount:payment.amount,receivedAmount:transaction.amount,
+        expectedCurrency:payment.currency,receivedCurrency:transaction.currency,
+      });
+      throw new AppError('The provider transaction does not match this order. MarketLink has not marked it as paid.',409,'PAYMENT_RECONCILIATION_MISMATCH');
+    }
+    if (metadataOrderId && String(metadataOrderId) !== String(payment.order_id)) {
+      logger.error('Modem Pay transaction reference does not match order',{paymentId,orderId:payment.order_id,providerOrderId:metadataOrderId});
+      throw new AppError('The provider transaction does not match this order.',409,'PAYMENT_RECONCILIATION_MISMATCH');
+    }
+    payment = await markPaymentConfirmed(paymentId);
+    try { await ordersService.settleOrderFinancials(payment.order_id); }
+    catch (e) { logger.warn('Settlement deferred after payment status reconciliation',{paymentId,orderId:payment.order_id,error:e.message}); }
+    return { payment, status:'completed', providerStatus };
+  }
+
+  if (['failed','cancelled','abandoned','expired'].includes(providerStatus)) {
+    await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'",[paymentId]);
+    try { await releaseOrderInventoryAfterPaymentFailure(payment.order_id,'Modem Pay reported '+providerStatus+'.'); }
+    catch (e) { logger.error('Could not release inventory after provider failure',{paymentId,orderId:payment.order_id,error:e.message}); }
+    payment = await findOwnedPayment(paymentId, actorId, roles);
+    return { payment, status:'failed', providerStatus };
+  }
+  return { payment, status:providerStatus === 'processing' ? 'processing' : 'pending', providerStatus };
+}
+
 async function confirmPayment(paymentId,actorId,roles){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));if(payment.method==='cod'){if(!isAdmin)throw new AppError('Only admins can confirm COD payments.',403,'FORBIDDEN');}else if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){await PROVIDERS[payment.method].verify(payment.provider_ref);}else if(payment.method!=='cod'){throw new AppError('This payment is confirmed by the provider webhook.',409,'WEBHOOK_CONFIRMATION_REQUIRED');}const confirmed=await markPaymentConfirmed(paymentId);try{await ordersService.settleOrderFinancials(payment.order_id);}catch(e){logger.warn('Settlement deferred after payment confirmation',{paymentId,orderId:payment.order_id,error:e.message});}return confirmed;}
 async function markPaymentConfirmed(paymentId){return withTransaction(async(client)=>{const {rows:[payment]}=await client.query('SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const {rows:[updated]}=await client.query(`UPDATE payments SET status='confirmed', paid_at=now() WHERE id=$1 RETURNING *`,[paymentId]);await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);const {rows:[o]}=await client.query('SELECT customer_id,total FROM orders WHERE id=$1',[payment.order_id]);if(o){await client.query(`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,[o.customer_id,'Your payment of D '+o.total+' has been confirmed.',paymentId]);}logger.info('Payment confirmed',{paymentId,orderId:payment.order_id});return updated;});}
-async function processWebhook({event,rawBody}){if(String(event?.event||'').startsWith('transfer.')){const withdrawalsSvc=require('../withdrawals/service');return withdrawalsSvc.processProviderWebhook(event);}if(!event||!event.event)throw new AppError('Invalid Modem Pay event.',400,'INVALID_WEBHOOK');const eventType=String(event.event);const payload=event.payload||{};const eventId=String(payload.id||payload.transaction_reference||crypto.createHash('sha256').update(rawBody||JSON.stringify(event)).digest('hex'));const result=await withTransaction(async(client)=>{const {rows:inserted}=await client.query(`INSERT INTO payment_webhook_events (provider,event_id,event_type,payload) VALUES ('modempay',$1,$2,$3) ON CONFLICT (provider,event_id) DO NOTHING RETURNING id`,[eventId,eventType,JSON.stringify(event)]);if(!inserted.length)return{duplicate:true,eventId,eventType};if(eventType==='charge.succeeded'){const orderId=payload?.metadata?.orderId;if(!orderId){logger.warn('Modem Pay charge has no MarketLink orderId metadata',{eventId});return{processed:true,ignored:true,eventId,eventType};}const {rows:[payment]}=await client.query(`SELECT p.* FROM payments p WHERE p.order_id=$1 AND p.method IN ('modempay','wave','afrimoney','qmoney') AND p.status='pending' ORDER BY p.created_at DESC LIMIT 1 FOR UPDATE`,[orderId]);if(!payment)return{processed:true,ignored:true,eventId,eventType};const providerAmount=Number(payload.amount);if(Number.isFinite(providerAmount)&&Math.abs(providerAmount-Number(payment.amount))>0.01){logger.error('Modem Pay amount mismatch',{eventId,orderId,paymentId:payment.id,expected:payment.amount,received:payload.amount});return{processed:true,ignored:true,eventId,eventType,reason:'amount_mismatch'};}await client.query(`UPDATE payments SET status='confirmed', paid_at=now(), provider_ref=COALESCE($2,provider_ref) WHERE id=$1`,[payment.id,payload.transaction_reference||payload.id||null]);await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);const {rows:[o]}=await client.query('SELECT customer_id,total FROM orders WHERE id=$1',[orderId]);if(o)await client.query(`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,[o.customer_id,'Your payment of D '+o.total+' has been confirmed.',payment.id]);logger.info('Modem Pay charge confirmed',{eventId,orderId,paymentId:payment.id});return{processed:true,eventId,eventType,paymentId:payment.id,orderId};}if(['charge.cancelled','charge.failed','charge.expired'].includes(eventType)){const orderId=payload?.metadata?.orderId;if(orderId){const {rows:failedPayments}=await client.query(`UPDATE payments SET status='failed' WHERE order_id=$1 AND method IN ('modempay','wave','afrimoney','qmoney') AND status='pending' RETURNING order_id`,[orderId]);if(failedPayments.length){const {rows:[order]}=await client.query('SELECT status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);if(order&&order.status!=='cancelled'&&order.status!=='delivered'){const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const item of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL',[item.quantity,item.product_id]);await client.query("UPDATE orders SET status='cancelled',cancellation_reason=$2 WHERE id=$1",[orderId,'Payment failed or expired; inventory released.']);}}}}return{processed:true,eventId,eventType};});if(result?.paymentId&&result?.orderId){try{await ordersService.settleOrderFinancials(result.orderId);}catch(e){logger.warn('Settlement deferred after provider webhook',{eventId,orderId:result.orderId,error:e.message});}}return result;}
+async function processWebhook({event,rawBody}){if(String(event?.event||'').startsWith('transfer.')){const withdrawalsSvc=require('../withdrawals/service');return withdrawalsSvc.processProviderWebhook(event);}if(!event||!event.event)throw new AppError('Invalid Modem Pay event.',400,'INVALID_WEBHOOK');const eventType=String(event.event);const payload=event.payload||{};const eventId=String(eventType+':'+(payload.transaction_reference||payload.id||crypto.createHash('sha256').update(rawBody||JSON.stringify(event)).digest('hex')));const result=await withTransaction(async(client)=>{const {rows:inserted}=await client.query(`INSERT INTO payment_webhook_events (provider,event_id,event_type,payload) VALUES ('modempay',$1,$2,$3) ON CONFLICT (provider,event_id) DO NOTHING RETURNING id`,[eventId,eventType,JSON.stringify(event)]);if(!inserted.length)return{duplicate:true,eventId,eventType};if(eventType==='charge.succeeded'){if(String(payload.status||'').toLowerCase()!=='completed'){logger.warn('Ignoring non-completed Modem Pay success event',{eventId,status:payload.status});return{processed:true,ignored:true,eventId,eventType,reason:'status_not_completed'};}const orderId=payload?.metadata?.orderId;if(!orderId){logger.warn('Modem Pay charge has no MarketLink orderId metadata',{eventId});return{processed:true,ignored:true,eventId,eventType};}const {rows:[payment]}=await client.query(`SELECT p.* FROM payments p WHERE p.order_id=$1 AND p.method IN ('modempay','wave','afrimoney','qmoney') AND p.status='pending' ORDER BY p.created_at DESC LIMIT 1 FOR UPDATE`,[orderId]);if(!payment)return{processed:true,ignored:true,eventId,eventType};const providerAmount=Number(payload.amount);if(!Number.isFinite(providerAmount)||Math.abs(providerAmount-Number(payment.amount))>0.01){logger.error('Modem Pay amount mismatch',{eventId,orderId,paymentId:payment.id,expected:payment.amount,received:payload.amount});return{processed:true,ignored:true,eventId,eventType,reason:'amount_mismatch'};}if(String(payload.currency||'').toUpperCase()!==String(payment.currency||'GMD').toUpperCase()){logger.error('Modem Pay currency mismatch',{eventId,orderId,paymentId:payment.id,expected:payment.currency,received:payload.currency});return{processed:true,ignored:true,eventId,eventType,reason:'currency_mismatch'};}await client.query(`UPDATE payments SET status='confirmed', paid_at=now(), provider_ref=COALESCE($2,provider_ref) WHERE id=$1`,[payment.id,payload.transaction_reference||payload.id||null]);await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);const {rows:[o]}=await client.query('SELECT customer_id,total FROM orders WHERE id=$1',[orderId]);if(o)await client.query(`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,[o.customer_id,'Your payment of D '+o.total+' has been confirmed.',payment.id]);logger.info('Modem Pay charge confirmed',{eventId,orderId,paymentId:payment.id});return{processed:true,eventId,eventType,paymentId:payment.id,orderId};}if(['charge.cancelled','charge.failed','charge.expired'].includes(eventType)){const orderId=payload?.metadata?.orderId;if(orderId){const {rows:failedPayments}=await client.query(`UPDATE payments SET status='failed' WHERE order_id=$1 AND method IN ('modempay','wave','afrimoney','qmoney') AND status='pending' RETURNING order_id`,[orderId]);if(failedPayments.length){const {rows:[order]}=await client.query('SELECT status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);if(order&&order.status!=='cancelled'&&order.status!=='delivered'){const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const item of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL',[item.quantity,item.product_id]);await client.query("UPDATE orders SET status='cancelled',cancellation_reason=$2 WHERE id=$1",[orderId,'Payment failed or expired; inventory released.']);}}}}return{processed:true,eventId,eventType};});if(result?.paymentId&&result?.orderId){try{await ordersService.settleOrderFinancials(result.orderId);}catch(e){logger.warn('Settlement deferred after provider webhook',{eventId,orderId:result.orderId,error:e.message});}}return result;}
 async function refund(paymentId,{amount,reason},actor){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id=$1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status!=='confirmed')throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');if(payment.refund_status==='processed')throw new AppError('Payment already refunded.',400,'ALREADY_REFUNDED');const refundAmount=amount||payment.amount;if(refundAmount>payment.amount)throw new AppError('Refund amount exceeds payment amount.',400,'INVALID_AMOUNT');const provider=PROVIDERS[payment.method];if(payment.method!=='cod'&&provider)await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});return withTransaction(async(client)=>{const {rows:[updated]}=await client.query(`UPDATE payments SET refund_status='processed', refund_amount=$1,status=CASE WHEN $1=amount THEN 'refunded' ELSE status END WHERE id=$2 RETURNING *`,[refundAmount,paymentId]);const {rows:[o]}=await client.query('SELECT customer_id FROM orders WHERE id=$1',[payment.order_id]);if(o){const {rows:[w]}=await client.query('SELECT id,balance FROM wallets WHERE user_id=$1',[o.customer_id]);if(w){await client.query('UPDATE wallets SET balance=balance+$1 WHERE id=$2',[refundAmount,w.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,[w.id,refundAmount,Number(w.balance)+Number(refundAmount),paymentId,reason||'Order refund']);}}await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,[actor.id,actor.role,paymentId,JSON.stringify({refundAmount,reason})]);return updated;});}
 async function getHistory(customerId,{page=1,limit=20}){const limit_=Math.min(parseInt(limit)||20,100);const offset=(Math.max(parseInt(page)||1,1)-1)*limit_;const {rows}=await query(`SELECT p.*,o.order_number FROM payments p JOIN orders o ON o.id=p.order_id WHERE o.customer_id=$1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,[customerId,limit_,offset]);return rows;}
-module.exports={initiatePayment,confirmPayment,refund,getHistory,processWebhook,markPaymentConfirmed};
+module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,refund,getHistory,processWebhook,markPaymentConfirmed};
