@@ -957,18 +957,18 @@
         ['Why we use it','Information supports sign-in, account management, order processing, delivery coordination, service security and help requests. Access to account-specific information requires an authenticated session.'],
         ['Payments and providers','Payment providers, including Modem Pay when enabled, process the information needed to complete and verify payments. Some networks may request a temporary PIN/OTP on the payment screen; this is sent to the provider for that transaction and is not saved in your MarketLink account. Please do not share payment codes in support chats or with vendors and riders. Providers have their own privacy notices and terms.'],
         ['Protecting your account','Keep your PIN private, sign out of shared devices and contact support if you suspect that another person has accessed your account.'],
-        ['Questions and requests','For privacy questions or help with account information, email marketlinkgambia@gmail.com or call +220 407 1510.']
+        ['Questions and requests','For privacy questions or help with account information, email marketlinkgambia@gmail.com or call +220 87 407 1510.']
       ]},
       deliveryPolicy:{title:'Delivery, Returns & Refunds',sections:[
         ['Before confirming an order','Check product details, quantity, delivery charges and your saved address before placing an order. Keep your phone available for delivery coordination.'],
         ['Delivery updates','Order status and rider details are shown when the relevant information is available from the live service. Estimated delivery times are not guarantees and may change with vendor, rider, traffic or network availability.'],
         ['Problems with an order','If an item is missing, damaged or different from what you ordered, keep the order reference and contact MarketLink support promptly so the order can be reviewed.'],
         ['Returns and refunds','If an item is missing, damaged or different from what you ordered, contact support with your order reference and a short explanation. We will review the order and explain the available next steps. Refund eligibility and timing can vary by order and payment provider, so we will confirm the outcome for your case rather than promise a fixed time for every transaction.'],
-        ['Contact','Email marketlinkgambia@gmail.com or call +220 407 1510 with your order reference and a short description of the issue.']
+        ['Contact','Email marketlinkgambia@gmail.com or call +220 87 407 1510 with your order reference and a short description of the issue.']
       ]}
     };
     var policy=policies[key];if(!root||!policy)return;
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button><h3>'+esc(policy.title)+'</h3></div><div class="ml-policy-content">'+policy.sections.map(function(section){return '<section><h4>'+esc(section[0])+'</h4><p>'+esc(section[1])+'</p></section>';}).join('')+'</div><footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><span>Questions?</span><a href="mailto:marketlinkgambia@gmail.com">Email support</a><a href="tel:+2204071510">Call +220 407 1510</a></div></footer></div>';
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button><h3>'+esc(policy.title)+'</h3></div><div class="ml-policy-content">'+policy.sections.map(function(section){return '<section><h4>'+esc(section[0])+'</h4><p>'+esc(section[1])+'</p></section>';}).join('')+'</div><footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><span>Questions?</span><a href="mailto:marketlinkgambia@gmail.com">Email support</a><a href="tel:+220874071510">Call +220 87 407 1510</a></div></footer></div>';
   }
   function openProfilePage(page){
     if(page==='terms'){S.profilePage=null;openSheet('sh-terms');return;}
