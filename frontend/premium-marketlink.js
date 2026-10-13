@@ -506,17 +506,115 @@
     if(typeof switchTab==='function'&&S.curTab!=='profile'){switchTab('profile');return;}
     if(typeof window.renderProfile==='function')window.renderProfile();
   }
+  function renderPremiumWalletPage(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div><div class="ml-loading">Loading your live wallet…</div></div>';
+    return Promise.all([ML_API.customers.getWallet(),ML_API.customers.getWalletTxns({page:1,limit:30})]).then(function(results){
+      var wallet=results[0]&&results[0].data||{},txns=normalizeProducts(results[1]&&results[1].data),balance=Number(wallet.balance||0);
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div>'+
+        '<section class="ml-wallet-hero"><span>Available balance</span><strong>'+money(balance)+'</strong><small>Live balance from your MarketLink account</small></section>'+
+        '<div class="ml-wallet-note">Wallet funding, transfers and bill payments are shown only when the corresponding production service is available. No sample transactions are added.</div>'+
+        '<div class="ml-section-head"><h3>Transaction history</h3><button type="button" onclick="window.ML_Premium.refreshWallet()">Refresh</button></div>'+
+        (txns.length?'<div class="ml-profile-card">'+txns.map(function(t){
+          var credit=String(t.type||'').toLowerCase()==='credit',amount=Math.abs(Number(t.amount||0)),desc=t.description||t.category||t.type||'Wallet transaction';
+          var date=t.created_at?new Date(t.created_at).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Date unavailable';
+          return '<div class="ml-wallet-transaction"><span class="ml-wallet-tx-icon '+(credit?'credit':'debit')+'">'+(credit?'↓':'↑')+'</span><div class="copy"><b>'+esc(desc)+'</b><span>'+esc(date)+' · '+esc(t.status||'recorded')+'</span></div><strong class="'+(credit?'credit':'debit')+'">'+(credit?'+':'−')+money(amount)+'</strong></div>';
+        }).join('')+'</div>':'<div class="ml-empty"><div style="font-size:28px">💳</div><b>No wallet transactions yet</b><span>Transactions will appear here when the live wallet service records them.</span></div>')+
+        '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+    }).catch(function(e){
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div><div class="ml-empty"><b>Wallet data unavailable</b><span>'+esc(e.error||'The live wallet service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.refreshWallet()">Retry</button></div></div>';
+    });
+  }
+  function renderPremiumPaymentsPage(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>Choose at checkout</b><span>Payment options are confirmed by the live MarketLink order service when you place an order. This page does not save fake cards or payment details.</span></div></div>'+
+      '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Available when enabled for the order and delivery area.</span></div></div>'+
+      '<div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>Mobile money and provider payments</b><span>Currently supported options are shown by the live checkout flow.</span></div></div></div>'+
+      '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\'cart\')">Go to cart and checkout →</button>'+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+  }
+  async function renderPremiumNotificationsPage(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Notifications</h3></div><div class="ml-loading">Loading account notifications…</div></div>';
+    try{
+      var response=await ML_API.customers.getNotifications({page:1,limit:50,unreadOnly:false}),items=normalizeProducts(response&&response.data);
+      var unread=items.filter(function(n){return !n.read_at;}).length;
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Notifications</h3></div>'+
+        (unread?'<button type="button" class="ml-btn ml-btn-secondary" style="margin:0 0 12px" onclick="window.ML_Premium.markAllNotificationsRead()">Mark all read ('+unread+')</button>':'')+
+        (items.length?'<div class="ml-profile-card">'+items.map(function(n){
+          var isRead=!!n.read_at,title=n.title||n.type||'MarketLink notification',message=n.message||n.body||'Update from MarketLink';
+          var when=n.created_at?new Date(n.created_at).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Recent';
+          return '<div class="ml-notification-row '+(isRead?'read':'unread')+'"><span class="ml-notification-icon">'+(isRead?'✓':'●')+'</span><div class="copy"><b>'+esc(title)+'</b><span>'+esc(message)+'</span><small>'+esc(when)+'</small></div>'+(isRead?'<span class="ml-read-label">Read</span>':'<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.markNotificationRead(\''+esc(String(n.id||''))+'\')">Mark read</button>')+'</div>';
+        }).join('')+'</div>':'<div class="ml-empty"><div style="font-size:28px">🔔</div><b>You are all caught up</b><span>New account and order notifications will appear here.</span></div>')+
+        '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Notifications</h3></div><div class="ml-empty"><b>Notifications unavailable</b><span>'+esc(e.error||'The notification service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openProfilePage(\'notifSet\')">Retry</button></div></div>';
+    }
+  }
+  async function markPremiumNotificationRead(id){
+    try{await ML_API.customers.markNotifRead([id]);toast('Notification marked as read.','success');await renderPremiumNotificationsPage(G('profile-body'));}
+    catch(e){toast(e.error||'Could not update the notification.','error');}
+  }
+  async function markAllPremiumNotificationsRead(){
+    try{await ML_API.customers.markNotifRead([]);toast('Notifications marked as read.','success');await renderPremiumNotificationsPage(G('profile-body'));}
+    catch(e){toast(e.error||'Could not update notifications.','error');}
+  }
+  function renderPremiumPrivacySettings(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Privacy & Security</h3></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🔑</div><div class="copy"><b>Reset your PIN</b><span>Request a verification code and set a new 4-digit PIN.</span></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.openResetPin()">Reset PIN</button></div>'+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')"><div class="ico">🛡️</div><div class="copy"><b>Privacy Policy</b><span>Review information used by MarketLink.</span></div><b class="ml-profile-arrow">›</b></button>'+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'terms\')"><div class="ico">📄</div><div class="copy"><b>Terms of Service</b><span>Review account and marketplace responsibilities.</span></div><b class="ml-profile-arrow">›</b></button></div>'+
+      '<div class="ml-wallet-note">Keep your PIN private and avoid signing in on devices you do not trust. Contact support if you suspect unauthorized access.</div>'+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+  }
+  async function renderPremiumWishlistPage(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Wishlist</h3></div><div class="ml-loading">Loading saved products…</div></div>';
+    try{
+      var response=await ML_API.customers.getWishlist({page:1,limit:50}),items=normalizeProducts(response&&response.data);
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Wishlist</h3></div>'+
+        (items.length?'<div class="ml-wishlist-list">'+items.map(function(item){
+          var productId=String(item.product_id||item.id||''),image=item.image||item.primary_image||'',price=Number(item.price||0);
+          return '<article class="ml-wishlist-row"><button type="button" class="ml-wishlist-image" onclick="window.openProductDetail(\''+esc(productId)+'\')" aria-label="Open '+esc(item.name||'saved product')+'">'+(image?'<img src="'+esc(image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':'🛍️')+'</button><div class="copy"><b>'+esc(item.name||'Saved product')+'</b><span>'+esc(item.vendor_name||'MarketLink vendor')+'</span><strong>'+money(price)+'</strong></div><div class="ml-wishlist-actions"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.openProductDetail(\''+esc(productId)+'\')">View</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.removeWishlist(\''+esc(productId)+'\')">Remove</button></div></article>';
+        }).join('')+'</div>':'<div class="ml-empty"><div style="font-size:28px">🤍</div><b>Your wishlist is empty</b><span>Save products while browsing the marketplace and they will appear here.</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="switchTab(\'home\')">Browse products</button></div>')+
+        '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Wishlist</h3></div><div class="ml-empty"><b>Saved products unavailable</b><span>'+esc(e.error||'The wishlist service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openProfilePage(\'wishlist\')">Retry</button></div></div>';
+    }
+  }
+  async function removePremiumWishlistItem(productId){
+    try{await ML_API.customers.removeWishlist(productId);toast('Product removed from wishlist.');await renderPremiumWishlistPage(G('profile-body'));}
+    catch(e){toast(e.error||'Could not remove the saved product.','error');}
+  }
+  function removePremiumCompareItem(id){
+    var item=(S.compareList||[]).find(function(x){return String(x.id)===String(id);});
+    if(!item){toast('Comparison item not found.','error');return;}
+    toggleCompare(item.id,item.name,item.price,item.emoji,item.cat);
+    renderPremiumComparePage(G('profile-body'));
+  }
+  function renderPremiumComparePage(root){
+    var items=Array.isArray(S.compareList)?S.compareList:[];
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Compare Products</h3></div>'+
+      (items.length?'<div class="ml-compare-grid">'+items.map(function(item){
+        return '<article class="ml-compare-card"><div class="ml-compare-icon">⚖️</div><b>'+esc(item.name||'Product')+'</b><strong>'+money(item.price||0)+'</strong><span>'+esc(item.cat||'Marketplace product')+'</span><div><button type="button" class="ml-btn ml-btn-primary" onclick="window.openProductDetail(\''+esc(String(item.id))+'\')">View product</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.removeCompareItem(\''+esc(String(item.id))+'\')">Remove</button></div></article>';
+      }).join('')+'</div>':'<div class="ml-empty"><div style="font-size:28px">⚖️</div><b>No products to compare</b><span>Use Compare on product cards while browsing to build your comparison list.</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="switchTab(\'home\')">Browse products</button></div>')+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+  }
+  function renderPremiumHelpPage(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Help Centre</h3></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">📞</div><div class="copy"><b>Call MarketLink support</b><span>+220 407 1510</span></div><a class="ml-btn ml-btn-secondary" href="tel:+2204071510">Call</a></div>'+
+      '<div class="ml-profile-row"><div class="ico">💬</div><div class="copy"><b>WhatsApp support</b><span>Contact the team with your question or order reference.</span></div><a class="ml-btn ml-btn-secondary" href="https://wa.me/2204071510?text=Hello%20MarketLink%20support" target="_blank" rel="noopener noreferrer">Message</a></div>'+
+      '<div class="ml-profile-row"><div class="ico">✉️</div><div class="copy"><b>Email support</b><span>marketlinkgambia@gmail.com</span></div><a class="ml-btn ml-btn-secondary" href="mailto:marketlinkgambia@gmail.com">Email</a></div></div>'+
+      '<div class="ml-wallet-note">For an order problem, include your order number and a short description. Do not send your PIN or payment passwords to support.</div>'+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+  }
   async function renderPremiumProfile(){
     var root=G('profile-body');if(!root)return;
-    if(S.profilePage==='terms'||S.profilePage==='privPolicy'||S.profilePage==='deliveryPolicy'){
-      renderPremiumPolicyPage(root,S.profilePage);return;
-    }
-    if(S.profilePage && S.profilePage!=='affiliate' && S.profilePage!=='addresses'){
-      if(typeof oldRenderProfile==='function'){
-        root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Opening '+esc(S.profilePage==='wallet'?'Royal Wallet':S.profilePage==='payments'?'Payment Methods':S.profilePage==='notifSet'?'Notification Settings':S.profilePage==='privacy'?'Privacy Settings':S.profilePage==='wishlist'?'Wishlist':S.profilePage==='compare'?'Compare Products':'Help Centre')+'…</div></div>';
-        oldRenderProfile();return;
-      }
-    }
+    if(S.profilePage==='terms'||S.profilePage==='privPolicy'||S.profilePage==='deliveryPolicy'){renderPremiumPolicyPage(root,S.profilePage);return;}
+    if(S.profilePage==='wallet'){await renderPremiumWalletPage(root);return;}
+    if(S.profilePage==='payments'){renderPremiumPaymentsPage(root);return;}
+    if(S.profilePage==='notifSet'){await renderPremiumNotificationsPage(root);return;}
+    if(S.profilePage==='privacy'){renderPremiumPrivacySettings(root);return;}
+    if(S.profilePage==='wishlist'){await renderPremiumWishlistPage(root);return;}
+    if(S.profilePage==='compare'){renderPremiumComparePage(root);return;}
+    if(S.profilePage==='help'){renderPremiumHelpPage(root);return;}
     if(S.profilePage==='addresses'){await renderAddresses();return;}
     await loadProfile();
     root=G('profile-body');if(!root)return;
@@ -549,7 +647,7 @@
       {icon:'🔗',title:'Affiliate Program',desc:'Your link, referrals and eligible 2% rewards',page:'affiliate'},
       {icon:'⚖️',title:'Compare Products',desc:'Review products you selected to compare',page:'compare'},
       {icon:'💳',title:'Payment Methods',desc:'View supported checkout payment methods',page:'payments'},
-      {icon:'🔔',title:'Notification Settings',desc:'Manage notification preferences',page:'notifSet'},
+      {icon:'🔔',title:'Notifications',desc:'View account updates and mark them as read',page:'notifSet'},
       {icon:'🔒',title:'Privacy Settings',desc:'Account and privacy controls',page:'privacy'},
       {icon:'📄',title:'Terms of Service',desc:'Read the rules for using MarketLink',page:'terms'},
       {icon:'🛡️',title:'Privacy Policy',desc:'How account and order information is used',page:'privPolicy'},
@@ -578,7 +676,7 @@
       var id=String(a.id);
       return '<div class="ml-profile-card" style="padding:15px;margin-top:10px"><div style="display:flex;align-items:flex-start;gap:10px"><div class="ico" style="width:38px;height:38px">📍</div><div style="flex:1"><b style="color:#EAF2F5;font-size:12px">'+esc(a.label||'Address')+'</b><div style="color:#91A4B4;font-size:11px;line-height:1.5;margin-top:4px">'+esc(a.full_address||'')+'</div>'+(a.area?'<div style="color:#718897;font-size:10px;margin-top:3px">'+esc(a.area)+'</div>':'')+'</div>'+(a.is_default?'<span style="font-size:9px;padding:4px 7px;border-radius:99px;background:rgba(13,115,119,.15);color:#42D2C9">Default</span>':'')+'</div><div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap"><button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.editAddress(\''+esc(id)+'\')">Edit</button>'+(!a.is_default?'<button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.setDefaultAddress(\''+esc(id)+'\')">Set default</button>':'')+'<button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.deleteAddress(\''+esc(id)+'\')">Delete</button></div></div>';
     }).join('');
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Saved addresses</h3><button onclick="window.ML_Premium.renderProfile()">← Profile</button></div><div class="ml-empty" style="text-align:left;margin-bottom:12px"><b>Delivery locations</b><span>These addresses are stored securely in your MarketLink account and are used for checkout.</span></div><div class="ml-profile-card" style="padding:15px"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin-bottom:6px">Label</label><input id="ml-addr-label" placeholder="Home, Work, Shop" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin:12px 0 6px">Full address</label><input id="ml-addr-full" placeholder="Street, area, city" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin:12px 0 6px">Area (optional)</label><input id="ml-addr-area" placeholder="e.g. Serrekunda" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><button class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="window.ML_Premium.addAddress()">Save address</button></div>'+cards+'</div>';
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Saved addresses</h3><button onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button></div><div class="ml-empty" style="text-align:left;margin-bottom:12px"><b>Delivery locations</b><span>These addresses are stored securely in your MarketLink account and are used for checkout.</span></div><div class="ml-profile-card" style="padding:15px"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin-bottom:6px">Label</label><input id="ml-addr-label" placeholder="Home, Work, Shop" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin:12px 0 6px">Full address</label><input id="ml-addr-full" placeholder="Street, area, city" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin:12px 0 6px">Area (optional)</label><input id="ml-addr-area" placeholder="e.g. Serrekunda" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><button class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="window.ML_Premium.addAddress()">Save address</button></div>'+cards+'</div>';
   }
   async function addAddress(){
     var label=G('ml-addr-label')&&G('ml-addr-label').value.trim(),full=G('ml-addr-full')&&G('ml-addr-full').value.trim(),area=G('ml-addr-area')&&G('ml-addr-area').value.trim();
@@ -904,7 +1002,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});

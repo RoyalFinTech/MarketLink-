@@ -423,3 +423,32 @@
 @media(prefers-reduced-motion:reduce){
  .ml-skeleton-line,.ml-skeleton-card{animation:none}
 }
+
+
+/* Premium account subpages share the same responsive styles as the dashboard. */
+.ml-wallet-hero{display:flex;flex-direction:column;gap:7px;padding:clamp(22px,3vw,38px);border:1px solid rgba(255,255,255,.12);border-radius:22px;background:radial-gradient(circle at 90% 10%,rgba(245,184,61,.28),transparent 32%),linear-gradient(135deg,#0b5961,#0a1d2a 72%);box-shadow:0 18px 46px rgba(0,0,0,.18)}
+.ml-wallet-hero>span{color:#cfdee4;font-size:12px}.ml-wallet-hero strong{font-size:clamp(30px,4vw,48px);line-height:1.1;color:#fff}.ml-wallet-hero small{font-size:10px;color:#b3c7ce}
+.ml-wallet-note{margin-top:13px;padding:14px 16px;border:1px solid var(--ml-line);border-radius:14px;background:rgba(255,255,255,.03);color:#97aab5;font-size:11px;line-height:1.7}
+.ml-wallet-transaction{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid var(--ml-line)}.ml-wallet-transaction:last-child{border-bottom:0}
+.ml-wallet-tx-icon{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+.ml-wallet-tx-icon.credit{background:rgba(39,174,96,.13);color:#82e4a2}.ml-wallet-tx-icon.debit{background:rgba(245,184,61,.12);color:#ffd477}
+.ml-wallet-transaction .copy{flex:1;min-width:0}.ml-wallet-transaction .copy b{display:block;font-size:12px;color:#e8f0f3}.ml-wallet-transaction .copy span{display:block;font-size:10px;color:#8197a4;margin-top:4px}
+.ml-wallet-transaction>strong{font-size:12px;white-space:nowrap}.ml-wallet-transaction>strong.credit{color:#7fe0a0}.ml-wallet-transaction>strong.debit{color:#ffd477}
+.ml-notification-row{display:flex;align-items:flex-start;gap:12px;padding:15px;border-bottom:1px solid var(--ml-line)}.ml-notification-row:last-child{border-bottom:0}
+.ml-notification-row .copy{flex:1;min-width:0}.ml-notification-row .copy b{display:block;color:#eff7f8;font-size:12px}.ml-notification-row .copy span{display:block;color:#a1b3bd;font-size:11px;line-height:1.6;margin-top:4px}.ml-notification-row .copy small{display:block;color:#778f9d;font-size:9px;margin-top:6px}
+.ml-notification-icon{color:#ffd477;font-size:12px;padding-top:3px}.ml-notification-row.read .ml-notification-icon{color:#607c8a}.ml-read-label{font-size:9px;color:#7f94a3;white-space:nowrap}.ml-notification-row button{flex:0 0 auto;padding:8px 10px;font-size:10px}
+.ml-wishlist-list{display:grid;gap:10px}.ml-wishlist-row{display:flex;align-items:center;gap:14px;min-width:0;padding:14px;border:1px solid var(--ml-line);border-radius:17px;background:rgba(255,255,255,.035)}
+.ml-wishlist-image{width:82px;height:82px;flex:0 0 82px;display:grid;place-items:center;overflow:hidden;border:0;border-radius:13px;background:#102c3a;color:#dce8ec;font-size:24px;cursor:pointer}.ml-wishlist-image img{width:100%;height:100%;object-fit:cover}
+.ml-wishlist-row .copy{flex:1;min-width:0}.ml-wishlist-row .copy b{display:block;color:#f1f6f7;font-size:13px}.ml-wishlist-row .copy span{display:block;color:#8399a6;font-size:10px;margin-top:4px}.ml-wishlist-row .copy strong{display:block;color:#42d2c9;font-size:14px;margin-top:8px}
+.ml-wishlist-actions{display:flex;flex-direction:column;gap:7px}.ml-wishlist-actions button{white-space:nowrap}
+.ml-compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.ml-compare-card{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px;border:1px solid var(--ml-line);border-radius:18px;background:rgba(255,255,255,.035)}
+.ml-compare-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:rgba(13,115,119,.14);font-size:22px}
+.ml-compare-card>b{font-size:13px;color:#f4f8fa}.ml-compare-card>strong{font-size:22px;color:#42d2c9}.ml-compare-card>span{font-size:10px;color:#91a4b4}
+.ml-compare-card>div:last-child{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+@media(max-width:600px){
+ .ml-wallet-transaction{align-items:flex-start;flex-wrap:wrap}.ml-wallet-transaction>strong{margin-left:50px}
+ .ml-notification-row{flex-wrap:wrap}.ml-notification-row>button{margin-left:28px}
+ .ml-wishlist-row{align-items:flex-start;flex-wrap:wrap}.ml-wishlist-image{width:70px;height:70px;flex-basis:70px}
+ .ml-wishlist-actions{width:100%;flex-direction:row}.ml-wishlist-actions button{flex:1}
+ .ml-compare-grid{grid-template-columns:1fr}
+}

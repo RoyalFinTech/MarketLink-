@@ -1322,8 +1322,10 @@ var ML_API = (function(){
       return data.data;
     },
     logout: async function(){
-      try{ await post('/auth/logout', {refreshToken: _refreshToken}); }catch(e){}
+      var pending=null;
+      try{pending=post('/auth/logout', {refreshToken: _refreshToken});}catch(e){}
       clearTokens();
+      try{if(pending)await pending;}catch(e){}
     },
     me: function(){ return get('/auth/me'); },
     requestPinReset: function(phone){ return post('/auth/pin-reset/request', {phone:phone}); },
