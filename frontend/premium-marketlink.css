@@ -574,3 +574,90 @@
 .lm .ml-affiliate-link-head b{color:#172b36!important}
 .lm .ml-affiliate-link-head span,.lm .ml-affiliate-footnote{color:#4b626e!important}
 .lm .ml-affiliate-link-field input{background:#fff!important;color:#172b36!important;border-color:#cbd9df!important}
+
+
+/* Contrast correction: the affiliate hero remains dark in both themes, so its copy must stay light. */
+.ml-affiliate-hero{background:radial-gradient(circle at 82% 22%,rgba(17,168,161,.27),transparent 34%),linear-gradient(130deg,#071b2a,#0b454c 68%,#102836)!important}
+.ml-affiliate-hero-copy h4{color:#f7fbfd!important}
+.ml-affiliate-hero-copy p{color:#dce9ee!important}
+.ml-affiliate-hero-copy small{color:#bdcfd7!important}
+.lm .ml-affiliate-hero{border-color:rgba(245,184,61,.46)!important}
+.lm .ml-affiliate-hero-copy h4{color:#f7fbfd!important}
+.lm .ml-affiliate-hero-copy p{color:#dce9ee!important}
+.lm .ml-affiliate-hero-copy small{color:#bdcfd7!important}
+
+/* Use an existing, sharp MarketLink campaign image in the affiliate hero without stretching it. */
+.ml-affiliate-hero-photo{position:relative!important;display:block!important;width:100%;max-width:250px;height:180px;min-width:0;padding:0!important;overflow:hidden;transform:none!important;border-radius:20px!important;background:#102b37!important;box-shadow:0 16px 34px rgba(0,0,0,.2)}
+.ml-affiliate-hero-photo .ml-affiliate-hero-image{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:center;image-rendering:auto}
+.ml-affiliate-hero-photo:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,19,29,.02) 28%,rgba(5,19,29,.78) 100%);pointer-events:none}
+.ml-affiliate-art-label{position:absolute;z-index:2;left:13px;right:13px;bottom:13px;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:10px 11px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(7,21,33,.88);backdrop-filter:blur(8px)}
+.ml-affiliate-art-label b{color:#ffc451!important;font-size:27px!important;letter-spacing:-.04em!important;line-height:1}
+.ml-affiliate-art-label span{color:#f4fbfc!important;font-size:8px!important;letter-spacing:.1em!important;font-weight:900!important;text-align:right}
+.ml-affiliate-hero-photo-failed{background:radial-gradient(circle at 80% 20%,rgba(245,184,61,.3),transparent 35%),linear-gradient(135deg,#0d7377,#071521)!important}
+@media(max-width:600px){.ml-affiliate-hero{grid-template-columns:minmax(0,1fr)!important}.ml-affiliate-hero-photo{max-width:none;height:175px}.ml-affiliate-hero-copy p{max-width:100%}}
+
+/* Category imagery uses the repository's 3-by-2 atlas for produce, with a visual fallback if an image cannot load. */
+.ml-cat-photo,.ml-category-photo{position:relative;background-color:#173846;background-size:var(--ml-category-size,cover);background-position:var(--ml-category-position,center);background-repeat:no-repeat}
+.ml-category-photo-fallback{position:absolute;right:8px;bottom:8px;z-index:2;display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:11px;background:rgba(7,21,33,.88);box-shadow:0 4px 12px rgba(0,0,0,.24);font-size:20px;line-height:1}
+.ml-cat-photo .ml-category-photo-fallback{width:28px;height:28px;font-size:17px;right:6px;bottom:6px}
+
+/* Profile shortcuts and role actions: strong, consistent tap targets in daylight and night mode. */
+.ml-profile-link{min-height:76px;background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.18)}
+.ml-profile-link .ico,.ml-profile-row .ico{flex:0 0 auto;background:linear-gradient(135deg,#0d7377,#f5b83d)!important;color:#071521!important;box-shadow:0 4px 12px rgba(7,21,33,.12)}
+.ml-profile-link .copy b,.ml-profile-row .copy b{color:#f4f8fa}
+.ml-profile-link .copy span,.ml-profile-row .copy span{color:#b5c5ce}
+.ml-profile-link .arrow,.ml-profile-arrow{color:#ffc451!important;font-size:22px;font-weight:900}
+.ml-profile-link:focus-visible,.ml-profile-upgrade button:focus-visible,.ml-profile-row-button:focus-visible{outline:3px solid #f5b83d;outline-offset:2px}
+.ml-profile-upgrade button{background:linear-gradient(120deg,#0d7377,#0a5c60)!important;border:1px solid #11a8a1!important;color:#fff!important;opacity:1!important}
+.ml-profile-upgrade button:nth-child(2){background:linear-gradient(120deg,#f5b83d,#ffb84d)!important;border-color:#d69a1d!important;color:#172b36!important}
+.ml-profile-upgrade button .ml-upgrade-icon{display:grid!important;place-items:center;width:42px;height:42px;flex:0 0 42px;margin:0!important;border-radius:12px;background:rgba(255,255,255,.92);color:#172b36!important;font-size:23px!important;line-height:1;opacity:1!important}
+.ml-profile-upgrade button b{color:#fff!important;font-size:12px!important;line-height:1.4}
+.ml-profile-upgrade button span{color:#eaf7f8!important;opacity:1!important}
+.ml-profile-upgrade button span span{color:#e0f0f1!important;opacity:1!important;line-height:1.5}
+.ml-profile-upgrade button:nth-child(2) b,.ml-profile-upgrade button:nth-child(2)>span:not(.ml-upgrade-icon),.ml-profile-upgrade button:nth-child(2) span span{color:#172b36!important}
+.ml-profile-upgrade button .arrow{color:#ffc451!important;font-size:24px!important;opacity:1!important}
+.ml-profile-row-button{cursor:pointer;min-height:62px}
+.ml-profile-row-button:hover{background:rgba(17,168,161,.08)!important}
+.ml-profile-row-button .ico{font-size:18px;opacity:1!important}
+
+/* Daylight theme: neutral surfaces and dark readable copy for account pages, settings, cards, and policy screens. */
+.lm .ml-profile-link,.lm .ml-profile-row-button,.lm .ml-profile-card,.lm .ml-compare-card,.lm .ml-wishlist-row,.lm .ml-category-card{background:#fff!important;border-color:#d4e0e5!important}
+.lm .ml-profile-link .copy b,.lm .ml-profile-row .copy b,.lm .ml-compare-card>b,.lm .ml-wishlist-row .copy b{color:#172b36!important}
+.lm .ml-profile-link .copy span,.lm .ml-profile-row .copy span,.lm .ml-compare-card>span,.lm .ml-wishlist-row .copy span{color:#4b626e!important}
+.lm .ml-profile-link .ico,.lm .ml-profile-row .ico{background:linear-gradient(135deg,#f5b83d,#ffd778)!important;color:#172b36!important}
+.lm .ml-profile-upgrade button{background:linear-gradient(120deg,#0d7377,#0a5c60)!important;border-color:#0d7377!important;color:#fff!important}
+.lm .ml-profile-upgrade button:nth-child(2){background:linear-gradient(120deg,#f5b83d,#ffca65)!important;border-color:#d69a1d!important;color:#172b36!important}
+.lm .ml-profile-upgrade button:nth-child(2) b,.lm .ml-profile-upgrade button:nth-child(2)>span:not(.ml-upgrade-icon),.lm .ml-profile-upgrade button:nth-child(2) span span{color:#172b36!important}
+.lm .ml-profile-upgrade button .ml-upgrade-icon{background:#fff!important;color:#172b36!important}
+.lm .ml-stat{background:#fff!important;border-color:#d4e0e5!important}
+.lm .ml-promo-strip .ml-promo{background:linear-gradient(135deg,#f3fbfa,#fff)!important;border-color:#d4e0e5!important}
+.lm .ml-promo strong{color:#172b36!important}
+.lm .ml-promo span{color:#4b626e!important}
+.lm .ml-policy-content{background:#fff!important}
+.lm .ml-policy-content h4{color:#172b36!important}
+.lm .ml-policy-content p{color:#4b626e!important}
+.lm .ml-app-footer{color:#526975!important;border-color:#d4e0e5!important}
+.lm .ml-app-footer button{color:#087b80!important}
+.lm .ml-wallet-hero{background:radial-gradient(circle at 90% 10%,rgba(245,184,61,.26),transparent 32%),linear-gradient(135deg,#eaf7f6,#fff)!important;border-color:#d4e0e5!important}
+.lm .ml-wallet-hero>span,.lm .ml-wallet-hero small{color:#4b626e!important}
+.lm .ml-wallet-hero strong{color:#172b36!important}
+.lm .ml-wallet-note{background:#fff!important;color:#4b626e!important;border-color:#d4e0e5!important}
+.lm .ml-toast-card{background:#fff!important}
+.lm .ml-legal-document section h4{color:#172b36!important}
+.lm .ml-legal-document section p,.lm .ml-legal-document>p{color:#4b626e!important}
+.lm .ml-legal-document .ml-legal-intro,.lm .ml-legal-document .ml-legal-disclaimer{color:#526975!important}
+
+/* Legacy controls are kept readable when Daylight is selected. */
+.lm .btn-gh{background:#fff!important;color:#172b36!important;border-color:#b8cbd2!important}
+.lm .btn-s{background:#fff!important;color:#0a5c60!important;border-color:#0d7377!important}
+.lm .inp,.lm input.inp,.lm select.inp,.lm textarea.inp{background:#fff!important;color:#172b36!important;border-color:#b8cbd2!important}
+.lm .inp::placeholder,.lm textarea::placeholder{color:#526975!important;opacity:1}
+.lm .card,.lm .rcard,.lm .cati{background:#fff!important;border-color:#d4e0e5!important}
+.lm .catn,.lm .ntab .nl{color:#526975!important}
+.lm .ntab.act .nl{color:#087b80!important;font-weight:800}
+.lm #bnav{background:#fff!important;border-color:#d4e0e5!important;box-shadow:0 -8px 26px rgba(23,43,54,.08)}
+.lm #bnav .ntab .ni{opacity:1!important;filter:none!important}
+.lm .sheet,.lm .sheet-hdr{background:#fff!important;color:#172b36!important}
+.lm .sheet-hdr span,.lm .sheet .copy b{color:#172b36!important}
+.lm .sheet-cls{background:#edf3f5!important;color:#172b36!important}
+.lm .ai-glass{background:rgba(255,255,255,.96)!important;color:#172b36!important;border-color:#d4e0e5!important}
