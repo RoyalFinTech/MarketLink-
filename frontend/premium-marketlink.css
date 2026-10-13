@@ -867,3 +867,10 @@
 #sh-profile-edit .ml-modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 #sh-profile-edit .ml-modal-actions button{flex:1;min-height:45px}
 @media(min-width:640px){#sh-profile-edit.ml-profile-edit-overlay{align-items:center}#sh-profile-edit .ml-profile-edit-sheet{border-radius:22px}}
+
+.ml-photo-guidance{max-width:125px;color:#b9cbd2;font-size:8px;line-height:1.5;text-align:center}
+.lm .ml-photo-guidance{color:#526975!important}
+.ml-avatar-photo{background:#0d7377;object-fit:cover;object-position:center}
+.ml-profile-row .copy span{overflow-wrap:anywhere}
+.ml-profile-editor input[type="date"]{width:100%;min-height:44px;box-sizing:border-box;padding:10px 12px;border:1px solid rgba(255,255,255,.15);border-radius:11px;background:#0b1a27;color:#f4fbfc;font:inherit;font-size:12px}
+.lm .ml-profile-editor input[type="date"]{background:#fff!important;color:#172b36!important;border-color:#bfd0d6!important}
