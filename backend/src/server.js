@@ -75,6 +75,8 @@ app.use(morgan('combined', { stream: { write: msg => logger.http(msg.trim()) }, 
 app.use('/api/v1/payments/webhook/modempay', express.raw({ type: 'application/json', limit: '2mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Serve local uploads only for development; production uploads use Supabase Storage.
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), { dotfiles: 'deny', index: false, maxAge: '1h' }));
 app.use('/api', rateLimit({ windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS)||900000, max: parseInt(process.env.RATE_LIMIT_MAX)||300, standardHeaders: true, legacyHeaders: false, message: { success: false, error: 'Too many requests.' } }));
 
 app.get('/', (req, res) => res.json({
