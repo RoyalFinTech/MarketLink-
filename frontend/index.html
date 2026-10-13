@@ -1875,7 +1875,7 @@ function goApp(){
     var savedTheme=localStorage.getItem('ml_theme');
     if(savedTheme!=='dark'){document.body.classList.add('lm');G('app').classList.add('lm');S.dark=false;if(!savedTheme)localStorage.setItem('ml_theme','light');}
     else{document.body.classList.remove('lm');G('app').classList.remove('lm');S.dark=true;}
-  }catch(e){document.body.classList.add('lm');S.dark=false;}
+  }catch(e){document.body.classList.add('lm');G('app').classList.add('lm');S.dark=false;}
   restoreCartFromStorage();
   restoreDelivLocation();
   restoreWishlistFromStorage();
@@ -6048,9 +6048,9 @@ function setAILanguage(lang){
 }
 function resetAISettings(){
   S.aiSettings={voiceReply:false,voiceInput:true,notifications:true,soundFx:true,autoRead:false,floatingAssistant:true,gpsPermission:false,language:'en-US',minimized:false};
-  document.body.classList.remove('lm');
+  // Resetting AI preferences must not silently change the user's app appearance.
   renderAISettings();
-  toast('Settings reset');
+  toast('AI settings reset');
 }
 
 
