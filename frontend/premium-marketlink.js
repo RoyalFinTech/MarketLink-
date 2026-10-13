@@ -585,6 +585,16 @@
     try{
       var response=await ML_API.orders.getById(id),o=response&&response.data&&response.data.order?response.data.order:response&&response.data;
       if(!o)throw new Error('Order details were not returned.');
+      var liveTracking=null;
+      if(o.delivery_id){
+        try{
+          var trackingResponse=await ML_API.delivery.getTracking(o.delivery_id);
+          liveTracking=trackingResponse&&trackingResponse.data?trackingResponse.data:trackingResponse;
+        }catch(trackingError){
+          // Status timeline remains available even while GPS tracking is not.
+          liveTracking=null;
+        }
+      }
       var items=Array.isArray(o.items)?o.items:Array.isArray(o.order_items)?o.order_items:[];
       var current=String(o.status||'pending').toLowerCase();
       var steps=[
@@ -614,6 +624,23 @@
       var deliveryDetails=o.rider_name?'<div class="ml-tracking-meta-row"><span>Delivery rider</span><b>'+esc(o.rider_name)+'</b></div>':'';
       if(o.estimated_minutes!==null&&o.estimated_minutes!==undefined)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Delivery estimate</span><b>'+Number(o.estimated_minutes)+' minutes (estimate)</b></div>';
       if(o.distance_km!==null&&o.distance_km!==undefined)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Route distance</span><b>'+Number(o.distance_km).toFixed(1)+' km</b></div>';
+      var latestPing=null,locationTrail=liveTracking&&Array.isArray(liveTracking.location_trail)?liveTracking.location_trail:[];
+      if(locationTrail.length)latestPing=locationTrail[0];
+      var liveLat=latestPing&&latestPing.lat!==null&&latestPing.lat!==undefined&&latestPing.lat!==''?Number(latestPing.lat):null;
+      var liveLng=latestPing&&latestPing.lng!==null&&latestPing.lng!==undefined&&latestPing.lng!==''?Number(latestPing.lng):null;
+      var validLiveCoordinates=liveLat!==null&&liveLng!==null&&Number.isFinite(liveLat)&&Number.isFinite(liveLng)&&liveLat>=-90&&liveLat<=90&&liveLng>=-180&&liveLng<=180;
+      var pingDate=latestPing&&latestPing.recorded_at?new Date(latestPing.recorded_at):null;
+      var pingAge=pingDate&&!Number.isNaN(pingDate.getTime())?Date.now()-pingDate.getTime():Infinity;
+      var freshGps=validLiveCoordinates&&pingAge>=0&&pingAge<=15*60*1000&&!terminal;
+      var gpsHtml='';
+      if(freshGps){
+        var mapUrl='https://www.google.com/maps?q='+encodeURIComponent(liveLat.toFixed(6)+','+liveLng.toFixed(6));
+        gpsHtml='<div class="ml-tracking-location"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Live rider location</b><span>Last shared '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>Location shared for this delivery only.</small></div><a class="ml-btn ml-btn-secondary ml-tracking-map-link" href="'+mapUrl+'" target="_blank" rel="noopener noreferrer">Open map ↗</a></div>';
+      }else if(validLiveCoordinates&&latestPing&&latestPing.recorded_at&&!terminal){
+        gpsHtml='<div class="ml-tracking-location is-stale"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Last rider location</b><span>Last update '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>This location is older than 15 minutes, so it is not shown as live.</small></div></div>';
+      }else if(!terminal&&o.rider_name){
+        gpsHtml='<div class="ml-tracking-location is-pending"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Rider location</b><span>Waiting for a location update for this delivery.</span><small>The order timeline will continue to refresh even when GPS is unavailable.</small></div></div>';
+      }
       var statusClass=current==='delivered'?'delivered':closed?'closed':'active';
       var closedNotice=closed?'<div class="ml-tracking-issue '+(current==='cancelled'?'cancelled':'failed')+'"><b>'+esc(mlOrderStatusLabel(current))+'</b><span>'+(current==='cancelled'?'This order was cancelled. Contact support if you need help with a payment or refund.':current==='refunded'?'The order is marked as refunded. Check payment history for the confirmed refund record.':'The order could not be completed. Contact MarketLink support for assistance.')+'</span></div>':'';
       var timeline=history.length?'<div class="ml-tracking-history"><h4>Latest order updates</h4>'+history.slice().reverse().slice(0,8).map(function(ev){return '<div class="ml-tracking-history-row"><span class="ml-tracking-history-dot"></span><div><b>'+esc(mlOrderStatusLabel(ev.status))+'</b><small>'+esc(mlTrackingTime(ev.changed_at))+'</small>'+(ev.note?'<p>'+esc(ev.note)+'</p>':'')+'</div></div>';}).join('')+'</div>':'';
@@ -622,10 +649,10 @@
         (!closed?'<div class="ml-tracking-progress"><span style="width:'+(current==='delivered'?100:ratio)+'%"></span></div>':'')+
         (closedNotice||'<div class="ml-tracking-steps">'+progressHtml+'</div>')+
         '</section>'+
-        '<section class="ml-tracking-info-grid"><div class="ml-live-order-card"><div class="ml-section-head"><h3>Delivery details</h3></div>'+(deliveryDetails||'<p class="ml-tracking-empty">Rider and delivery estimate will appear here when they are assigned by the live delivery system.</p>')+'</div>'+
+        '<section class="ml-tracking-info-grid"><div class="ml-live-order-card"><div class="ml-section-head"><h3>Delivery details</h3></div>'+(deliveryDetails||'<p class="ml-tracking-empty">Rider and delivery estimate will appear here when they are assigned by the live delivery system.</p>')+gpsHtml+'</div>'+
         '<div class="ml-live-order-card"><div class="ml-section-head"><h3>Order summary</h3></div><div class="ml-tracking-meta-row"><span>Vendor</span><b>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</b></div><div class="ml-tracking-meta-row"><span>Payment</span><b>'+esc(String(o.payment_method||'Not listed').replace(/_/g,' '))+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</b></div><div class="ml-tracking-meta-row"><span>Total</span><b>'+money(o.total||0)+'</b></div><div class="ml-tracking-items">'+(items.length?items.map(function(it){return '<div><span>'+esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1)+'</span><b>'+money(it.total||it.line_total||Number(it.price||it.unit_price||0)*Number(it.qty||it.quantity||1))+'</b></div>';}).join(''):'<span>Item details unavailable</span>')+'</div></div></section>'+
         timeline+
-        '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order updates come from MarketLink’s live order status. GPS location is shown only if the delivery system supplies rider-location data.</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||id))+'\')">Refresh now ↻</button></div></div>';
+        '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order statuses refresh every 10 seconds. Rider location appears only when a recent GPS ping is recorded for this delivery.</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||id))+'\')">Refresh now ↻</button></div></div>';
       if(terminal)stopCustomerOrderDetailPolling();else startCustomerOrderDetailPolling(id);
     }catch(e){
       if(!silent)root.innerHTML='<div class="ml-empty"><b>Could not open this order</b><span>'+esc(e.error||e.message||'The order may no longer be available.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Back to order history</button></div>';
