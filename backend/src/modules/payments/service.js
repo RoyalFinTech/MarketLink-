@@ -75,7 +75,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
       return { payment, order, cashOnDelivery: true };
     }
 
-    const idempotencyKey = 'marketlink-order-' + orderId + '-' + method;
+    const idempotencyKey = 'marketlink-payment-' + payment.id;
     const { rows: [payment] } = await client.query(
       "INSERT INTO payments (order_id, method, provider_ref, amount, currency, status) VALUES ($1,$2,$3,$4,'GMD','pending') RETURNING *",
       [orderId, method, idempotencyKey, requestedAmount]
@@ -110,6 +110,11 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
       metadata: { orderId, customerId },
     });
   } catch (err) {
+    if(err&&err.code==='MODEM_PAY_NETWORK_ERROR'){
+      logger.warn('Modem Pay initiation outcome is unknown; keeping payment pending for reconciliation',{paymentId:payment.id,orderId,method});
+      const {rows:[pendingAttempt]}=await query('SELECT * FROM payments WHERE id=$1',[payment.id]);
+      return {payment:pendingAttempt||payment,action:'continue',provider:provider.name,status:'pending',providerStatus:'unknown'};
+    }
     try { await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'", [payment.id]); }
     catch (updateErr) { logger.error('Could not mark failed payment attempt',{paymentId:payment.id,error:updateErr.message}); }
     if (err && ((err.code === 'PROVIDER_UNAVAILABLE') || (Number(err.status) >= 400 && Number(err.status) < 500))) {
@@ -199,7 +204,7 @@ async function getPaymentStatus(paymentId, actorId, roles) {
   if (providerStatus === 'completed') {
     const amount = Number(transaction.amount);
     const currency = String(transaction.currency || '').toUpperCase();
-    const metadataOrderId = transaction.external_reference || transaction.metadata && transaction.metadata.orderId;
+    const metadataOrderId = transaction.metadata && transaction.metadata.orderId;
     if (!Number.isFinite(amount) || Math.abs(amount - Number(payment.amount)) > 0.01 || currency !== 'GMD') {
       logger.error('Modem Pay transaction mismatch during status reconciliation',{
         paymentId,orderId:payment.order_id,expectedAmount:payment.amount,receivedAmount:transaction.amount,
