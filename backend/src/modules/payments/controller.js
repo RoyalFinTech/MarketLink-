@@ -5,7 +5,7 @@ const modemPay = require('../../integrations/modempay');
 const logger = require('../../utils/logger');
 const wrap = fn => async (req,res,next) => { try { await fn(req,res,next); } catch(e) { next(e); } };
 exports.methods = wrap(async (req,res) => {
-  const configured = Boolean(process.env.MODEM_PAY_API_KEY);
+  const configured = Boolean(modemPay.isConfigured());
   const h2h = Boolean(modemPay.isH2H());
   res.json({success:true,data:{
     provider:'modempay',
