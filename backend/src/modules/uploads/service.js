@@ -14,14 +14,50 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_DOC_SIZE = 10 * 1024 * 1024;
 const EXT_BY_MIME = {'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp','image/gif':'.gif','application/pdf':'.pdf'};
 
+const PROFILE_IMAGE_MIN_DIMENSION = 512;
+function imageDimensions(buffer, mime) {
+  if (!Buffer.isBuffer(buffer)) return null;
+  if (mime === 'image/png' && buffer.length >= 24 &&
+      buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) {
+    return {width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};
+  }
+  if (mime === 'image/jpeg' && buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
+    let offset=2;
+    while(offset+9<buffer.length) {
+      if(buffer[offset]!==0xff){offset++;continue;}
+      const marker=buffer[offset+1];offset+=2;
+      if(marker===0xd8||marker===0xd9||marker===0x01||(marker>=0xd0&&marker<=0xd7))continue;
+      if(offset+2>buffer.length)break;
+      const length=buffer.readUInt16BE(offset);
+      if(length<2||offset+length>buffer.length)break;
+      if([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)) {
+        return {height:buffer.readUInt16BE(offset+3),width:buffer.readUInt16BE(offset+5)};
+      }
+      offset+=length;
+    }
+  }
+  return null;
+}
+function isProfilePhoto(purpose) {
+  const p=String(purpose||'').toLowerCase().replace(/_/g,'-').replace(/\s+/g,'-');
+  return p==='profile-photo'||p==='profile-image'||p==='avatar';
+}
 function validateFile(file, purpose) {
-  const p = String(purpose || 'general').toLowerCase();
-  const isDoc = p.includes('document') || p.includes('doc') || file.mimetype === 'application/pdf';
-  const allowed = isDoc ? ALLOWED_DOC_TYPES : ALLOWED_IMAGE_TYPES;
-  const maxSize = isDoc ? MAX_DOC_SIZE : MAX_IMAGE_SIZE;
-  if (!allowed.includes(file.mimetype)) throw new AppError('This file type is not supported for this upload.', 400, 'INVALID_FILE_TYPE');
-  if (!Number.isFinite(Number(file.size)) || file.size <= 0) throw new AppError('The selected file is empty or invalid.', 400, 'INVALID_FILE');
-  if (file.size > maxSize) throw new AppError('File is too large. Maximum size is ' + (maxSize / 1024 / 1024) + 'MB.', 400, 'FILE_TOO_LARGE');
+  const p=String(purpose||'general').toLowerCase();
+  const profilePhoto=isProfilePhoto(p);
+  const isDoc=p.includes('document')||p.includes('doc')||file.mimetype==='application/pdf';
+  const allowed=profilePhoto?['image/jpeg','image/png']:(isDoc?ALLOWED_DOC_TYPES:ALLOWED_IMAGE_TYPES);
+  const maxSize=isDoc?MAX_DOC_SIZE:MAX_IMAGE_SIZE;
+  if(!allowed.includes(file.mimetype)) throw new AppError(profilePhoto?'Profile photos must be JPG/JPEG or PNG.':'This file type is not supported for this upload.',400,'INVALID_FILE_TYPE');
+  if(!Number.isFinite(Number(file.size))||file.size<=0) throw new AppError('The selected file is empty or invalid.',400,'INVALID_FILE');
+  if(file.size>maxSize) throw new AppError('File is too large. Maximum size is '+(maxSize/1024/1024)+' MB.',400,'FILE_TOO_LARGE');
+  if(profilePhoto) {
+    const dimensions=imageDimensions(file.buffer,file.mimetype);
+    if(!dimensions) throw new AppError('MarketLink could not read this image. Please choose a valid JPG or PNG file.',400,'INVALID_IMAGE');
+    if(dimensions.width<PROFILE_IMAGE_MIN_DIMENSION||dimensions.height<PROFILE_IMAGE_MIN_DIMENSION) {
+      throw new AppError('Profile photos must be at least 512 × 512 pixels. Please choose a larger image.',400,'IMAGE_DIMENSIONS_TOO_SMALL');
+    }
+  }
 }
 
 function publicApiBase() {
@@ -34,15 +70,11 @@ function supabaseConfig() {
   return {url, key, bucket, privateBucket:String(process.env.SUPABASE_PRIVATE_STORAGE_BUCKET || (bucket + '-private')).trim()};
 }
 function getStorageProvider() {
-  const configured = String(process.env.STORAGE_PROVIDER || '').trim().toLowerCase();
-  const s = supabaseConfig();
-  // The old S3/Cloudinary adapters were placeholders. Prefer the working
-  // Supabase configuration even if an obsolete provider value remains in Render.
-  if (configured === 'supabase' || (s.url && s.key)) return 'supabase';
-  if (configured === 'local' && process.env.NODE_ENV !== 'production' && !process.env.RENDER) return 'local';
-  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
-    throw new AppError('Profile-photo storage is not configured for production. Configure Supabase Storage on the backend service.', 503, 'STORAGE_NOT_CONFIGURED');
-  }
+  const configured=String(process.env.STORAGE_PROVIDER||'').trim().toLowerCase();
+  const supabase=supabaseConfig();
+  if(configured==='supabase'||(supabase.url&&supabase.key)) return 'supabase';
+  if(configured==='local'&&process.env.NODE_ENV!=='production'&&!process.env.RENDER) return 'local';
+  if(process.env.NODE_ENV==='production'||process.env.RENDER) return 'database';
   return 'local';
 }
 function encodeObjectPath(value) {
@@ -135,36 +167,33 @@ async function uploadLocal(file, purpose) {
   return {storedUrl:publicApiBase() + relative, publicUrl:publicApiBase() + relative, privateFile:false};
 }
 async function upload(file, purpose, uploaderId) {
-  validateFile(file, purpose);
-  const isProfilePhoto = ['profile-photo','profile_photo','profile photo'].includes(String(purpose || '').toLowerCase());
-  const fileType = privateDocumentType(file,purpose);
-  let stored, record;
-  let provider;
-  try { provider = getStorageProvider(); }
-  catch (error) {
-    if (!isProfilePhoto || !['STORAGE_NOT_CONFIGURED'].includes(error.code)) throw error;
-    // Durable fallback: store small profile images in Postgres until object storage is configured.
-    const {rows:[saved]} = await query(
-      'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb,content_bytes,content_type,storage_backend) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-      [uploaderId || null, 'dbprofile://pending', fileType, purpose, Math.ceil(file.size/1024), file.buffer, file.mimetype, 'database']
+  validateFile(file,purpose);
+  const type=privateDocumentType(file,purpose);
+  const provider=getStorageProvider();
+  let stored;
+  if(provider==='database') {
+    if(!isProfilePhoto(purpose)) {
+      throw new AppError('Secure cloud storage is not configured for this type of file. Please contact MarketLink support.',503,'STORAGE_NOT_CONFIGURED');
+    }
+    // Profile images are small and bounded; keep the binary in Postgres when cloud
+    // object storage is not configured instead of making profile uploads unavailable.
+    const id=crypto.randomUUID();
+    const url=publicApiBase()+'/api/v1/uploads/'+id+'/profile-content';
+    const {rows:[record]}=await query(
+      'INSERT INTO file_uploads (id,uploaded_by,file_url,file_type,purpose,file_size_kb,content_bytes,content_type,storage_backend) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+      [id,uploaderId||null,url,type,purpose,Math.ceil(file.size/1024),file.buffer,file.mimetype,'database']
     );
-    record = saved;
-    const url = publicApiBase() + '/api/v1/uploads/' + record.id + '/profile-content';
-    await query('UPDATE file_uploads SET file_url=$1 WHERE id=$2',[url,record.id]);
-    record.file_url = url;
-    return {url,record};
+    return {url,record:Object.assign({},record,{file_url:url})};
   }
-  if (provider === 'supabase') stored = await uploadSupabase(file,purpose);
-  else if (provider === 'local') stored = await uploadLocal(file,purpose);
-  else throw new AppError('The configured storage provider is not implemented. Use Supabase Storage for production uploads.',503,'STORAGE_NOT_CONFIGURED');
-  const {rows:[saved]} = await query(
-    'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb,storage_backend) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-    [uploaderId || null, stored.storedUrl, fileType, purpose, Math.ceil(file.size/1024), provider]
+  if(provider==='supabase') stored=await uploadSupabase(file,purpose);
+  else if(provider==='local') stored=await uploadLocal(file,purpose);
+  else throw new AppError('The configured storage provider is not available.',503,'STORAGE_NOT_CONFIGURED');
+  const {rows:[record]}=await query(
+    'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb,storage_backend,content_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+    [uploaderId||null,stored.storedUrl,type,purpose,Math.ceil(file.size/1024),provider,file.mimetype]
   );
-  record=saved;
-  const url = stored.publicUrl || (publicApiBase() + '/api/v1/uploads/' + record.id + '/content');
-  const responseRecord = Object.assign({}, record, {file_url:url});
-  return {url, record:responseRecord};
+  const url=stored.publicUrl||(publicApiBase()+'/api/v1/uploads/'+record.id+'/content');
+  return {url,record:Object.assign({},record,{file_url:url})};
 }
 async function getPublicProfileContent(fileId) {
   const {rows:[f]}=await query("SELECT content_bytes,content_type,purpose,file_type FROM file_uploads WHERE id=$1 AND deleted_at IS NULL",[fileId]);
@@ -224,6 +253,7 @@ async function getFile(fileId, requesterId, roles) {
   if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
   const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
   if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to access this file.',403,'FORBIDDEN');
+  if(f.content_bytes) return {buffer:Buffer.from(f.content_bytes),contentType:f.content_type||'application/octet-stream'};
   const ref=parseSupabaseRef(f.file_url);
   if(ref) {
     const config=supabaseConfig();
@@ -256,8 +286,11 @@ async function deleteFile(fileId, requesterId, roles) {
   if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
   const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
   if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to delete this file.',403,'FORBIDDEN');
-  await storageDelete(f.file_url);
-  await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[fileId]);
+  if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
+  else {
+    await storageDelete(f.file_url);
+    await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[fileId]);
+  }
   return {deleted:true,id:fileId};
 }
 async function deleteFileByUrl(url, requesterId) {
@@ -270,8 +303,11 @@ async function deleteFileByUrl(url, requesterId) {
     [url]
   );
   if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref)) return {deleted:false,reason:'STILL_IN_USE'};
-  await storageDelete(f.file_url);
-  await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[f.id]);
+  if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
+  else {
+    await storageDelete(f.file_url);
+    await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[f.id]);
+  }
   return {deleted:true,id:f.id};
 }
 async function removeProfilePhoto(requesterId) {
