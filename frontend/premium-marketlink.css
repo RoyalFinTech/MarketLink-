@@ -929,3 +929,91 @@
 .lm .ml-tracking-meta-row b,.lm .ml-tracking-items b{color:#172b36!important}
 .lm .ml-tracking-history-row small,.lm .ml-tracking-history-row p{color:#526975!important}
 @media(max-width:720px){.ml-tracking-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.ml-tracking-info-grid{grid-template-columns:minmax(0,1fr)}.ml-tracking-hero-top{flex-direction:column}.ml-tracking-footer>span:nth-child(2){min-width:0}}
+
+
+/* Language preference (login + profile) */
+.ml-language-login-wrap{position:absolute;top:12px;right:14px;z-index:6;display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(7,21,33,.78);backdrop-filter:blur(10px)}
+.ml-language-login-wrap label{color:#eef8fa;font-size:10px;font-weight:800;white-space:nowrap}
+.ml-language-login-wrap select{max-width:150px;min-width:92px;min-height:32px;padding:6px 8px;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:#fff;color:#172b36;font-size:11px;font-weight:650}
+.ml-language-card{padding:clamp(18px,3vw,26px);border:1px solid rgba(17,168,161,.26);border-radius:20px;background:linear-gradient(135deg,rgba(13,115,119,.15),rgba(245,184,61,.07));}
+.ml-language-globe{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#0d9488,#f5b83d);font-size:27px;box-shadow:0 8px 22px rgba(13,115,119,.16)}
+.ml-language-card h3{margin:14px 0 7px;color:#eff8fa;font-size:18px;line-height:1.35}
+.ml-language-card p{margin:0 0 18px;color:#b8cbd2;font-size:11px;line-height:1.7}
+.ml-language-card label{display:block;margin-bottom:7px;color:#d8e8ec;font-size:11px;font-weight:850}
+.ml-language-card select{width:100%;min-height:48px;padding:12px;border-radius:11px;border:1px solid rgba(255,255,255,.2);background:#071823;color:#f4fbfc;font-size:12px}
+.ml-language-status{margin:11px 0 15px;color:#b8cbd2;font-size:10px;line-height:1.6}
+.ml-language-card>.ml-btn{width:100%;min-height:44px}
+.lm .ml-language-login-wrap{background:rgba(255,255,255,.94);border-color:#cbdce1}
+.lm .ml-language-login-wrap label{color:#172b36}
+.lm .ml-language-card{background:linear-gradient(135deg,#e8f8f6,#fff8e9)!important;border-color:#cbdedd!important}
+.lm .ml-language-card h3{color:#172b36!important}
+.lm .ml-language-card p,.lm .ml-language-status{color:#526975!important}
+.lm .ml-language-card label{color:#314c58!important}
+.lm .ml-language-card select{background:#fff!important;color:#172b36!important;border-color:#bfd0d6!important}
+@media(max-width:600px){.ml-language-login-wrap{top:9px;right:9px;gap:5px;padding:5px 6px}.ml-language-login-wrap label{font-size:9px}.ml-language-login-wrap select{min-width:82px;max-width:118px;font-size:10px}.ml-language-card{padding:17px}}
+
+/* WhatsApp brand icon applied consistently to Help Centre and floating support shortcut. */
+#btn-sup.fab-sup{appearance:none;-webkit-appearance:none;border:0;padding:0;display:grid;place-items:center;background:#25D366!important;color:#fff!important;overflow:hidden;cursor:pointer;box-shadow:0 6px 20px rgba(37,211,102,.35)}
+#btn-sup.fab-sup img{display:block;width:39px;height:39px;object-fit:contain;filter:none}
+.ml-support-whatsapp-icon{width:52px;height:52px;border-radius:50%;background:#25D366;display:grid;place-items:center;flex:0 0 52px;box-shadow:0 4px 14px rgba(37,211,102,.28)}
+.ml-support-whatsapp-icon img{width:38px;height:38px;display:block;object-fit:contain}
+.ml-help-whatsapp-ico{background:#25D366!important;color:#fff!important}
+.ml-help-whatsapp-ico img{width:25px;height:25px;object-fit:contain;display:block}
+.ml-whatsapp-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#25D366!important;border-color:#25D366!important;color:#063b20!important;font-weight:850}
+.ml-whatsapp-button img{width:18px;height:18px;object-fit:contain}
+.lm #btn-sup.fab-sup{background:#25D366!important}
+.lm .ml-help-contact-card .ml-profile-row .copy b{color:#172b36!important}
+.lm .ml-help-contact-card .ml-profile-row .copy span{color:#526975!important}
+
+/* Help Centre and friendly FAQ accordions */
+.ml-help-welcome{position:relative;overflow:hidden;margin:12px 0 15px;padding:22px;border-radius:20px;background:radial-gradient(circle at 85% 0%,rgba(245,184,61,.22),transparent 34%),linear-gradient(130deg,#071c2a,#0b4a50 75%,#153441);border:1px solid rgba(17,168,161,.28)}
+.ml-help-welcome-eyebrow{font-size:9px;font-weight:900;letter-spacing:.14em;color:#77e6dc}
+.ml-help-welcome h3{margin:9px 0 6px;color:#fff;font-size:22px;line-height:1.25}
+.ml-help-welcome p{margin:0 0 15px;max-width:550px;color:#d0e0e5;font-size:11px;line-height:1.7}
+.ml-help-welcome .ml-btn{min-height:42px;opacity:1}
+.ml-help-faq-heading{margin-top:20px}
+.ml-help-faq-heading span{color:#8ca3ae;font-size:10px}
+.ml-help-faq-list{display:grid;gap:8px}
+.ml-help-faq{border:1px solid rgba(255,255,255,.12);border-radius:13px;background:rgba(255,255,255,.035);overflow:hidden}
+.ml-help-faq summary{position:relative;cursor:pointer;list-style:none;padding:15px 42px 15px 15px;color:#eef7f9;font-size:11px;font-weight:850;line-height:1.5}
+.ml-help-faq summary::-webkit-details-marker{display:none}
+.ml-help-faq summary:after{content:"+";position:absolute;right:15px;top:13px;color:#ffc451;font-size:20px;font-weight:500}
+.ml-help-faq[open] summary:after{content:"−"}
+.ml-help-faq[open] summary{border-bottom:1px solid rgba(255,255,255,.09);color:#ffd778}
+.ml-help-faq p{margin:0;padding:13px 15px 15px;color:#bacbd2;font-size:11px;line-height:1.75}
+.ml-help-faq summary:focus-visible{outline:3px solid #f5b83d;outline-offset:-3px}
+.lm .ml-help-faq{background:#fff!important;border-color:#d5e0e5!important}
+.lm .ml-help-faq summary{color:#172b36!important}
+.lm .ml-help-faq[open] summary{color:#775000!important;border-bottom-color:#e7edf0}
+.lm .ml-help-faq p{color:#526975!important}
+.lm .ml-help-welcome{background:radial-gradient(circle at 85% 0%,rgba(245,184,61,.16),transparent 34%),linear-gradient(130deg,#e4f7f5,#f8fffe 75%,#fff8e8)!important;border-color:#cfe4e3!important}
+.lm .ml-help-welcome h3{color:#172b36!important}
+.lm .ml-help-welcome p{color:#405c66!important}
+.lm .ml-help-welcome-eyebrow{color:#087b80!important}
+
+/* Role-aware MarketLink AI page */
+.ml-ai-profile-hero{display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:16px;margin:12px 0 22px;padding:22px;border:1px solid rgba(17,168,161,.25);border-radius:20px;background:radial-gradient(circle at 88% 0%,rgba(245,184,61,.22),transparent 32%),linear-gradient(135deg,#071c2a,#0b4249 72%,#112b3a)}
+.ml-ai-profile-mark{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#0d9488,#f5b83d);font-size:26px;box-shadow:0 8px 20px rgba(13,115,119,.18)}
+.ml-ai-profile-hero h3{margin:8px 0;color:#f4fbfc;font-size:20px;line-height:1.25}
+.ml-ai-profile-hero p{margin:0 0 10px;color:#c6d8de;font-size:11px;line-height:1.7}
+.ml-ai-profile-hero .ml-btn{grid-column:2 / 4;justify-self:start;min-height:43px;opacity:1}
+.ml-ai-role-tag{display:inline-flex;margin-top:2px;padding:5px 8px;border:1px solid rgba(119,230,220,.24);border-radius:99px;background:rgba(13,148,136,.12);color:#8fe9df;font-size:9px;font-weight:850}
+.ml-ai-prompt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ml-ai-prompt-card{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0;text-align:left;padding:15px;border:1px solid rgba(255,255,255,.12);border-radius:15px;background:rgba(255,255,255,.035);cursor:pointer;opacity:1!important}
+.ml-ai-prompt-card>span{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#0d7377,#f5b83d);font-size:18px}
+.ml-ai-prompt-card>b{color:#f4fbfc;font-size:12px;line-height:1.35}
+.ml-ai-prompt-card>small{color:#a9bdc5;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+.ml-ai-prompt-card>i{font-size:9px;color:#ffd778;font-style:normal;font-weight:850;margin-top:auto}
+.ml-ai-prompt-card:hover{border-color:rgba(17,168,161,.45);background:rgba(13,115,119,.10)}
+.lm .ml-ai-profile-hero{background:linear-gradient(135deg,#e6f7f5,#fff8e8)!important;border-color:#cfe4e3!important}
+.lm .ml-ai-profile-hero h3{color:#172b36!important}
+.lm .ml-ai-profile-hero p{color:#526975!important}
+.lm .ml-ai-role-tag{color:#087b80!important;border-color:#c9e4e2;background:#eaf8f6}
+.lm .ml-ai-prompt-card{background:#fff!important;border-color:#d4e0e5!important}
+.lm .ml-ai-prompt-card>b{color:#172b36!important}
+.lm .ml-ai-prompt-card>small{color:#526975!important}
+.lm .ml-ai-prompt-card>i{color:#775000!important}
+@media(max-width:700px){.ml-ai-profile-hero{grid-template-columns:48px minmax(0,1fr);gap:12px;padding:17px}.ml-ai-profile-mark{width:46px;height:46px}.ml-ai-profile-hero .ml-btn{grid-column:1 / 3}.ml-ai-prompt-grid{grid-template-columns:minmax(0,1fr)}}
+html[dir="rtl"] .ml-help-faq summary{padding:15px 15px 15px 42px;text-align:right}
+html[dir="rtl"] .ml-help-faq summary:after{right:auto;left:15px}
+html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
