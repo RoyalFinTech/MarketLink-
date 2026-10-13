@@ -659,7 +659,13 @@
         hostedCheckout:Boolean(capabilityData&&capabilityData.hostedCheckout)
       };
     }catch(capabilityError){
-      S.paymentCapabilities=S.paymentCapabilities||{configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
+      // Fail closed: a capability check error must never leave a previously cached
+      // provider state looking ready for a new payment attempt.
+      S.paymentCapabilities={configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
+    }
+    if(!S.paymentCapabilities.configured&&S.selPay!=='Pay on Delivery'){
+      S.selPay='Pay on Delivery';
+      S.paymentAccountNumber='';
     }
     var chosenPaymentLabel=S.selPay||'Pay on Delivery';
     var paymentCaps=S.paymentCapabilities||{configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
