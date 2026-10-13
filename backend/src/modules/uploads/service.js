@@ -289,7 +289,7 @@ async function deleteFile(fileId, requesterId, roles) {
   if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
   else {
     await storageDelete(f.file_url);
-    await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[fileId]);
+    await query('UPDATE file_uploads SET deleted_at=now(), content_bytes=NULL WHERE id=$1',[fileId]);
   }
   return {deleted:true,id:fileId};
 }
@@ -306,7 +306,7 @@ async function deleteFileByUrl(url, requesterId) {
   if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
   else {
     await storageDelete(f.file_url);
-    await query('UPDATE file_uploads SET deleted_at=now() WHERE id=$1',[f.id]);
+    await query('UPDATE file_uploads SET deleted_at=now(), content_bytes=NULL WHERE id=$1',[f.id]);
   }
   return {deleted:true,id:f.id};
 }
