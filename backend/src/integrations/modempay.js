@@ -28,10 +28,13 @@ const BASE_URL = resolveBaseUrl();
 
 function isH2H() { return API_MODE === 'h2h'; }
 
+function isConfigured() {
+  const key=String(process.env.MODEM_PAY_API_KEY||'').trim();
+  return Boolean(key && !/(placeholder|replace[_ -]?me|change[_ -]?me|your[_ -]?(api[_ -]?)?key|example[_ -]?key)/i.test(key));
+}
 function getApiKey() {
-  const key = process.env.MODEM_PAY_API_KEY;
-  if (!key) throw new AppError('Modem Pay is not configured on the server.', 503, 'PROVIDER_UNAVAILABLE');
-  return key;
+  if (!isConfigured()) throw new AppError('Modem Pay is not configured on the server.', 503, 'PROVIDER_UNAVAILABLE');
+  return String(process.env.MODEM_PAY_API_KEY).trim();
 }
 
 async function modemRequest(path, { method='GET', body, idempotencyKey } = {}) {
@@ -76,7 +79,7 @@ async function createPaymentIntent({
       body: { data: {
         amount: Number(amount), currency: 'GMD', network: String(network).toLowerCase(),
         account_number: localAccount,
-        external_reference: String(metadata.orderId || idempotencyKey),
+        external_reference: String(idempotencyKey || metadata.orderId),
         metadata,
         ...(callbackUrl ? { callback_url: callbackUrl } : {}),
         ...(returnUrl ? { return_url: returnUrl } : {}),
@@ -99,24 +102,26 @@ async function createPaymentIntent({
 
   // Hosted Merchant API flow. Keep this separate from H2H: their URL and
   // request/response contracts are not interchangeable.
+  const selectedMethod=String(network||'').toLowerCase();
+  const supportedHostedMethods=['wave','afrimoney','qmoney','aps','yonna','card'];
   const response = await modemRequest('/payments', {
     method: 'POST',
     idempotencyKey,
     body: { data: {
       amount: Number(amount), currency, metadata, title, description,
-      return_url: returnUrl, cancel_url: cancelUrl, from_sdk: false,
+      return_url: returnUrl, cancel_url: cancelUrl,
+      ...(supportedHostedMethods.includes(selectedMethod)?{payment_methods:[selectedMethod]}:{}),
+      from_sdk: false,
     }},
   });
   const data = response?.data || response;
   if (!data?.payment_link) throw new AppError('Modem Pay did not return a payment link.', 502, 'PROVIDER_INVALID_RESPONSE');
   return {
-    reference: data.intent_secret || data.id || data.payment_intent_id || idempotencyKey,
+    reference: data.payment_intent_id || data.id || idempotencyKey,
     paymentIntentId: data.payment_intent_id || data.id || null,
     paymentLink: data.payment_link,
-    intentSecret: data.intent_secret || null,
     nextStep: null,
     status: data.status || null,
-    raw: data,
   };
 }
 
@@ -167,5 +172,5 @@ function verifyWebhookSignature(rawBody, signature) {
 
 module.exports = {
   createPaymentIntent, confirmCharge, finalizeCharge, getTransaction,
-  initiateTransfer, verifyWebhookSignature, isH2H,
+  initiateTransfer, verifyWebhookSignature, isH2H, isConfigured,
 };
