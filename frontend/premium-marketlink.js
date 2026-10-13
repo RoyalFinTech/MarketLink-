@@ -113,6 +113,64 @@
   function paymentBrandMarkup(){
     return '<div class="ml-payment-brand"><img src="./assets/marketlink-logo.png" alt="MarketLink logo"><div><b>MarketLink Gambia</b><span>Secure payment status</span></div></div>';
   }
+  function persistPendingPayment(pending){
+    try{
+      if(!pending||!pending.payment||!pending.order){return;}
+      sessionStorage.setItem('ml_pending_payment',JSON.stringify({
+        orderId:String(pending.order.id||pending.order.order_id||''),
+        orderNumber:String(pending.order.order_number||''),
+        paymentId:String(pending.payment.id||''),
+        method:String(pending.method||''),
+        amount:Number(pending.amount||pending.order.total||0),
+        redirectUrl:String(pending.redirectUrl||''),
+        nextStep:pending.nextStep||null,
+        status:String(pending.status||'pending'),
+        savedAt:Date.now()
+      }));
+      sessionStorage.setItem('ml_pending_order_id',String(pending.order.id||pending.order.order_id||''));
+      sessionStorage.setItem('ml_pending_payment_id',String(pending.payment.id||''));
+    }catch(e){}
+  }
+  function clearPendingPaymentSession(){
+    try{
+      sessionStorage.removeItem('ml_pending_payment');
+      sessionStorage.removeItem('ml_pending_order_id');
+      sessionStorage.removeItem('ml_pending_payment_id');
+    }catch(e){}
+  }
+  async function resumePendingPaymentFromSession(){
+    var saved;
+    try{saved=JSON.parse(sessionStorage.getItem('ml_pending_payment')||'null');}catch(e){saved=null;}
+    if(!saved||!saved.paymentId||!saved.orderId)return false;
+    S.pendingPayment={
+      order:{id:saved.orderId,order_number:saved.orderNumber||'',total:Number(saved.amount||0)},
+      payment:{id:saved.paymentId,status:saved.status||'pending'},
+      method:saved.method||'wave',
+      accountNumber:'',
+      nextStep:saved.nextStep||null,
+      redirectUrl:saved.redirectUrl||null,
+      status:String(saved.status||'pending').toLowerCase(),
+      amount:Number(saved.amount||0),
+      cartSnapshot:Object.assign({},S.cart||{}),
+      cartItemsSnapshot:Object.assign({},CART_ITEMS||{})
+    };
+    try{
+      var orderResponse=await ML_API.orders.getById(saved.orderId),orderData=orderResponse&&orderResponse.data?orderResponse.data:orderResponse;
+      var order=orderData&&orderData.order?orderData.order:orderData;
+      if(order&&order.id)S.pendingPayment.order=order;
+    }catch(e){}
+    try{
+      var statusResponse=await ML_API.payments.status(saved.paymentId),statusData=statusResponse&&statusResponse.data?statusResponse.data:statusResponse;
+      if(statusData){
+        if(statusData.payment)S.pendingPayment.payment=statusData.payment;
+        S.pendingPayment.status=String(statusData.status||statusData.payment&&statusData.payment.status||S.pendingPayment.status).toLowerCase();
+        if(statusData.nextStep)S.pendingPayment.nextStep=statusData.nextStep;
+        if(statusData.redirectUrl)S.pendingPayment.redirectUrl=statusData.redirectUrl;
+        persistPendingPayment(S.pendingPayment);
+      }
+    }catch(e){}
+    return true;
+  }
   function renderLivePaymentStep(){
     var root=G('cart-body'),pending=S.pendingPayment;
     if(!root||!pending)return;
@@ -156,6 +214,7 @@
       if(data.nextStep)pending.nextStep=data.nextStep;
       if(data.redirectUrl)pending.redirectUrl=data.redirectUrl;
       if(data.payment)pending.payment=data.payment;
+      persistPendingPayment(pending);
       if(['completed','confirmed','failed','cancelled','abandoned','expired'].indexOf(pending.status)>-1){
         stopPaymentStatusPolling();
         renderLivePaymentStep();
@@ -210,6 +269,7 @@
     }
     S.pendingPayment=null;
     S.paymentAccountNumber='';
+    clearPendingPaymentSession();
     switchTab('cart');
     renderLiveCart();
   }
@@ -217,6 +277,10 @@
     stopPaymentStatusPolling();
     S.pendingPayment=null;
     S.paymentAccountNumber='';
+    S.appliedCoupon=null;
+    S.cart={};CART_ITEMS={};
+    updateCartBadge();saveCartToStorage();
+    clearPendingPaymentSession();
     switchTab('orders');
     startOrderTracking();
   }
@@ -264,10 +328,9 @@
         var payment=paymentData&&paymentData.payment;
         if(!payment||!payment.id)throw {error:'The payment provider did not return a valid payment record. Your cart has been kept; check order history before trying again.'};
         S.pendingPayment={order:order,payment:payment,method:payMethod,accountNumber:accountNumber,nextStep:paymentData.nextStep||null,redirectUrl:paymentData.redirectUrl||null,status:String(paymentData.status||payment.status||'pending').toLowerCase(),amount:Number(order.total),cartSnapshot:cartSnapshot,cartItemsSnapshot:cartItemsSnapshot};
-        try{sessionStorage.setItem('ml_pending_order_id',String(order.id));sessionStorage.setItem('ml_pending_payment_id',String(payment.id));}catch(e){}
-        // Keep the server-confirmed order and its payment reference. Clear the visible cart
-        // only after the provider has accepted the initiation request.
-        S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();
+        persistPendingPayment(S.pendingPayment);
+        // Keep the cart saved while the provider is processing. The payment screen
+        // replaces it visually, and the basket is cleared only after verified success.
         renderLivePaymentStep();
         if(S.pendingPayment.status!=='failed'&&S.pendingPayment.status!=='confirmed'&&S.pendingPayment.status!=='completed')checkLivePaymentStatus(true);
       }else{
@@ -576,6 +639,7 @@
   async function renderLiveCart(){
     var root=G('cart-body');if(!root)return;
     if(!apiOk()){root.innerHTML='<div class="ml-empty"><b>Sign in to use your cart</b><span>Checkout uses your authenticated MarketLink account and saved addresses.</span></div>';return;}
+    if(!S.pendingPayment)await resumePendingPaymentFromSession();
     if(S.pendingPayment){renderLivePaymentStep();return;}
     if(!Object.keys(S.cart||{}).length){root.innerHTML='<div class="ml-empty"><div style="font-size:30px">🛒</div><b>Your cart is empty</b><span>Add an active product from the live marketplace to begin checkout.</span></div>';return;}
     root.innerHTML='<div class="ml-loading">Loading live cart…</div>';
