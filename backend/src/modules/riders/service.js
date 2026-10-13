@@ -160,14 +160,26 @@ async function setAvailability(userId, isOnline) {
 
 // ── LOCATION UPDATE (GPS ping from rider app) ────────────────────────
 async function updateLocation(userId, { lat, lng, deliveryId }) {
-  // Update current position on rider record
+  if (deliveryId) {
+    const { rows: [delivery] } = await query(
+      'SELECT id, rider_id, status FROM deliveries WHERE id=$1',
+      [deliveryId]
+    );
+    if (!delivery) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    if (String(delivery.rider_id)!==String(userId)) {
+      throw new AppError('You can only share your location for a delivery assigned to you.',403,'FORBIDDEN');
+    }
+    if (!['assigned','picked_up','in_transit'].includes(String(delivery.status))) {
+      throw new AppError('Location updates are only accepted for an active delivery.',409,'DELIVERY_NOT_ACTIVE');
+    }
+  }
+
   await query(
     `UPDATE riders SET current_lat = $1, current_lng = $2, last_location_at = now()
      WHERE user_id = $3`,
     [lat, lng, userId]
   );
 
-  // Append to location ping history for tracking
   await query(
     `INSERT INTO rider_location_pings (rider_id, delivery_id, lat, lng)
      VALUES ($1,$2,$3,$4)`,
