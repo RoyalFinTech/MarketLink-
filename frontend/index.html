@@ -1873,8 +1873,8 @@ function goApp(){
   if(S.aiSettings.floatingAssistant) G('fab').classList.add('fab-visible');
   try{
     var savedTheme=localStorage.getItem('ml_theme');
-    if(savedTheme!=='dark'){document.body.classList.add('lm');S.dark=false;if(!savedTheme)localStorage.setItem('ml_theme','light');}
-    else{document.body.classList.remove('lm');S.dark=true;}
+    if(savedTheme!=='dark'){document.body.classList.add('lm');G('app').classList.add('lm');S.dark=false;if(!savedTheme)localStorage.setItem('ml_theme','light');}
+    else{document.body.classList.remove('lm');G('app').classList.remove('lm');S.dark=true;}
   }catch(e){document.body.classList.add('lm');S.dark=false;}
   restoreCartFromStorage();
   restoreDelivLocation();
@@ -3182,7 +3182,10 @@ function editName(){
 }
 function toggleDark(){
   S.dark=!S.dark;
-  G('app').classList.toggle('lm',!S.dark);
+  var daylight=!S.dark;
+  document.body.classList.toggle('lm',daylight);
+  G('app').classList.toggle('lm',daylight);
+  try{localStorage.setItem('ml_theme',daylight?'light':'dark');}catch(e){}
   renderProfile();
 }
 function doLogout(){
@@ -6032,9 +6035,11 @@ function toggleAISetting(key){
   renderAISettings();
 }
 function setAITheme(mode){
-  if(mode==='light') document.body.classList.add('lm');
-  else document.body.classList.remove('lm');
-  try{localStorage.setItem('ml_theme',mode);}catch(e){}
+  var daylight=mode==='light';
+  document.body.classList.toggle('lm',daylight);
+  G('app').classList.toggle('lm',daylight);
+  S.dark=!daylight;
+  try{localStorage.setItem('ml_theme',daylight?'light':'dark');}catch(e){}
   renderAISettings();
 }
 function setAILanguage(lang){
