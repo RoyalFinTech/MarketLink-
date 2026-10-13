@@ -683,25 +683,25 @@
   function renderPremiumPolicyPage(root,key){
     var policies={
       terms:{title:'Terms of Service',sections:[
-        ['Your account and PIN','Provide accurate registration details and keep your 4-digit PIN private. You are responsible for activity carried out through your account. Contact MarketLink if you suspect unauthorized access.'],
-        ['Marketplace listings','Vendors are responsible for accurate listings, availability, pricing and lawful sale of their goods. Product availability and final prices can change; review your basket before confirming an order.'],
-        ['Orders and payments','Review the order total, delivery charges and any displayed service fees before confirming. Use only the payment options presented in MarketLink checkout. Payment providers may apply their own terms.'],
+        ['Your account and PIN','Please use accurate registration details and keep your 4-digit PIN private. If you think someone else has accessed your account, contact MarketLink support so we can help you secure it.'],
+        ['Marketplace listings','Vendors should keep product details, prices and availability accurate and offer goods they are allowed to sell. Stock and prices can change, so please review your basket before confirming an order.'],
+        ['Orders and payments','Please check the order total and delivery fees before confirming. Use a payment option shown in checkout. If Modem Pay is enabled, follow the payment instructions shown on screen; MarketLink will mark an order as paid only after the provider confirms it. If a payment is pending, check its status before trying again.'],
         ['Delivery responsibilities','Provide a complete address and reachable contact number. Riders must follow applicable road-safety rules and handle orders responsibly. Delivery estimates can vary with availability, traffic and other conditions.'],
-        ['Responsible use and disputes','Do not use MarketLink for fraud, harassment or unlawful activity. Report order problems through support so the parties can review the order and available remedies.'],
+        ['Getting help and using MarketLink fairly','Please use MarketLink respectfully and lawfully. If an order goes wrong, contact support with your order number so we can review the details and explain the available next steps. We may limit access when there is a clear safety or misuse concern.'],
         ['Applicable law','These terms are intended to operate in accordance with applicable laws of The Gambia. MarketLink may update in-app terms as the service develops.']
       ]},
       privPolicy:{title:'Privacy Policy',sections:[
-        ['Information used by the service','Depending on the features you use, MarketLink handles your account name and phone number, saved delivery addresses, orders, wallet and transaction records, and information you send to support.'],
+        ['Information used by the service','Depending on the features you use, MarketLink may process your name, phone number, account details, saved addresses, orders, wallet and transaction records, support messages and application information. If you choose mobile-money payment, the mobile number you enter and transaction details may be sent to Modem Pay or the selected provider to process and verify that payment.'],
         ['Why we use it','Information supports sign-in, account management, order processing, delivery coordination, service security and help requests. Access to account-specific information requires an authenticated session.'],
-        ['Payments and providers','Supported payment methods may involve third-party payment providers. Those providers may process payment information under their own privacy notices and terms. Review the provider information shown during payment.'],
+        ['Payments and providers','Payment providers, including Modem Pay when enabled, process the information needed to complete and verify payments. Some networks may request a temporary PIN/OTP on the payment screen; this is sent to the provider for that transaction and is not saved in your MarketLink account. Please do not share payment codes in support chats or with vendors and riders. Providers have their own privacy notices and terms.'],
         ['Protecting your account','Keep your PIN private, sign out of shared devices and contact support if you suspect that another person has accessed your account.'],
-        ['Questions and requests','For privacy questions or help with account information, contact marketlinkgambia@gmail.com or +220 407 1510.']
+        ['Questions and requests','For privacy questions or help with account information, email marketlinkgambia@gmail.com or call +220 407 1510.']
       ]},
       deliveryPolicy:{title:'Delivery, Returns & Refunds',sections:[
         ['Before confirming an order','Check product details, quantity, delivery charges and your saved address before placing an order. Keep your phone available for delivery coordination.'],
         ['Delivery updates','Order status and rider details are shown when the relevant information is available from the live service. Estimated delivery times are not guarantees and may change with vendor, rider, traffic or network availability.'],
         ['Problems with an order','If an item is missing, damaged or different from what you ordered, keep the order reference and contact MarketLink support promptly so the order can be reviewed.'],
-        ['Returns and refunds','Eligibility and resolution may depend on order status, the circumstances, vendor requirements and the payment provider. The current app does not promise one universal return window or refund time for every order. Contact support for review of your specific order.'],
+        ['Returns and refunds','If an item is missing, damaged or different from what you ordered, contact support with your order reference and a short explanation. We will review the order and explain the available next steps. Refund eligibility and timing can vary by order and payment provider, so we will confirm the outcome for your case rather than promise a fixed time for every transaction.'],
         ['Contact','Email marketlinkgambia@gmail.com or call +220 407 1510 with your order reference and a short description of the issue.']
       ]}
     };
@@ -735,12 +735,24 @@
       root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div><div class="ml-empty"><b>Wallet data unavailable</b><span>'+esc(e.error||'The live wallet service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.refreshWallet()">Retry</button></div></div>';
     });
   }
-  function renderPremiumPaymentsPage(root){
+  async function renderPremiumPaymentsPage(root){
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div><div class="ml-loading">Checking available payment options…</div></div>';
+    var caps={configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
+    try{
+      var response=await ML_API.payments.methods();
+      var data=response&&response.data?response.data:response;
+      caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout)};
+      S.paymentCapabilities=caps;
+    }catch(e){}
+    var providerStatus=!caps.configured?'Mobile-money payments are still being set up. They will become selectable in checkout after the Modem Pay account is configured.':caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'Modem Pay hosted checkout is configured. Choose a mobile-money method in your cart to continue to the secure provider page and complete payment there.';
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>Choose at checkout</b><span>Payment options are confirmed by the live MarketLink order service when you place an order. This page does not save fake cards or payment details.</span></div></div>'+
-      '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Available when enabled for the order and delivery area.</span></div></div>'+
-      '<div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>Mobile money and provider payments</b><span>Currently supported options are shown by the live checkout flow.</span></div></div></div>'+
-      '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\'cart\')">Go to cart and checkout →</button>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Pay when your order arrives, where this option is available for the order and delivery area.</span></div></div>'+
+      '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Pay with your Wave account through the active Modem Pay checkout flow.</span></div></div>'+
+      '<div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Approve the payment using the instructions shown by the selected provider flow.</span></div></div>'+
+      '<div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Follow the provider instructions, including a temporary authorization code if required for that transaction.</span></div></div></div>'+
+      '<div class="ml-wallet-note ml-payment-availability-note">'+paymentBrandMarkup()+'<b>'+ (caps.configured?'Modem Pay status: configured':'Modem Pay status: setup pending')+'</b><p>'+esc(providerStatus)+'</p></div>'+
+      '<div class="ml-wallet-note">MarketLink confirms payment only after the provider reports a verified completed transaction. If the status is pending, check it before trying to pay again. Never share your MarketLink PIN with a vendor, rider or support agent.</div>'+
+      '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\\'cart\\')">Go to cart and checkout →</button>'+
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
   async function renderPremiumNotificationsPage(root){
