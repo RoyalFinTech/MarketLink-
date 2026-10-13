@@ -136,21 +136,42 @@ async function uploadLocal(file, purpose) {
 }
 async function upload(file, purpose, uploaderId) {
   validateFile(file, purpose);
-  const provider = getStorageProvider();
-  let stored;
+  const isProfilePhoto = ['profile-photo','profile_photo','profile photo'].includes(String(purpose || '').toLowerCase());
+  const fileType = privateDocumentType(file,purpose);
+  let stored, record;
+  let provider;
+  try { provider = getStorageProvider(); }
+  catch (error) {
+    if (!isProfilePhoto || !['STORAGE_NOT_CONFIGURED'].includes(error.code)) throw error;
+    // Durable fallback: store small profile images in Postgres until object storage is configured.
+    const {rows:[saved]} = await query(
+      'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb,content_bytes,content_type,storage_backend) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+      [uploaderId || null, 'dbprofile://pending', fileType, purpose, Math.ceil(file.size/1024), file.buffer, file.mimetype, 'database']
+    );
+    record = saved;
+    const url = publicApiBase() + '/api/v1/uploads/' + record.id + '/profile-content';
+    await query('UPDATE file_uploads SET file_url=$1 WHERE id=$2',[url,record.id]);
+    record.file_url = url;
+    return {url,record};
+  }
   if (provider === 'supabase') stored = await uploadSupabase(file,purpose);
   else if (provider === 'local') stored = await uploadLocal(file,purpose);
-  else {
-    throw new AppError('The configured storage provider is not implemented. Use Supabase Storage for production uploads.',503,'STORAGE_NOT_CONFIGURED');
-  }
-  const fileType = privateDocumentType(file,purpose);
-  const {rows:[record]} = await query(
-    'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-    [uploaderId || null, stored.storedUrl, fileType, purpose, Math.round(file.size/1024)]
+  else throw new AppError('The configured storage provider is not implemented. Use Supabase Storage for production uploads.',503,'STORAGE_NOT_CONFIGURED');
+  const {rows:[saved]} = await query(
+    'INSERT INTO file_uploads (uploaded_by,file_url,file_type,purpose,file_size_kb,storage_backend) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+    [uploaderId || null, stored.storedUrl, fileType, purpose, Math.ceil(file.size/1024), provider]
   );
+  record=saved;
   const url = stored.publicUrl || (publicApiBase() + '/api/v1/uploads/' + record.id + '/content');
   const responseRecord = Object.assign({}, record, {file_url:url});
   return {url, record:responseRecord};
+}
+async function getPublicProfileContent(fileId) {
+  const {rows:[f]}=await query("SELECT content_bytes,content_type,purpose,file_type FROM file_uploads WHERE id=$1 AND deleted_at IS NULL",[fileId]);
+  if(!f || !f.content_bytes || !['profile-photo','profile_photo','profile photo'].includes(String(f.purpose||'').toLowerCase()) || f.file_type!=='image') {
+    throw new AppError('Profile photo not found.',404,'FILE_NOT_FOUND');
+  }
+  return {buffer:f.content_bytes,contentType:f.content_type || 'image/jpeg'};
 }
 function privateDocumentType(file,purpose) {
   const p=String(purpose || '').toLowerCase();
@@ -264,4 +285,4 @@ async function removeProfilePhoto(requesterId) {
   }
   return {removed:true,profilePhotoUrl:null};
 }
-module.exports={upload,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,validateFile};
+module.exports={upload,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,getPublicProfileContent,validateFile};
