@@ -70,8 +70,8 @@ async function createPaymentIntent({
     if (!['wave', 'afrimoney', 'qmoney', 'aps'].includes(String(network || '').toLowerCase())) {
       throw new AppError('Choose a supported Modem Pay mobile-money network.', 400, 'INVALID_PAYMENT_NETWORK');
     }
-    const localAccount = String(accountNumber || '').replace(/[\\s-]/g, '');
-    if (!/^\\d{7}$/.test(localAccount)) {
+    const localAccount = String(accountNumber || '').replace(/[\s-]/g, '');
+    if (!/^\d{7}$/.test(localAccount)) {
       throw new AppError('Enter the 7-digit mobile-money number without the country code.', 400, 'INVALID_ACCOUNT_NUMBER');
     }
     const response = await modemRequest('/payments', {
@@ -133,7 +133,7 @@ async function confirmCharge(transactionId) {
 
 async function finalizeCharge(transactionId, pin) {
   if (!isH2H()) throw new AppError('This payment flow does not use H2H PIN confirmation.', 409, 'PAYMENT_FLOW_MISMATCH');
-  if (!/^\\d{4,8}$/.test(String(pin || ''))) throw new AppError('Enter the payment authorization code requested by your provider.', 400, 'INVALID_AUTH_CODE');
+  if (!/^\d{4,8}$/.test(String(pin || ''))) throw new AppError('Enter the payment authorization code requested by your provider.', 400, 'INVALID_AUTH_CODE');
   // Never log or persist the customer's mobile-money PIN / one-time code.
   return modemRequest('/payments/finalize/' + encodeURIComponent(String(transactionId)), {
     method: 'POST', body: { pin: String(pin) },
