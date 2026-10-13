@@ -752,7 +752,7 @@
       '<div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Follow the provider instructions, including a temporary authorization code if required for that transaction.</span></div></div></div>'+
       '<div class="ml-wallet-note ml-payment-availability-note">'+paymentBrandMarkup()+'<b>'+ (caps.configured?'Modem Pay status: configured':'Modem Pay status: setup pending')+'</b><p>'+esc(providerStatus)+'</p></div>'+
       '<div class="ml-wallet-note">MarketLink confirms payment only after the provider reports a verified completed transaction. If the status is pending, check it before trying to pay again. Never share your MarketLink PIN with a vendor, rider or support agent.</div>'+
-      '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\\'cart\\')">Go to cart and checkout →</button>'+
+      '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\'cart\')">Go to cart and checkout →</button>'+
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
   async function renderPremiumNotificationsPage(root){
