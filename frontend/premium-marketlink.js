@@ -24,7 +24,7 @@
   function normalizeProducts(d){return Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:[]);}
   function liveProductId(id){return id==null?'':String(id);}
   function livePaymentOptions(){return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];}
-  var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null;
+  var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null,mlPaymentStatusTimer=null,mlPaymentStatusStarted=0;
   var mlPromoSlides=[
     {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
     {kind:'sell',eyebrow:'FOR LOCAL BUSINESSES',title:'Your shop. More customers.',accent:'Grow with MarketLink.',body:'Bring your business online, showcase your real products and manage incoming orders in one place.',pill:'SELL ON MARKETLINK',image:'./assets/promo-vendor.webp',cta:'Become a vendor'},
@@ -105,6 +105,111 @@
       }catch(e){out.push(null);}
     }
     saveCartToStorage();updateCartBadge();return out;
+  }
+  function stopPaymentStatusPolling(){
+    if(mlPaymentStatusTimer){clearInterval(mlPaymentStatusTimer);mlPaymentStatusTimer=null;}
+    mlPaymentStatusStarted=0;
+  }
+  function paymentBrandMarkup(){
+    return '<div class="ml-payment-brand"><img src="./assets/marketlink-logo.png" alt="MarketLink logo"><div><b>MarketLink Gambia</b><span>Secure payment status</span></div></div>';
+  }
+  function renderLivePaymentStep(){
+    var root=G('cart-body'),pending=S.pendingPayment;
+    if(!root||!pending)return;
+    var step=pending.nextStep||{},status=String(pending.status||pending.payment&&pending.payment.status||'pending').toLowerCase();
+    var isComplete=status==='completed'||status==='confirmed';
+    var isFailed=status==='failed'||status==='cancelled'||status==='abandoned'||status==='expired';
+    var link=String(step.launch_url||pending.redirectUrl||'');
+    if(!/^https:\/\/[a-z0-9.-]+(?::\d+)?\//i.test(link))link='';
+    var methodLabel=pending.method==='wave'?'Wave':pending.method==='afrimoney'?'AfriMoney':pending.method==='qmoney'?'QMoney':'Modem Pay';
+    var pinMode=String(step.auth_mode||'').toLowerCase()==='pin';
+    var confirmMode=String(step.auth_mode||'').toLowerCase()==='confirm'&&!step.openExternal;
+    var headline=isComplete?'Payment confirmed':isFailed?'Payment not completed':'Complete your payment';
+    var message=isComplete?'Modem Pay has confirmed your payment. Your MarketLink order status is now updated.':isFailed?'Modem Pay did not complete this payment. You can return to your cart and try again with a new payment attempt.':'Follow the provider’s next step below. MarketLink will only mark your order as paid after a verified confirmation.';
+    root.innerHTML='<div class="ml-profile-shell ml-payment-flow">'+
+      '<div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK CHECKOUT</div><h3>Secure payment</h3></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.restoreCartAndRetry()">← Back to cart</button></div>'+
+      '<div class="ml-payment-result '+(isComplete?'is-success':isFailed?'is-failed':'is-pending')+'">'+paymentBrandMarkup()+'<div class="ml-payment-result-title">'+(isComplete?'✓ ':isFailed?'! ':'')+esc(headline)+'</div><p>'+esc(message)+'</p>'+
+      '<div class="ml-payment-summary"><div><span>Order reference</span><b>'+esc(pending.order&& (pending.order.order_number||pending.order.id)||'Created by MarketLink')+'</b></div><div><span>Payment method</span><b>'+esc(methodLabel)+'</b></div><div><span>Order total</span><b>'+money(pending.order&&pending.order.total||pending.amount||0)+'</b></div>'+(pending.accountNumber?'<div><span>Mobile-money number</span><b>••• '+esc(String(pending.accountNumber).slice(-4))+'</b></div>':'')+'</div>'+
+      (isComplete?'<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.finishPaidOrder()">View order tracking →</button>':
+       isFailed?'<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.restoreCartAndRetry()">Return to cart and try again</button>':
+       (link?'<a class="ml-btn ml-btn-primary ml-payment-open-provider" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">Continue to '+esc(methodLabel)+' ↗</a>':'')+
+       (confirmMode?'<div class="ml-payment-next-step"><b>Approve the request on your phone</b><p>'+esc(step.confirmation_steps||'Approve the payment request on your mobile-money phone. Then select the button below.')+'</p><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'confirm\')">I have approved the request</button></div>':'')+
+       (pinMode?'<div class="ml-payment-next-step"><label for="ml-modem-payment-pin">Provider authorization code</label><p>Enter the code requested by your payment provider. MarketLink will send it for this payment attempt only and will not save it.</p><input id="ml-modem-payment-pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="'+Math.min(8,Math.max(4,Number(step.auth_length)||6))+'" placeholder="Enter authorization code"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'pin\')">Submit code securely</button></div>':'')+
+       '<div class="ml-payment-status-line" id="ml-payment-status-message">Waiting for the payment provider to confirm. This can take a little time.</div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.checkPaymentStatus()">Check payment status</button>')+
+      '</div><p class="ml-payment-footnote">Do not pay twice while a transaction is pending. If the provider has already requested approval on your phone, finish that request first.</p></div>';
+    if(!isComplete&&!isFailed&&!mlPaymentStatusTimer){
+      mlPaymentStatusStarted=Date.now();
+      mlPaymentStatusTimer=setInterval(function(){
+        if(!S.pendingPayment||Date.now()-mlPaymentStatusStarted>=300000){stopPaymentStatusPolling();return;}
+        checkLivePaymentStatus(true);
+      },5000);
+    }
+  }
+  async function checkLivePaymentStatus(silent){
+    var pending=S.pendingPayment;
+    if(!pending||!pending.payment||!pending.payment.id)return;
+    var line=G('ml-payment-status-message');
+    if(line&&!silent)line.textContent='Checking the payment provider…';
+    try{
+      var response=await ML_API.payments.status(pending.payment.id),data=response&&response.data?response.data:response;
+      pending.status=String(data.status||data.payment&&data.payment.status||'pending').toLowerCase();
+      if(data.nextStep)pending.nextStep=data.nextStep;
+      if(data.redirectUrl)pending.redirectUrl=data.redirectUrl;
+      if(data.payment)pending.payment=data.payment;
+      if(['completed','confirmed','failed','cancelled','abandoned','expired'].indexOf(pending.status)>-1){
+        stopPaymentStatusPolling();
+        renderLivePaymentStep();
+        if(pending.status==='completed'||pending.status==='confirmed')toast('Payment confirmed by Modem Pay. Your order is updated.','success');
+        else toast('Payment was not completed. Review the status and try again if needed.','error');
+      }else if(line){
+        line.textContent='Payment status: '+(pending.status==='processing'?'The provider is processing it.':'Still waiting for provider confirmation.')+' Do not submit another payment.';
+      }
+    }catch(e){
+      if(line)line.textContent='We could not check the latest status just now. Your payment is not marked as successful; try checking again shortly.';
+      if(!silent)toast(e.error||'Could not check payment status. Please try again.','warning');
+    }
+  }
+  async function continueLiveModemPayment(action){
+    var pending=S.pendingPayment;
+    if(!pending||!pending.payment||!pending.payment.id)return;
+    var pinEl=G('ml-modem-payment-pin'),pin='';
+    if(action==='pin'){
+      pin=String(pinEl&&pinEl.value||'').trim();
+      if(!/^\\d{4,8}$/.test(pin)){toast('Enter the provider authorization code requested for this payment.','error');return;}
+    }
+    try{
+      var response=await ML_API.payments.continue(pending.payment.id,action,action==='pin'?pin:undefined);
+      if(pinEl)pinEl.value='';
+      var data=response&&response.data?response.data:response;
+      if(data.payment)pending.payment=data.payment;
+      pending.status=String(data.status||'pending').toLowerCase();
+      if(data.nextStep)pending.nextStep=data.nextStep;
+      // Do not treat confirm/finalize responses alone as success; refresh authoritative status.
+      await checkLivePaymentStatus(false);
+    }catch(e){
+      if(pinEl)pinEl.value='';
+      toast(e.error||'The payment request could not be confirmed. Check the status before retrying.','error');
+    }
+  }
+  function restoreLiveCartAfterPaymentFailure(){
+    var pending=S.pendingPayment;
+    stopPaymentStatusPolling();
+    if(pending&&pending.cartSnapshot){
+      S.cart=Object.assign({},pending.cartSnapshot);
+      CART_ITEMS=Object.assign({},pending.cartItemsSnapshot||{});
+      saveCartToStorage();updateCartBadge();
+    }
+    S.pendingPayment=null;
+    S.paymentAccountNumber='';
+    switchTab('cart');
+    renderLiveCart();
+  }
+  function finishLivePaidOrder(){
+    stopPaymentStatusPolling();
+    S.pendingPayment=null;
+    S.paymentAccountNumber='';
+    switchTab('orders');
+    startOrderTracking();
   }
   async function placeLiveOrder(){
     if(!apiOk()){toast('Please sign in before placing an order.','error');return;}
@@ -451,7 +556,10 @@
     var sub=ids.reduce(function(t,id){var p=CART_ITEMS[id];return t+Number(p&&p.price||0)*Number(S.cart[id]||0);},0);
     var addresses;try{addresses=await loadLiveAddresses();}catch(e){root.innerHTML='<div class="ml-empty"><b>Saved addresses unavailable</b><span>'+esc(e.error||'Could not load your saved addresses.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshCart()">Retry</button></div>';return;}
     var addressHtml=addresses.length?addresses.map(function(a){var selected=String(a.id)===String(S.delivAddressId||S.deliveryAddressId);return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectAddress(\''+esc(String(a.id))+'\')"><div class="ico">📍</div><div class="copy"><b>'+esc(a.label||'Address')+'</b><span>'+esc(a.full_address||'')+(a.area?' · '+esc(a.area):'')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join(''):'<div class="ml-empty"><b>No saved delivery addresses</b><span>Add your first address in Profile → Saved addresses.</span></div>';
-    var paymentHtml=livePaymentOptions().map(function(opt){var selected=(S.selPay||'Pay on Delivery')===opt[0];return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\''+esc(opt[0])+'\')"><div class="ico">💳</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+(opt[1]==='cod'?'Pay when your order arrives.':'Payment is initiated through the configured MarketLink provider.')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join('');
+    var chosenPaymentLabel=S.selPay||'Pay on Delivery';
+    var paymentHtml=livePaymentOptions().map(function(opt){var selected=chosenPaymentLabel===opt[0];return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\\''+esc(opt[0])+'\\')"><div class="ico">'+(opt[1]==='cod'?'💵':opt[1]==='wave'?'📱':opt[1]==='afrimoney'?'📲':'💳')+'</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+(opt[1]==='cod'?'Pay when your order arrives.':'Enter the number linked to this mobile-money account. MarketLink will show the provider’s next step before asking you to approve payment.')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join('');
+    var mobileMoneySelected=['Wave','AfriMoney','QMoney'].indexOf(chosenPaymentLabel)>-1;
+    var mobileMoneyInputHtml=mobileMoneySelected?'<div class="ml-mobile-money-field"><label for="ml-mobile-money-number">Mobile-money number</label><input id="ml-mobile-money-number" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" pattern="[0-9]{7}" placeholder="Enter 7-digit number" value="'+esc(S.paymentAccountNumber||'')+'"><small>Use the local 7-digit number, without +220. Never enter your wallet PIN on this screen.</small></div>':'';
     var itemsHtml=ids.map(function(id){var p=CART_ITEMS[id],qty=Number(S.cart[id]||0);return '<div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>'+esc(p.name)+'</b><span>'+money(p.price)+' × '+qty+' · '+esc(p.vendorName||'Vendor')+'</span></div><strong style="color:#FFD778">'+money(Number(p.price||0)*qty)+'</strong></div>';}).join('');
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Your cart</h3><button onclick="window.ML_Premium.refreshCart()">Refresh</button></div><div class="ml-profile-card"><div class="ml-section-head"><h3>Items</h3><span style="color:#91A4B4;font-size:10px">'+vendorIds.length+' vendor'+(vendorIds.length===1?'':'s')+'</span></div>'+itemsHtml+'</div>'+
       (vendorIds.length>1?'<div class="ml-empty" style="margin-top:10px"><b>Multiple vendors in cart</b><span>MarketLink currently requires one vendor per checkout. Remove items from other vendors.</span></div>':'')+
