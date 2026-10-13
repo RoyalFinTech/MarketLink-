@@ -557,3 +557,20 @@
   #scr-auth>div:first-child {flex:0 0 auto}
   #scr-auth #auth-body {padding-bottom:calc(42px + env(safe-area-inset-bottom))!important}
 }
+
+/* Affiliate rules panel and daylight-mode legibility. */
+.ml-affiliate-rules{margin-top:14px;padding:20px;border:1px solid var(--ml-line);border-radius:18px;background:rgba(255,255,255,.035)}
+.ml-affiliate-rules h4{margin:8px 0 13px;color:#eff8fa;font-size:16px}
+.ml-affiliate-rules ul{display:grid;gap:11px;padding-left:19px;color:#a9bbc5;font-size:11px;line-height:1.7}
+.ml-affiliate-rules li::marker{color:#f5b83d}
+.ml-affiliate-rules li b{color:#eff8fa}
+.ml-affiliate-rules p{margin-top:14px;color:#8fa4af;font-size:10px;line-height:1.6}
+.lm .ml-affiliate-rules{background:#fff!important;border-color:#d4e1e5!important}
+.lm .ml-affiliate-rules h4,.lm .ml-affiliate-rules li b{color:#172b36!important}
+.lm .ml-affiliate-rules ul,.lm .ml-affiliate-rules p{color:#4b626e!important}
+.lm .ml-affiliate-hero{border-color:#d9e3e6!important}
+.lm .ml-affiliate-hero-copy h4{color:#172b36!important}
+.lm .ml-affiliate-hero-copy p,.lm .ml-affiliate-hero-copy small{color:#4b626e!important}
+.lm .ml-affiliate-link-head b{color:#172b36!important}
+.lm .ml-affiliate-link-head span,.lm .ml-affiliate-footnote{color:#4b626e!important}
+.lm .ml-affiliate-link-field input{background:#fff!important;color:#172b36!important;border-color:#cbd9df!important}
