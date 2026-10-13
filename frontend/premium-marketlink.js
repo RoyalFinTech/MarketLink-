@@ -229,6 +229,14 @@
     }
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
     var payLabel=S.selPay||'Pay on Delivery',payMethod=payLabel==='Pay on Delivery'?'cod':String(payLabel).toLowerCase().replace(/\s+/g,'-');
+    var accountNumber='';
+    if(['wave','afrimoney','qmoney'].indexOf(payMethod)>-1){
+      var mobileInput=G('ml-mobile-money-number');
+      accountNumber=String(mobileInput&&mobileInput.value||S.paymentAccountNumber||'').replace(/\D/g,'');
+      if(!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit mobile-money number for the selected payment method.','error');if(mobileInput)mobileInput.focus();return;}
+      S.paymentAccountNumber=accountNumber;
+    }
+    var cartSnapshot=Object.assign({},S.cart||{}),cartItemsSnapshot=Object.assign({},CART_ITEMS||{});
     var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
     var placeBtn=document.querySelector('#cart-body button[data-ml-place-order]');
     if(placeBtn){placeBtn.disabled=true;placeBtn.textContent='Creating secure order…';}
@@ -236,16 +244,22 @@
       var orderRes=await ML_API.orders.place(payload),order=orderRes&&orderRes.data&&orderRes.data.order?orderRes.data.order:orderRes.data;
       if(!order||!order.id)throw {error:'The backend did not return a valid order.'};
       S.order=order;S.orderSI=0;
-      var paymentRes=await ML_API.payments.initiate(order.id,payMethod,Number(order.total)),paymentData=paymentRes&&paymentRes.data?paymentRes.data:paymentRes;
-      S.order=Object.assign({},S.order,{payment:paymentData});
+      var paymentRes=await ML_API.payments.initiate(order.id,payMethod,Number(order.total),accountNumber),paymentData=paymentRes&&paymentRes.data?paymentRes.data:paymentRes;
+      S.order=Object.assign({},S.order,{payment:paymentData&&paymentData.payment||paymentData});
       if(payMethod!=='cod'){
-        var redirect=paymentData&&paymentData.redirectUrl;
-        if(!redirect)throw {error:'Payment was initiated without a payment page. Please try again.'};
-        try{sessionStorage.setItem('ml_pending_order_id',String(order.id));}catch(e){}
-        var popup=window.open(redirect,'_blank','noopener,noreferrer');
-        toast(popup?'Payment page opened. Complete payment to confirm your order.':'Payment page blocked. Allow pop-ups to complete payment.','info');
-      }else toast('Order placed — Pay on Delivery selected ✓','success');
-      S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');startOrderTracking();
+        var payment=paymentData&&paymentData.payment;
+        if(!payment||!payment.id)throw {error:'The payment provider did not return a valid payment record. Your cart has been kept; check order history before trying again.'};
+        S.pendingPayment={order:order,payment:payment,method:payMethod,accountNumber:accountNumber,nextStep:paymentData.nextStep||null,redirectUrl:paymentData.redirectUrl||null,status:String(paymentData.status||payment.status||'pending').toLowerCase(),amount:Number(order.total),cartSnapshot:cartSnapshot,cartItemsSnapshot:cartItemsSnapshot};
+        try{sessionStorage.setItem('ml_pending_order_id',String(order.id));sessionStorage.setItem('ml_pending_payment_id',String(payment.id));}catch(e){}
+        // Keep the server-confirmed order and its payment reference. Clear the visible cart
+        // only after the provider has accepted the initiation request.
+        S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();
+        renderLivePaymentStep();
+        if(S.pendingPayment.status!=='failed'&&S.pendingPayment.status!=='confirmed'&&S.pendingPayment.status!=='completed')checkLivePaymentStatus(true);
+      }else{
+        toast('Order placed — Pay on Delivery selected ✓','success');
+        S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');startOrderTracking();
+      }
     }catch(e){
       if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
       toast(e.error||'Could not place your order.','error');
@@ -564,14 +578,14 @@
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Your cart</h3><button onclick="window.ML_Premium.refreshCart()">Refresh</button></div><div class="ml-profile-card"><div class="ml-section-head"><h3>Items</h3><span style="color:#91A4B4;font-size:10px">'+vendorIds.length+' vendor'+(vendorIds.length===1?'':'s')+'</span></div>'+itemsHtml+'</div>'+
       (vendorIds.length>1?'<div class="ml-empty" style="margin-top:10px"><b>Multiple vendors in cart</b><span>MarketLink currently requires one vendor per checkout. Remove items from other vendors.</span></div>':'')+
       '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Delivery address</h3><button onclick="window.ML_Premium.manageAddresses()">Manage</button></div>'+addressHtml+'</div>'+
-      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Payment</h3><span style="color:#91A4B4;font-size:10px">Live provider options</span></div>'+paymentHtml+'</div>'+
+      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Payment</h3><span style="color:#91A4B4;font-size:10px">Live provider options</span></div>'+paymentHtml+mobileMoneyInputHtml+'</div>'+
       '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Coupon</h3><span style="color:#91A4B4;font-size:10px">Validated by backend</span></div><div style="display:flex;gap:8px"><input id="ml-cart-coupon" class="inp" placeholder="Optional coupon code" value="'+esc((S.appliedCoupon&&S.appliedCoupon.code)||'')+'" style="margin:0;flex:1"><button class="ml-btn ml-btn-secondary" type="button" onclick="window.ML_Premium.setCoupon()">Apply</button></div></div>'+
       '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-profile-row"><div class="copy"><b>Subtotal</b><span>Current live product prices; final totals are validated by the backend.</span></div><strong>'+money(sub)+'</strong></div><div class="ml-profile-row"><div class="copy"><b>Delivery</b><span>Calculated by MarketLink server.</span></div><strong>At checkout</strong></div><div class="ml-profile-row"><div class="copy"><b>Total</b><span>The backend confirms the final payable amount.</span></div><strong style="color:#42D2C9">Server-calculated</strong></div></div>'+
       (addresses.length&&String(S.delivAddressId||S.deliveryAddressId)?'<button class="ml-btn ml-btn-primary" data-ml-place-order style="width:100%;margin-top:12px" onclick="window.ML_Premium.placeOrder()">Place Order</button>':'<button class="ml-btn ml-btn-primary" style="width:100%;margin-top:12px" disabled>Select a delivery address first</button>')+
       '</div>';
   }
   function selectAddress(id){S.delivAddressId=String(id);S.deliveryAddressId=String(id);renderLiveCart();}
-  function selectPayment(label){S.selPay=label;renderLiveCart();}
+  function selectPayment(label){var previous=G('ml-mobile-money-number');if(previous)S.paymentAccountNumber=String(previous.value||'').replace(/\D/g,'').slice(0,7);S.selPay=label;renderLiveCart();}
   function setCoupon(){var el=G('ml-cart-coupon'),code=el&&el.value.trim().toUpperCase();S.appliedCoupon=code?{code:code}:null;toast(code?'Coupon will be validated securely at order placement.':'Coupon removed.','info');renderLiveCart();}
   function manageAddresses(){switchTab('profile');renderAddresses();}
   async function loadProfile(){
