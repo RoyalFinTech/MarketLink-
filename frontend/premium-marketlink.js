@@ -1083,11 +1083,28 @@
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
   function renderPremiumHelpPage(root){
+    var faqs=[
+      {q:'What is MarketLink?',a:'MarketLink Gambia connects customers with local vendors and delivery riders. You can shop, manage orders, sell products or apply to deliver.'},
+      {q:'How do I place an order?',a:'Choose a category or search for a product, review the vendor and price, add the item to your cart, confirm your delivery address and select a payment option shown at checkout.'},
+      {q:'How do I track my order?',a:'Open Orders, choose the order and select View details. MarketLink refreshes the order status while the tracking page is open. Rider location is shown only when the delivery service provides live location data.'},
+      {q:'What if my payment is pending?',a:'A pending payment is not the same as a confirmed payment. Check the status in your order details before trying to pay again, so you do not risk paying twice.'},
+      {q:'How do I change my profile or photo?',a:'Open Profile and choose Edit profile to update your name, display name, date of birth, gender and short introduction. Choose Change photo or Remove beside your profile picture. Profile photos must be JPG or PNG, at least 512 × 512 pixels and no larger than 5 MB.'},
+      {q:'How do I become a vendor?',a:'Open Profile and choose Become a vendor. Complete the application with accurate business details. Vendor access starts after the required review and approval.'},
+      {q:'How do I become a rider?',a:'Open Profile and choose Become a rider. Complete the application with accurate contact and delivery details. Rider access is subject to review and approval.'},
+      {q:'How does the affiliate reward work?',a:'Share your unique affiliate link. Eligible referrals can earn a 2% reward on the qualifying merchandise subtotal after the order is successfully delivered. Delivery fees and other non-merchandise charges are excluded.'},
+      {q:'How can I contact MarketLink?',a:'For a direct call, use +220 87 407 1510. To contact the team on WhatsApp, use +220 407 1510. Include your order number when asking about an order. Never share your PIN or payment password.'}
+    ];
+    var faqHtml=faqs.map(function(faq){
+      return '<details class="ml-help-faq"><summary>'+esc(faq.q)+'</summary><p>'+esc(faq.a)+'</p></details>';
+    }).join('');
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Help Centre</h3></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">📞</div><div class="copy"><b>Call MarketLink support</b><span>+220 407 1510</span></div><a class="ml-btn ml-btn-secondary" href="tel:+2204071510">Call</a></div>'+
-      '<div class="ml-profile-row"><div class="ico">💬</div><div class="copy"><b>WhatsApp support</b><span>Contact the team with your question or order reference.</span></div><a class="ml-btn ml-btn-secondary" href="https://wa.me/2204071510?text=Hello%20MarketLink%20support" target="_blank" rel="noopener noreferrer">Message</a></div>'+
+      '<div class="ml-help-welcome"><div class="ml-help-welcome-eyebrow">WE’RE HERE TO HELP</div><h3>Let’s get things sorted.</h3><p>Find quick answers below, or contact the MarketLink team. For order questions, have your order number ready.</p><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openMarketLinkAI()">Ask MarketLink AI ✨</button></div>'+
+      '<div class="ml-profile-card ml-help-contact-card"><div class="ml-profile-row"><div class="ico">📞</div><div class="copy"><b>Call MarketLink support</b><span>+220 87 407 1510 · Direct phone call</span></div><a class="ml-btn ml-btn-secondary" href="tel:+220874071510">Call</a></div>'+
+      '<div class="ml-profile-row"><div class="ico ml-help-whatsapp-ico"><img src="./assets/whatsapp.svg" alt="WhatsApp"></div><div class="copy"><b>WhatsApp support</b><span>+220 407 1510 · Message the support team</span></div><a class="ml-btn ml-btn-secondary ml-whatsapp-button" href="https://wa.me/2204071510?text=Hello%20MarketLink%20support" target="_blank" rel="noopener noreferrer"><img src="./assets/whatsapp.svg" alt=""> Message</a></div>'+
       '<div class="ml-profile-row"><div class="ico">✉️</div><div class="copy"><b>Email support</b><span>marketlinkgambia@gmail.com</span></div><a class="ml-btn ml-btn-secondary" href="mailto:marketlinkgambia@gmail.com">Email</a></div></div>'+
-      '<div class="ml-wallet-note">For an order problem, include your order number and a short description. Do not send your PIN or payment passwords to support.</div>'+
+      '<div class="ml-wallet-note">For an order problem, include your order number and a short description. Never send your MarketLink PIN, wallet PIN, OTP or payment password to support.</div>'+
+      '<div class="ml-section-head ml-help-faq-heading"><h3>Frequently asked questions</h3><span>Quick answers</span></div>'+
+      '<div class="ml-help-faq-list">'+faqHtml+'</div>'+
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
   function defaultAvatarMarkup(){
@@ -1132,6 +1149,8 @@
     if(S.profilePage==='wishlist'){await renderPremiumWishlistPage(root);return;}
     if(S.profilePage==='compare'){renderPremiumComparePage(root);return;}
     if(S.profilePage==='help'){renderPremiumHelpPage(root);return;}
+    if(S.profilePage==='assistant'){renderPremiumAIProfilePage(root);return;}
+    if(S.profilePage==='language'){renderMarketLinkLanguagePage(root);return;}
     if(S.profilePage==='addresses'){await renderAddresses();return;}
     await loadProfile();
     root=G('profile-body');if(!root)return;
@@ -1175,6 +1194,7 @@
       {icon:'📄',title:'Terms of Service',desc:'Read the rules for using MarketLink',page:'terms'},
       {icon:'🛡️',title:'Privacy Policy',desc:'How account and order information is used',page:'privPolicy'},
       {icon:'🛵',title:'Delivery, Returns & Refunds',desc:'Guidance for delivery and order issues',page:'deliveryPolicy'},
+      {icon:'✨',title:'MarketLink AI',desc:'Help with shopping, selling, delivery and payments',page:'assistant'},
       {icon:'❓',title:'Help Centre',desc:'Contact MarketLink support',page:'help'}
     ];
     var profileLinks=profileItems.map(function(item){
