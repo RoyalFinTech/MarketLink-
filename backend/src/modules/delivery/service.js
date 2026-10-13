@@ -162,7 +162,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
 
 async function getTracking(deliveryId, actorId, roles) {
   const { rows: [d] } = await query(
-    \`SELECT d.id, d.order_id, d.status, d.estimated_minutes, d.picked_up_at,
+    `SELECT d.id, d.order_id, d.status, d.estimated_minutes, d.picked_up_at,
             o.customer_id, o.vendor_id,
             r.current_lat, r.current_lng, r.last_location_at,
             u.full_name AS rider_name,
@@ -174,7 +174,7 @@ async function getTracking(deliveryId, actorId, roles) {
      JOIN orders o ON o.id=d.order_id
      LEFT JOIN riders r ON r.user_id = d.rider_id
      LEFT JOIN users u ON u.id = r.user_id
-     WHERE d.id = $1\`, [deliveryId]);
+     WHERE d.id = $1`, [deliveryId]);
   if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
   const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
   if (!isAdmin && String(d.customer_id)!==String(actorId) && String(d.vendor_id)!==String(actorId) && String(d.rider_id)!==String(actorId)) {
