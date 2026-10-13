@@ -771,3 +771,85 @@
   background-color:#173846!important;
 }
 .ml-category-photo-fallback{opacity:1!important;visibility:visible!important}
+
+
+/* Premium customer profile — true avatar stack, strong actions and accessible profile editing. */
+.ml-profile-hero{
+  position:relative;
+  gap:18px;
+  padding:22px;
+  overflow:hidden;
+  background:radial-gradient(circle at 4% 0%,rgba(17,168,161,.18),transparent 42%),linear-gradient(130deg,#081f2d,#0b3941 70%,#112938)!important;
+  border-color:rgba(17,168,161,.3)!important;
+}
+.ml-profile-hero:after{content:"";position:absolute;right:-50px;top:-90px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(245,184,61,.16),transparent 68%);pointer-events:none}
+.ml-profile-avatar-wrap{position:relative;z-index:1;flex:0 0 94px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.ml-avatar.ml-avatar-button{position:relative;display:block;width:88px;height:88px;flex:0 0 88px;padding:0;border:2px solid rgba(255,255,255,.7);border-radius:25px;background:#0d7377;overflow:hidden;box-shadow:0 8px 24px rgba(3,14,23,.25);cursor:pointer;opacity:1!important}
+.ml-avatar .ml-default-avatar{position:absolute;inset:0;display:block;width:100%;height:100%;z-index:0}
+.ml-avatar .ml-avatar-photo{position:absolute;inset:0;z-index:1;display:block;width:100%;height:100%;object-fit:cover;object-position:center;border-radius:inherit;background:#0d7377}
+.ml-avatar-camera{position:absolute;z-index:3;right:5px;bottom:5px;width:26px;height:26px;display:grid;place-items:center;border-radius:9px;background:#ffc451;color:#172b36;font-size:14px;border:2px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.ml-avatar-actions{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;max-width:125px}
+.ml-photo-action{min-height:27px;padding:5px 8px;border:1px solid rgba(245,184,61,.45);border-radius:8px;background:rgba(245,184,61,.12);color:#ffd778;font-size:9px;font-weight:850;line-height:1.2;cursor:pointer;white-space:nowrap;opacity:1!important}
+.ml-photo-action:hover{background:#f5b83d;color:#172b36}
+.ml-photo-action.ml-photo-remove{border-color:rgba(248,113,113,.38);background:rgba(248,113,113,.09);color:#ffb4ad}
+.ml-photo-action.ml-photo-remove:hover{background:#b91c1c;color:#fff}
+.ml-profile-identity{position:relative;z-index:1;min-width:0;flex:1}
+.ml-profile-name{color:#f7fbfd;font-size:clamp(20px,2.2vw,25px);line-height:1.18;letter-spacing:-.035em;font-weight:900;overflow-wrap:anywhere}
+.ml-profile-phone{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#c0d1d8!important;font-size:11px;margin-top:7px}
+.ml-role-pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px}
+.ml-role-pill{display:inline-flex;align-items:center;min-height:23px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#eaf5f7!important;font-size:9px;font-weight:800;line-height:1.2;letter-spacing:.01em}
+.ml-role-pill.ml-role-active{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.13);color:#9cf2bd!important}
+.ml-profile-hero .ml-edit{position:relative;z-index:1;align-self:flex-start;margin-left:auto;background:linear-gradient(120deg,#f5b83d,#ffd778)!important;border:1px solid #f5b83d!important;color:#172b36!important;padding:10px 14px;font-size:11px;min-height:39px;border-radius:12px;box-shadow:0 5px 14px rgba(0,0,0,.12);opacity:1!important}
+.ml-profile-hero .ml-edit:hover{filter:brightness(1.04)}
+.ml-profile-card{background:rgba(255,255,255,.035)}
+.ml-profile-row .ico{flex:0 0 38px;width:38px;height:38px;min-width:38px;border-radius:12px;background:linear-gradient(135deg,#f5b83d,#ffd778)!important;color:#172b36!important;box-shadow:0 5px 14px rgba(3,14,23,.13);font-size:17px;opacity:1!important;filter:none!important}
+.ml-profile-row .copy{min-width:0}
+.ml-profile-row .copy b{color:#f4f9fb;font-size:12px;line-height:1.35;font-weight:850}
+.ml-profile-row .copy span{color:#b7c8d0;font-size:10px;line-height:1.55;white-space:normal;overflow-wrap:anywhere}
+.ml-profile-row-button{min-height:68px;background:rgba(255,255,255,.025);transition:background .15s ease,border-color .15s ease}
+.ml-profile-row-button:hover{background:rgba(17,168,161,.12)!important}
+.ml-profile-row-button:focus-visible,.ml-profile-link:focus-visible,.ml-photo-action:focus-visible,.ml-avatar-button:focus-visible,.ml-profile-hero .ml-edit:focus-visible{outline:3px solid #f5b83d;outline-offset:3px}
+.ml-profile-arrow{color:#ffc451!important;font-size:24px!important;font-weight:900!important;line-height:1}
+.ml-profile-about-row .copy span{white-space:normal;line-height:1.65}
+.ml-profile-editor{padding:5px 1px 3px}
+.ml-profile-editor-note{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid rgba(17,168,161,.25);border-radius:13px;background:rgba(13,115,119,.12);color:#c7dce2;font-size:10px;line-height:1.6}
+.ml-profile-editor-note-icon{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,#0d7377,#f5b83d);color:#172b36;font-size:14px}
+.ml-profile-editor .ml-form-optional{display:inline;margin-left:4px;color:#9aadb8;font-size:9px;font-weight:500}
+.ml-profile-editor textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:80px;border-radius:11px;padding:12px 13px;background:#0b1a27;border:1px solid rgba(255,255,255,.15);color:#f4fbfc;font:inherit;font-size:12px;outline:none}
+.ml-profile-editor textarea:focus{border-color:#11a8a1;box-shadow:0 0 0 3px rgba(17,168,161,.12)}
+.ml-profile-bio-count{display:block;margin-top:5px;color:#97aab5;text-align:right;font-size:9px}
+.ml-profile-editor .ml-modal-actions{margin-top:18px}
+.ml-profile-editor .ml-modal-actions button{min-height:44px;opacity:1!important}
+#sh-profile-edit .sheet-in{max-height:min(88dvh,860px);overflow-y:auto}
+#sh-profile-edit .sheet-hdr{position:sticky;top:0;z-index:4;background:inherit}
+@media(max-width:600px){
+  .ml-profile-hero{display:grid;grid-template-columns:88px minmax(0,1fr);align-items:start;gap:14px;padding:17px}
+  .ml-profile-avatar-wrap{grid-row:1 / span 2;flex-basis:88px;width:88px}
+  .ml-avatar.ml-avatar-button{width:78px;height:78px;flex-basis:78px;border-radius:22px}
+  .ml-avatar-actions{max-width:92px}
+  .ml-photo-action{padding:5px 6px;font-size:8px}
+  .ml-profile-hero .ml-edit{grid-column:2;grid-row:2;justify-self:start;margin:0}
+  .ml-profile-name{font-size:20px}
+}
+@media(min-width:601px){
+  .ml-profile-hero .ml-edit{margin-left:auto}
+  .ml-profile-avatar-wrap{flex-basis:104px}
+}
+.lm .ml-profile-hero{background:radial-gradient(circle at 4% 0%,rgba(17,168,161,.1),transparent 42%),linear-gradient(130deg,#e7f7f5,#ffffff 72%,#fff8e8)!important;border-color:#cfe4e3!important}
+.lm .ml-profile-name{color:#172b36!important}
+.lm .ml-profile-phone{color:#526975!important}
+.lm .ml-role-pill{background:#eff5f6!important;border-color:#d2e0e4!important;color:#314c58!important}
+.lm .ml-role-pill.ml-role-active{background:#e3f8ec!important;border-color:#a8e5bf!important;color:#176a3a!important}
+.lm .ml-profile-row .copy b{color:#172b36!important}
+.lm .ml-profile-row .copy span{color:#526975!important}
+.lm .ml-profile-card{background:#fff!important;border-color:#d4e0e5!important}
+.lm .ml-profile-row{border-bottom-color:#e0e8eb!important}
+.lm .ml-photo-action{background:#fff6d9!important;border-color:#e7c66a!important;color:#6f4c00!important}
+.lm .ml-photo-action.ml-photo-remove{background:#fff0f0!important;border-color:#efb4b4!important;color:#a61b1b!important}
+.lm .ml-profile-editor-note{background:#edf9f8!important;border-color:#cde5e3!important;color:#405d66!important}
+.lm .ml-profile-editor-note-icon{color:#172b36!important}
+.lm .ml-profile-editor .ml-form-optional{color:#657b85!important}
+.lm .ml-profile-bio-count{color:#526975!important}
+.lm .ml-profile-editor textarea,.lm #sh-profile-edit .ml-modal-form input,.lm #sh-profile-edit .ml-modal-form select{background:#fff!important;color:#172b36!important;border-color:#bfd0d6!important}
+.lm .ml-profile-editor textarea:focus,.lm #sh-profile-edit .ml-modal-form input:focus,.lm #sh-profile-edit .ml-modal-form select:focus{border-color:#0d9488!important;box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+.lm #sh-profile-edit .ml-sheet-hdr,.lm #sh-profile-edit .sheet-hdr{background:#fff!important;color:#172b36!important}
