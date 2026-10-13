@@ -160,6 +160,74 @@
       'Language preference':'Suɓaade ɗemngal','App language':'Ɗemngal aplikasiyoŋ'
     }
   };
+  Object.assign(dictionaries.fr,{
+    'Continue':'Continuer','Next':'Suivant','Back':'Retour','Create account':'Créer un compte','Register':'S’inscrire','Log in':'Se connecter','Login':'Connexion',
+    'Phone number':'Numéro de téléphone','Enter phone number':'Saisissez votre numéro de téléphone','Enter your 4-digit PIN':'Saisissez votre code PIN à 4 chiffres',
+    'Verify':'Vérifier','Submit':'Envoyer','Add to cart':'Ajouter au panier','Place order':'Passer la commande','Checkout':'Paiement','View details':'Voir les détails',
+    'View order details':'Voir les détails de la commande','Latest order updates':'Dernières mises à jour de la commande','No active orders':'Aucune commande active',
+    'Notifications':'Notifications','Terms of Service':'Conditions d’utilisation','Privacy Policy':'Politique de confidentialité','Retry':'Réessayer','Save':'Enregistrer','Loading…':'Chargement…'
+  });
+  Object.assign(dictionaries.es,{
+    'Continue':'Continuar','Next':'Siguiente','Back':'Volver','Create account':'Crear cuenta','Register':'Registrarse','Log in':'Iniciar sesión','Login':'Iniciar sesión',
+    'Phone number':'Número de teléfono','Enter phone number':'Introduce tu número de teléfono','Enter your 4-digit PIN':'Introduce tu PIN de 4 dígitos',
+    'Verify':'Verificar','Submit':'Enviar','Add to cart':'Añadir al carrito','Place order':'Realizar pedido','Checkout':'Finalizar compra','View details':'Ver detalles',
+    'View order details':'Ver detalles del pedido','Latest order updates':'Últimas actualizaciones del pedido','No active orders':'No hay pedidos activos',
+    'Notifications':'Notificaciones','Terms of Service':'Términos del servicio','Privacy Policy':'Política de privacidad','Retry':'Reintentar','Save':'Guardar','Loading…':'Cargando…'
+  });
+  Object.assign(dictionaries.de,{
+    'Continue':'Weiter','Next':'Weiter','Back':'Zurück','Create account':'Konto erstellen','Register':'Registrieren','Log in':'Anmelden','Login':'Anmelden',
+    'Phone number':'Telefonnummer','Enter phone number':'Telefonnummer eingeben','Enter your 4-digit PIN':'4-stellige PIN eingeben','Verify':'Verifizieren','Submit':'Absenden',
+    'Add to cart':'In den Warenkorb','Place order':'Bestellung aufgeben','Checkout':'Zur Kasse','View details':'Details ansehen','View order details':'Bestelldetails ansehen',
+    'Latest order updates':'Neueste Bestellupdates','No active orders':'Keine aktiven Bestellungen','Notifications':'Mitteilungen','Terms of Service':'Nutzungsbedingungen',
+    'Privacy Policy':'Datenschutzerklärung','Retry':'Erneut versuchen','Save':'Speichern','Loading…':'Wird geladen…'
+  });
+  Object.assign(dictionaries.pt,{
+    'Continue':'Continuar','Next':'Seguinte','Back':'Voltar','Create account':'Criar conta','Register':'Registar','Log in':'Iniciar sessão','Login':'Iniciar sessão',
+    'Phone number':'Número de telefone','Enter phone number':'Introduza o seu número de telefone','Enter your 4-digit PIN':'Introduza o PIN de 4 dígitos',
+    'Verify':'Verificar','Submit':'Enviar','Add to cart':'Adicionar ao carrinho','Place order':'Fazer pedido','Checkout':'Finalizar compra','View details':'Ver detalhes',
+    'View order details':'Ver detalhes do pedido','Latest order updates':'Atualizações recentes do pedido','No active orders':'Não há pedidos ativos',
+    'Notifications':'Notificações','Terms of Service':'Termos de serviço','Privacy Policy':'Política de privacidade','Retry':'Tentar novamente','Save':'Guardar','Loading…':'A carregar…'
+  });
+  Object.assign(dictionaries['zh-Hans'],{
+    'Continue':'继续','Next':'下一步','Back':'返回','Create account':'创建账户','Register':'注册','Log in':'登录','Login':'登录',
+    'Phone number':'电话号码','Enter phone number':'请输入电话号码','Enter your 4-digit PIN':'请输入 4 位 PIN','Verify':'验证','Submit':'提交',
+    'Add to cart':'加入购物车','Place order':'提交订单','Checkout':'结账','View details':'查看详情','View order details':'查看订单详情',
+    'Latest order updates':'最新订单更新','No active orders':'没有进行中的订单','Notifications':'通知','Terms of Service':'服务条款',
+    'Privacy Policy':'隐私政策','Retry':'重试','Save':'保存','Loading…':'正在加载…'
+  });
+  Object.assign(dictionaries.ar,{
+    'Continue':'متابعة','Next':'التالي','Back':'رجوع','Create account':'إنشاء حساب','Register':'تسجيل','Log in':'تسجيل الدخول','Login':'تسجيل الدخول',
+    'Phone number':'رقم الهاتف','Enter phone number':'أدخل رقم الهاتف','Enter your 4-digit PIN':'أدخل رمز PIN المكوّن من 4 أرقام',
+    'Verify':'تحقق','Submit':'إرسال','Add to cart':'أضف إلى السلة','Place order':'تأكيد الطلب','Checkout':'إتمام الدفع','View details':'عرض التفاصيل',
+    'View order details':'عرض تفاصيل الطلب','Latest order updates':'أحدث تحديثات الطلب','No active orders':'لا توجد طلبات نشطة','Notifications':'الإشعارات',
+    'Terms of Service':'شروط الخدمة','Privacy Policy':'سياسة الخصوصية','Retry':'إعادة المحاولة','Save':'حفظ','Loading…':'جارٍ التحميل…'
+  });
+  Object.assign(dictionaries.tl,{
+    'Continue':'Magpatuloy','Next':'Susunod','Back':'Bumalik','Create account':'Gumawa ng account','Register':'Magrehistro','Log in':'Mag-log in','Login':'Mag-log in',
+    'Phone number':'Numero ng telepono','Enter phone number':'Ilagay ang numero ng telepono','Enter your 4-digit PIN':'Ilagay ang 4-digit PIN','Verify':'I-verify','Submit':'Isumite',
+    'Add to cart':'Idagdag sa cart','Place order':'Ilagay ang order','Checkout':'Checkout','View details':'Tingnan ang mga detalye','View order details':'Tingnan ang detalye ng order',
+    'Latest order updates':'Pinakabagong update ng order','No active orders':'Walang aktibong order','Notifications':'Mga notification','Terms of Service':'Mga tuntunin ng serbisyo',
+    'Privacy Policy':'Patakaran sa privacy','Retry':'Subukan muli','Save':'I-save','Loading…':'Naglo-load…'
+  });
+  Object.assign(dictionaries.wo,{
+    'Home':'Xëtu dalal','Continue':'Wéyal','Next':'Li ci topp','Back':'Delluwaat','Create account':'Sos koont','Log in':'Dugg','Phone number':'Nimero telefon',
+    'Add to cart':'Yokk ci panier','Place order':'Def commande','View details':'Xool leeral','Save':'Denc','Notifications':'Yëgle yi'
+  });
+  Object.assign(dictionaries.ha,{
+    'Continue':'Ci gaba','Next':'Na gaba','Back':'Koma baya','Create account':'Ƙirƙiri asusu','Register':'Yi rajista','Log in':'Shiga','Login':'Shiga',
+    'Phone number':'Lambar waya','Verify':'Tabbatar','Submit':'Aika','Add to cart':'Ƙara cikin kwando','Place order':'Sanya oda','View details':'Duba cikakkun bayanai',
+    'Latest order updates':'Sabbin bayanan oda','No active orders':'Babu odar da ke aiki','Save':'Ajiye','Retry':'Sake gwadawa','Loading…':'Ana lodawa…'
+  });
+  Object.assign(dictionaries.yo,{
+    'Continue':'Tẹ̀síwájú','Next':'Tó kàn','Back':'Padà','Create account':'Ṣẹ̀dá àkọọ́lẹ̀','Register':'Forúkọ sílẹ̀','Log in':'Wọlé','Login':'Wọlé',
+    'Phone number':'Nọ́mbà fóònù','Verify':'Jẹ́rìí','Submit':'Fìránṣẹ́','Add to cart':'Fi kún àpò','Place order':'Fi àṣẹ sílẹ̀','View details':'Wo àlàyé',
+    'Latest order updates':'Àwọn ìmúdójúìwọ̀n àṣẹ tuntun','No active orders':'Kò sí àṣẹ tó ń lọ','Save':'Pamọ́','Retry':'Tún gbìyànjú','Loading…':'Ó ń ṣí…'
+  });
+  Object.assign(dictionaries.ig,{
+    'Continue':'Gaa n’ihu','Next':'Ọzọ','Back':'Laghachi','Create account':'Mepụta akaụntụ','Register':'Debanye aha','Log in':'Banye','Login':'Banye',
+    'Phone number':'Nọmba ekwentị','Verify':'Nyochaa','Submit':'Zipụ','Add to cart':'Tinye na nkata','Place order':'Debe iwu','View details':'Lee nkọwa',
+    'Latest order updates':'Mmelite iwu kacha ọhụrụ','No active orders':'Enweghị iwu na-arụ ọrụ','Save':'Chekwa','Retry':'Nwaa ọzọ','Loading…':'Na-ebunye…'
+  });
   var coverage={
     en:'English is the default. All untranslated text remains in its original wording.',
     fr:'French beta: core labels translated; some text remains in English. Please report unclear wording.',
@@ -173,8 +241,12 @@
     ff:'Fula/Pulaar draft: selected labels translated; native-speaker review is recommended.'
   };
   languages.forEach(function(item){
-    if(item.code!=='en'&&!coverage[item.code]){
-      coverage[item.code]=item.label.split(' (')[0]+' beta: coverage is limited; unsupported text remains in English until reviewed.';
+    if(item.code==='en')return;
+    if(!coverage[item.code]){
+      var n=Object.keys(dictionaries[item.code]||{}).length;
+      coverage[item.code]=n
+        ? item.label.split(' (')[0]+' beta: '+n+' common phrases translated; other text remains in English until reviewed.'
+        : item.label.split(' (')[0]+' translation is not enabled yet. MarketLink stays in English for now while accurate wording is prepared and reviewed.';
     }
   });
   var originalNodes=new WeakMap();
