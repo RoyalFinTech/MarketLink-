@@ -6,7 +6,25 @@ const API_MODE = String(process.env.MODEM_PAY_API_MODE || 'merchant').trim().toL
 const DEFAULT_BASE_URL = API_MODE === 'h2h'
   ? 'https://api.modempay.com/h2h/v1'
   : 'https://api.modempay.com/v1';
-const BASE_URL = String(process.env.MODEM_PAY_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
+function resolveBaseUrl() {
+  const configured=String(process.env.MODEM_PAY_BASE_URL||'').trim();
+  if(!configured)return DEFAULT_BASE_URL;
+  let parsed;
+  try{parsed=new URL(configured);}catch(e){throw new Error('MODEM_PAY_BASE_URL must be a valid URL.');}
+  if(parsed.protocol!=='https:'&&!/^(localhost|127\.0\.0\.1)$/.test(parsed.hostname))throw new Error('MODEM_PAY_BASE_URL must use HTTPS.');
+  let pathname=parsed.pathname.replace(/\/+$/,'');
+  if(API_MODE==='h2h'){
+    if(/\/h2h\/v1$/.test(pathname)){}
+    else if(/\/v1$/.test(pathname))pathname=pathname.replace(/\/v1$/,'/h2h/v1');
+    else pathname=(pathname||'')+'/h2h/v1';
+  }else if(!/\/v1$/.test(pathname)){
+    pathname=(pathname||'')+'/v1';
+  }
+  parsed.pathname=pathname;
+  parsed.search='';parsed.hash='';
+  return parsed.toString().replace(/\/+$/,'');
+}
+const BASE_URL = resolveBaseUrl();
 
 function isH2H() { return API_MODE === 'h2h'; }
 
