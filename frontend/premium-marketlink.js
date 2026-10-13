@@ -193,8 +193,13 @@
   }
   function restoreLiveCartAfterPaymentFailure(){
     var pending=S.pendingPayment;
-    if(pending&&['pending','processing'].indexOf(String(pending.status||'pending').toLowerCase())>-1){
+    var state=String(pending&&pending.status||'').toLowerCase();
+    if(pending&&['pending','processing'].indexOf(state)>-1){
       toast('This payment is still pending. Check its status before starting another payment, so you are not charged twice.','warning');
+      return;
+    }
+    if(pending&&['failed','cancelled','abandoned','expired'].indexOf(state)===-1){
+      toast('This payment may already be complete. Check the confirmed status and open order tracking instead of paying again.','info');
       return;
     }
     stopPaymentStatusPolling();
@@ -571,6 +576,7 @@
   async function renderLiveCart(){
     var root=G('cart-body');if(!root)return;
     if(!apiOk()){root.innerHTML='<div class="ml-empty"><b>Sign in to use your cart</b><span>Checkout uses your authenticated MarketLink account and saved addresses.</span></div>';return;}
+    if(S.pendingPayment){renderLivePaymentStep();return;}
     if(!Object.keys(S.cart||{}).length){root.innerHTML='<div class="ml-empty"><div style="font-size:30px">🛒</div><b>Your cart is empty</b><span>Add an active product from the live marketplace to begin checkout.</span></div>';return;}
     root.innerHTML='<div class="ml-loading">Loading live cart…</div>';
     var metadata=await refreshCartMetadata();
