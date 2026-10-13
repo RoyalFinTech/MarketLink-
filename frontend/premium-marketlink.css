@@ -761,3 +761,13 @@
 .lm .ml-payment-availability-note .ml-payment-brand span{color:#526975!important}
 .lm .ml-payment-availability-note>b{color:#172b36!important}
 .lm .ml-payment-availability-note>p{color:#526975!important}
+
+/* Respect each category's image mapping; this overrides the legacy atlas-only background rule. */
+.ml-cat-photo,.ml-category-photo{
+  background-image:var(--ml-category-image,url("./assets/marketlink-category-atlas.webp"))!important;
+  background-size:var(--ml-category-size,cover)!important;
+  background-position:var(--ml-category-position,center)!important;
+  background-repeat:no-repeat!important;
+  background-color:#173846!important;
+}
+.ml-category-photo-fallback{opacity:1!important;visibility:visible!important}
