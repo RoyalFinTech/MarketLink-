@@ -801,7 +801,7 @@
       document.body.appendChild(sh);
     }
     sh.classList.add('ml-profile-edit-overlay');
-    sh.innerHTML='<div class="sheet ml-profile-edit-sheet"><div class="sheet-hdr"><span id="ml-profile-edit-title">Edit your profile</span><button type="button" class="sheet-cls" onclick="closeSheet(\\'sh-profile-edit\\')" aria-label="Close edit profile">×</button></div><div class="sheet-in">'+html+'</div></div>';
+    sh.innerHTML='<div class="sheet ml-profile-edit-sheet"><div class="sheet-hdr"><span id="ml-profile-edit-title">Edit your profile</span><button type="button" class="sheet-cls" onclick="closeSheet(\'sh-profile-edit\')" aria-label="Close edit profile">×</button></div><div class="sheet-in">'+html+'</div></div>';
     openSheet('sh-profile-edit');
     var bioInput=G('ml-edit-bio'),bioCount=sh.querySelector('.ml-profile-bio-count');
     if(bioInput&&bioCount)bioInput.addEventListener('input',function(){bioCount.textContent=String(bioInput.value.length)+'/280 characters';});
