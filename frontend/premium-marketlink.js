@@ -260,6 +260,23 @@
     for(var i=0;i<n.length;i++)hash=(hash+n.charCodeAt(i))%choices.length;
     return '--ml-category-image:url("'+choices[hash]+'");--ml-category-size:cover;--ml-category-position:center;';
   }
+  function mlCategoryEmoji(name){
+    var n=String(name||'').toLowerCase();
+    if(/tomato/.test(n))return '🍅';
+    if(/onion/.test(n))return '🧅';
+    if(/rice|grain|cereal/.test(n))return '🍚';
+    if(/carrot/.test(n))return '🥕';
+    if(/vegetable|fresh|produce|fruit|grocery|grocer/.test(n))return '🥬';
+    if(/food|meal|restaurant|fish|meat|chicken|seafood|bakery|snack/.test(n))return '🍲';
+    if(/clothing|fashion|shoe|fabric|tailor|apparel/.test(n))return '👕';
+    if(/beauty|cosmetic|jewel|accessor/.test(n))return '✨';
+    if(/oil|spice|pantry|kitchen|household|home/.test(n))return '🛒';
+    return '🛍️';
+  }
+  function mlCategoryPhotoMarkup(name,photoClass){
+    var label=String(name||'Marketplace category');
+    return '<span class="'+photoClass+'" role="img" aria-label="'+esc(label)+'" style="'+mlCategoryStyle(label)+'"><span class="ml-category-photo-fallback" aria-hidden="true">'+mlCategoryEmoji(label)+'</span></span>';
+  }
   async function renderLiveCategoriesPage(){
     var root=G('catpage-content');if(!root)return;
     if(S.activeCategoryId){await renderLiveCategoryProducts(S.activeCategoryId,S.activeCategoryName||'Category');return;}
@@ -270,7 +287,7 @@
         liveCategories=Array.isArray(response.data)?response.data:[];
       }
       var cards=liveCategories.map(function(cat){
-        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'"><span class="ml-category-photo" style="'+mlCategoryStyle(cat.name)+'"></span><span class="ml-category-card-name">'+esc(cat.name||'Category')+'</span></button>';
+        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'">'+mlCategoryPhotoMarkup(cat.name,'ml-category-photo')+'<span class="ml-category-card-name">'+esc(cat.name||'Category')+'</span></button>';
       }).join('');
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">FIND YOUR ESSENTIALS</div><h3>Shop by category</h3></div><button type="button" onclick="switchTab(\'home\')">← Home</button></div>'+
         (cards?'<div class="ml-category-grid">'+cards+'</div>':'<div class="ml-empty"><b>No live categories yet</b><span>Categories will appear when published by MarketLink.</span></div>')+'</div>';
@@ -347,7 +364,7 @@
   function renderPremiumHome(){
     var root=G('tab-home');if(!root)return;
     var catHtml=liveCategories.slice(0,12).map(function(c){
-      return '<button type="button" class="ml-cat" data-ml-category-id="'+esc(liveProductId(c.id))+'" data-ml-category-name="'+esc(c.name||'Category')+'"><span class="ml-cat-photo" style="'+mlCategoryStyle(c.name)+'"></span><span class="ml-cat-name">'+esc(c.name)+'</span></button>';
+      return '<button type="button" class="ml-cat" data-ml-category-id="'+esc(liveProductId(c.id))+'" data-ml-category-name="'+esc(c.name||'Category')+'">'+mlCategoryPhotoMarkup(c.name,'ml-cat-photo')+'<span class="ml-cat-name">'+esc(c.name)+'</span></button>';
     }).join('');
     if(!catHtml) catHtml='<div class="ml-empty" style="width:100%;box-sizing:border-box;"><b>Categories are being prepared</b><span>Live categories will appear here as soon as they are published.</span></div>';
     var prodHtml=liveProducts.map(function(p){return productCard(p);}).join('');
@@ -488,7 +505,7 @@
     var link=(typeof buildAffiliateShareLink==='function'&&buildAffiliateShareLink())||'Your personal link will appear after your affiliate profile is available.';
     var pct=Number(affiliateData&&affiliateData.commissionPct!=null?affiliateData.commissionPct:2);
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK AFFILIATE</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Share value. Earn rewards.</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div>'+
-      '<section class="ml-affiliate-hero"><div class="ml-affiliate-hero-copy"><span class="ml-affiliate-label">YOUR REFERRAL REWARD</span><div class="ml-affiliate-big">'+pct+'<span>%</span></div><h4>Earn 2% of eligible merchandise.</h4><p>Share your unique MarketLink link. When someone places a qualifying order through your link, you can earn 2% of the eligible discounted merchandise subtotal after successful delivery.</p><small>Rewards are funded from MarketLink’s platform commission, not added to the customer’s price.</small></div><div class="ml-affiliate-hero-art"><div class="ml-affiliate-link-icon">🔗</div><span>SHARE</span><b>SHOP</b><em>EARN</em></div></section>'+
+      '<section class="ml-affiliate-hero"><div class="ml-affiliate-hero-copy"><span class="ml-affiliate-label">YOUR REFERRAL REWARD</span><div class="ml-affiliate-big">'+pct+'<span>%</span></div><h4>Earn 2% of eligible merchandise.</h4><p>Share your unique MarketLink link. When someone places a qualifying order through your link, you can earn 2% of the eligible discounted merchandise subtotal after successful delivery.</p><small>Rewards are funded from MarketLink’s platform commission, not added to the customer’s price.</small></div><div class="ml-affiliate-hero-art ml-affiliate-hero-photo"><img class="ml-affiliate-hero-image" src="./assets/promo-shopping.webp" alt="Customers discovering products at a local supermarket" loading="lazy" decoding="async" onerror="this.onerror=null;this.style.display='none';this.parentElement.classList.add('ml-affiliate-hero-photo-failed')"><div class="ml-affiliate-art-label"><b>2%</b><span>ON ELIGIBLE ORDERS</span></div></div></section>'+
       '<div class="ml-stat-grid ml-affiliate-stats"><div class="ml-stat"><div class="ml-stat-label">Total rewards</div><div class="ml-stat-value">'+money(S.affiliateEarnings||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(S.affiliateClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referred orders</div><div class="ml-stat-value">'+Number(S.affiliateOrders||0)+'</div></div></div>'+
       '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your personal affiliate link</b><span>Share it on WhatsApp or with friends and family.</span></div><span>🔗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Affiliate referral link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><div class="ml-affiliate-footnote">The 2% reward applies to eligible discounted merchandise subtotal on qualifying purchases attributed to your link, after successful delivery. Delivery fees are excluded. Your live statistics above come from your MarketLink account.</div></div>'+
       '<section class="ml-affiliate-rules"><div class="ml-eyebrow">PROGRAM RULES</div><h4>How your 2% reward works</h4><ul>'+
