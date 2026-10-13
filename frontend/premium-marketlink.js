@@ -455,16 +455,19 @@
   }
   function mlCategoryStyle(name){
     var n=String(name||'').toLowerCase(),atlas='./assets/marketlink-category-atlas.webp';
-    if(/onion/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:50% 0%;';
-    if(/rice|grain|cereal/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:100% 0%;';
-    if(/tomato/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:0% 0%;';
-    if(/carrot/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:50% 100%;';
-    if(/fufu|benachin|benetin|domoda|meal|prepared food|cooked|restaurant|fish|meat|chicken|seafood|bakery|snack/.test(n))return '--ml-category-image:url("./assets/promo-shopping.webp");--ml-category-size:cover;--ml-category-position:center;';
-    if(/clothing|fashion|shoe|fabric|tailor|apparel|jewel|accessor|beauty|cosmetic/.test(n))return '--ml-category-image:url("./assets/promo-vendor.webp");--ml-category-size:cover;--ml-category-position:center;';
-    if(/fresh|leaf|green|vegetable|fruit|produce|grocery|grocer|cook|oil|spice|pantry|household|kitchen|home/.test(n))return '--ml-category-image:url("./assets/hero-marketlink-bag.webp");--ml-category-size:cover;--ml-category-position:center;';
+    // URLs are deliberately unquoted inside the inline style attribute. Nested
+    // double-quotes previously broke that attribute and caused some category tiles
+    // to lose their intended asset mapping.
+    if(/onion/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:50% 0%;';
+    if(/rice|grain|cereal/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:100% 0%;';
+    if(/tomato/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:0% 0%;';
+    if(/carrot/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:50% 100%;';
+    if(/fufu|benachin|benetin|domoda|meal|prepared food|cooked|restaurant|fish|meat|chicken|seafood|bakery|snack/.test(n))return '--ml-category-image:url(./assets/promo-shopping.webp);--ml-category-size:cover;--ml-category-position:center;';
+    if(/clothing|fashion|shoe|fabric|tailor|apparel|jewel|accessor|beauty|cosmetic/.test(n))return '--ml-category-image:url(./assets/promo-vendor.webp);--ml-category-size:cover;--ml-category-position:center;';
+    if(/fresh|leaf|green|vegetable|fruit|produce|grocery|grocer|cook|oil|spice|pantry|household|kitchen|home/.test(n))return '--ml-category-image:url(./assets/hero-marketlink-bag.webp);--ml-category-size:cover;--ml-category-position:center;';
     var choices=['./assets/promo-shopping.webp','./assets/promo-vendor.webp','./assets/hero-marketlink-bag.webp'],hash=0;
     for(var i=0;i<n.length;i++)hash=(hash+n.charCodeAt(i))%choices.length;
-    return '--ml-category-image:url("'+choices[hash]+'");--ml-category-size:cover;--ml-category-position:center;';
+    return '--ml-category-image:url('+choices[hash]+');--ml-category-size:cover;--ml-category-position:center;';
   }
   function mlCategoryEmoji(name){
     var n=String(name||'').toLowerCase();
@@ -666,7 +669,8 @@
         configured:Boolean(capabilityData&&capabilityData.configured),
         mode:String(capabilityData&&capabilityData.mode||'merchant'),
         directMobileMoney:Boolean(capabilityData&&capabilityData.directMobileMoney),
-        hostedCheckout:Boolean(capabilityData&&capabilityData.hostedCheckout)
+        hostedCheckout:Boolean(capabilityData&&capabilityData.hostedCheckout),
+        setupReason:String(capabilityData&&capabilityData.setupReason||'')
       };
     }catch(capabilityError){
       // Fail closed: a capability check error must never leave a previously cached
@@ -830,7 +834,7 @@
       caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout)};
       S.paymentCapabilities=caps;
     }catch(e){}
-    var providerStatus=!caps.configured?'Mobile-money payments are still being set up. They will become selectable in checkout after the Modem Pay account is configured and, for direct H2H, partner approval is recorded.':caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'Modem Pay hosted checkout is configured. Continue to the secure Modem Pay payment page and choose from the methods activated for your merchant account.';
+    var providerStatus=!caps.configured?(caps.setupReason||'Mobile-money payments are still being set up. They will become selectable in checkout after Modem Pay configuration and any required H2H partner approval.'):caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'Modem Pay hosted checkout is configured. Continue to the secure Modem Pay payment page and choose from the methods activated for your merchant account.';
     var methodCards=caps.directMobileMoney
       ? '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Enter your local Wave number in checkout and follow the next step from Modem Pay.</span></div></div><div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Enter your local number, approve the phone prompt, then confirm you have approved it in MarketLink.</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Enter your local number and provide the temporary code only if Modem Pay requests it for this payment.</span></div></div>'
       : '<div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>Modem Pay secure checkout</b><span>'+(caps.configured?'Choose one of the payment options activated for the MarketLink merchant account on Modem Pay’s payment page.':'Available after provider setup is complete.')+'</span></div></div>';
