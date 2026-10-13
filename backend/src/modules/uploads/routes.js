@@ -40,7 +40,8 @@ router.delete('/by-url',
   ctrl.deleteByUrl
 );
 
-router.get('/:id/content', authenticate, [param('id').isUUID()], validate, ctrl.getContent);
+router.get('/:id/content-public', authenticate, [param('id').isUUID()], validate, ctrl.getContent);
+router.get('/:id/profile-content', [param('id').isUUID()], validate, ctrl.getPublicProfileContent);
 
 router.delete('/:id',
   authenticate,
