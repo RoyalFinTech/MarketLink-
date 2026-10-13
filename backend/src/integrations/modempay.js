@@ -44,7 +44,9 @@ async function modemRequest(path, { method='GET', body, idempotencyKey } = {}) {
       method, headers, body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (err) {
-    throw new AppError('Could not connect to Modem Pay. Please try again shortly.', 503, 'PROVIDER_UNAVAILABLE');
+    // The request may have reached the provider before the connection failed.
+    // Preserve an unknown payment outcome for reconciliation instead of declaring failure.
+    throw new AppError('Modem Pay did not return a response. The payment status must be checked before trying again.', 503, 'MODEM_PAY_NETWORK_ERROR');
   }
   const text = await response.text();
   let data;
