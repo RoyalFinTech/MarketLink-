@@ -34,9 +34,9 @@ async function updateProfile(customerId, data) {
     userSets.push(`full_name = $${upi++}`);
     userParams.push(fullName.trim());
   }
-  if (displayName !== undefined) { custSets.push(`display_name = ${cpi++}`); custParams.push(displayName && displayName.trim() ? displayName.trim() : null); }
-  if (bio !== undefined) { custSets.push(`bio = ${cpi++}`); custParams.push(bio && bio.trim() ? bio.trim() : null); }
-  if (dateOfBirth !== undefined) { custSets.push(`date_of_birth = ${cpi++}`); custParams.push(dateOfBirth || null); }
+  if (displayName !== undefined) { custSets.push(`display_name = $${cpi++}`); custParams.push(displayName && displayName.trim() ? displayName.trim() : null); }
+  if (bio !== undefined) { custSets.push(`bio = $${cpi++}`); custParams.push(bio && bio.trim() ? bio.trim() : null); }
+  if (dateOfBirth !== undefined) { custSets.push(`date_of_birth = $${cpi++}`); custParams.push(dateOfBirth || null); }
   if (gender      !== undefined) { custSets.push(`gender = $${cpi++}`);        custParams.push(gender); }
   if (profilePhotoUrl !== undefined) {
     custSets.push(`profile_photo_url = $${cpi++}`);
