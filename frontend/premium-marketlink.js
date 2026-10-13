@@ -778,22 +778,57 @@
     }catch(e){toast(e.error||'Could not remove your profile photo. Please try again.','error');}
   }
   function editProfileModal(){
-    var n=liveProfile&&liveProfile.full_name||S.profileName||S.user&&S.user.name||'';
+    var fullName=liveProfile&&liveProfile.full_name||S.profileName||S.user&&S.user.name||'';
+    var displayName=liveProfile&&liveProfile.display_name||fullName;
+    var bio=liveProfile&&liveProfile.bio||'';
     var dob=liveProfile&&liveProfile.date_of_birth||'',gender=liveProfile&&liveProfile.gender||'';
-    var html='<div class="ml-modal-form"><label>Display name</label><input id="ml-edit-name" value="'+esc(n)+'" maxlength="80"><label>Date of birth</label><input id="ml-edit-dob" type="date" value="'+esc(String(dob).slice(0,10))+'"><label>Gender</label><select id="ml-edit-gender"><option value="">Prefer not to say</option><option '+(gender==='male'?'selected':'')+' value="male">Male</option><option '+(gender==='female'?'selected':'')+' value="female">Female</option></select><div class="ml-modal-actions"><button class="ml-btn ml-btn-secondary" onclick="closeSheet(\'sh-profile-edit\')">Cancel</button><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.saveProfile()">Save changes</button></div></div>';
+    var html='<div class="ml-modal-form ml-profile-editor">'+
+      '<div class="ml-profile-editor-note"><span class="ml-profile-editor-note-icon">🔐</span><span>Your verified phone number stays linked to your account. Contact support if it needs to be changed.</span></div>'+
+      '<label for="ml-edit-full-name">Full name</label><input id="ml-edit-full-name" autocomplete="name" value="'+esc(fullName)+'" maxlength="150" placeholder="Enter your full name" required>'+
+      '<label for="ml-edit-display-name">Display name</label><input id="ml-edit-display-name" autocomplete="nickname" value="'+esc(displayName)+'" maxlength="80" placeholder="What should people call you?">'+
+      '<label for="ml-edit-bio">About you <span class="ml-form-optional">Optional</span></label><textarea id="ml-edit-bio" rows="3" maxlength="280" placeholder="A short introduction about yourself">'+esc(bio)+'</textarea><small class="ml-profile-bio-count">'+String(bio).length+'/280 characters</small>'+
+      '<label for="ml-edit-dob">Date of birth <span class="ml-form-optional">Optional</span></label><input id="ml-edit-dob" type="date" value="'+esc(String(dob).slice(0,10))+'">'+
+      '<label for="ml-edit-gender">Gender <span class="ml-form-optional">Optional</span></label><select id="ml-edit-gender"><option value="" '+(!gender?'selected':'')+'>Prefer not to say</option><option '+(gender==='male'?'selected':'')+' value="male">Male</option><option '+(gender==='female'?'selected':'')+' value="female">Female</option><option '+(gender==='other'?'selected':'')+' value="other">Other</option></select>'+
+      '<div class="ml-modal-actions"><button type="button" class="ml-btn ml-btn-secondary" onclick="closeSheet(\\'sh-profile-edit\\')">Cancel</button><button type="button" class="ml-btn ml-btn-primary" id="ml-save-profile-button" onclick="window.ML_Premium.saveProfile()">Save changes</button></div></div>';
     var sh=G('sh-profile-edit');
     if(!sh){sh=document.createElement('div');sh.id='sh-profile-edit';sh.className='sheet';document.body.appendChild(sh);}
-    sh.innerHTML='<div class="sheet-in"><div class="sheet-hdr"><span>Edit profile</span><button class="sheet-cls" onclick="closeSheet(\'sh-profile-edit\')">×</button></div>'+html+'</div>';
+    sh.innerHTML='<div class="sheet-in"><div class="sheet-hdr"><span>Edit your profile</span><button class="sheet-cls" onclick="closeSheet(\\'sh-profile-edit\\')" aria-label="Close edit profile">×</button></div>'+html+'</div>';
     openSheet('sh-profile-edit');
+    var bioInput=G('ml-edit-bio'),bioCount=sh.querySelector('.ml-profile-bio-count');
+    if(bioInput&&bioCount)bioInput.addEventListener('input',function(){bioCount.textContent=String(bioInput.value.length)+'/280 characters';});
   }
   async function saveProfile(){
-    var name=G('ml-edit-name')&&G('ml-edit-name').value.trim();
-    if(!name){toast('Display name is required.','error');return;}
+    var fullName=G('ml-edit-full-name')&&G('ml-edit-full-name').value.trim();
+    var displayName=G('ml-edit-display-name')&&G('ml-edit-display-name').value.trim();
+    var bio=G('ml-edit-bio')&&G('ml-edit-bio').value.trim();
+    var dateOfBirth=G('ml-edit-dob')&&G('ml-edit-dob').value||null;
+    var gender=G('ml-edit-gender')&&G('ml-edit-gender').value||null;
+    if(!fullName){toast('Please enter your full name.','error');if(G('ml-edit-full-name'))G('ml-edit-full-name').focus();return;}
+    if(fullName.length>150||displayName.length>80||bio.length>280){toast('Please shorten the profile details to fit the fields.','error');return;}
+    var saveButton=G('ml-save-profile-button');
+    if(saveButton){saveButton.disabled=true;saveButton.textContent='Saving…';}
     try{
-      var r=await ML_API.customers.updateProfile({fullName:name,dateOfBirth:G('ml-edit-dob')&&G('ml-edit-dob').value||undefined,gender:G('ml-edit-gender')&&G('ml-edit-gender').value||undefined});
-      liveProfile=r.data||liveProfile;S.profileName=name;if(S.user)S.user.name=name;
-      closeSheet('sh-profile-edit');renderPremiumProfile();toast('Profile updated ✓');
-    }catch(e){toast(e.error||'Could not update profile.','error');}
+      var response=await ML_API.customers.updateProfile({
+        fullName:fullName,
+        displayName:displayName||fullName,
+        bio:bio||null,
+        dateOfBirth:dateOfBirth,
+        gender:gender
+      });
+      liveProfile=response&&response.data||liveProfile||{};
+      liveProfile.full_name=fullName;
+      liveProfile.display_name=displayName||fullName;
+      liveProfile.bio=bio||null;
+      S.profileName=displayName||fullName;
+      S.profileFullName=fullName;
+      if(S.user){S.user.name=fullName;S.user.displayName=displayName||fullName;}
+      closeSheet('sh-profile-edit');
+      await renderPremiumProfile();
+      toast('Your profile has been updated.','success');
+    }catch(e){
+      toast(e.error||'Could not update your profile. Please try again.','error');
+      if(saveButton){saveButton.disabled=false;saveButton.textContent='Save changes';}
+    }
   }
   function renderPremiumAffiliatePage(root,affiliateData){
     var link=(typeof buildAffiliateShareLink==='function'&&buildAffiliateShareLink())||'Your personal link will appear after your affiliate profile is available.';
