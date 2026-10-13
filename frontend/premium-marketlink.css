@@ -504,3 +504,56 @@
 @keyframes mlToastIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:translateY(0)}}
 #bnav .ml-global-notification-tab{position:relative;appearance:none;-webkit-appearance:none;border:0;background:transparent;font-family:inherit;cursor:pointer}#bnav .ml-global-notification-tab .ml-bell-badge{position:absolute;top:0;right:calc(50% - 20px);min-width:18px;height:18px;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg,#fff);border-radius:30px;background:#d7334c;color:#fff;font-size:9px;font-weight:900}
 @media(max-width:760px){#toast.ml-toast-card{right:12px;left:12px;top:calc(10px + env(safe-area-inset-top,0px));width:auto;max-width:none}#bnav .ntab{min-width:0;flex:1;padding-left:2px;padding-right:2px}#bnav .nl{font-size:9px}#bnav .ni{font-size:18px}}
+
+
+/* Daylight contrast audit — keep text readable across all premium account screens. */
+.lm{
+  --ml-white:#172b36;
+  --ml-muted:#526975;
+  --ml-line:rgba(23,43,54,.16);
+  --ml-glass:rgba(23,43,54,.045);
+}
+.lm .ml-hero-title,.lm .ml-section-head h3,.lm .ml-profile-name,
+.lm .ml-profile-row b,.lm .ml-product-name,.lm .ml-empty b,
+.lm .ml-category-card-name,.lm .ml-cat-name,.lm .ml-stat-value,
+.lm .ml-role-cta-heading h3,.lm .ml-role-cta-button,
+.lm .ml-compare-card>b,.lm .ml-wallet-transaction .copy b,
+.lm .ml-notification-row .copy b,.lm .ml-wishlist-row .copy b,
+.lm .ml-legal-document section h4 {color:#172b36!important}
+.lm .ml-hero-sub,.lm .ml-live-dot,.lm .ml-profile-phone,
+.lm .ml-profile-row span,.lm .ml-product-vendor,.lm .ml-stock,
+.lm .ml-stat-label,.lm .ml-empty,.lm .ml-role-cta-heading p,
+.lm .ml-role-cta-button small,.lm .ml-wallet-note,
+.lm .ml-wallet-transaction .copy span,.lm .ml-notification-row .copy span,
+.lm .ml-notification-row .copy small,.lm .ml-wishlist-row .copy span,
+.lm .ml-compare-card>span,.lm .ml-legal-document {color:#4b626e!important}
+.lm .ml-product,.lm .ml-profile-card,.lm .ml-category-card,
+.lm .ml-compare-card,.lm .ml-wishlist-row,.lm .ml-profile-row,
+.lm .ml-role-cta-button {background:#fff!important;border-color:rgba(23,43,54,.15)!important}
+.lm .ml-profile-hero,.lm .ml-wallet-hero {background:linear-gradient(135deg,#e8f4f5,#fff)!important;border-color:#d5e3e7!important}
+.lm .ml-modal-form label {color:#405965!important}
+.lm .ml-modal-form input,.lm .ml-modal-form select {background:#fff!important;color:#172b36!important;border-color:#cbd9df!important}
+.lm .ml-btn-secondary,.lm .ml-edit {background:#fff!important;color:#155e63!important;border-color:#9dbfc2!important}
+.lm .ml-cat {background:#fff!important;border-color:#d8e2e6!important}
+.lm .ml-home-search {background:#fff!important;border-color:#cbd9df!important}
+.lm .ml-home-search input {color:#172b36!important}
+.lm .ml-home-search input::placeholder {color:#526975!important;opacity:1}
+.lm .ml-role-cta-section {background:linear-gradient(135deg,#edf8f7,#fff)!important;border-color:#d5e3e7!important}
+.lm .ml-legal-document section {border-color:#d9e2e6!important}
+.lm .ml-legal-document a {color:#086f73!important}
+.lm .ml-notification-row,.lm .ml-wallet-transaction {border-color:#d9e2e6!important}
+
+/* Authentication: scroll the whole page on short screens and keep hero photography sharp. */
+#scr-auth.active {overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain}
+#scr-auth>div:first-child {background-size:cover;background-repeat:no-repeat;background-position:center center}
+#scr-auth>div:first-child img,#scr-auth .ml-auth-photo {max-width:100%;height:auto;object-fit:contain;image-rendering:auto}
+#scr-auth #auth-body {min-height:min-content;max-height:none;overflow:visible}
+@media(min-width:761px){
+  #scr-auth.active {overflow-y:auto!important;min-height:100dvh;height:auto!important}
+  #scr-auth>div:first-child {position:sticky;top:0;height:100dvh;min-height:100dvh}
+}
+@media(max-width:760px){
+  #scr-auth.active {height:100dvh!important;min-height:0!important}
+  #scr-auth>div:first-child {flex:0 0 auto}
+  #scr-auth #auth-body {padding-bottom:calc(42px + env(safe-area-inset-bottom))!important}
+}
