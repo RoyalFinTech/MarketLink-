@@ -831,7 +831,7 @@
     try{
       var response=await ML_API.payments.methods();
       var data=response&&response.data?response.data:response;
-      caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout)};
+      caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout),setupReason:String(data&&data.setupReason||'')};
       S.paymentCapabilities=caps;
     }catch(e){}
     var providerStatus=!caps.configured?(caps.setupReason||'Mobile-money payments are still being set up. They will become selectable in checkout after Modem Pay configuration and any required H2H partner approval.'):caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'Modem Pay hosted checkout is configured. Continue to the secure Modem Pay payment page and choose from the methods activated for your merchant account.';
