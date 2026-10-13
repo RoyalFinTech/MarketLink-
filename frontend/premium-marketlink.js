@@ -34,7 +34,7 @@
     if(label==='Modem Pay secure checkout')return 'modempay';
     return String(label||'').toLowerCase().replace(/\s+/g,'-');
   }
-  var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null,mlPaymentStatusTimer=null,mlPaymentStatusStarted=0;
+  var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null,mlPaymentStatusTimer=null,mlPaymentStatusStarted=0,mlOrderDetailTimer=null,mlOpenOrderDetailId=null;
   var mlPromoSlides=[
     {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
     {kind:'sell',eyebrow:'FOR LOCAL BUSINESSES',title:'Your shop. More customers.',accent:'Grow with MarketLink.',body:'Bring your business online, showcase your real products and manage incoming orders in one place.',pill:'SELL ON MARKETLINK',image:'./assets/promo-vendor.webp',cta:'Become a vendor'},
@@ -527,6 +527,7 @@
     return Number.isNaN(date.getTime())?'Date unavailable':date.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
   }
   async function renderLiveOrders(){
+    stopCustomerOrderDetailPolling();
     var root=G('orders-body');if(!root)return;
     if(!apiOk()){
       root.innerHTML='<div class="ml-empty"><div style="font-size:32px">🔐</div><b>Sign in to view your orders</b><span>Your order history is securely linked to your MarketLink account.</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="goAuth()">Sign in</button></div>';
@@ -555,19 +556,79 @@
       root.innerHTML='<div class="ml-empty"><div style="font-size:32px">📦</div><b>Order history unavailable</b><span>'+esc(e.error||e.message||'MarketLink could not load your order history.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Retry</button></div>';
     }
   }
-  async function openOrderDetail(id){
+  function stopCustomerOrderDetailPolling(){
+    if(mlOrderDetailTimer){clearInterval(mlOrderDetailTimer);mlOrderDetailTimer=null;}
+    mlOpenOrderDetailId=null;
+  }
+  function startCustomerOrderDetailPolling(id){
+    if(mlOrderDetailTimer&&String(mlOpenOrderDetailId)===String(id))return;
+    stopCustomerOrderDetailPolling();
+    mlOpenOrderDetailId=String(id);
+    mlOrderDetailTimer=setInterval(function(){
+      if(S.curTab!=='orders'||String(mlOpenOrderDetailId)!==String(id)){
+        stopCustomerOrderDetailPolling();return;
+      }
+      openOrderDetail(id,true);
+    },10000);
+  }
+  function mlTrackingTime(value){
+    if(!value)return 'Waiting for this update';
+    var d=new Date(value);
+    if(Number.isNaN(d.getTime()))return 'Update recorded';
+    return d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  }
+  async function openOrderDetail(id,silent){
     var root=G('orders-body');if(!root)return;
-    if(!id){renderLiveOrders();return;}
-    root.innerHTML='<div class="ml-loading">Loading order details…</div>';
+    if(!id){stopCustomerOrderDetailPolling();renderLiveOrders();return;}
+    if(!silent){stopCustomerOrderDetailPolling();mlOpenOrderDetailId=String(id);root.innerHTML='<div class="ml-loading">Loading live order details…</div>';}
+    else if(String(mlOpenOrderDetailId)!==String(id)||S.curTab!=='orders')return;
     try{
       var response=await ML_API.orders.getById(id),o=response&&response.data&&response.data.order?response.data.order:response&&response.data;
       if(!o)throw new Error('Order details were not returned.');
       var items=Array.isArray(o.items)?o.items:Array.isArray(o.order_items)?o.order_items:[];
-      var status=mlOrderStatusLabel(o.status);
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">ORDER DETAILS</div><h2>'+esc(o.order_number||'MarketLink order')+'</h2><p class="ml-hero-sub">'+mlOrderDate(o.placed_at||o.created_at)+'</p></div><button type="button" onclick="window.ML_Premium.openOrders()">← All orders</button></div>'+
-        '<div class="ml-live-order-card"><div class="ml-live-order-top"><b>Status</b><span class="ml-live-order-status active">'+esc(status)+'</span></div><div class="ml-profile-row"><div class="ico">🏪</div><div class="copy"><b>Vendor</b><span>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>Payment</b><span>'+esc(String(o.payment_method||'Not listed').replace(/_/g,' '))+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</span></div></div><div class="ml-profile-row"><div class="ico">📦</div><div class="copy"><b>Items</b><span>'+(items.length?items.map(function(it){return esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1);}).join('<br>'):'Item details unavailable')+'</span></div></div><div class="ml-live-order-bottom"><div><span>Total</span><strong>'+money(o.total||0)+'</strong></div><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openOrders()">Back to history</button></div></div></div>';
+      var current=String(o.status||'pending').toLowerCase();
+      var steps=[
+        {keys:['pending'],title:'Order received',body:'MarketLink has received your order.'},
+        {keys:['accepted'],title:'Vendor confirmed',body:'The vendor has accepted your order.'},
+        {keys:['preparing','awaiting_rider'],title:'Preparing your order',body:'The vendor is preparing your items and arranging collection.'},
+        {keys:['rider_assigned'],title:'Rider assigned',body:'A delivery rider has been assigned to your order.'},
+        {keys:['picked_up'],title:'Picked up',body:'The rider has collected your order.'},
+        {keys:['on_the_way'],title:'On the way',body:'Your order is on its way to the delivery address.'},
+        {keys:['delivered'],title:'Delivered',body:'Your order has been marked as delivered.'}
+      ];
+      var progressIndex=steps.findIndex(function(st){return st.keys.indexOf(current)>-1;});
+      if(current==='awaiting_rider')progressIndex=2;
+      if(progressIndex<0)progressIndex=0;
+      var history=Array.isArray(o.status_history)?o.status_history:[];
+      var terminal=['delivered','cancelled','failed','refunded'].indexOf(current)>-1;
+      var closed=['cancelled','failed','refunded'].indexOf(current)>-1;
+      var progressHtml=steps.map(function(st,index){
+        var found=history.filter(function(event){return st.keys.indexOf(String(event.status||'').toLowerCase())>-1;}).pop();
+        var done=index<progressIndex||(current==='delivered'&&index<=progressIndex);
+        var active=index===progressIndex&&!closed;
+        var cls=done?'done':active?'current':'upcoming';
+        var mark=done?'✓':active?'•':String(index+1);
+        return '<div class="ml-tracking-step '+cls+'"><span class="ml-tracking-step-marker">'+mark+'</span><div class="ml-tracking-step-copy"><b>'+esc(st.title)+'</b><p>'+esc(st.body)+'</p><small>'+esc(found?mlTrackingTime(found.changed_at):active?'Current status · '+mlOrderStatusLabel(current):'')+'</small>'+(found&&found.note?'<span class="ml-tracking-note">'+esc(found.note)+'</span>':'')+'</div></div>';
+      }).join('');
+      var ratio=Math.max(0,Math.min(100,progressIndex/(steps.length-1)*100));
+      var deliveryDetails=o.rider_name?'<div class="ml-tracking-meta-row"><span>Delivery rider</span><b>'+esc(o.rider_name)+'</b></div>':'';
+      if(o.estimated_minutes!==null&&o.estimated_minutes!==undefined)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Delivery estimate</span><b>'+Number(o.estimated_minutes)+' minutes (estimate)</b></div>';
+      if(o.distance_km!==null&&o.distance_km!==undefined)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Route distance</span><b>'+Number(o.distance_km).toFixed(1)+' km</b></div>';
+      var statusClass=current==='delivered'?'delivered':closed?'closed':'active';
+      var closedNotice=closed?'<div class="ml-tracking-issue '+(current==='cancelled'?'cancelled':'failed')+'"><b>'+esc(mlOrderStatusLabel(current))+'</b><span>'+(current==='cancelled'?'This order was cancelled. Contact support if you need help with a payment or refund.':current==='refunded'?'The order is marked as refunded. Check payment history for the confirmed refund record.':'The order could not be completed. Contact MarketLink support for assistance.')+'</span></div>':'';
+      var timeline=history.length?'<div class="ml-tracking-history"><h4>Latest order updates</h4>'+history.slice().reverse().slice(0,8).map(function(ev){return '<div class="ml-tracking-history-row"><span class="ml-tracking-history-dot"></span><div><b>'+esc(mlOrderStatusLabel(ev.status))+'</b><small>'+esc(mlTrackingTime(ev.changed_at))+'</small>'+(ev.note?'<p>'+esc(ev.note)+'</p>':'')+'</div></div>';}).join('')+'</div>':'';
+      root.innerHTML='<div class="ml-premium-home ml-order-tracking-page"><div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK ORDER TRACKING</div><h2>'+esc(o.order_number||'Your order')+'</h2><p class="ml-hero-sub">Placed '+esc(mlOrderDate(o.placed_at||o.created_at))+'</p></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openOrders()">← Order history</button></div>'+
+        '<section class="ml-tracking-hero"><div class="ml-tracking-hero-top"><div><span class="ml-tracking-label">CURRENT ORDER STATUS</span><h3>'+esc(mlOrderStatusLabel(current))+'</h3><p>'+(closed?'The order needs attention.':current==='delivered'?'Your delivery has been completed.': 'Your order progress refreshes automatically every 10 seconds while this page is open.')+'</p></div><span class="ml-live-order-status '+statusClass+'">'+esc(mlOrderStatusLabel(current))+'</span></div>'+
+        (!closed?'<div class="ml-tracking-progress"><span style="width:'+(current==='delivered'?100:ratio)+'%"></span></div>':'')+
+        (closedNotice||'<div class="ml-tracking-steps">'+progressHtml+'</div>')+
+        '</section>'+
+        '<section class="ml-tracking-info-grid"><div class="ml-live-order-card"><div class="ml-section-head"><h3>Delivery details</h3></div>'+(deliveryDetails||'<p class="ml-tracking-empty">Rider and delivery estimate will appear here when they are assigned by the live delivery system.</p>')+'</div>'+
+        '<div class="ml-live-order-card"><div class="ml-section-head"><h3>Order summary</h3></div><div class="ml-tracking-meta-row"><span>Vendor</span><b>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</b></div><div class="ml-tracking-meta-row"><span>Payment</span><b>'+esc(String(o.payment_method||'Not listed').replace(/_/g,' '))+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</b></div><div class="ml-tracking-meta-row"><span>Total</span><b>'+money(o.total||0)+'</b></div><div class="ml-tracking-items">'+(items.length?items.map(function(it){return '<div><span>'+esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1)+'</span><b>'+money(it.total||it.line_total||Number(it.price||it.unit_price||0)*Number(it.qty||it.quantity||1))+'</b></div>';}).join(''):'<span>Item details unavailable</span>')+'</div></div></section>'+
+        timeline+
+        '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order updates come from MarketLink’s live order status. GPS location is shown only if the delivery system supplies rider-location data.</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\\''+esc(String(o.id||id))+'\\')">Refresh now ↻</button></div></div>';
+      if(terminal)stopCustomerOrderDetailPolling();else startCustomerOrderDetailPolling(id);
     }catch(e){
-      root.innerHTML='<div class="ml-empty"><b>Could not open this order</b><span>'+esc(e.error||e.message||'The order may no longer be available.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Back to order history</button></div>';
+      if(!silent)root.innerHTML='<div class="ml-empty"><b>Could not open this order</b><span>'+esc(e.error||e.message||'The order may no longer be available.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Back to order history</button></div>';
     }
   }
   function renderPremiumHome(){
@@ -1467,6 +1528,7 @@
   window.adminGoTo=adminGoToLive;
     window.ML_Premium={toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
+    if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
     var target=G('tab-'+tab);if(target)target.style.display='block';
