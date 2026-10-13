@@ -726,13 +726,39 @@
       if(liveProfile){S.profileName=liveProfile.full_name||'';S.profilePhone=liveProfile.phone||'';S.profilePhoto=liveProfile.profile_photo_url||null;}
     }catch(e){}
   }
+  async function getProfileImageDimensions(file){
+    if(typeof createImageBitmap==='function'){
+      var bitmap=await createImageBitmap(file);
+      var dimensions={width:bitmap.width,height:bitmap.height};
+      if(bitmap.close)bitmap.close();
+      return dimensions;
+    }
+    return await new Promise(function(resolve,reject){
+      var reader=new FileReader();
+      reader.onerror=function(){reject(new Error('This image could not be read. Please choose a valid JPG or PNG.'));};
+      reader.onload=function(){
+        var image=new Image();
+        image.onload=function(){resolve({width:image.naturalWidth,height:image.naturalHeight});};
+        image.onerror=function(){reject(new Error('This image could not be read. Please choose a valid JPG or PNG.'));};
+        image.src=String(reader.result||'');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
   async function saveProfilePhoto(file){
     if(!file)return false;
     if(!apiOk()){toast('Please sign in again before changing your profile photo.','error');return false;}
-    var allowed=['image/jpeg','image/png','image/webp','image/gif'];
-    if(allowed.indexOf(file.type)<0){toast('Choose a JPG, PNG, WebP or GIF image.','error');return false;}
-    if(file.size>5*1024*1024){toast('Choose an image smaller than 5 MB.','error');return false;}
+    var allowed=['image/jpeg','image/png'];
+    if(allowed.indexOf(file.type)<0){toast('Profile photos must be JPG/JPEG or PNG.','error');return false;}
+    if(file.size>5*1024*1024){toast('Profile photos must be no larger than 5 MB. Please choose a smaller image.','error');return false;}
     if(file.size<=0){toast('The selected image is empty. Please choose another photo.','error');return false;}
+    try{
+      var dimensions=await getProfileImageDimensions(file);
+      if(dimensions.width<512||dimensions.height<512){
+        toast('Choose a photo that is at least 512 × 512 pixels. Your photo has not been uploaded.','error');
+        return false;
+      }
+    }catch(imageReadError){toast(imageReadError.message||'Could not read this image. Please choose a valid JPG or PNG.','error');return false;}
     var oldPhoto=liveProfile&&liveProfile.profile_photo_url||S.profilePhoto||null;
     var uploadedUrl=null;
     try{
@@ -1069,7 +1095,7 @@
       });
     }
     var photo=p.profile_photo_url||S.profilePhoto;
-    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photo)+'" alt="Profile photo" loading="lazy" decoding="async">':'');
+    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photo)+'" alt="Profile photo" loading="lazy" decoding="async" onerror="this.onerror=null;this.remove();">':'');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
     var upgradeHtml='',userRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
     if(userRoles.indexOf('vendor')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-upgrade-icon">🏪</span><span><b>Open Vendor Dashboard</b><span>Manage products, orders and store activity</span></span><span class="arrow">›</span></button>';
@@ -1094,8 +1120,8 @@
       return '<button type="button" class="ml-profile-link" onclick="window.ML_Premium.openProfilePage(\''+item.page+'\')"><span class="ico">'+item.icon+'</span><span class="copy"><b>'+esc(item.title)+'</b><span>'+esc(item.desc)+'</span></span><span class="arrow" aria-hidden="true">›</span></button>';
     }).join('');
     root.innerHTML='<div class="ml-profile-shell">'+
-      '<div class="ml-profile-hero"><div class="ml-profile-avatar-wrap"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.pickPhoto()" aria-label="Change profile photo">'+avatar+'<span class="ml-avatar-camera" aria-hidden="true">📷</span></button><div class="ml-avatar-actions"><button type="button" class="ml-photo-action" onclick="window.ML_Premium.pickPhoto()">Change photo</button>'+(photo?'<button type="button" class="ml-photo-action ml-photo-remove" onclick="window.ML_Premium.removeProfilePhoto()">Remove</button>':'')+'</div><input type="file" id="ml-profile-photo-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"></div><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">👤</div><div class="copy"><b>Full name</b><span>'+esc(fullName)+'</span></div></div><div class="ml-profile-row"><div class="ico">✨</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div>'+(p.bio?'<div class="ml-profile-row ml-profile-about-row"><div class="ico">💬</div><div class="copy"><b>About you</b><span>'+esc(p.bio)+'</span></div></div>':'')+
+      '<div class="ml-profile-hero"><div class="ml-profile-avatar-wrap"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.pickPhoto()" aria-label="Change profile photo">'+avatar+'<span class="ml-avatar-camera" aria-hidden="true">📷</span></button><div class="ml-avatar-actions"><button type="button" class="ml-photo-action" onclick="window.ML_Premium.pickPhoto()">Change photo</button>'+(photo?'<button type="button" class="ml-photo-action ml-photo-remove" onclick="window.ML_Premium.removeProfilePhoto()">Remove</button>':'')+'</div><div class="ml-photo-guidance">JPG or PNG · at least 512 × 512 px · maximum 5 MB</div><input type="file" id="ml-profile-photo-input" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"></div><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">👤</div><div class="copy"><b>Full name</b><span>'+esc(fullName)+'</span></div></div><div class="ml-profile-row"><div class="ico">✨</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div><div class="ml-profile-row"><div class="ico">🎂</div><div class="copy"><b>Date of birth</b><span>'+esc(p.date_of_birth?String(p.date_of_birth).slice(0,10):'Not added yet')+'</span></div></div><div class="ml-profile-row"><div class="ico">🧾</div><div class="copy"><b>Gender</b><span>'+esc(p.gender?({'male':'Male','female':'Female','other':'Other','prefer_not_to_say':'Prefer not to say'}[p.gender]||String(p.gender)):'Not added yet')+'</span></div></div>'+(p.bio?'<div class="ml-profile-row ml-profile-about-row"><div class="ico">💬</div><div class="copy"><b>About you</b><span>'+esc(p.bio)+'</span></div></div>':'')+
       '<button type="button" class="ml-profile-row ml-profile-row-button ml-appearance-row" onclick="window.ML_Premium.toggleAppearance()"><div class="ico">'+(S.dark?'🌙':'☀️')+'</div><div class="copy"><b>Appearance · '+(S.dark?'Night mode':'Daylight mode')+'</b><span>'+(S.dark?'Night mode is active. Tap here to switch to Daylight.':'Daylight mode is active. Tap here to switch to Night.')+'</span></div><b class="ml-profile-arrow">›</b></button>'+applicationHtml+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'wallet\')"><div class="ico">💰</div><div class="copy"><b>Royal Wallet</b><span>Available balance · '+money(p.wallet_balance||S.walletBalance||0)+'</span></div><b class="ml-profile-arrow">›</b></button>'+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openOrders()"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>'+Number(p.total_orders||0)+' completed orders · '+money(p.total_spent||0)+' spent</span></div><b class="ml-profile-arrow">›</b></button>'+
