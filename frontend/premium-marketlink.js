@@ -791,8 +791,17 @@
       '<label for="ml-edit-gender">Gender <span class="ml-form-optional">Optional</span></label><select id="ml-edit-gender"><option value="" '+(!gender?'selected':'')+'>Prefer not to say</option><option '+(gender==='male'?'selected':'')+' value="male">Male</option><option '+(gender==='female'?'selected':'')+' value="female">Female</option><option '+(gender==='other'?'selected':'')+' value="other">Other</option></select>'+
       '<div class="ml-modal-actions"><button type="button" class="ml-btn ml-btn-secondary" onclick="closeSheet(\'sh-profile-edit\')">Cancel</button><button type="button" class="ml-btn ml-btn-primary" id="ml-save-profile-button" onclick="window.ML_Premium.saveProfile()">Save changes</button></div></div>';
     var sh=G('sh-profile-edit');
-    if(!sh){sh=document.createElement('div');sh.id='sh-profile-edit';sh.className='sheet';document.body.appendChild(sh);}
-    sh.innerHTML='<div class="sheet-in"><div class="sheet-hdr"><span>Edit your profile</span><button class="sheet-cls" onclick="closeSheet(\'sh-profile-edit\')" aria-label="Close edit profile">×</button></div>'+html+'</div>';
+    if(!sh){
+      sh=document.createElement('div');
+      sh.id='sh-profile-edit';
+      sh.className='sheet-ov';
+      sh.setAttribute('role','dialog');
+      sh.setAttribute('aria-modal','true');
+      sh.setAttribute('aria-labelledby','ml-profile-edit-title');
+      document.body.appendChild(sh);
+    }
+    sh.classList.add('ml-profile-edit-overlay');
+    sh.innerHTML='<div class="sheet ml-profile-edit-sheet"><div class="sheet-hdr"><span id="ml-profile-edit-title">Edit your profile</span><button type="button" class="sheet-cls" onclick="closeSheet(\\'sh-profile-edit\\')" aria-label="Close edit profile">×</button></div><div class="sheet-in">'+html+'</div></div>';
     openSheet('sh-profile-edit');
     var bioInput=G('ml-edit-bio'),bioCount=sh.querySelector('.ml-profile-bio-count');
     if(bioInput&&bioCount)bioInput.addEventListener('input',function(){bioCount.textContent=String(bioInput.value.length)+'/280 characters';});
