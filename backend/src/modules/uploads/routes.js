@@ -31,6 +31,17 @@ const ctrl = require('./controller');
  */
 router.post('/', authenticate, ctrl.uploadMiddleware, ctrl.uploadFile);
 
+router.delete('/profile-photo', authenticate, ctrl.removeProfilePhoto);
+
+router.delete('/by-url',
+  authenticate,
+  [body('url').isString().trim().notEmpty().isLength({ max: 1000 })],
+  validate,
+  ctrl.deleteByUrl
+);
+
+router.get('/:id/content', authenticate, [param('id').isUUID()], validate, ctrl.getContent);
+
 router.delete('/:id',
   authenticate,
   [param('id').isUUID().withMessage('Invalid file ID.')],
