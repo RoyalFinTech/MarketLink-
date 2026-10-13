@@ -23,7 +23,17 @@
   }
   function normalizeProducts(d){return Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:[]);}
   function liveProductId(id){return id==null?'':String(id);}
-  function livePaymentOptions(){return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];}
+  function livePaymentOptions(){
+    var caps=S.paymentCapabilities||{configured:false,directMobileMoney:false,hostedCheckout:false};
+    if(caps.directMobileMoney)return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];
+    if(caps.hostedCheckout)return [['Pay on Delivery','cod'],['Modem Pay secure checkout','modempay']];
+    return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];
+  }
+  function normalizePaymentChoice(label){
+    if(label==='Pay on Delivery')return 'cod';
+    if(label==='Modem Pay secure checkout')return 'modempay';
+    return String(label||'').toLowerCase().replace(/\s+/g,'-');
+  }
   var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null,mlPaymentStatusTimer=null,mlPaymentStatusStarted=0;
   var mlPromoSlides=[
     {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
@@ -301,7 +311,7 @@
       try{var ar=await ML_API.customers.getAddresses(),addresses=normalizeProducts(ar.data),def=addresses.find(function(x){return x.is_default;});if(def){addressId=String(def.id);S.delivAddressId=addressId;S.deliveryAddressId=addressId;S.delivAddr=def.full_address||S.delivAddr||'';}}catch(e){}
     }
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
-    var payLabel=S.selPay||'Pay on Delivery',payMethod=payLabel==='Pay on Delivery'?'cod':String(payLabel).toLowerCase().replace(/\s+/g,'-');
+    var payLabel=S.selPay||'Pay on Delivery',payMethod=normalizePaymentChoice(payLabel);
     var accountNumber='';
     var activePaymentCaps=S.paymentCapabilities||{configured:false,directMobileMoney:false};
     if(payMethod!=='cod'&&!activePaymentCaps.configured){
@@ -663,9 +673,15 @@
       // provider state looking ready for a new payment attempt.
       S.paymentCapabilities={configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
     }
+    var mobileChoices=['Wave','AfriMoney','QMoney'];
     if(!S.paymentCapabilities.configured&&S.selPay!=='Pay on Delivery'){
       S.selPay='Pay on Delivery';
       S.paymentAccountNumber='';
+    }else if(S.paymentCapabilities.configured&&!S.paymentCapabilities.directMobileMoney&&mobileChoices.indexOf(S.selPay)>-1){
+      S.selPay='Modem Pay secure checkout';
+      S.paymentAccountNumber='';
+    }else if(S.paymentCapabilities.directMobileMoney&&S.selPay==='Modem Pay secure checkout'){
+      S.selPay='Pay on Delivery';
     }
     var chosenPaymentLabel=S.selPay||'Pay on Delivery';
     var paymentCaps=S.paymentCapabilities||{configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
@@ -690,7 +706,7 @@
   function selectPayment(label){
     var previous=G('ml-mobile-money-number');
     if(previous)S.paymentAccountNumber=String(previous.value||'').replace(/\D/g,'').slice(0,7);
-    var method=label==='Pay on Delivery'?'cod':String(label).toLowerCase().replace(/\s+/g,'-');
+    var method=normalizePaymentChoice(label);
     if(method!=='cod'&&!(S.paymentCapabilities&&S.paymentCapabilities.configured)){
       toast('Mobile-money payments are not available yet. MarketLink is waiting for Modem Pay configuration.','warning');
       return;
@@ -814,12 +830,12 @@
       caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout)};
       S.paymentCapabilities=caps;
     }catch(e){}
-    var providerStatus=!caps.configured?'Mobile-money payments are still being set up. They will become selectable in checkout after the Modem Pay account is configured.':caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'Modem Pay hosted checkout is configured. Choose a mobile-money method in your cart to continue to the secure provider page and complete payment there.';
+    var providerStatus=!caps.configured?'Mobile-money payments are still being set up. They will become selectable in checkout after the Modem Pay account is configured and, for direct H2H, partner approval is recorded.':caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'Modem Pay hosted checkout is configured. Continue to the secure Modem Pay payment page and choose from the methods activated for your merchant account.';
+    var methodCards=caps.directMobileMoney
+      ? '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Enter your local Wave number in checkout and follow the next step from Modem Pay.</span></div></div><div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Enter your local number, approve the phone prompt, then confirm you have approved it in MarketLink.</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Enter your local number and provide the temporary code only if Modem Pay requests it for this payment.</span></div></div>'
+      : '<div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>Modem Pay secure checkout</b><span>'+(caps.configured?'Choose one of the payment options activated for the MarketLink merchant account on Modem Pay’s payment page.':'Available after provider setup is complete.')+'</span></div></div>';
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Pay when your order arrives, where this option is available for the order and delivery area.</span></div></div>'+
-      '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Pay with your Wave account through the active Modem Pay checkout flow.</span></div></div>'+
-      '<div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Approve the payment using the instructions shown by the selected provider flow.</span></div></div>'+
-      '<div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Follow the provider instructions, including a temporary authorization code if required for that transaction.</span></div></div></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Pay when your order arrives, where this option is available for the order and delivery area.</span></div></div>'+methodCards+'</div>'+
       '<div class="ml-wallet-note ml-payment-availability-note">'+paymentBrandMarkup()+'<b>'+ (caps.configured?'Modem Pay status: configured':'Modem Pay status: setup pending')+'</b><p>'+esc(providerStatus)+'</p></div>'+
       '<div class="ml-wallet-note">MarketLink confirms payment only after the provider reports a verified completed transaction. If the status is pending, check it before trying to pay again. Never share your MarketLink PIN with a vendor, rider or support agent.</div>'+
       '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\'cart\')">Go to cart and checkout →</button>'+
