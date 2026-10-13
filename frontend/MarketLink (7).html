@@ -428,6 +428,11 @@ button:active{opacity:0.82;}
 .lm #bnav{border-top-color:#E2E8F0;}
 .lm .fab-ai{box-shadow:0 4px 20px rgba(13,115,119,0.4);}
 
+
+/* Critical responsive shell: avoid the legacy 430px mobile frame flashing on desktop. */
+#app{width:100%;max-width:none;margin:0 auto;height:100dvh;}
+@media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
+@media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 </style>
 <link rel="stylesheet" href="./premium-marketlink.css?v=market-assets-20261012-r3"><script src="./premium-marketlink.js?v=market-assets-20261012-r3" defer></script></head>
 <body>
@@ -946,6 +951,25 @@ button:active{opacity:0.82;}
       <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">5. Payment Terms</strong>Payments are processed securely. MarketLink takes a service fee per transaction. Refunds subject to our refund policy.</p>
       <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">6. Governing Law</strong>These terms are governed by the laws of The Republic of The Gambia.</p>
       <p style="color:var(--mu);font-size:10px;margin-top:16px;">Contact: marketlinkgambia@gmail.com · Powered by Royal FinTech Company, The Gambia</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- Privacy Policy Sheet -->
+<div id="sh-privacy" class="sheet-ov">
+  <div class="sheet" style="max-height:92vh;">
+    <div class="sheet-hdr">
+      <span style="color:var(--tx);font-size:16px;font-weight:700;">Privacy Policy</span>
+      <button class="sheet-cls" onclick="closeSheet('sh-privacy')" aria-label="Close privacy policy">×</button>
+    </div>
+    <div style="padding:16px 18px;color:var(--mu);font-size:12px;line-height:1.7;">
+      <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">Information we use</strong>MarketLink uses the account and contact information you provide, saved delivery details, and the order, wallet and transaction information needed by the features you use.</p>
+      <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">How information is used</strong>Information supports account access, order processing, delivery coordination, account records, support and security.</p>
+      <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">Payments and service providers</strong>Available payment methods may involve third-party payment providers, which may have their own privacy terms. Review the provider terms shown when using a payment service.</p>
+      <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">Protect your account</strong>Keep your 4-digit PIN private and contact support if you suspect unauthorized account access.</p>
+      <p style="margin-bottom:12px;"><strong style="color:var(--tx);display:block;margin-bottom:4px;">Questions or requests</strong>For privacy questions or account support, contact marketlinkgambia@gmail.com or +220 407 1510.</p>
+      <p style="color:var(--mu);font-size:10px;margin-top:16px;">MarketLink Gambia · Powered by Royal FinTech Company</p>
     </div>
   </div>
 </div>
@@ -1947,7 +1971,7 @@ function renderAuth(){
       '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="S.regPhone=this.value;" style="flex:1;"></div>'+
       '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;padding:12px;background:rgba(13,115,119,0.1);border-radius:10px;border:1px solid rgba(13,115,119,0.3);">'+
       '<div id="agree-box" onclick="toggleAgree()" style="width:20px;height:20px;border-radius:5px;border:2px solid '+(S.agreed?'#0D7377':'rgba(255,255,255,0.15)')+';background:'+(S.agreed?'#0D7377':'transparent')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;">'+(S.agreed?'<span style="color:#fff;font-size:12px;font-weight:700;">✓</span>':'')+
-      '</div><div style="font-size:12px;color:var(--mu);line-height:1.5;">I agree to the <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Terms & Conditions</span> and <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Privacy Policy</span></div></div>'+
+      '</div><div style="font-size:12px;color:var(--mu);line-height:1.5;">I agree to the <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Terms & Conditions</span> and <span onclick="openSheet(\'sh-privacy\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Privacy Policy</span></div></div>'+
       '<button class="btn btn-p" onclick="doRegister()">Continue</button>'+
       '<div style="text-align:center;margin-top:16px;"><span style="color:var(--mu);font-size:13px;">Have an account? </span>'+
       '<span onclick="S.authMode=\'login\';renderAuth();" style="color:var(--pr);font-size:13px;font-weight:600;cursor:pointer;">Sign in</span></div>'+
@@ -3134,6 +3158,7 @@ function toggleDark(){
 }
 function doLogout(){
   if(!confirm('Are you sure you want to logout?')) return;
+  if(typeof ML_API!=='undefined'&&ML_API.auth){try{ML_API.auth.logout();}catch(e){}}
   S.user=null; S.cart={}; S.order=null; S.roles=[]; S.curTab='home';
   S.profilePage=null; S.profilePhoto=null;
   clearInterval(S.orderTimer); clearInterval(S.riderTimer);
@@ -6359,6 +6384,13 @@ window.addEventListener('unhandledrejection',function(e){
         link.style.cssText='display:block;width:100%;margin:12px 0 0;padding:4px 0;border:0;background:transparent;color:#0D7377;font-size:13px;font-weight:600;cursor:pointer;text-align:center;';
         loginBtn.parentNode.insertBefore(link,loginBtn.nextSibling);
       }
+    }
+    var authBody=G('auth-body');
+    if(authBody && !authBody.querySelector('.ml-auth-legal-footer')){
+      var legal=document.createElement('div');
+      legal.className='ml-auth-legal-footer';
+      legal.innerHTML="<span>By using MarketLink, you agree to our platform terms.</span><div><button type=\"button\" onclick=\"openSheet('sh-terms')\">Terms of Service</button><button type=\"button\" onclick=\"openSheet('sh-privacy')\">Privacy Policy</button></div>";
+      authBody.appendChild(legal);
     }
   };
 

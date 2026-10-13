@@ -346,6 +346,7 @@
       '<div class="ml-section-head"><h3>Browse categories</h3><button onclick="window.ML_Premium.refresh()">Refresh</button></div><div class="ml-cat-row">'+catHtml+'</div>'+
       '<div class="ml-section-head"><h3>Latest from MarketLink</h3><button onclick="window.ML_Premium.refresh()">View latest</button></div>'+
       (prodHtml?'<div class="ml-product-grid">'+prodHtml+'</div>':'<div class="ml-empty"><div style="font-size:30px">🛍️</div><b>No live products yet</b><span>When an approved vendor publishes an active product, it will appear here automatically. No demo products are being shown.</span></div>')+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button></div></footer>'+
       '</div>';
     setTimeout(initPromoCarousel,0);
     var homeRoot=G('tab-home');
@@ -471,9 +472,54 @@
       '<div class="ml-stat-grid ml-affiliate-stats"><div class="ml-stat"><div class="ml-stat-label">Total rewards</div><div class="ml-stat-value">'+money(S.affiliateEarnings||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(S.affiliateClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referred orders</div><div class="ml-stat-value">'+Number(S.affiliateOrders||0)+'</div></div></div>'+
       '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your personal affiliate link</b><span>Share it on WhatsApp or with friends and family.</span></div><span>🔗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Affiliate referral link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><div class="ml-affiliate-footnote">The 2% reward applies to eligible discounted merchandise subtotal on qualifying purchases attributed to your link, after successful delivery. Delivery fees are excluded. Your live statistics above come from your MarketLink account.</div></div></div>';
   }
+  function renderPremiumPolicyPage(root,key){
+    var policies={
+      terms:{title:'Terms of Service',sections:[
+        ['Your account and PIN','Provide accurate registration details and keep your 4-digit PIN private. You are responsible for activity carried out through your account. Contact MarketLink if you suspect unauthorized access.'],
+        ['Marketplace listings','Vendors are responsible for accurate listings, availability, pricing and lawful sale of their goods. Product availability and final prices can change; review your basket before confirming an order.'],
+        ['Orders and payments','Review the order total, delivery charges and any displayed service fees before confirming. Use only the payment options presented in MarketLink checkout. Payment providers may apply their own terms.'],
+        ['Delivery responsibilities','Provide a complete address and reachable contact number. Riders must follow applicable road-safety rules and handle orders responsibly. Delivery estimates can vary with availability, traffic and other conditions.'],
+        ['Responsible use and disputes','Do not use MarketLink for fraud, harassment or unlawful activity. Report order problems through support so the parties can review the order and available remedies.'],
+        ['Applicable law','These terms are intended to operate in accordance with applicable laws of The Gambia. MarketLink may update in-app terms as the service develops.']
+      ]},
+      privPolicy:{title:'Privacy Policy',sections:[
+        ['Information used by the service','Depending on the features you use, MarketLink handles your account name and phone number, saved delivery addresses, orders, wallet and transaction records, and information you send to support.'],
+        ['Why we use it','Information supports sign-in, account management, order processing, delivery coordination, service security and help requests. Access to account-specific information requires an authenticated session.'],
+        ['Payments and providers','Supported payment methods may involve third-party payment providers. Those providers may process payment information under their own privacy notices and terms. Review the provider information shown during payment.'],
+        ['Protecting your account','Keep your PIN private, sign out of shared devices and contact support if you suspect that another person has accessed your account.'],
+        ['Questions and requests','For privacy questions or help with account information, contact marketlinkgambia@gmail.com or +220 407 1510.']
+      ]},
+      deliveryPolicy:{title:'Delivery, Returns & Refunds',sections:[
+        ['Before confirming an order','Check product details, quantity, delivery charges and your saved address before placing an order. Keep your phone available for delivery coordination.'],
+        ['Delivery updates','Order status and rider details are shown when the relevant information is available from the live service. Estimated delivery times are not guarantees and may change with vendor, rider, traffic or network availability.'],
+        ['Problems with an order','If an item is missing, damaged or different from what you ordered, keep the order reference and contact MarketLink support promptly so the order can be reviewed.'],
+        ['Returns and refunds','Eligibility and resolution may depend on order status, the circumstances, vendor requirements and the payment provider. The current app does not promise one universal return window or refund time for every order. Contact support for review of your specific order.'],
+        ['Contact','Email marketlinkgambia@gmail.com or call +220 407 1510 with your order reference and a short description of the issue.']
+      ]}
+    };
+    var policy=policies[key];if(!root||!policy)return;
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button><h3>'+esc(policy.title)+'</h3></div><div class="ml-policy-content">'+policy.sections.map(function(section){return '<section><h4>'+esc(section[0])+'</h4><p>'+esc(section[1])+'</p></section>';}).join('')+'</div><footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><span>Questions?</span><a href="mailto:marketlinkgambia@gmail.com">Email support</a><a href="tel:+2204071510">Call +220 407 1510</a></div></footer></div>';
+  }
+  function openProfilePage(page){
+    S.profilePage=page||null;
+    if(page==='addresses'){renderAddresses();return;}
+    if(typeof switchTab==='function'&&S.curTab!=='profile'){switchTab('profile');return;}
+    if(typeof window.renderProfile==='function')window.renderProfile();
+  }
   async function renderPremiumProfile(){
-    await loadProfile();
     var root=G('profile-body');if(!root)return;
+    if(S.profilePage==='terms'||S.profilePage==='privPolicy'||S.profilePage==='deliveryPolicy'){
+      renderPremiumPolicyPage(root,S.profilePage);return;
+    }
+    if(S.profilePage && S.profilePage!=='affiliate' && S.profilePage!=='addresses'){
+      if(typeof oldRenderProfile==='function'){
+        root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Opening '+esc(S.profilePage==='wallet'?'Royal Wallet':S.profilePage==='payments'?'Payment Methods':S.profilePage==='notifSet'?'Notification Settings':S.profilePage==='privacy'?'Privacy Settings':S.profilePage==='wishlist'?'Wishlist':S.profilePage==='compare'?'Compare Products':'Help Centre')+'…</div></div>';
+        oldRenderProfile();return;
+      }
+    }
+    if(S.profilePage==='addresses'){await renderAddresses();return;}
+    await loadProfile();
+    root=G('profile-body');if(!root)return;
     if(S.profilePage==='affiliate'){var affiliateData=await syncAffiliateProfile();renderPremiumAffiliatePage(root,affiliateData);return;}
     var p=liveProfile||{},name=p.full_name||S.user&&S.user.name||'MarketLink user',phone=p.phone||S.user&&S.user.phone||'';
     var applicationHtml='';
@@ -485,18 +531,44 @@
       var appNames=[['Vendor application',apps[0]],['Rider application',apps[1]]];
       appNames.forEach(function(a){
         if(a[1]&&a[1].kyc_status){
-          var st=String(a[1].kyc_status).toLowerCase(), label=st==='approved'?'Approved':st==='rejected'?'Rejected':st==='suspended'?'Suspended':'Pending review';
-          var icon=st==='approved'?'✓':st==='rejected'?'!':st==='suspended'?'!':'⏳';
+          var st=String(a[1].kyc_status).toLowerCase(),label=st==='approved'?'Approved':st==='rejected'?'Rejected':st==='suspended'?'Suspended':'Pending review';
+          var icon=st==='approved'?'✓':st==='rejected'||st==='suspended'?'!':'⏳';
           var cls=st==='approved'?'color:#42D2C9':st==='rejected'||st==='suspended'?'color:#FF8A7A':'color:#FFD778';
           applicationHtml+='<div class="ml-profile-row"><div class="ico">'+icon+'</div><div class="copy"><b>'+a[0]+'</b><span>'+label+' · operational access is controlled by admin approval</span></div><b style="'+cls+'">'+label+'</b></div>';
         }
       });
     }
     var photo=p.profile_photo_url||S.profilePhoto;
-    var avatar=photo?'<img src="'+esc(photo)+'" alt="Profile">':esc(name.trim().charAt(0).toUpperCase()||'M');
-    var roles=(S.roles||[]).map(function(r){return '<span style="font-size:9px;padding:4px 8px;border-radius:99px;background:rgba(13,115,119,.14);color:#42D2C9">'+esc(r)+'</span>';}).join('');
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-profile-hero"><div class="ml-avatar">'+avatar+'</div><div><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">'+roles+'<span style="font-size:9px;padding:4px 8px;border-radius:99px;background:rgba(245,184,61,.1);color:#FFD778">Active account</span></div></div><button class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🪪</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div>'+applicationHtml+'<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Phone number</b><span>'+esc(phone)+'</span></div></div><div class="ml-profile-row"><div class="ico">💰</div><div class="copy"><b>Wallet balance</b><span>'+money(p.wallet_balance||0)+'</span></div></div><div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>Orders completed</b><span>'+Number(p.total_orders||0)+' orders · '+money(p.total_spent||0)+' spent</span></div></div><div class="ml-profile-row" onclick="window.ML_Premium.openOrders()" style="cursor:pointer"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>View your real orders and delivery status</span></div><b style="color:#42D2C9">›</b></div><div class="ml-profile-row" onclick="window.ML_Premium.renderAddresses()" style="cursor:pointer"><div class="ico">📍</div><div class="copy"><b>Saved addresses</b><span>Manage your delivery locations</span></div><b style="color:#42D2C9">›</b></div><div class="ml-profile-row" onclick="doLogout()" style="cursor:pointer"><div class="ico">↪</div><div class="copy"><b>Sign out</b><span>End this session securely</span></div></div></div></div>';
+    var avatar=photo?'<img src="'+esc(photo)+'" alt="Profile photo">':esc(name.trim().charAt(0).toUpperCase()||'M');
+    var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
+    var upgradeHtml='';
+    if((S.roles||[]).indexOf('vendor')<0)upgradeHtml+='<button type="button" onclick="openVendorApp()"><span class="ml-upgrade-icon">🏪</span><span><b>Become a vendor</b><span>List products and grow your shop</span></span><span class="arrow">›</span></button>';
+    if((S.roles||[]).indexOf('rider')<0)upgradeHtml+='<button type="button" onclick="openRiderApp()"><span class="ml-upgrade-icon">🛵</span><span><b>Become a rider</b><span>Apply to deliver local orders</span></span><span class="arrow">›</span></button>';
+    var profileItems=[
+      {icon:'❤️',title:'Wishlist',desc:'Products you have saved',page:'wishlist'},
+      {icon:'🔗',title:'Affiliate Program',desc:'Your link, referrals and eligible 2% rewards',page:'affiliate'},
+      {icon:'⚖️',title:'Compare Products',desc:'Review products you selected to compare',page:'compare'},
+      {icon:'💳',title:'Payment Methods',desc:'View supported checkout payment methods',page:'payments'},
+      {icon:'🔔',title:'Notification Settings',desc:'Manage notification preferences',page:'notifSet'},
+      {icon:'🔒',title:'Privacy Settings',desc:'Account and privacy controls',page:'privacy'},
+      {icon:'📄',title:'Terms of Service',desc:'Read the rules for using MarketLink',page:'terms'},
+      {icon:'🛡️',title:'Privacy Policy',desc:'How account and order information is used',page:'privPolicy'},
+      {icon:'🛵',title:'Delivery, Returns & Refunds',desc:'Guidance for delivery and order issues',page:'deliveryPolicy'},
+      {icon:'❓',title:'Help Centre',desc:'Contact MarketLink support',page:'help'}
+    ];
+    var profileLinks=profileItems.map(function(item){
+      return '<button type="button" class="ml-profile-link" onclick="window.ML_Premium.openProfilePage(\''+item.page+'\')"><span class="ico">'+item.icon+'</span><span class="copy"><b>'+esc(item.title)+'</b><span>'+esc(item.desc)+'</span></span><span class="arrow" aria-hidden="true">›</span></button>';
+    }).join('');
+    root.innerHTML='<div class="ml-profile-shell">'+
+      '<div class="ml-profile-hero"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.pickPhoto()" aria-label="Change profile photo">'+avatar+'<span aria-hidden="true">✎</span></button><input type="file" id="ml-profile-photo-input" accept="image/*" style="display:none" onchange="window.handlePhoto(this)"><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🪪</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div>'+applicationHtml+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'wallet\')"><div class="ico">💰</div><div class="copy"><b>Royal Wallet</b><span>Available balance · '+money(p.wallet_balance||S.walletBalance||0)+'</span></div><b class="ml-profile-arrow">›</b></button>'+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openOrders()"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>'+Number(p.total_orders||0)+' completed orders · '+money(p.total_spent||0)+' spent</span></div><b class="ml-profile-arrow">›</b></button>'+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.renderAddresses()"><div class="ico">📍</div><div class="copy"><b>Saved addresses</b><span>Manage delivery locations</span></div><b class="ml-profile-arrow">›</b></button>'+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="doLogout()"><div class="ico">↪</div><div class="copy"><b>Sign out</b><span>End this session securely</span></div><b class="ml-profile-arrow">›</b></button></div>'+
+      (upgradeHtml?'<div class="ml-profile-upgrade">'+upgradeHtml+'</div>':'')+
+      '<div class="ml-section-head"><h3>Account & support</h3></div><div class="ml-profile-links">'+profileLinks+'</div>'+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'deliveryPolicy\')">Delivery & Returns</button></div></footer></div>';
   }
   var liveAddresses=[];
   async function renderAddresses(){
@@ -832,7 +904,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
@@ -887,11 +959,20 @@
   }
   window.renderAdminDash=renderAdminDash;
   var oldRenderHome=window.renderHome,oldRenderProfile=window.renderProfile;
-  window.renderHome=function(){loadLiveHome().catch(function(e){toast(e.error||'Could not load the marketplace.','error');});};
+  function showPremiumHomeLoading(){
+    var root=G('tab-home');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home ml-home-loading"><div class="ml-dashboard-brand">'+mlOfficialBrandMarkup()+'</div><div class="ml-skeleton-line" style="width:54%"></div><div class="ml-skeleton-line" style="width:36%"></div><div class="ml-skeleton-card"></div><div class="ml-skeleton-line" style="width:44%"></div></div>';
+  }
+  window.renderHome=function(){showPremiumHomeLoading();loadLiveHome().catch(function(e){var root=G('tab-home');if(root)root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Marketplace could not load</b><span>'+esc(e.error||'Please check your connection and try again.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.renderHome()">Retry</button></div></div>';});};
   window.openCategory=function(cat){if(cat&&cat.id){return openCategory(cat.id,cat.name||'Category');}return loadLiveHome();};
   window.openProductDetail=function(id){return openProduct(id);};
   window.doSearch=function(q){return searchMarketplace(q);};
-  window.renderProfile=function(){renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});};
+  window.renderProfile=function(){
+    var root=G('profile-body');
+    if(root&&!S.profilePage)root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Loading your MarketLink account…</div></div>';
+    renderPremiumProfile().catch(function(e){toast(e.error||'Could not load your profile.','error');});
+  };
+  window.renderOrders=function(){renderLiveOrders().catch(function(e){toast(e.error||'Could not load your orders.','error');});};
   window.renderAdminDash=function(){loadAdminDashboard().catch(function(e){toast(e.error||'Could not load the admin dashboard.','error');});};
   var mlOriginalGoAuth=window.goAuth;
   window.goAuth=function(){if(mlOnboardTimer){clearInterval(mlOnboardTimer);mlOnboardTimer=null;}if(typeof mlOriginalGoAuth==='function')return mlOriginalGoAuth.apply(this,arguments);};
