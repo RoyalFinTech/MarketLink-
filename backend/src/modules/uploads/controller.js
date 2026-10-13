@@ -30,3 +30,22 @@ exports.deleteFile = wrap(async (req, res) => {
   const result = await svc.deleteFile(req.params.id, req.user.id, req.user.roles);
   res.json({ success: true, data: result });
 });
+
+exports.removeProfilePhoto = wrap(async (req, res) => {
+  const result = await svc.removeProfilePhoto(req.user.id);
+  res.json({ success: true, data: result });
+});
+
+exports.deleteByUrl = wrap(async (req, res) => {
+  const result = await svc.deleteFileByUrl(req.body.url, req.user.id);
+  res.json({ success: true, data: result });
+});
+
+exports.getContent = wrap(async (req, res) => {
+  const file = await svc.getFile(req.params.id, req.user.id, req.user.roles);
+  res.setHeader('Content-Type', file.contentType || 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Content-Disposition', 'inline');
+  res.send(file.buffer);
+});
