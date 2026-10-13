@@ -749,3 +749,15 @@
 .lm .ml-payment-option-disabled .copy span{color:#526975!important}
 .lm .ml-payment-unavailable{color:#6d4a00;background:#fff5d8;border-color:#e0bf69}
 .ml-section-head button,.ml-profile-shell .ml-section-head .ml-btn{opacity:1}
+
+.ml-payment-availability-note{background:rgba(255,255,255,.045)!important;color:#d8e7eb!important}
+.ml-payment-availability-note .ml-payment-brand{margin-bottom:13px}
+.ml-payment-availability-note .ml-payment-brand b{color:#f4fbfc!important}
+.ml-payment-availability-note .ml-payment-brand span{color:#b8cbd2!important}
+.ml-payment-availability-note>b{display:block;margin-top:2px;color:#f4fbfc!important;font-size:12px}
+.ml-payment-availability-note>p{margin:7px 0 0;color:#b8cbd2!important;font-size:11px;line-height:1.65}
+.lm .ml-payment-availability-note{background:#fff!important;color:#526975!important;border-color:#d4e0e5!important}
+.lm .ml-payment-availability-note .ml-payment-brand b{color:#172b36!important}
+.lm .ml-payment-availability-note .ml-payment-brand span{color:#526975!important}
+.lm .ml-payment-availability-note>b{color:#172b36!important}
+.lm .ml-payment-availability-note>p{color:#526975!important}
