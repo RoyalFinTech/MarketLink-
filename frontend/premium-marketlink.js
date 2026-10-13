@@ -1384,6 +1384,81 @@
     try{var next=!S.vOnline;var r=await ML_API.vendors.updateProfile({isOpen:next});S.vOnline=!!(r.data&&r.data.is_open!==undefined?r.data.is_open:next);renderVDash();toast(S.vOnline?'Store is open 🟢':'Store is closed');}
     catch(e){toast(e.error||'Could not update store status.','error');}
   }
+  var mlRiderGpsWatchId=null,mlRiderGpsTimer=null,mlRiderGpsDeliveryId=null,mlRiderGpsBusy=false,mlRiderGpsLastSent=0,mlRiderGpsError=null;
+  function stopRiderLocationWatch(){
+    if(mlRiderGpsTimer){clearInterval(mlRiderGpsTimer);mlRiderGpsTimer=null;}
+    if(mlRiderGpsWatchId!==null&&navigator.geolocation&&navigator.geolocation.clearWatch){
+      try{navigator.geolocation.clearWatch(mlRiderGpsWatchId);}catch(e){}
+    }
+    mlRiderGpsWatchId=null;
+    mlRiderGpsDeliveryId=null;
+    mlRiderGpsBusy=false;
+    mlRiderGpsError=null;
+  }
+  async function submitRiderGpsPosition(position,deliveryId){
+    if(!position||!position.coords||!S.activeDel||String(S.activeDel.id)!==String(deliveryId)||String(mlRiderGpsDeliveryId)!==String(deliveryId))return;
+    var status=String(S.activeDel.status||'assigned').toLowerCase();
+    if(['assigned','picked_up','in_transit'].indexOf(status)<0)return;
+    if(mlRiderGpsBusy||Date.now()-mlRiderGpsLastSent<9000)return;
+    var lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat < -90||lat > 90||lng < -180||lng > 180)return;
+    mlRiderGpsBusy=true;
+    mlRiderGpsLastSent=Date.now();
+    try{
+      var response=await ML_API.delivery.updateLocation(lat,lng,deliveryId);
+      var data=response&&response.data?response.data:response;
+      if(!S.activeDel||String(S.activeDel.id)!==String(deliveryId))return;
+      var now=(data&&data.updatedAt)||new Date().toISOString();
+      S.activeDel.tracking=Object.assign({},S.activeDel.tracking||{},{
+        current_lat:lat,current_lng:lng,last_location_at:now,
+        location_trail:[{lat:lat,lng:lng,recorded_at:now}]
+      });
+      mlRiderGpsError=null;
+      sanitizeRiderMap();
+    }catch(e){
+      mlRiderGpsError=e&&e.code==='FORBIDDEN'?'This delivery is not assigned to this rider.':'The last GPS update did not reach MarketLink. Check location permission and connection.';
+      // Do not spam the rider with a toast every time a location ping fails.
+    }finally{mlRiderGpsBusy=false;}
+  }
+  function requestRiderGpsOnce(deliveryId){
+    if(!navigator.geolocation||!navigator.geolocation.getCurrentPosition){
+      mlRiderGpsError='This browser does not support GPS location.';
+      sanitizeRiderMap();return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      function(position){submitRiderGpsPosition(position,deliveryId);},
+      function(err){
+        mlRiderGpsError=err&&err.code===1?'Allow location access to share your position during this delivery.':'MarketLink could not read the current GPS position yet.';
+        sanitizeRiderMap();
+      },
+      {enableHighAccuracy:true,maximumAge:5000,timeout:12000}
+    );
+  }
+  function startRiderLocationWatch(deliveryId){
+    if(!deliveryId||!S.activeDel||String(S.activeDel.id)!==String(deliveryId)||!apiOk())return;
+    var status=String(S.activeDel.status||'assigned').toLowerCase();
+    if(['assigned','picked_up','in_transit'].indexOf(status)<0){stopRiderLocationWatch();return;}
+    if(mlRiderGpsTimer&&String(mlRiderGpsDeliveryId)===String(deliveryId))return;
+    stopRiderLocationWatch();
+    mlRiderGpsDeliveryId=String(deliveryId);
+    requestRiderGpsOnce(deliveryId);
+    if(navigator.geolocation&&navigator.geolocation.watchPosition){
+      mlRiderGpsWatchId=navigator.geolocation.watchPosition(
+        function(position){submitRiderGpsPosition(position,deliveryId);},
+        function(err){
+          mlRiderGpsError=err&&err.code===1?'Allow location access to share your position during this delivery.':'GPS updates are temporarily unavailable.';
+          sanitizeRiderMap();
+        },
+        {enableHighAccuracy:true,maximumAge:5000,timeout:15000}
+      );
+    }
+    mlRiderGpsTimer=setInterval(function(){
+      if(!S.activeDel||String(S.activeDel.id)!==String(deliveryId)||String(mlRiderGpsDeliveryId)!==String(deliveryId)){
+        stopRiderLocationWatch();return;
+      }
+      requestRiderGpsOnce(deliveryId);
+    },15000);
+  }
   async function liveRiderNextStep(){
     if(!S.activeDel||!S.activeDel.id){toast('No active delivery.','error');return;}
     var current=S.activeDel.status, next={assigned:'picked_up',picked_up:'in_transit',in_transit:'delivered'}[current];
@@ -1442,6 +1517,8 @@
   var baseRenderRDash=window.renderRDash;
   window.renderRDash=function(){
     if(typeof baseRenderRDash==='function')baseRenderRDash();
+    if(S.activeDel&&S.activeDel.id)startRiderLocationWatch(S.activeDel.id);
+    else stopRiderLocationWatch();
     sanitizeRiderMap();
     document.querySelectorAll('#rdash-body button').forEach(function(btn){
       if((btn.textContent||'').indexOf('Decline')>=0) btn.remove();
