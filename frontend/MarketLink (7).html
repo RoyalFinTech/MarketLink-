@@ -477,6 +477,7 @@ button:active{opacity:0.82;}
   <div class="ntab" data-tab="catpage"><div class="ni">🛍️</div><div class="nl">Categories</div></div>
   <div class="ntab" data-tab="orders"><div class="ni">📦</div><div class="nl">Orders</div></div>
   <div class="ntab" data-tab="cart"><div class="ni">🛒<span class="nbadge" id="cbadge" style="display:none">0</span></div><div class="nl">Cart</div></div>
+  <button type="button" class="ntab ml-global-notification-tab" onclick="window.ML_Premium&&window.ML_Premium.openProfilePage('notifSet')" aria-label="Open MarketLink notifications"><div class="ni">🔔<span class="ml-bell-badge" id="ml-global-notification-count" style="display:none">0</span></div><div class="nl">Alerts</div></button>
   <div class="ntab" data-tab="profile"><div class="ni">👤</div><div class="nl">Profile</div></div>
 </nav>
 
@@ -1559,7 +1560,7 @@ var OTPService = {
 };
 
 var S = {
-  dark:true, user:null, cart:{}, order:null, roles:[], curTab:'home',
+  dark:false, user:null, cart:{}, order:null, roles:[], curTab:'home',
   orderSI:2, orderTimer:null, riderTick:0, riderTimer:null,
   obSlide:0, authMode:'login', pinStep:'create',
   pin:['','','',''], cpin:['','','',''], otp:['','','','','',''],
@@ -1704,12 +1705,23 @@ var GAMBIA_ADDRS = [
 // ═══════════════════════════════════════════════════════════
 function G(id){return document.getElementById(id);}
 function toast(msg,type){
-  var t=G('toast');
-  t.textContent=msg;
-  t.style.background=type==='error'?'#EF4444':type==='info'?'#0D7377':'#22C55E';
-  t.style.display='block';
-  clearTimeout(t._t);
-  t._t=setTimeout(function(){t.style.display='none';},3000);
+  var t=G('toast');if(!t)return;
+  var kind=String(type||'success').toLowerCase();
+  if(['error','danger','failed','failure'].indexOf(kind)>=0)kind='error';
+  else if(['warning','warn'].indexOf(kind)>=0)kind='warning';
+  else if(kind==='info')kind='info';else kind='success';
+  var titles={success:'Completed successfully',error:'We could not complete that',warning:'Please review this update',info:'MarketLink update'};
+  var messages={success:'Your request has been processed. You can continue using MarketLink.',error:'No success was assumed. Review the message below and try again when ready.',warning:'Please review the information below before continuing.',info:'Here is the latest information about your MarketLink account.'};
+  var text=String(msg==null?'MarketLink update':msg);
+  function safe(v){return String(v).replace(/[&<>"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch];});}
+  var logo=(typeof LOGO_ICON_URI==='string'&&LOGO_ICON_URI.indexOf('data:image/')===0)?LOGO_ICON_URI:'./assets/marketlink-logo.png';
+  var marks={success:'✓',error:'!',warning:'!',info:'i'};
+  t.className='ml-toast-card ml-toast-'+kind;
+  t.setAttribute('role',kind==='error'?'alert':'status');t.setAttribute('aria-live',kind==='error'?'assertive':'polite');
+  t.innerHTML='<div class="ml-toast-brand"><img src="'+logo+'" alt="MarketLink logo"><div><span>MARKETLINK GAMBIA</span><small>Marketplace notification</small></div><span class="ml-toast-symbol">'+marks[kind]+'</span><button type="button" class="ml-toast-close" aria-label="Dismiss" onclick="document.getElementById(\'toast\').style.display=\'none\'">×</button></div>'+
+    '<div class="ml-toast-title">'+titles[kind]+'</div><div class="ml-toast-message">'+safe(text)+'</div><div class="ml-toast-detail">'+messages[kind]+'</div>'+
+    '<div class="ml-toast-actions">'+(kind==='error'?'<button type="button" onclick="window.ML_Premium&&window.ML_Premium.openProfilePage(\'help\')">Contact support</button>':'')+'<button type="button" onclick="document.getElementById(\'toast\').style.display=\'none\'">Dismiss</button></div>';
+  t.style.display='block';clearTimeout(t._t);t._t=setTimeout(function(){t.style.display='none';},kind==='error'?8000:5000);
 }
 function openSheet(id){G(id).classList.add('open');}
 function closeSheet(id){G(id).classList.remove('open');}
@@ -1855,8 +1867,9 @@ function goApp(){
   if(S.aiSettings.floatingAssistant) G('fab').classList.add('fab-visible');
   try{
     var savedTheme=localStorage.getItem('ml_theme');
-    if(savedTheme==='light') document.body.classList.add('lm');
-  }catch(e){}
+    if(savedTheme!=='dark'){document.body.classList.add('lm');S.dark=false;if(!savedTheme)localStorage.setItem('ml_theme','light');}
+    else{document.body.classList.remove('lm');S.dark=true;}
+  }catch(e){document.body.classList.add('lm');S.dark=false;}
   restoreCartFromStorage();
   restoreDelivLocation();
   restoreWishlistFromStorage();
