@@ -6,6 +6,7 @@ const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
 const ADMIN = ['admin','super_admin'];
+router.get('/methods', authenticate, authorize('customer'), ctrl.methods);
 router.post('/initiate', authenticate, authorize('customer'),
   [body('orderId').isUUID(), body('method').isIn(['cod','wave','afrimoney','qmoney','modempay']), body('amount').isFloat({min:0}), body('accountNumber').optional({checkFalsy:true}).matches(/^\\d{7}$/)],
   validate, ctrl.initiate);
