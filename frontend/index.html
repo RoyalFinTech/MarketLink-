@@ -1314,7 +1314,7 @@ var ML_API = (function(){
   var post   = function(path, b, opts) { return req('POST', path, b, opts); };
   var put    = function(path, b)  { return req('PUT',    path, b); };
   var patch  = function(path, b)  { return req('PATCH',  path, b); };
-  var del    = function(path)     { return req('DELETE', path); };
+  var del    = function(path, b)  { return req('DELETE', path, b); };
 
   // ── AUTH ─────────────────────────────────────────────────────
   var auth = {
@@ -1429,16 +1429,28 @@ var ML_API = (function(){
       var form = new FormData();
       form.append('file', file);
       form.append('purpose', purpose);
-      var res = await fetch(BASE + '/uploads', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + _accessToken },
-        body: form
-      });
-      var data;
-      try { data = await res.json(); } catch(e){ data = {}; }
-      if(!res.ok) throw {code: data.code||'UPLOAD_ERROR', error: data.error||'Upload failed.'};
-      return data.data;
-    }
+      var controller = typeof AbortController === 'function' ? new AbortController() : null;
+      var timeout = controller ? setTimeout(function(){controller.abort();}, 60000) : null;
+      try {
+        var res = await fetch(BASE + '/uploads', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + _accessToken },
+          body: form,
+          signal: controller ? controller.signal : undefined
+        });
+        var data;
+        try { data = await res.json(); } catch(e){ data = {}; }
+        if(!res.ok) throw {code: data.code||'UPLOAD_ERROR', error: data.error||'Upload failed.', status:res.status};
+        if(!data.data||!data.data.url) throw {code:'UPLOAD_RESPONSE_INVALID',error:'The server did not return a saved image URL.'};
+        return data.data;
+      } catch(e) {
+        if(e && (e.name==='AbortError')) throw {code:'UPLOAD_TIMEOUT',error:'The image upload took too long. Please try again.'};
+        if(e && e.code) throw e;
+        throw {code:'UPLOAD_NETWORK_ERROR',error:'MarketLink could not upload this image. Check your connection and try again.'};
+      } finally { if(timeout!==null) clearTimeout(timeout); }
+    },
+    deleteByUrl: function(url){ return del('/uploads/by-url',{url:url}); },
+    removeProfilePhoto: function(){ return del('/uploads/profile-photo'); }
   };
 
   // ── ASSISTANT (MarketLink Assistant — knowledge-base backed) ──
