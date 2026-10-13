@@ -661,3 +661,71 @@
 .lm .sheet-hdr span,.lm .sheet .copy b{color:#172b36!important}
 .lm .sheet-cls{background:#edf3f5!important;color:#172b36!important}
 .lm .ai-glass{background:rgba(255,255,255,.96)!important;color:#172b36!important;border-color:#d4e0e5!important}
+
+/* Modem Pay mobile-money screens: explicit actions, high contrast and branded status states. */
+.ml-mobile-money-field{display:grid;gap:7px;padding:14px 15px 16px;border-top:1px solid var(--ml-line);background:rgba(245,184,61,.06)}
+.ml-mobile-money-field label,.ml-payment-next-step label{font-size:11px;font-weight:850;color:#ffc451}
+.ml-mobile-money-field input,.ml-payment-next-step input{display:block;width:100%;min-height:48px;box-sizing:border-box;border:1px solid rgba(245,184,61,.45);border-radius:11px;padding:12px 13px;background:#071823;color:#f7fbfd;font-size:14px;letter-spacing:.04em;outline:none}
+.ml-mobile-money-field input:focus,.ml-payment-next-step input:focus{border-color:#f5b83d;box-shadow:0 0 0 3px rgba(245,184,61,.18)}
+.ml-mobile-money-field small{font-size:10px;line-height:1.6;color:#b8c8d0}
+.ml-payment-flow{max-width:850px}
+.ml-payment-result{border:1px solid var(--ml-line);border-radius:22px;padding:clamp(18px,3vw,30px);background:linear-gradient(135deg,#0b1c2a,#0b3b42);color:#f4fbfc;box-shadow:0 16px 38px rgba(0,0,0,.12)}
+.ml-payment-result.is-success{border-color:rgba(54,201,137,.55);background:linear-gradient(135deg,#0b2928,#0d453f)}
+.ml-payment-result.is-failed{border-color:rgba(239,68,68,.45);background:linear-gradient(135deg,#301d26,#3f2227)}
+.ml-payment-brand{display:flex;align-items:center;gap:11px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.14)}
+.ml-payment-brand img{width:42px;height:42px;flex:0 0 42px;object-fit:contain;background:#fff;border-radius:12px;padding:4px}
+.ml-payment-brand b{display:block;color:#f4fbfc;font-size:12px;font-weight:900;letter-spacing:.02em}
+.ml-payment-brand span{display:block;margin-top:3px;color:#b6cbd2;font-size:10px}
+.ml-payment-result-title{margin:18px 0 7px;color:#fff;font-size:clamp(20px,3vw,27px);font-weight:900;line-height:1.2}
+.ml-payment-result>p{color:#d8e7eb;font-size:12px;line-height:1.7}
+.ml-payment-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:18px 0}
+.ml-payment-summary>div{min-width:0;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.045)}
+.ml-payment-summary span{display:block;color:#b5c8d0;font-size:9px;margin-bottom:6px}
+.ml-payment-summary b{display:block;color:#fff;font-size:12px;overflow-wrap:anywhere}
+.ml-payment-open-provider{display:flex;align-items:center;justify-content:center;text-decoration:none;margin:12px 0;background:linear-gradient(110deg,#0d9488,#11a8a1)!important;color:#fff!important}
+.ml-payment-next-step{display:grid;gap:10px;margin-top:15px;padding:16px;border:1px solid rgba(245,184,61,.34);border-radius:14px;background:rgba(245,184,61,.07)}
+.ml-payment-next-step p{color:#d7e5e9;font-size:11px;line-height:1.65}
+.ml-payment-status-line{margin:14px 0 10px;padding:12px;border-radius:11px;background:rgba(255,255,255,.055);color:#e1ecef;font-size:11px;line-height:1.6}
+.ml-payment-footnote{margin-top:13px;color:#607985;font-size:10px;line-height:1.65}
+.ml-payment-result .ml-btn{min-height:44px;opacity:1!important;white-space:normal}
+.lm .ml-mobile-money-field{background:#fffaf0!important;border-color:#e7d5a8!important}
+.lm .ml-mobile-money-field label,.lm .ml-payment-next-step label{color:#775000!important}
+.lm .ml-mobile-money-field small{color:#526975!important}
+.lm .ml-mobile-money-field input,.lm .ml-payment-next-step input{background:#fff!important;color:#172b36!important;border-color:#c9a444!important}
+.lm .ml-payment-result,.lm .ml-payment-result.is-success,.lm .ml-payment-result.is-failed{color:#f4fbfc!important}
+.lm .ml-payment-brand b,.lm .ml-payment-result-title,.lm .ml-payment-summary b{color:#fff!important}
+.lm .ml-payment-brand span,.lm .ml-payment-result>p,.lm .ml-payment-summary span,.lm .ml-payment-next-step p,.lm .ml-payment-status-line{color:#d8e7eb!important}
+.lm .ml-payment-next-step{background:rgba(245,184,61,.09)!important;border-color:rgba(245,184,61,.4)!important}
+.lm .ml-payment-footnote{color:#526975!important}
+.lm .ml-mobile-money-field{background:#fffaf0!important}
+.lm .ml-profile-link .copy b,.lm .ml-profile-row .copy b{opacity:1!important}
+.lm .ml-profile-link .copy span,.lm .ml-profile-row .copy span{opacity:1!important}
+.lm .ml-profile-link .ico,.lm .ml-profile-row .ico{opacity:1!important;filter:none!important}
+
+/* The affiliate image is shown at its intended wide aspect ratio instead of forcing a banner into a tall card. */
+.ml-affiliate-hero{grid-template-columns:minmax(0,1fr) minmax(250px,.58fr)!important}
+.ml-affiliate-hero-photo{width:100%;max-width:360px;height:auto;aspect-ratio:16/9}
+.ml-affiliate-hero-photo .ml-affiliate-hero-image{object-fit:cover;object-position:center}
+@media(max-width:600px){
+  .ml-affiliate-hero{grid-template-columns:minmax(0,1fr)!important}
+  .ml-affiliate-hero-photo{width:100%;max-width:none;height:auto;aspect-ratio:16/9}
+  .ml-payment-summary{grid-template-columns:minmax(0,1fr)}
+  .ml-payment-result{padding:17px}
+}
+
+/* Preserve the actual campaign image's wide crop on login instead of upscaling its short banner to fill a tall column. */
+@media(min-width:761px){
+  #scr-auth>div:first-child{
+    background-size:100% 100%,100% auto!important;
+    background-repeat:no-repeat,no-repeat!important;
+    background-position:center center,center 36%!important;
+    background-color:#071521!important;
+  }
+}
+@media(max-width:760px){
+  #scr-auth>div:first-child{
+    background-size:100% 100%,cover!important;
+    background-position:center center,center 44%!important;
+    background-repeat:no-repeat,no-repeat!important;
+  }
+}
