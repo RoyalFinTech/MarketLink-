@@ -1082,6 +1082,60 @@
       }).join('')+'</div>':'<div class="ml-empty"><div style="font-size:28px">⚖️</div><b>No products to compare</b><span>Use Compare on product cards while browsing to build your comparison list.</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="switchTab(\'home\')">Browse products</button></div>')+
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
+  function openMarketLinkAI(){
+    if(typeof window.openAI==='function')window.openAI();
+    else toast('MarketLink AI is not ready yet. Please refresh and try again.','error');
+  }
+  function openMarketLinkAIWithQuestion(question){
+    openMarketLinkAI();
+    var input=G('ai-inp');
+    if(input){input.value=String(question||'');if(typeof window.sendAI==='function')window.sendAI();}
+  }
+  function renderPremiumAIProfilePage(root){
+    var roles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
+    var role=roles.indexOf('vendor')>-1?'vendor':roles.indexOf('rider')>-1?'rider':'customer';
+    var prompts={
+      customer:[
+        ['📦','Track an order','How do I track my order?'],
+        ['💳','Payment help','What should I do if my payment is pending?'],
+        ['🛍️','Find products','How do I find products and place an order?'],
+        ['👤','My profile','How can I update my profile and photo?']
+      ],
+      vendor:[
+        ['🧾','Manage orders','How do I accept and update a vendor order?'],
+        ['🛒','Manage products','How do I add or update my products?'],
+        ['💰','Payouts','How do vendor wallet payouts work?'],
+        ['📣','Promote my shop','How can I grow my shop on MarketLink?']
+      ],
+      rider:[
+        ['🛵','Delivery steps','How do I update an assigned delivery?'],
+        ['📍','Order updates','How does order tracking work for a rider?'],
+        ['💰','My earnings','How do rider earnings and withdrawals work?'],
+        ['🪪','My application','How do I check my rider application status?']
+      ]
+    };
+    var list=prompts[role]||prompts.customer;
+    root.innerHTML='<div class="ml-profile-shell ml-marketlink-ai-page">'+
+      '<div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>MarketLink AI</h3></div>'+
+      '<section class="ml-ai-profile-hero"><div class="ml-ai-profile-mark">✨</div><div><div class="ml-eyebrow">MARKETLINK KNOWLEDGE ASSISTANT</div><h3>Help with your next step.</h3><p>Ask about shopping, orders, payments, profiles or how to use MarketLink. Answers come from the MarketLink help knowledge base, not an external AI provider.</p><span class="ml-ai-role-tag">Personalized for '+esc(role==='rider'?'Riders':role==='vendor'?'Vendors':'Customers')+'</span></div><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openMarketLinkAI()">Open MarketLink AI chat →</button></section>'+
+      '<div class="ml-section-head"><h3>Suggested questions</h3><span>Choose a topic to start</span></div>'+
+      '<div class="ml-ai-prompt-grid">'+list.map(function(item){return '<button type="button" class="ml-ai-prompt-card" onclick="window.ML_Premium.askMarketLinkAI(\\''+esc(item[2]).replace(/'/g,"\\\\'")+'\\')"><span>'+item[0]+'</span><b>'+esc(item[1])+'</b><small>'+esc(item[2])+'</small><i>Ask MarketLink AI →</i></button>';}).join('')+'</div>'+
+      '<div class="ml-wallet-note">MarketLink AI can guide you through supported app features. It cannot approve an application, change an order, confirm a payment or guarantee a payout on its own. For account-specific help, open the relevant page or contact support.</div>'+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
+  }
+  function renderMarketLinkLanguagePage(root){
+    var i18n=window.MarketLinkI18n;
+    var languages=i18n&&typeof i18n.getLanguages==='function'?i18n.getLanguages():[{code:'en',label:'English'}];
+    var selected=i18n&&typeof i18n.getLanguage==='function'?i18n.getLanguage():'en';
+    var options=languages.map(function(item){return '<option value="'+esc(item.code)+'" '+(item.code===selected?'selected':'')+'>'+esc(item.label)+'</option>';}).join('');
+    var coverage=i18n&&typeof i18n.getCoverageLabel==='function'?i18n.getCoverageLabel(selected):'English is the default language.';
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Language preference</h3></div>'+
+      '<div class="ml-language-card"><div class="ml-language-globe">🌐</div><h3>Use MarketLink in your preferred language</h3><p>Choose a language for supported app labels, buttons and help content. Your name, product names and messages you type are kept as written.</p>'+
+      '<label for="ml-language-profile">App language</label><select id="ml-language-profile" onchange="window.MarketLinkI18n&&window.MarketLinkI18n.setLanguage(this.value)">'+options+'</select>'+
+      '<div class="ml-language-status" id="ml-language-coverage">'+esc(coverage)+'</div>'+
+      '<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.applyLanguagePreference()">Apply language preference</button></div>'+
+      '<div class="ml-wallet-note">Translation is being expanded in phases. If a sentence has not yet been reviewed in your selected language, MarketLink keeps that sentence in English rather than showing an unverified translation. Gambian-language wording will need native-speaker review before we call it complete.</div></div>';
+  }
   function renderPremiumHelpPage(root){
     var faqs=[
       {q:'What is MarketLink?',a:'MarketLink Gambia connects customers with local vendors and delivery riders. You can shop, manage orders, sell products or apply to deliver.'},
@@ -1189,6 +1243,7 @@
       {icon:'🔗',title:'Affiliate Program',desc:'Your link, referrals and eligible 2% rewards',page:'affiliate'},
       {icon:'⚖️',title:'Compare Products',desc:'Review products you selected to compare',page:'compare'},
       {icon:'💳',title:'Payment Methods',desc:'View supported checkout payment methods',page:'payments'},
+      {icon:'🌐',title:'Language preference',desc:'Choose your preferred MarketLink language',page:'language'},
       {icon:'🔔',title:'Notifications',desc:'View account updates and mark them as read',page:'notifSet'},
       {icon:'🔒',title:'Privacy Settings',desc:'Account and privacy controls',page:'privacy'},
       {icon:'📄',title:'Terms of Service',desc:'Read the rules for using MarketLink',page:'terms'},
@@ -1546,7 +1601,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
