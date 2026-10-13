@@ -789,10 +789,10 @@
       '<label for="ml-edit-bio">About you <span class="ml-form-optional">Optional</span></label><textarea id="ml-edit-bio" rows="3" maxlength="280" placeholder="A short introduction about yourself">'+esc(bio)+'</textarea><small class="ml-profile-bio-count">'+String(bio).length+'/280 characters</small>'+
       '<label for="ml-edit-dob">Date of birth <span class="ml-form-optional">Optional</span></label><input id="ml-edit-dob" type="date" value="'+esc(String(dob).slice(0,10))+'">'+
       '<label for="ml-edit-gender">Gender <span class="ml-form-optional">Optional</span></label><select id="ml-edit-gender"><option value="" '+(!gender?'selected':'')+'>Prefer not to say</option><option '+(gender==='male'?'selected':'')+' value="male">Male</option><option '+(gender==='female'?'selected':'')+' value="female">Female</option><option '+(gender==='other'?'selected':'')+' value="other">Other</option></select>'+
-      '<div class="ml-modal-actions"><button type="button" class="ml-btn ml-btn-secondary" onclick="closeSheet(\\'sh-profile-edit\\')">Cancel</button><button type="button" class="ml-btn ml-btn-primary" id="ml-save-profile-button" onclick="window.ML_Premium.saveProfile()">Save changes</button></div></div>';
+      '<div class="ml-modal-actions"><button type="button" class="ml-btn ml-btn-secondary" onclick="closeSheet(\'sh-profile-edit\')">Cancel</button><button type="button" class="ml-btn ml-btn-primary" id="ml-save-profile-button" onclick="window.ML_Premium.saveProfile()">Save changes</button></div></div>';
     var sh=G('sh-profile-edit');
     if(!sh){sh=document.createElement('div');sh.id='sh-profile-edit';sh.className='sheet';document.body.appendChild(sh);}
-    sh.innerHTML='<div class="sheet-in"><div class="sheet-hdr"><span>Edit your profile</span><button class="sheet-cls" onclick="closeSheet(\\'sh-profile-edit\\')" aria-label="Close edit profile">×</button></div>'+html+'</div>';
+    sh.innerHTML='<div class="sheet-in"><div class="sheet-hdr"><span>Edit your profile</span><button class="sheet-cls" onclick="closeSheet(\'sh-profile-edit\')" aria-label="Close edit profile">×</button></div>'+html+'</div>';
     openSheet('sh-profile-edit');
     var bioInput=G('ml-edit-bio'),bioCount=sh.querySelector('.ml-profile-bio-count');
     if(bioInput&&bioCount)bioInput.addEventListener('input',function(){bioCount.textContent=String(bioInput.value.length)+'/280 characters';});
