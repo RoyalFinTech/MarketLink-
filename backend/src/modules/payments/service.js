@@ -189,6 +189,13 @@ async function getPaymentStatus(paymentId, actorId, roles) {
 
   const transaction = await modemPay.getTransaction(payment.provider_ref);
   const providerStatus = String(transaction && transaction.status || 'pending').toLowerCase();
+  const nextStep = transaction && (transaction.next_step || transaction.nextStep) || {
+    openExternal: Boolean(transaction && (transaction.open_external || transaction.openExternal)),
+    launch_url: transaction && (transaction.launch_url || transaction.payment_link) || null,
+    auth_mode: transaction && (transaction.auth_mode || transaction.authMode) || null,
+    auth_length: transaction && (transaction.auth_length || transaction.authLength) || null,
+    confirmation_steps: transaction && (transaction.confirmation_steps || transaction.confirmationSteps) || null
+  };
   if (providerStatus === 'completed') {
     const amount = Number(transaction.amount);
     const currency = String(transaction.currency || '').toUpperCase();
@@ -217,7 +224,7 @@ async function getPaymentStatus(paymentId, actorId, roles) {
     payment = await findOwnedPayment(paymentId, actorId, roles);
     return { payment, status:'failed', providerStatus };
   }
-  return { payment, status:providerStatus === 'processing' ? 'processing' : 'pending', providerStatus };
+  return { payment, status:providerStatus === 'processing' ? 'processing' : 'pending', providerStatus, nextStep, redirectUrl:nextStep && nextStep.launch_url || null };
 }
 
 async function confirmPayment(paymentId,actorId,roles){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));if(payment.method==='cod'){if(!isAdmin)throw new AppError('Only admins can confirm COD payments.',403,'FORBIDDEN');}else if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){await PROVIDERS[payment.method].verify(payment.provider_ref);}else if(payment.method!=='cod'){throw new AppError('This payment is confirmed by the provider webhook.',409,'WEBHOOK_CONFIRMATION_REQUIRED');}const confirmed=await markPaymentConfirmed(paymentId);try{await ordersService.settleOrderFinancials(payment.order_id);}catch(e){logger.warn('Settlement deferred after payment confirmation',{paymentId,orderId:payment.order_id,error:e.message});}return confirmed;}
