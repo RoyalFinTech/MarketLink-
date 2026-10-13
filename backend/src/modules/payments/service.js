@@ -48,6 +48,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
   method = String(method).toLowerCase();
   const requestedAmount = Number(amount);
   if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) throw new AppError('Payment amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+  if (method!=='cod'&&!modemPay.isH2H()&&requestedAmount<10) throw new AppError('Modem Pay checkout requires a minimum payment of D 10.00.',400,'BELOW_PROVIDER_MINIMUM');
   if (String(currency || 'GMD').toUpperCase() !== 'GMD') throw new AppError('MarketLink checkout currently supports Gambian Dalasi (GMD).', 400, 'INVALID_CURRENCY');
 
   // Reserve a pending payment while holding the order lock, so two requests cannot
