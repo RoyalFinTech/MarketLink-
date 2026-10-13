@@ -86,7 +86,37 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
 }
 
 async function getById(id, userId, roles) {
-  const { rows } = await query(`SELECT o.*,u.full_name AS customer_name,v.business_name AS vendor_name,json_agg(json_build_object('name',oi.product_name_snapshot,'qty',oi.quantity,'price',oi.unit_price_snapshot,'total',oi.line_total)) AS items,d.id AS delivery_id,d.status AS delivery_status,d.rider_id FROM orders o JOIN users u ON u.id=o.customer_id JOIN vendors v ON v.user_id=o.vendor_id JOIN order_items oi ON oi.order_id=o.id LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 GROUP BY o.id,u.full_name,v.business_name,d.status,d.rider_id`,[id]);
+  const { rows } = await query(`
+    SELECT o.*,
+      u.full_name AS customer_name,
+      v.business_name AS vendor_name,
+      COALESCE(json_agg(json_build_object(
+        'name',oi.product_name_snapshot,'qty',oi.quantity,
+        'price',oi.unit_price_snapshot,'total',oi.line_total
+      ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items,
+      d.id AS delivery_id,
+      d.status AS delivery_status,
+      d.rider_id,
+      d.distance_km,
+      d.estimated_minutes,
+      d.picked_up_at,
+      d.delivered_at,
+      (SELECT ru.full_name FROM users ru WHERE ru.id=d.rider_id) AS rider_name,
+      COALESCE((
+        SELECT json_agg(json_build_object(
+          'status',h.status,'note',h.note,'changed_at',h.created_at
+        ) ORDER BY h.created_at ASC)
+        FROM order_status_history h WHERE h.order_id=o.id
+      ),'[]'::json) AS status_history
+    FROM orders o
+    JOIN users u ON u.id=o.customer_id
+    JOIN vendors v ON v.user_id=o.vendor_id
+    LEFT JOIN order_items oi ON oi.order_id=o.id
+    LEFT JOIN deliveries d ON d.order_id=o.id
+    WHERE o.id=$1
+    GROUP BY o.id,u.full_name,v.business_name,d.id,d.status,d.rider_id,
+      d.distance_km,d.estimated_minutes,d.picked_up_at,d.delivered_at
+  `,[id]);
   if (!rows.length) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
   const o=rows[0]; const adm=(roles||[]).some(r=>['admin','super_admin'].includes(r));
   if (!adm && o.customer_id!==userId && o.vendor_id!==userId && o.rider_id!==userId) throw new AppError('Forbidden.',403,'FORBIDDEN');
