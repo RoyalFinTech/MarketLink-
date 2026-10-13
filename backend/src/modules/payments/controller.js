@@ -5,6 +5,8 @@ const modemPay = require('../../integrations/modempay');
 const logger = require('../../utils/logger');
 const wrap = fn => async (req,res,next) => { try { await fn(req,res,next); } catch(e) { next(e); } };
 exports.initiate = wrap(async (req,res) => { const result=await svc.initiatePayment({ ...req.body, customerId:req.user.id }); res.status(result.existing?200:201).json({success:true,data:result}); });
+exports.continue = wrap(async (req,res) => res.json({success:true,data:await svc.continuePayment(req.params.id,req.body,req.user.id,req.user.roles)}));
+exports.status = wrap(async (req,res) => res.json({success:true,data:await svc.getPaymentStatus(req.params.id,req.user.id,req.user.roles)}));
 exports.confirm = wrap(async (req,res) => res.json({success:true,data:await svc.confirmPayment(req.params.id,req.user.id,req.user.roles)}));
 exports.refund = wrap(async (req,res) => { const actor={id:req.user.id,role:(req.user.roles||[])[0]}; res.json({success:true,data:await svc.refund(req.params.id,req.body,actor)}); });
 exports.history = wrap(async (req,res) => res.json({success:true,data:await svc.getHistory(req.user.id,req.query)}));
