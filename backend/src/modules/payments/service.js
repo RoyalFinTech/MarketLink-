@@ -9,12 +9,30 @@ const ordersService = require('../orders/service');
 
 const modemAdapter = {
   name: 'modempay',
-  charge: async ({ amount, currency, metadata, idempotencyKey, method }) => {
-    const result = await modemPay.createPaymentIntent({ amount, currency, metadata: { ...metadata, payment_method: method }, title: 'MarketLink Order Payment', description: 'Payment for MarketLink order ' + metadata.orderId, returnUrl: process.env.MODEM_PAY_RETURN_URL, cancelUrl: process.env.MODEM_PAY_CANCEL_URL, idempotencyKey });
-    return { reference: result.reference, authorizationUrl: result.paymentLink, intentSecret: result.intentSecret };
+  charge: async ({ amount, currency, metadata, idempotencyKey, method, accountNumber }) => {
+    const result = await modemPay.createPaymentIntent({
+      amount, currency,
+      metadata: { ...metadata, payment_method: method },
+      title: 'MarketLink Order Payment',
+      description: 'Payment for MarketLink order ' + metadata.orderId,
+      returnUrl: process.env.MODEM_PAY_RETURN_URL,
+      cancelUrl: process.env.MODEM_PAY_CANCEL_URL,
+      callbackUrl: process.env.MODEM_PAY_CALLBACK_URL,
+      network: method,
+      accountNumber,
+      idempotencyKey,
+    });
+    return {
+      reference: result.reference,
+      paymentIntentId: result.paymentIntentId,
+      authorizationUrl: result.paymentLink,
+      intentSecret: result.intentSecret,
+      nextStep: result.nextStep || null,
+      providerStatus: result.status || null,
+    };
   },
   refund: async () => { throw new AppError('Modem Pay refunds are not enabled in MarketLink yet.', 503, 'PROVIDER_UNAVAILABLE'); },
-  verify: async () => { throw new AppError('Modem Pay payments are confirmed by signed webhooks.', 409, 'WEBHOOK_CONFIRMATION_REQUIRED'); },
+  verify: async () => { throw new AppError('Modem Pay payments are confirmed by signed webhooks or status checks.', 409, 'WEBHOOK_CONFIRMATION_REQUIRED'); },
 };
 const stripeAdapter = { name:'stripe', charge:async()=>{throw new AppError('Stripe integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, refund:async()=>{throw new AppError('Stripe integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, verify:async()=>{throw new AppError('Stripe integration is not configured.',503,'PROVIDER_UNAVAILABLE');} };
 const paystackAdapter = { name:'paystack', charge:async()=>{throw new AppError('Paystack integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, refund:async()=>{throw new AppError('Paystack integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, verify:async()=>{throw new AppError('Paystack integration is not configured.',503,'PROVIDER_UNAVAILABLE');} };
@@ -23,7 +41,109 @@ const PROVIDERS = { modempay:modemAdapter, wave:modemAdapter, afrimoney:modemAda
 async function checkIdempotency(key){const {rows}=await query("SELECT * FROM payments WHERE provider_ref = $1 AND status IN ('confirmed','pending')",[key]);return rows.length?rows[0]:null;}
 async function releaseOrderInventoryAfterPaymentFailure(orderId, reason){return withTransaction(async(client)=>{const {rows:[order]}=await client.query('SELECT id,status,payment_status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);if(!order)return{released:false,reason:'ORDER_NOT_FOUND'};if(order.payment_status==='confirmed')return{released:false,reason:'PAYMENT_ALREADY_CONFIRMED'};if(!['pending','accepted','preparing','awaiting_rider'].includes(order.status))return{released:false,reason:'ORDER_NOT_RELEASEABLE'};const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const item of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL',[item.quantity,item.product_id]);await client.query("UPDATE orders SET status='cancelled',cancellation_reason=$2 WHERE id=$1",[orderId,reason||'Payment initiation failed; inventory released.']);await client.query("INSERT INTO order_status_history (order_id,status,note) VALUES($1,'cancelled',$2)",[orderId,reason||'Payment initiation failed; inventory released.']);await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered','cancelled')",[orderId]);return{released:true};});}
 
-async function initiatePayment({orderId,method,amount,currency='GMD',customerId}){const {rows:[order]}=await query('SELECT * FROM orders WHERE id = $1 AND customer_id = $2',[orderId,customerId]);if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');if(order.payment_status==='confirmed')throw new AppError('Order is already paid.',400,'ALREADY_PAID');const requestedAmount=Number(amount);if(!Number.isFinite(requestedAmount)||requestedAmount<=0)throw new AppError('Payment amount must be greater than zero.',400,'INVALID_AMOUNT');const orderTotal=Number(order.total);if(Math.abs(requestedAmount-orderTotal)>0.01)throw new AppError('Payment amount does not match the order total.',400,'AMOUNT_MISMATCH');const idempotencyKey='marketlink-order-'+orderId+'-'+method;const existing=await checkIdempotency(idempotencyKey);if(existing)return{existing:true,payment:existing};if(method==='cod'){const {rows:[payment]}=await query(`INSERT INTO payments (order_id, method, amount, currency, status) VALUES ($1,'cod',$2,$3,'pending') RETURNING *`,[orderId,requestedAmount,currency]);return{payment,action:'cod_pending'};}const provider=PROVIDERS[method];if(!provider)throw new AppError('Payment method "'+method+'" is not supported.',400,'UNSUPPORTED_METHOD');let chargeResult;try{chargeResult=await provider.charge({amount:requestedAmount,currency,method,idempotencyKey,metadata:{orderId,customerId}});}catch(err){if(err&&((err.code==='PROVIDER_UNAVAILABLE')||Number(err.status)>=400&&Number(err.status)<500)){try{await releaseOrderInventoryAfterPaymentFailure(orderId,err.error||'Payment provider rejected the payment.');}catch(releaseErr){logger.error('Failed to release inventory after payment initiation failure',{orderId,error:releaseErr.message});}}throw err;}const {rows:[payment]}=await query(`INSERT INTO payments (order_id, method, provider_ref, amount, currency, status) VALUES ($1,$2,$3,$4,$5,'pending') RETURNING *`,[orderId,method,chargeResult.reference||idempotencyKey,requestedAmount,currency]);return{payment,action:'redirect',redirectUrl:chargeResult.authorizationUrl,provider:provider.name};}
+async function initiatePayment({ orderId, method, amount, currency='GMD', customerId, accountNumber }) {
+  if (!['cod','wave','afrimoney','qmoney','modempay'].includes(String(method || '').toLowerCase())) {
+    throw new AppError('Choose a supported MarketLink payment method.', 400, 'UNSUPPORTED_METHOD');
+  }
+  method = String(method).toLowerCase();
+  const requestedAmount = Number(amount);
+  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) throw new AppError('Payment amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+  if (String(currency || 'GMD').toUpperCase() !== 'GMD') throw new AppError('MarketLink checkout currently supports Gambian Dalasi (GMD).', 400, 'INVALID_CURRENCY');
+
+  // Reserve a pending payment while holding the order lock, so two requests cannot
+  // both start a provider charge for the same order and method.
+  const reservation = await withTransaction(async (client) => {
+    const { rows: [order] } = await client.query(
+      'SELECT id, customer_id, total, payment_status FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
+      [orderId, customerId]
+    );
+    if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
+    if (order.payment_status === 'confirmed') throw new AppError('Order is already paid.', 400, 'ALREADY_PAID');
+    if (Math.abs(requestedAmount - Number(order.total)) > 0.01) throw new AppError('Payment amount does not match the order total.', 400, 'AMOUNT_MISMATCH');
+
+    const { rows: [existing] } = await client.query(
+      "SELECT * FROM payments WHERE order_id=$1 AND method=$2 AND status IN ('pending','confirmed') ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+      [orderId, method]
+    );
+    if (existing) return { existing, order };
+
+    if (method === 'cod') {
+      const { rows: [payment] } = await client.query(
+        "INSERT INTO payments (order_id, method, amount, currency, status) VALUES ($1,'cod',$2,'GMD','pending') RETURNING *",
+        [orderId, requestedAmount]
+      );
+      return { payment, order, cashOnDelivery: true };
+    }
+
+    const idempotencyKey = 'marketlink-order-' + orderId + '-' + method;
+    const { rows: [payment] } = await client.query(
+      "INSERT INTO payments (order_id, method, provider_ref, amount, currency, status) VALUES ($1,$2,$3,$4,'GMD','pending') RETURNING *",
+      [orderId, method, idempotencyKey, requestedAmount]
+    );
+    return { payment, order, idempotencyKey };
+  });
+
+  if (reservation.existing) {
+    return {
+      existing: true,
+      payment: reservation.existing,
+      action: reservation.existing.status === 'confirmed' ? 'confirmed' : 'pending',
+    };
+  }
+  if (reservation.cashOnDelivery) return { payment: reservation.payment, action: 'cod_pending' };
+
+  const payment = reservation.payment;
+  const provider = PROVIDERS[method];
+  if (!provider) {
+    await query("UPDATE payments SET status='failed' WHERE id=$1", [payment.id]);
+    throw new AppError('Payment method is not supported.', 400, 'UNSUPPORTED_METHOD');
+  }
+
+  let chargeResult;
+  try {
+    chargeResult = await provider.charge({
+      amount: requestedAmount,
+      currency: 'GMD',
+      method,
+      accountNumber,
+      idempotencyKey: reservation.idempotencyKey,
+      metadata: { orderId, customerId },
+    });
+  } catch (err) {
+    try { await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'", [payment.id]); }
+    catch (updateErr) { logger.error('Could not mark failed payment attempt',{paymentId:payment.id,error:updateErr.message}); }
+    if (err && ((err.code === 'PROVIDER_UNAVAILABLE') || (Number(err.status) >= 400 && Number(err.status) < 500))) {
+      try { await releaseOrderInventoryAfterPaymentFailure(orderId, err.error || 'Payment initiation failed.'); }
+      catch (releaseErr) { logger.error('Failed to release inventory after payment initiation failure',{orderId,error:releaseErr.message}); }
+    }
+    throw err;
+  }
+
+  const { rows: [updatedPayment] } = await query(
+    "UPDATE payments SET provider_ref=$2 WHERE id=$1 RETURNING *",
+    [payment.id, String(chargeResult.reference || reservation.idempotencyKey)]
+  );
+
+  const nextStep = chargeResult.nextStep || null;
+  const redirectUrl = chargeResult.authorizationUrl || null;
+  if (modemPay.isH2H()) {
+    return {
+      payment: updatedPayment,
+      provider: provider.name,
+      action: nextStep && nextStep.openExternal && (nextStep.launch_url || redirectUrl) ? 'redirect' : 'continue',
+      redirectUrl,
+      nextStep,
+      providerStatus: chargeResult.providerStatus || 'pending',
+    };
+  }
+  return {
+    payment: updatedPayment,
+    action: 'redirect',
+    redirectUrl,
+    provider: provider.name,
+    providerStatus: chargeResult.providerStatus || 'pending',
+  };
+}
 async function confirmPayment(paymentId,actorId,roles){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));if(payment.method==='cod'){if(!isAdmin)throw new AppError('Only admins can confirm COD payments.',403,'FORBIDDEN');}else if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){await PROVIDERS[payment.method].verify(payment.provider_ref);}else if(payment.method!=='cod'){throw new AppError('This payment is confirmed by the provider webhook.',409,'WEBHOOK_CONFIRMATION_REQUIRED');}const confirmed=await markPaymentConfirmed(paymentId);try{await ordersService.settleOrderFinancials(payment.order_id);}catch(e){logger.warn('Settlement deferred after payment confirmation',{paymentId,orderId:payment.order_id,error:e.message});}return confirmed;}
 async function markPaymentConfirmed(paymentId){return withTransaction(async(client)=>{const {rows:[payment]}=await client.query('SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const {rows:[updated]}=await client.query(`UPDATE payments SET status='confirmed', paid_at=now() WHERE id=$1 RETURNING *`,[paymentId]);await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);const {rows:[o]}=await client.query('SELECT customer_id,total FROM orders WHERE id=$1',[payment.order_id]);if(o){await client.query(`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,[o.customer_id,'Your payment of D '+o.total+' has been confirmed.',paymentId]);}logger.info('Payment confirmed',{paymentId,orderId:payment.order_id});return updated;});}
 async function processWebhook({event,rawBody}){if(String(event?.event||'').startsWith('transfer.')){const withdrawalsSvc=require('../withdrawals/service');return withdrawalsSvc.processProviderWebhook(event);}if(!event||!event.event)throw new AppError('Invalid Modem Pay event.',400,'INVALID_WEBHOOK');const eventType=String(event.event);const payload=event.payload||{};const eventId=String(payload.id||payload.transaction_reference||crypto.createHash('sha256').update(rawBody||JSON.stringify(event)).digest('hex'));const result=await withTransaction(async(client)=>{const {rows:inserted}=await client.query(`INSERT INTO payment_webhook_events (provider,event_id,event_type,payload) VALUES ('modempay',$1,$2,$3) ON CONFLICT (provider,event_id) DO NOTHING RETURNING id`,[eventId,eventType,JSON.stringify(event)]);if(!inserted.length)return{duplicate:true,eventId,eventType};if(eventType==='charge.succeeded'){const orderId=payload?.metadata?.orderId;if(!orderId){logger.warn('Modem Pay charge has no MarketLink orderId metadata',{eventId});return{processed:true,ignored:true,eventId,eventType};}const {rows:[payment]}=await client.query(`SELECT p.* FROM payments p WHERE p.order_id=$1 AND p.method IN ('modempay','wave','afrimoney','qmoney') AND p.status='pending' ORDER BY p.created_at DESC LIMIT 1 FOR UPDATE`,[orderId]);if(!payment)return{processed:true,ignored:true,eventId,eventType};const providerAmount=Number(payload.amount);if(Number.isFinite(providerAmount)&&Math.abs(providerAmount-Number(payment.amount))>0.01){logger.error('Modem Pay amount mismatch',{eventId,orderId,paymentId:payment.id,expected:payment.amount,received:payload.amount});return{processed:true,ignored:true,eventId,eventType,reason:'amount_mismatch'};}await client.query(`UPDATE payments SET status='confirmed', paid_at=now(), provider_ref=COALESCE($2,provider_ref) WHERE id=$1`,[payment.id,payload.transaction_reference||payload.id||null]);await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);const {rows:[o]}=await client.query('SELECT customer_id,total FROM orders WHERE id=$1',[orderId]);if(o)await client.query(`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,[o.customer_id,'Your payment of D '+o.total+' has been confirmed.',payment.id]);logger.info('Modem Pay charge confirmed',{eventId,orderId,paymentId:payment.id});return{processed:true,eventId,eventType,paymentId:payment.id,orderId};}if(['charge.cancelled','charge.failed','charge.expired'].includes(eventType)){const orderId=payload?.metadata?.orderId;if(orderId){const {rows:failedPayments}=await client.query(`UPDATE payments SET status='failed' WHERE order_id=$1 AND method IN ('modempay','wave','afrimoney','qmoney') AND status='pending' RETURNING order_id`,[orderId]);if(failedPayments.length){const {rows:[order]}=await client.query('SELECT status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);if(order&&order.status!=='cancelled'&&order.status!=='delivered'){const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const item of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL',[item.quantity,item.product_id]);await client.query("UPDATE orders SET status='cancelled',cancellation_reason=$2 WHERE id=$1",[orderId,'Payment failed or expired; inventory released.']);}}}}return{processed:true,eventId,eventType};});if(result?.paymentId&&result?.orderId){try{await ordersService.settleOrderFinancials(result.orderId);}catch(e){logger.warn('Settlement deferred after provider webhook',{eventId,orderId:result.orderId,error:e.message});}}return result;}
