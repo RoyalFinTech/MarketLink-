@@ -162,18 +162,26 @@ async function initiateTransfer({ amount, currency='GMD', network, accountNumber
 
 function verifyWebhookSignature(rawBody, signature) {
   const crypto = require('crypto');
-  // Per-payment callback URLs use the SHA-256-hashed API secret. Dashboard-level
-  // webhooks use the dedicated webhook signing secret. Do not mix the two keys.
-  const hasPerPaymentCallback=Boolean(String(process.env.MODEM_PAY_CALLBACK_URL||'').trim());
-  const secret=hasPerPaymentCallback
-    ? process.env.MODEM_PAY_SECRET_HASH
-    : (process.env.MODEM_PAY_WEBHOOK_SECRET || process.env.MODEM_PAY_SECRET_HASH);
-  if (!secret) throw new AppError('Modem Pay webhook signing configuration is missing.', 503, 'PROVIDER_UNAVAILABLE');
   if (!signature || !rawBody) return false;
-  const expected = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
-  const a = Buffer.from(expected);
-  const b = Buffer.from(String(signature));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  // Global dashboard webhooks use MODEM_PAY_WEBHOOK_SECRET. Per-payment
+  // callback_url notifications use MODEM_PAY_SECRET_HASH (SHA-256 of the API
+  // secret). Try configured candidates so both routes may safely share one
+  // webhook endpoint when the merchant intentionally enables both mechanisms.
+  const secrets = [
+    process.env.MODEM_PAY_WEBHOOK_SECRET,
+    process.env.MODEM_PAY_SECRET_HASH,
+  ].filter(value => String(value || '').trim().length > 0).map(value => String(value).trim());
+  if (!secrets.length) throw new AppError('Modem Pay webhook signing configuration is missing.', 503, 'PROVIDER_UNAVAILABLE');
+  const supplied = Buffer.from(String(signature).trim().toLowerCase());
+  let matched = false;
+  for (const secret of secrets) {
+    const expected = Buffer.from(crypto.createHmac('sha512', secret).update(rawBody).digest('hex'));
+    const comparable = expected.length === supplied.length;
+    const equal = comparable && crypto.timingSafeEqual(expected, supplied);
+    // Evaluate every configured candidate; do not short-circuit on the first match.
+    matched = Boolean(equal || matched);
+  }
+  return matched;
 }
 
 module.exports = {
