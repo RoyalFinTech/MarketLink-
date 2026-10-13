@@ -33,7 +33,8 @@
   function promoSlideMarkup(index,cls){
     var p=mlPromoSlides[(Number(index)||0)%mlPromoSlides.length];
     var officialMark=(typeof logoSVG==='function'?logoSVG(25):'')+(typeof LOGO_WORDMARK_URI!=='undefined'?'<img class="ml-promo-wordmark" src="'+LOGO_WORDMARK_URI+'" alt="MarketLink">':'<b>MarketLink</b>');
-    return '<article class="ml-promo-panel ml-promo-'+p.kind+(cls?' '+cls:'')+'" style="background-image:linear-gradient(90deg,rgba(5,18,30,.97) 0%,rgba(5,18,30,.88) 43%,rgba(5,18,30,.38) 73%,rgba(5,18,30,.10) 100%),url(&quot;'+esc(p.image)+'&quot;)">'+
+    return '<article class="ml-promo-panel ml-promo-'+p.kind+(cls?' '+cls:'')+'" style="background-image:linear-gradient(135deg,#071521,#0B303A)">'+
+      '<div class="ml-promo-image" role="img" aria-label="'+esc(p.kind==='shop'?'MarketLink local shopping and groceries':p.kind==='sell'?'MarketLink vendor marketplace':'MarketLink affiliate marketplace')+'" style="background-image:url(&quot;'+esc(p.image)+'&quot;)"></div>'+
       '<div class="ml-promo-official">'+officialMark+'</div>'+
       '<div class="ml-promo-copy"><span class="ml-promo-eyebrow"><i></i>'+esc(p.eyebrow)+'</span><span class="ml-promo-kicker">'+esc(p.pill)+'</span>'+
       '<h3>'+esc(p.title)+'<em>'+esc(p.accent)+'</em></h3><p>'+esc(p.body)+'</p>'+
@@ -227,19 +228,37 @@
     }
     renderPremiumHome();
   }
+  function isMarketLinkRole(role){return (S.roles||[]).some(function(r){return String(r).toLowerCase()===String(role).toLowerCase();});}
+  function roleCtaSectionMarkup(){
+    return '<section class="ml-role-cta-section"><div class="ml-role-cta-heading"><div><h3>Grow with MarketLink</h3><p>Sell through the marketplace or earn by delivering local orders.</p></div></div><div class="ml-role-cta-buttons">'+
+      (isMarketLinkRole('vendor')?'<button type="button" class="ml-role-cta-button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-role-cta-icon">🏪</span><span class="ml-role-cta-copy"><b>Vendor Dashboard</b><small>Manage your store and incoming orders.</small></span><span>↗</span></button>':'<button type="button" class="ml-role-cta-button" onclick="openVendorApp()"><span class="ml-role-cta-icon">🏪</span><span class="ml-role-cta-copy"><b>Become a Vendor</b><small>Register your business and reach more customers.</small></span><span>↗</span></button>')+
+      (isMarketLinkRole('rider')?'<button type="button" class="ml-role-cta-button" onclick="window.ML_Premium.openRoleDashboard(\'rider\')"><span class="ml-role-cta-icon">🛵</span><span class="ml-role-cta-copy"><b>Rider Dashboard</b><small>View deliveries and manage availability.</small></span><span>↗</span></button>':'<button type="button" class="ml-role-cta-button" onclick="openRiderApp()"><span class="ml-role-cta-icon">🛵</span><span class="ml-role-cta-copy"><b>Become a Rider</b><small>Apply to join the delivery network.</small></span><span>↗</span></button>')+
+    '</div></section>';
+  }
+  function openRoleDashboard(role){
+    var r=String(role||'').toLowerCase();
+    if(r==='profile'){switchTab('profile');return;}
+    if(r==='vendor'){if(!isMarketLinkRole('vendor')){toast('Your vendor application must be approved before dashboard access.','error');return;}switchTab('vendordash');return;}
+    if(r==='rider'){if(!isMarketLinkRole('rider')){toast('Your rider application must be approved before dashboard access.','error');return;}switchTab('riderdash');return;}
+    toast('Choose a valid MarketLink dashboard.','error');
+  }
   function mlOfficialBrandMarkup(){
     var icon=typeof logoSVG==='function'?logoSVG(34):'';
     var word=(typeof LOGO_WORDMARK_URI!=='undefined')?'<img class="ml-brand-wordmark" src="'+LOGO_WORDMARK_URI+'" alt="MarketLink">':'<strong>MarketLink</strong>';
     return '<div class="ml-dashboard-brand">'+icon+word+'<span>The Gambia’s local marketplace</span></div>';
   }
-  function mlCategoryPosition(name){
-    var n=String(name||'').toLowerCase();
-    if(/onion/.test(n))return '50% 0%';
-    if(/rice|grain|cereal/.test(n))return '100% 0%';
-    if(/cook|oil|spice|pantry|grocery|grocer/.test(n))return '0% 100%';
-    if(/carrot|fresh|leaf|green|vegetable/.test(n))return '50% 100%';
-    if(/tomato|fruit|produce/.test(n))return '0% 0%';
-    return '100% 100%';
+  function mlCategoryStyle(name){
+    var n=String(name||'').toLowerCase(),atlas='./assets/marketlink-category-atlas.webp';
+    if(/onion/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:50% 0%;';
+    if(/rice|grain|cereal/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:100% 0%;';
+    if(/tomato/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:0% 0%;';
+    if(/carrot/.test(n))return '--ml-category-image:url("'+atlas+'");--ml-category-size:300% 200%;--ml-category-position:50% 100%;';
+    if(/fufu|benachin|benetin|domoda|meal|prepared food|cooked|restaurant|fish|meat|chicken|seafood|bakery|snack/.test(n))return '--ml-category-image:url("./assets/promo-shopping.webp");--ml-category-size:cover;--ml-category-position:center;';
+    if(/clothing|fashion|shoe|fabric|tailor|apparel|jewel|accessor|beauty|cosmetic/.test(n))return '--ml-category-image:url("./assets/promo-vendor.webp");--ml-category-size:cover;--ml-category-position:center;';
+    if(/fresh|leaf|green|vegetable|fruit|produce|grocery|grocer|cook|oil|spice|pantry|household|kitchen|home/.test(n))return '--ml-category-image:url("./assets/hero-marketlink-bag.webp");--ml-category-size:cover;--ml-category-position:center;';
+    var choices=['./assets/promo-shopping.webp','./assets/promo-vendor.webp','./assets/hero-marketlink-bag.webp'],hash=0;
+    for(var i=0;i<n.length;i++)hash=(hash+n.charCodeAt(i))%choices.length;
+    return '--ml-category-image:url("'+choices[hash]+'");--ml-category-size:cover;--ml-category-position:center;';
   }
   async function renderLiveCategoriesPage(){
     var root=G('catpage-content');if(!root)return;
@@ -251,7 +270,7 @@
         liveCategories=Array.isArray(response.data)?response.data:[];
       }
       var cards=liveCategories.map(function(cat){
-        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'"><span class="ml-category-photo" style="--ml-category-position:'+mlCategoryPosition(cat.name)+'"></span><span class="ml-category-card-name">'+esc(cat.name||'Category')+'</span></button>';
+        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'"><span class="ml-category-photo" style="'+mlCategoryStyle(cat.name)+'"></span><span class="ml-category-card-name">'+esc(cat.name||'Category')+'</span></button>';
       }).join('');
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">FIND YOUR ESSENTIALS</div><h3>Shop by category</h3></div><button type="button" onclick="switchTab(\'home\')">← Home</button></div>'+
         (cards?'<div class="ml-category-grid">'+cards+'</div>':'<div class="ml-empty"><b>No live categories yet</b><span>Categories will appear when published by MarketLink.</span></div>')+'</div>';
@@ -328,7 +347,7 @@
   function renderPremiumHome(){
     var root=G('tab-home');if(!root)return;
     var catHtml=liveCategories.slice(0,12).map(function(c){
-      return '<button type="button" class="ml-cat" data-ml-category-id="'+esc(liveProductId(c.id))+'" data-ml-category-name="'+esc(c.name||'Category')+'"><span class="ml-cat-photo" style="--ml-category-position:'+mlCategoryPosition(c.name)+'"></span><span class="ml-cat-name">'+esc(c.name)+'</span></button>';
+      return '<button type="button" class="ml-cat" data-ml-category-id="'+esc(liveProductId(c.id))+'" data-ml-category-name="'+esc(c.name||'Category')+'"><span class="ml-cat-photo" style="'+mlCategoryStyle(c.name)+'"></span><span class="ml-cat-name">'+esc(c.name)+'</span></button>';
     }).join('');
     if(!catHtml) catHtml='<div class="ml-empty" style="width:100%;box-sizing:border-box;"><b>Categories are being prepared</b><span>Live categories will appear here as soon as they are published.</span></div>';
     var prodHtml=liveProducts.map(function(p){return productCard(p);}).join('');
@@ -346,7 +365,8 @@
       '<div class="ml-section-head"><h3>Browse categories</h3><button onclick="window.ML_Premium.refresh()">Refresh</button></div><div class="ml-cat-row">'+catHtml+'</div>'+
       '<div class="ml-section-head"><h3>Latest from MarketLink</h3><button onclick="window.ML_Premium.refresh()">View latest</button></div>'+
       (prodHtml?'<div class="ml-product-grid">'+prodHtml+'</div>':'<div class="ml-empty"><div style="font-size:30px">🛍️</div><b>No live products yet</b><span>When an approved vendor publishes an active product, it will appear here automatically. No demo products are being shown.</span></div>')+
-      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button></div></footer>'+
+      roleCtaSectionMarkup()+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div class="ml-footer-nav"><button type="button" onclick="switchTab(\'home\')">Home</button><button type="button" onclick="switchTab(\'catpage\')">Categories</button><button type="button" onclick="switchTab(\'orders\')">Orders</button><button type="button" onclick="switchTab(\'cart\')">Cart</button><button type="button" onclick="switchTab(\'profile\')">Profile</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Royal Wallet</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'deliveryPolicy\')">Delivery & Returns</button></div></footer>'+
       '</div>';
     setTimeout(initPromoCarousel,0);
     var homeRoot=G('tab-home');
@@ -501,6 +521,9 @@
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button><h3>'+esc(policy.title)+'</h3></div><div class="ml-policy-content">'+policy.sections.map(function(section){return '<section><h4>'+esc(section[0])+'</h4><p>'+esc(section[1])+'</p></section>';}).join('')+'</div><footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><span>Questions?</span><a href="mailto:marketlinkgambia@gmail.com">Email support</a><a href="tel:+2204071510">Call +220 407 1510</a></div></footer></div>';
   }
   function openProfilePage(page){
+    if(page==='terms'){S.profilePage=null;openSheet('sh-terms');return;}
+    if(page==='privPolicy'){S.profilePage=null;openSheet('sh-privacy');return;}
+    if(page==='deliveryPolicy'){S.profilePage=null;openSheet('sh-delivery-policy');return;}
     S.profilePage=page||null;
     if(page==='addresses'){renderAddresses();return;}
     if(typeof switchTab==='function'&&S.curTab!=='profile'){switchTab('profile');return;}
@@ -533,7 +556,7 @@
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
   async function renderPremiumNotificationsPage(root){
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Notifications</h3></div><div class="ml-loading">Loading account notifications…</div></div>';
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Notifications</h3></div><button type="button" class="ml-btn ml-btn-secondary ml-push-setup-button" onclick="window.ML_Push.enable()">🔔 Enable push on this device</button><div class="ml-loading">Loading account notifications…</div></div>';
     try{
       var response=await ML_API.customers.getNotifications({page:1,limit:50,unreadOnly:false}),items=normalizeProducts(response&&response.data);
       var unread=items.filter(function(n){return !n.read_at;}).length;
@@ -607,7 +630,7 @@
   }
   async function renderPremiumProfile(){
     var root=G('profile-body');if(!root)return;
-    if(S.profilePage==='terms'||S.profilePage==='privPolicy'||S.profilePage==='deliveryPolicy'){renderPremiumPolicyPage(root,S.profilePage);return;}
+    if(S.profilePage==='terms'||S.profilePage==='privPolicy'||S.profilePage==='deliveryPolicy'){openProfilePage(S.profilePage);return;}
     if(S.profilePage==='wallet'){await renderPremiumWalletPage(root);return;}
     if(S.profilePage==='payments'){renderPremiumPaymentsPage(root);return;}
     if(S.profilePage==='notifSet'){await renderPremiumNotificationsPage(root);return;}
@@ -620,13 +643,15 @@
     root=G('profile-body');if(!root)return;
     if(S.profilePage==='affiliate'){var affiliateData=await syncAffiliateProfile();renderPremiumAffiliatePage(root,affiliateData);return;}
     var p=liveProfile||{},name=p.full_name||S.user&&S.user.name||'MarketLink user',phone=p.phone||S.user&&S.user.phone||'';
-    var applicationHtml='';
+    var applicationHtml='',vendorApplication=null,riderApplication=null;
     if(S.user&&S.user.id){
       var apps=await Promise.all([
         ML_API.vendors.getById(S.user.id).catch(function(){return null;}),
         ML_API.riders.getById(S.user.id).catch(function(){return null;})
       ]);
-      var appNames=[['Vendor application',apps[0]],['Rider application',apps[1]]];
+      vendorApplication=apps[0]&&apps[0].kyc_status?apps[0]:null;
+      riderApplication=apps[1]&&apps[1].kyc_status?apps[1]:null;
+      var appNames=[['Vendor application',vendorApplication],['Rider application',riderApplication]];
       appNames.forEach(function(a){
         if(a[1]&&a[1].kyc_status){
           var st=String(a[1].kyc_status).toLowerCase(),label=st==='approved'?'Approved':st==='rejected'?'Rejected':st==='suspended'?'Suspended':'Pending review';
@@ -639,9 +664,13 @@
     var photo=p.profile_photo_url||S.profilePhoto;
     var avatar=photo?'<img src="'+esc(photo)+'" alt="Profile photo">':esc(name.trim().charAt(0).toUpperCase()||'M');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
-    var upgradeHtml='';
-    if((S.roles||[]).indexOf('vendor')<0)upgradeHtml+='<button type="button" onclick="openVendorApp()"><span class="ml-upgrade-icon">🏪</span><span><b>Become a vendor</b><span>List products and grow your shop</span></span><span class="arrow">›</span></button>';
-    if((S.roles||[]).indexOf('rider')<0)upgradeHtml+='<button type="button" onclick="openRiderApp()"><span class="ml-upgrade-icon">🛵</span><span><b>Become a rider</b><span>Apply to deliver local orders</span></span><span class="arrow">›</span></button>';
+    var upgradeHtml='',userRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
+    if(userRoles.indexOf('vendor')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-upgrade-icon">🏪</span><span><b>Open Vendor Dashboard</b><span>Manage products, orders and store activity</span></span><span class="arrow">›</span></button>';
+    else if(vendorApplication)upgradeHtml+='<button type="button" class="ml-role-application-state" onclick="window.ML_Premium.openProfilePage(\'help\')"><span class="ml-upgrade-icon">🏪</span><span><b>Vendor application: '+esc(String(vendorApplication.kyc_status))+'</b><span>Check status or contact support. You do not need to submit another application.</span></span><span class="arrow">›</span></button>';
+    else upgradeHtml+='<button type="button" onclick="openVendorApp()"><span class="ml-upgrade-icon">🏪</span><span><b>Become a vendor</b><span>List products and grow your shop</span></span><span class="arrow">›</span></button>';
+    if(userRoles.indexOf('rider')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'rider\')"><span class="ml-upgrade-icon">🛵</span><span><b>Open Rider Dashboard</b><span>View assigned deliveries and earnings</span></span><span class="arrow">›</span></button>';
+    else if(riderApplication)upgradeHtml+='<button type="button" class="ml-role-application-state" onclick="window.ML_Premium.openProfilePage(\'help\')"><span class="ml-upgrade-icon">🛵</span><span><b>Rider application: '+esc(String(riderApplication.kyc_status))+'</b><span>Check status or contact support. You do not need to submit another application.</span></span><span class="arrow">›</span></button>';
+    else upgradeHtml+='<button type="button" onclick="openRiderApp()"><span class="ml-upgrade-icon">🛵</span><span><b>Become a rider</b><span>Apply to deliver local orders</span></span><span class="arrow">›</span></button>';
     var profileItems=[
       {icon:'❤️',title:'Wishlist',desc:'Products you have saved',page:'wishlist'},
       {icon:'🔗',title:'Affiliate Program',desc:'Your link, referrals and eligible 2% rewards',page:'affiliate'},
@@ -1002,7 +1031,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
@@ -1061,6 +1090,30 @@
     var root=G('tab-home');if(!root)return;
     root.innerHTML='<div class="ml-premium-home ml-home-loading"><div class="ml-dashboard-brand">'+mlOfficialBrandMarkup()+'</div><div class="ml-skeleton-line" style="width:54%"></div><div class="ml-skeleton-line" style="width:36%"></div><div class="ml-skeleton-card"></div><div class="ml-skeleton-line" style="width:44%"></div></div>';
   }
+  async function loadFirebaseCompatScript(src){
+    if(document.querySelector('script[data-marketlink-firebase="'+src+'"]'))return;
+    await new Promise(function(resolve,reject){var script=document.createElement('script');script.src=src;script.async=true;script.dataset.marketlinkFirebase=src;script.onload=resolve;script.onerror=function(){reject(new Error('Firebase SDK could not be loaded. Check the content-security policy and network.'));};document.head.appendChild(script);});
+  }
+  async function enableMarketLinkPush(){
+    var cfg=window.MARKETLINK_FIREBASE_CONFIG||window.MARKETLINK_CONFIG&&window.MARKETLINK_CONFIG.FIREBASE_WEB_CONFIG;
+    if(!cfg||!cfg.apiKey||!cfg.projectId||!cfg.messagingSenderId||!cfg.appId||!cfg.vapidKey){toast('Push setup needs the real Firebase Web app config and VAPID public key. Contact the MarketLink administrator.','error');return {enabled:false,reason:'FIREBASE_WEB_CONFIG_MISSING'};}
+    if(!window.isSecureContext||!navigator.serviceWorker||!window.Notification){toast('This browser does not support secure web push notifications.','error');return {enabled:false,reason:'BROWSER_PUSH_UNSUPPORTED'};}
+    if(!ML_API.auth.isAuthenticated()){toast('Sign in before enabling account push notifications.','error');return {enabled:false,reason:'AUTH_REQUIRED'};}
+    try{
+      var permission=Notification.permission;if(permission==='default')permission=await Notification.requestPermission();
+      if(permission!=='granted'){toast('Notification permission was not granted. You can enable it in browser settings.','error');return {enabled:false,reason:'PERMISSION_DENIED'};}
+      await loadFirebaseCompatScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
+      await loadFirebaseCompatScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
+      if(!window.firebase)throw new Error('Firebase SDK is unavailable.');
+      var app=window.firebase.apps&&window.firebase.apps.length?window.firebase.app():window.firebase.initializeApp({apiKey:cfg.apiKey,authDomain:cfg.authDomain,projectId:cfg.projectId,messagingSenderId:cfg.messagingSenderId,appId:cfg.appId});
+      var sw=await navigator.serviceWorker.register('./firebase-messaging-sw.js'),messaging=app.messaging();
+      var token=await messaging.getToken({vapidKey:cfg.vapidKey,serviceWorkerRegistration:sw});if(!token)throw new Error('Firebase did not return a device token.');
+      await ML_API.notifications.registerPushToken(token,'web');
+      if(!messaging.__marketLinkForegroundBound){messaging.__marketLinkForegroundBound=true;messaging.onMessage(function(payload){var n=payload&&payload.notification||{},title=n.title||'MarketLink update',body=n.body||'You have a new account update.';toast(title+(body?' — '+body:''),'info');if(!document.hidden&&Notification.permission==='granted'){try{new Notification(title,{body:body,tag:'marketlink-foreground'});}catch(e){}}});}
+      toast('Push notifications are enabled for this device.','success');return {enabled:true};
+    }catch(e){console.error('[MarketLink push setup]',e);toast(e&&e.message||'Could not enable push notifications. Check Firebase setup and browser permissions.','error');return {enabled:false,reason:'PUSH_SETUP_FAILED'};}
+  }
+  window.ML_Push={enable:enableMarketLinkPush};
   window.renderHome=function(){showPremiumHomeLoading();loadLiveHome().catch(function(e){var root=G('tab-home');if(root)root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Marketplace could not load</b><span>'+esc(e.error||'Please check your connection and try again.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.renderHome()">Retry</button></div></div>';});};
   window.openCategory=function(cat){if(cat&&cat.id){return openCategory(cat.id,cat.name||'Category');}return loadLiveHome();};
   window.openProductDetail=function(id){return openProduct(id);};
