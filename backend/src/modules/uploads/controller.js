@@ -41,6 +41,15 @@ exports.deleteByUrl = wrap(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+exports.getPublicProfileContent = wrap(async (req, res) => {
+  const file = await svc.getPublicProfileContent(req.params.id);
+  res.setHeader('Content-Type', file.contentType || 'image/jpeg');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+  res.setHeader('Content-Disposition', 'inline');
+  res.send(file.buffer);
+});
+
 exports.getContent = wrap(async (req, res) => {
   const file = await svc.getFile(req.params.id, req.user.id, req.user.roles);
   res.setHeader('Content-Type', file.contentType || 'application/octet-stream');
