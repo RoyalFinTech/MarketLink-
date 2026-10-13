@@ -1405,7 +1405,9 @@ var ML_API = (function(){
 
   // ── PAYMENTS ─────────────────────────────────────────────────
   var payments = {
-    initiate: function(orderId, method, amount){ return post('/payments/initiate', {orderId:orderId, method:method, amount:amount}); },
+    initiate: function(orderId, method, amount, accountNumber){ return post('/payments/initiate', {orderId:orderId, method:method, amount:amount, accountNumber:accountNumber||undefined}); },
+    continue: function(id, action, pin){ return post('/payments/'+id+'/continue', {action:action, pin:pin||undefined}); },
+    status: function(id){ return get('/payments/'+id+'/status'); },
     confirm:  function(id){ return post('/payments/'+id+'/confirm'); },
     history:  function(qs){ return get('/payments/history', qs); },
   };
