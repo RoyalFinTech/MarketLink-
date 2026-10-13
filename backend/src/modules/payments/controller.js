@@ -5,15 +5,18 @@ const modemPay = require('../../integrations/modempay');
 const logger = require('../../utils/logger');
 const wrap = fn => async (req,res,next) => { try { await fn(req,res,next); } catch(e) { next(e); } };
 exports.methods = wrap(async (req,res) => {
-  const configured = Boolean(modemPay.isConfigured());
+  const keyConfigured = Boolean(modemPay.isConfigured());
   const h2h = Boolean(modemPay.isH2H());
+  const h2hApproved = Boolean(modemPay.isH2HApproved());
+  const configured = keyConfigured && (!h2h || h2hApproved);
   res.json({success:true,data:{
     provider:'modempay',
     configured,
     mode:h2h?'h2h':'merchant',
     directMobileMoney:configured&&h2h,
     hostedCheckout:configured&&!h2h,
-    methods:['wave','afrimoney','qmoney'],
+    setupReason:!keyConfigured?'Waiting for Modem Pay server credentials.':(h2h&&!h2hApproved?'Waiting for Modem Pay H2H partner approval.':null),
+    methods:configured?['wave','afrimoney','qmoney']:[],
     currency:'GMD'
   }});
 });
