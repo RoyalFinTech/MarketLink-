@@ -35,9 +35,11 @@ function supabaseConfig() {
 }
 function getStorageProvider() {
   const configured = String(process.env.STORAGE_PROVIDER || '').trim().toLowerCase();
-  if (configured) return configured;
   const s = supabaseConfig();
-  if (s.url && s.key) return 'supabase';
+  // The old S3/Cloudinary adapters were placeholders. Prefer the working
+  // Supabase configuration even if an obsolete provider value remains in Render.
+  if (configured === 'supabase' || (s.url && s.key)) return 'supabase';
+  if (configured === 'local' && process.env.NODE_ENV !== 'production' && !process.env.RENDER) return 'local';
   if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
     throw new AppError('Profile-photo storage is not configured for production. Configure Supabase Storage on the backend service.', 503, 'STORAGE_NOT_CONFIGURED');
   }
