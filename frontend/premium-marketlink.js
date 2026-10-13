@@ -727,14 +727,55 @@
     }catch(e){}
   }
   async function saveProfilePhoto(file){
-    if(!file||!apiOk())return;
+    if(!file)return false;
+    if(!apiOk()){toast('Please sign in again before changing your profile photo.','error');return false;}
+    var allowed=['image/jpeg','image/png','image/webp','image/gif'];
+    if(allowed.indexOf(file.type)<0){toast('Choose a JPG, PNG, WebP or GIF image.','error');return false;}
+    if(file.size>5*1024*1024){toast('Choose an image smaller than 5 MB.','error');return false;}
+    if(file.size<=0){toast('The selected image is empty. Please choose another photo.','error');return false;}
+    var oldPhoto=liveProfile&&liveProfile.profile_photo_url||S.profilePhoto||null;
+    var uploadedUrl=null;
     try{
+      toast('Uploading your profile photo…','info');
       var uploaded=await ML_API.uploads.upload(file,'profile-photo');
-      var url=uploaded&&(uploaded.url||uploaded.file_url||uploaded.location||uploaded.path);
-      if(!url)throw new Error('Upload succeeded but no file URL was returned.');
-      var r=await ML_API.customers.updateProfile({profilePhotoUrl:url});
-      liveProfile=r.data||liveProfile;S.profilePhoto=url;renderPremiumProfile();toast('Profile photo updated ✓');
-    }catch(e){toast(e.error||e.message||'Could not update profile photo.','error');}
+      uploadedUrl=uploaded&&uploaded.url;
+      if(!uploadedUrl||!/^https?:\/\//i.test(uploadedUrl))throw {error:'MarketLink did not receive a valid saved image URL. Please retry or contact support.'};
+      var response=await ML_API.customers.updateProfile({profilePhotoUrl:uploadedUrl});
+      liveProfile=response&&response.data||liveProfile;
+      if(!liveProfile)liveProfile={};
+      liveProfile.profile_photo_url=uploadedUrl;
+      S.profilePhoto=uploadedUrl;
+      renderPremiumProfile();
+      toast('Your profile photo has been updated.','success');
+      if(oldPhoto&&oldPhoto!==uploadedUrl){
+        try{await ML_API.uploads.deleteByUrl(oldPhoto);}catch(cleanupError){}
+      }
+      return true;
+    }catch(e){
+      if(uploadedUrl&&uploadedUrl!==oldPhoto){
+        try{await ML_API.uploads.deleteByUrl(uploadedUrl);}catch(cleanupError){}
+      }
+      toast(e.error||e.message||'Could not save your profile photo. Please try again.','error');
+      return false;
+    }
+  }
+  async function handleProfilePhotoInput(input){
+    var file=input&&input.files&&input.files[0];
+    try{if(file)await saveProfilePhoto(file);}
+    finally{if(input)input.value='';}
+  }
+  async function removeProfilePhoto(){
+    var oldPhoto=liveProfile&&liveProfile.profile_photo_url||S.profilePhoto||null;
+    if(!oldPhoto){toast('You are already using the default avatar.','info');return;}
+    if(!confirm('Remove your profile photo and use the MarketLink default avatar?'))return;
+    try{
+      await ML_API.uploads.removeProfilePhoto();
+      var refreshed=await ML_API.customers.getProfile();
+      liveProfile=refreshed&&refreshed.data||liveProfile;
+      S.profilePhoto=null;
+      renderPremiumProfile();
+      toast('Your profile photo has been removed.','success');
+    }catch(e){toast(e.error||'Could not remove your profile photo. Please try again.','error');}
   }
   function editProfileModal(){
     var n=liveProfile&&liveProfile.full_name||S.profileName||S.user&&S.user.name||'';
@@ -918,6 +959,30 @@
       '<div class="ml-wallet-note">For an order problem, include your order number and a short description. Do not send your PIN or payment passwords to support.</div>'+
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
+  function defaultAvatarMarkup(){
+    return '<svg class="ml-default-avatar" viewBox="0 0 160 160" role="img" aria-label="MarketLink default 3D avatar" xmlns="http://www.w3.org/2000/svg">'+
+      '<defs><linearGradient id="mlAvatarBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0F8F8A"/><stop offset=".52" stop-color="#276B75"/><stop offset="1" stop-color="#F5B83D"/></linearGradient>'+
+      '<radialGradient id="mlAvatarGlow" cx=".28" cy=".18" r=".9"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".45"/><stop offset="1" stop-color="#071521" stop-opacity=".12"/></radialGradient>'+
+      '<linearGradient id="mlAvatarSkin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#DDA47C"/><stop offset=".5" stop-color="#B97650"/><stop offset="1" stop-color="#8E4D34"/></linearGradient>'+
+      '<linearGradient id="mlAvatarShirt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#142F4A"/><stop offset=".55" stop-color="#0D7377"/><stop offset="1" stop-color="#073D4D"/></linearGradient>'+
+      '<linearGradient id="mlAvatarHair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#293342"/><stop offset="1" stop-color="#0A1220"/></linearGradient></defs>'+
+      '<rect width="160" height="160" rx="30" fill="url(#mlAvatarBg)"/><rect width="160" height="160" rx="30" fill="url(#mlAvatarGlow)"/>'+
+      '<circle cx="128" cy="34" r="21" fill="#FFD778" fill-opacity=".23"/><circle cx="26" cy="122" r="31" fill="#082B3E" fill-opacity=".13"/>'+
+      '<path d="M18 160c3-28 21-44 43-49 13-3 24-3 38 0 22 5 39 21 43 49Z" fill="url(#mlAvatarShirt)"/>'+
+      '<path d="M62 103h36l8 17-27 23-26-23Z" fill="url(#mlAvatarSkin)"/>'+
+      '<path d="M46 58c0-26 16-40 35-40 22 0 37 16 37 41v22c0 25-17 41-37 41-21 0-37-17-37-41Z" fill="url(#mlAvatarSkin)"/>'+
+      '<ellipse cx="44" cy="76" rx="7" ry="12" fill="#A96143"/><ellipse cx="119" cy="76" rx="7" ry="12" fill="#965037"/>'+
+      '<path d="M43 61c-3-25 11-43 36-45 23-2 39 12 43 35-9-6-14-15-18-22-6 12-22 19-39 21-7 1-14 5-22 11Z" fill="url(#mlAvatarHair)"/>'+
+      '<path d="M54 69c4-4 11-5 17-2" fill="none" stroke="#613522" stroke-width="3" stroke-linecap="round"/><path d="M90 67c6-3 12-2 17 2" fill="none" stroke="#613522" stroke-width="3" stroke-linecap="round"/>'+
+      '<ellipse cx="65" cy="77" rx="3.2" ry="4" fill="#172B36"/><ellipse cx="98" cy="77" rx="3.2" ry="4" fill="#172B36"/><circle cx="66" cy="75.5" r="1" fill="#FFFFFF"/><circle cx="99" cy="75.5" r="1" fill="#FFFFFF"/>'+
+      '<path d="M81 77l-4 13c2 3 5 4 8 2" fill="none" stroke="#8D4D35" stroke-width="2.4" stroke-linecap="round"/>'+
+      '<path d="M67 100c8 8 20 8 28 0" fill="none" stroke="#713B2D" stroke-width="3.4" stroke-linecap="round"/>'+
+      '<path d="M61 103c11 6 23 6 34 0" fill="none" stroke="#F4D0B6" stroke-width="2" stroke-linecap="round"/>'+
+      '<path d="M34 150c6-18 19-27 32-31l14 13 15-13c15 5 26 15 31 31" fill="url(#mlAvatarShirt)"/>'+
+      '<path d="M67 119l13 13 14-13" fill="none" stroke="#F5B83D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '<path d="M29 29c10-10 20-15 32-18" stroke="#FFFFFF" stroke-opacity=".32" stroke-width="3" fill="none" stroke-linecap="round"/>'+
+      '</svg>';
+  }
   function togglePremiumAppearance(){
     S.dark=!S.dark;
     var daylight=!S.dark;
@@ -940,7 +1005,7 @@
     await loadProfile();
     root=G('profile-body');if(!root)return;
     if(S.profilePage==='affiliate'){var affiliateData=await syncAffiliateProfile();renderPremiumAffiliatePage(root,affiliateData);return;}
-    var p=liveProfile||{},name=p.full_name||S.user&&S.user.name||'MarketLink user',phone=p.phone||S.user&&S.user.phone||'';
+    var p=liveProfile||{},fullName=p.full_name||S.user&&S.user.name||'MarketLink user',name=p.display_name||fullName,phone=p.phone||S.user&&S.user.phone||'';
     var applicationHtml='',vendorApplication=null,riderApplication=null;
     if(S.user&&S.user.id){
       var apps=await Promise.all([
@@ -960,7 +1025,7 @@
       });
     }
     var photo=p.profile_photo_url||S.profilePhoto;
-    var avatar=photo?'<img src="'+esc(photo)+'" alt="Profile photo">':esc(name.trim().charAt(0).toUpperCase()||'M');
+    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photo)+'" alt="Profile photo" loading="lazy" decoding="async">':'');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
     var upgradeHtml='',userRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
     if(userRoles.indexOf('vendor')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-upgrade-icon">🏪</span><span><b>Open Vendor Dashboard</b><span>Manage products, orders and store activity</span></span><span class="arrow">›</span></button>';
@@ -985,8 +1050,8 @@
       return '<button type="button" class="ml-profile-link" onclick="window.ML_Premium.openProfilePage(\''+item.page+'\')"><span class="ico">'+item.icon+'</span><span class="copy"><b>'+esc(item.title)+'</b><span>'+esc(item.desc)+'</span></span><span class="arrow" aria-hidden="true">›</span></button>';
     }).join('');
     root.innerHTML='<div class="ml-profile-shell">'+
-      '<div class="ml-profile-hero"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.pickPhoto()" aria-label="Change profile photo">'+avatar+'<span aria-hidden="true">✎</span></button><input type="file" id="ml-profile-photo-input" accept="image/*" style="display:none" onchange="window.handlePhoto(this)"><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">🪪</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div>'+
+      '<div class="ml-profile-hero"><div class="ml-profile-avatar-wrap"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.pickPhoto()" aria-label="Change profile photo">'+avatar+'<span class="ml-avatar-camera" aria-hidden="true">📷</span></button><div class="ml-avatar-actions"><button type="button" class="ml-photo-action" onclick="window.ML_Premium.pickPhoto()">Change photo</button>'+(photo?'<button type="button" class="ml-photo-action ml-photo-remove" onclick="window.ML_Premium.removeProfilePhoto()">Remove</button>':'')+'</div><input type="file" id="ml-profile-photo-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"></div><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
+      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">👤</div><div class="copy"><b>Full name</b><span>'+esc(fullName)+'</span></div></div><div class="ml-profile-row"><div class="ico">✨</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div>'+(p.bio?'<div class="ml-profile-row ml-profile-about-row"><div class="ico">💬</div><div class="copy"><b>About you</b><span>'+esc(p.bio)+'</span></div></div>':'')+'
       '<button type="button" class="ml-profile-row ml-profile-row-button ml-appearance-row" onclick="window.ML_Premium.toggleAppearance()"><div class="ico">'+(S.dark?'🌙':'☀️')+'</div><div class="copy"><b>Appearance · '+(S.dark?'Night mode':'Daylight mode')+'</b><span>'+(S.dark?'Night mode is active. Tap here to switch to Daylight.':'Daylight mode is active. Tap here to switch to Night.')+'</span></div><b class="ml-profile-arrow">›</b></button>'+applicationHtml+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'wallet\')"><div class="ico">💰</div><div class="copy"><b>Royal Wallet</b><span>Available balance · '+money(p.wallet_balance||S.walletBalance||0)+'</span></div><b class="ml-profile-arrow">›</b></button>'+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openOrders()"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>'+Number(p.total_orders||0)+' completed orders · '+money(p.total_spent||0)+' spent</span></div><b class="ml-profile-arrow">›</b></button>'+
@@ -1330,7 +1395,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={toggleAppearance:togglePremiumAppearance,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
   function switchTab(tab){
     S.curTab=tab;
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
