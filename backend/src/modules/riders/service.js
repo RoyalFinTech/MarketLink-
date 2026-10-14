@@ -160,7 +160,8 @@ async function setAvailability(userId, isOnline) {
 
 // ── LOCATION UPDATE (GPS ping from rider app) ────────────────────────
 async function updateLocation(userId, { lat, lng, deliveryId }) {
-  if (deliveryId) {
+  if (!deliveryId) throw new AppError('An active assigned delivery is required for location sharing.',400,'DELIVERY_REQUIRED');
+  {
     const { rows: [delivery] } = await query(
       'SELECT id, rider_id, status FROM deliveries WHERE id=$1',
       [deliveryId]
