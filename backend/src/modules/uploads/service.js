@@ -72,9 +72,20 @@ function supabaseConfig() {
 function getStorageProvider() {
   const configured=String(process.env.STORAGE_PROVIDER||'').trim().toLowerCase();
   const supabase=supabaseConfig();
-  if(configured==='supabase'||(supabase.url&&supabase.key)) return 'supabase';
-  if(configured==='local'&&process.env.NODE_ENV!=='production'&&!process.env.RENDER) return 'local';
-  if(process.env.NODE_ENV==='production'||process.env.RENDER) return 'database';
+  const hasSupabaseCredentials=Boolean(supabase.url&&supabase.key);
+  const isProduction=process.env.NODE_ENV==='production'||Boolean(process.env.RENDER);
+
+  // A stale STORAGE_PROVIDER=supabase setting must not disable the documented
+  // database-backed profile-photo fallback when the required credentials are
+  // absent. Non-profile uploads still fail safely in the database provider path.
+  if(configured==='supabase') {
+    if(hasSupabaseCredentials) return 'supabase';
+    return isProduction?'database':'local';
+  }
+  if(configured==='database') return 'database';
+  if(configured==='local'&&!isProduction) return 'local';
+  if(hasSupabaseCredentials) return 'supabase';
+  if(isProduction) return 'database';
   return 'local';
 }
 function encodeObjectPath(value) {
