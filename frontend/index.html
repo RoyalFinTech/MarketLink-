@@ -1325,7 +1325,7 @@ var ML_API = (function(){
     registerComplete: function(fullName, phone, otp, pin){ return post('/auth/register/complete', {fullName:fullName, phone:phone, otp:otp, pin:pin}); },
     login: async function(phone, pin){
       // Render Free web services can take about a minute to wake after idle.
-      var data = await post('/auth/login', {phone:phone, pin:pin}, {timeoutMs:65000});
+      var data = await post('/auth/login', {phone:phone, pin:pin}, {timeoutMs:120000});
       saveTokens(data.data.accessToken, data.data.refreshToken);
       return data.data;
     },
