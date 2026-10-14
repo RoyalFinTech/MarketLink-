@@ -455,16 +455,18 @@
   }
   function mlCategoryStyle(name){
     var n=String(name||'').toLowerCase(),atlas='./assets/marketlink-category-atlas.webp';
-    // URLs are deliberately unquoted inside the inline style attribute. Nested
-    // double-quotes previously broke that attribute and caused some category tiles
-    // to lose their intended asset mapping.
+    // The six-cell atlas is a 3x2 grid: tomato, onion, rice / oil, carrot, greens.
+    // Keep URLs unquoted inside the inline custom-property style to avoid broken
+    // nested quotes in generated category-card markup.
+    if(/tomato/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:0% 0%;';
     if(/onion/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:50% 0%;';
     if(/rice|grain|cereal/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:100% 0%;';
-    if(/tomato/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:0% 0%;';
-    if(/carrot/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:50% 100%;';
-    if(/fufu|benachin|benetin|domoda|meal|prepared food|cooked|restaurant|fish|meat|chicken|seafood|bakery|snack/.test(n))return '--ml-category-image:url(./assets/promo-shopping.webp);--ml-category-size:cover;--ml-category-position:center;';
-    if(/clothing|fashion|shoe|fabric|tailor|apparel|jewel|accessor|beauty|cosmetic/.test(n))return '--ml-category-image:url(./assets/promo-vendor.webp);--ml-category-size:cover;--ml-category-position:center;';
-    if(/fresh|leaf|green|vegetable|fruit|produce|grocery|grocer|cook|oil|spice|pantry|household|kitchen|home/.test(n))return '--ml-category-image:url(./assets/hero-marketlink-bag.webp);--ml-category-size:cover;--ml-category-position:center;';
+    if(/oil|spice|pantry|seasoning|cooking essential/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:0% 100%;';
+    if(/carrot|root vegetable/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:50% 100%;';
+    if(/leaf|green|vegetable|fruit|fresh produce|produce|grocery|grocer/.test(n))return '--ml-category-image:url('+atlas+');--ml-category-size:300% 200%;--ml-category-position:100% 100%;';
+    if(/fufu|benachin|benetin|domoda|gambian food|nigerian food|meal|prepared food|cooked|restaurant|fish|meat|chicken|seafood|bakery|snack|international/.test(n))return '--ml-category-image:url(./assets/promo-shopping.webp);--ml-category-size:cover;--ml-category-position:center;';
+    if(/clothing|fashion|shoe|fabric|tailor|apparel|jewel|accessor|beauty|cosmetic|construction|building material|vehicle|car|motorbike|service|vendor|business/.test(n))return '--ml-category-image:url(./assets/promo-vendor.webp);--ml-category-size:cover;--ml-category-position:center;';
+    if(/electronics|digital|phone|computer|pharmacy|medicine|health|household|kitchen|home/.test(n))return '--ml-category-image:url(./assets/hero-marketlink-bag.webp);--ml-category-size:cover;--ml-category-position:center;';
     var choices=['./assets/promo-shopping.webp','./assets/promo-vendor.webp','./assets/hero-marketlink-bag.webp'],hash=0;
     for(var i=0;i<n.length;i++)hash=(hash+n.charCodeAt(i))%choices.length;
     return '--ml-category-image:url('+choices[hash]+');--ml-category-size:cover;--ml-category-position:center;';
@@ -474,12 +476,17 @@
     if(/tomato/.test(n))return '🍅';
     if(/onion/.test(n))return '🧅';
     if(/rice|grain|cereal/.test(n))return '🍚';
-    if(/carrot/.test(n))return '🥕';
-    if(/vegetable|fresh|produce|fruit|grocery|grocer/.test(n))return '🥬';
+    if(/carrot|root vegetable/.test(n))return '🥕';
+    if(/leaf|green|vegetable|fresh|produce|fruit|grocery|grocer/.test(n))return '🥬';
+    if(/oil|spice|pantry|seasoning|kitchen/.test(n))return '🫙';
     if(/food|meal|restaurant|fish|meat|chicken|seafood|bakery|snack/.test(n))return '🍲';
     if(/clothing|fashion|shoe|fabric|tailor|apparel/.test(n))return '👕';
-    if(/beauty|cosmetic|jewel|accessor/.test(n))return '✨';
-    if(/oil|spice|pantry|kitchen|household|home/.test(n))return '🛒';
+    if(/beauty|cosmetic|jewel|accessor|pharmacy|medicine|health/.test(n))return '✨';
+    if(/electronics|digital|phone|computer/.test(n))return '📱';
+    if(/construction|building/.test(n))return '🧱';
+    if(/vehicle|car|motorbike|delivery/.test(n))return '🛵';
+    if(/service/.test(n))return '🧰';
+    if(/oil|household|home/.test(n))return '🛒';
     return '🛍️';
   }
   function mlCategoryPhotoMarkup(name,photoClass){
