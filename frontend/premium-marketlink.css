@@ -1038,7 +1038,7 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #toast.ml-toast-card .ml-toast-close{flex:0 0 32px;width:32px;height:32px;min-height:32px;display:grid;place-items:center}
 #toast.ml-toast-card .ml-toast-message,
 #toast.ml-toast-card .ml-toast-detail{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
-#toast.ml-toast-card .ml-toast-actions{display:flex;flex-wrap:wrap;justify-content:stretch;gap:8px}
+#toast.ml-toast-card .ml-toast-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:8px}
 #toast.ml-toast-card .ml-toast-actions button{flex:1 1 110px;min-width:0;min-height:40px;white-space:normal;overflow-wrap:anywhere}
 @media(max-width:760px){
   #toast.ml-toast-card{
