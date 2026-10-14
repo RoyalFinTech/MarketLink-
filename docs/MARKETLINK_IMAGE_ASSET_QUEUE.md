@@ -1,6 +1,6 @@
 # MarketLink Gambia — image asset queue
 
-**Status:** Reuse existing assets now; generate and fit the remaining category imagery during the next approved image-generation window. Do not replace the actual MarketLink logo or bake words/logos into generated photos.
+**Status (14 October 2026):** Existing-asset category mapping and category-specific emoji fallbacks are implemented in `frontend/premium-marketlink.js` and deployed on Render static site `MarketLink-Gambia Frontend` from `main` (commit `29dfcbf856344a00c04ab80c28adee42b5780165`). The six-tile produce atlas now maps tomatoes, onions, rice, cooking oil/pantry, carrots and greens/produce; existing shopping, vendor and MarketLink bag images are used as category-appropriate fallbacks for other live categories. The official logo remains untouched. New high-resolution category-specific photography is still queued for a later image-generation pass; don't mark that part complete until those files are created and visually checked. Do not bake words/logos into generated photos.
 
 ## Existing assets to reuse now
 
