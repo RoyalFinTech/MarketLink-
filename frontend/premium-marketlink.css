@@ -1017,3 +1017,56 @@
 html[dir="rtl"] .ml-help-faq summary{padding:15px 15px 15px 42px;text-align:right}
 html[dir="rtl"] .ml-help-faq summary:after{right:auto;left:15px}
 html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
+
+/* Mobile error/success notification card hardening.
+   Keep the toast inside the safe viewport, allow long API errors to wrap,
+   and prevent the action buttons/header from widening the page on small phones. */
+#toast.ml-toast-card{
+  box-sizing:border-box;
+  min-width:0;
+  max-width:calc(100vw - 24px);
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+#toast.ml-toast-card *,
+#toast.ml-toast-card *::before,
+#toast.ml-toast-card *::after{box-sizing:border-box;min-width:0}
+#toast.ml-toast-card .ml-toast-brand{width:100%;gap:8px}
+#toast.ml-toast-card .ml-toast-brand>div{flex:1 1 90px;min-width:0;overflow-wrap:anywhere}
+#toast.ml-toast-card .ml-toast-brand>div span,
+#toast.ml-toast-card .ml-toast-brand>div small{overflow-wrap:anywhere;white-space:normal}
+#toast.ml-toast-card .ml-toast-close{flex:0 0 32px;width:32px;height:32px;min-height:32px;display:grid;place-items:center}
+#toast.ml-toast-card .ml-toast-message,
+#toast.ml-toast-card .ml-toast-detail{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+#toast.ml-toast-card .ml-toast-actions{display:flex;flex-wrap:wrap;justify-content:stretch;gap:8px}
+#toast.ml-toast-card .ml-toast-actions button{flex:1 1 110px;min-width:0;min-height:40px;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:760px){
+  #toast.ml-toast-card{
+    top:calc(8px + env(safe-area-inset-top,0px))!important;
+    right:10px!important;left:10px!important;
+    width:auto!important;max-width:none!important;
+    max-height:calc(100dvh - 20px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    overflow-x:hidden;overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    padding:13px 13px 12px;
+    border-radius:16px;
+  }
+  #toast.ml-toast-card .ml-toast-brand{gap:7px;padding-bottom:9px}
+  #toast.ml-toast-card .ml-toast-brand img{flex:0 0 30px;width:30px;height:30px}
+  #toast.ml-toast-card .ml-toast-brand>div span{font-size:8px;letter-spacing:.09em}
+  #toast.ml-toast-card .ml-toast-brand>div small{font-size:10px;line-height:1.35}
+  #toast.ml-toast-card .ml-toast-symbol{flex:0 0 24px;width:24px;height:24px}
+  #toast.ml-toast-card .ml-toast-title{font-size:13px;line-height:1.4;margin-top:10px}
+  #toast.ml-toast-card .ml-toast-message{font-size:12px;line-height:1.55}
+  #toast.ml-toast-card .ml-toast-detail{font-size:10px;line-height:1.5}
+  #toast.ml-toast-card .ml-toast-actions{gap:7px;margin-top:10px}
+  #toast.ml-toast-card .ml-toast-actions button{font-size:11px;padding:9px 10px}
+}
+@media(max-width:380px){
+  #toast.ml-toast-card{right:8px!important;left:8px!important;padding:11px}
+  #toast.ml-toast-card .ml-toast-actions{flex-direction:column}
+  #toast.ml-toast-card .ml-toast-actions button{flex:1 1 auto;width:100%}
+  #toast.ml-toast-card .ml-toast-brand>div span{font-size:7px;letter-spacing:.07em}
+}
+
