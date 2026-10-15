@@ -38,7 +38,8 @@
   var mlPromoSlides=[
     {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
     {kind:'sell',eyebrow:'FOR LOCAL BUSINESSES',title:'Your shop. More customers.',accent:'Grow with MarketLink.',body:'Bring your business online, showcase your real products and manage incoming orders in one place.',pill:'SELL ON MARKETLINK',image:'./assets/promo-vendor.webp',cta:'Become a vendor'},
-    {kind:'affiliate',eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link.',accent:'Earn 2%.',body:'Share your affiliate link. Earn 2% of eligible discounted merchandise when a referred order is successfully delivered.',pill:'EARN ON ELIGIBLE PURCHASES',image:'./assets/promo-shopping.webp',cta:'Explore affiliate'}
+    {kind:'affiliate',eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link.',accent:'Earn 2%.',body:'Share your affiliate link. Earn 2% of eligible discounted merchandise when a referred order is successfully delivered.',pill:'EARN ON ELIGIBLE PURCHASES',image:'./assets/promo-shopping.webp',cta:'Explore affiliate'},
+    {kind:'promote',eyebrow:'VENDOR PROMOTION DESK',title:'Put your products',accent:'in the spotlight.',body:'Request a featured banner, product search boost or shop spotlight. Admin confirms the price and schedule before anything goes live.',pill:'FOR MARKETLINK VENDORS',image:'./assets/promo-vendor.webp',cta:'Request promotion'}
   ];
   function promoSlideMarkup(index,cls){
     var p=mlPromoSlides[(Number(index)||0)%mlPromoSlides.length];
@@ -49,8 +50,8 @@
       '<div class="ml-promo-copy"><span class="ml-promo-eyebrow"><i></i>'+esc(p.eyebrow)+'</span><span class="ml-promo-kicker">'+esc(p.pill)+'</span>'+
       '<h3>'+esc(p.title)+'<em>'+esc(p.accent)+'</em></h3><p>'+esc(p.body)+'</p>'+
       '<button class="ml-promo-cta" onclick="window.ML_Premium.promoAction(\''+p.kind+'\')">'+esc(p.cta)+' <b>↗</b></button></div>'+
-      '<div class="ml-promo-art-stamp"><span>'+(p.kind==='shop'?'🛍️':p.kind==='sell'?'🏪':'🔗')+'</span><b>'+(p.kind==='affiliate'?'2%':gambiaFlagMarkup())+'</b><small>'+(p.kind==='affiliate'?'AFFILIATE REWARD':p.kind==='sell'?'LOCAL BUSINESS':'MADE FOR THE GAMBIA')+'</small></div>'+
-      '<div class="ml-promo-bottom-note">'+(p.kind==='affiliate'?'Reward is calculated on eligible discounted merchandise subtotal after successful delivery.':p.kind==='sell'?'Real products. Real customers. One connected marketplace.':'Discover products from local vendors, all in one place.')+'</div></article>';
+      '<div class="ml-promo-art-stamp"><span>'+(p.kind==='shop'?'🛍️':p.kind==='sell'||p.kind==='promote'?'🏪':'🔗')+'</span><b>'+(p.kind==='affiliate'?'2%':p.kind==='promote'?'🎫':gambiaFlagMarkup())+'</b><small>'+(p.kind==='affiliate'?'AFFILIATE REWARD':p.kind==='sell'?'LOCAL BUSINESS':p.kind==='promote'?'PROMOTION DESK':'MADE FOR THE GAMBIA')+'</small></div>'+
+      '<div class="ml-promo-bottom-note">'+(p.kind==='affiliate'?'Reward is calculated on eligible discounted merchandise subtotal after successful delivery.':p.kind==='sell'?'Real products. Real customers. One connected marketplace.':p.kind==='promote'?'Admin approval and confirmed payment are required before publishing.':'Discover products from local vendors, all in one place.')+'</div></article>';
   }
   function promoCarouselMarkup(){
     return '<section class="ml-promo-carousel" id="ml-promo-carousel" aria-label="MarketLink promotions">'+
@@ -86,6 +87,7 @@
     },5000);
   }
   function promoAction(kind){
+    if(kind==='promote'){if(!ML_API.auth.isAuthenticated()){goAuth();return;}if(!isMarketLinkRole('vendor')){toast('Apply to become a vendor before requesting a paid promotion.','info');if(typeof openVendorApp==='function')openVendorApp();return;}if(typeof window.vAddPromo==='function')window.vAddPromo();return;}
     if(kind==='shop'){if(typeof switchTab==='function')switchTab('home');var search=G('hsearch');if(search)setTimeout(function(){search.focus();},150);return;}
     if(kind==='sell'){if(!ML_API.auth.isAuthenticated()){goAuth();return;}if(typeof openVendorApp==='function')openVendorApp();else toast('Open Profile and choose Become a Vendor to apply.','info');return;}
     if(kind==='affiliate'){
