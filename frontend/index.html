@@ -6619,6 +6619,7 @@ window.addEventListener('unhandledrejection',function(e){
   function networkMarkup(target,initial){
     var selected=inferCarrier(initial,target);
     var nat=currentNational(target);
+    if(target==='admin'){nat=digits(initial);if(nat.indexOf('220')===0&&nat.length>9)nat=nat.slice(3);if(operatorsByPrefix(nat.slice(0,2)))nat=nat.slice(2);nat=nat.slice(-7);}
     var opts=Object.keys(operators).map(function(k){
       return '<option value="'+k+'" '+(k===selected?'selected':'')+'>'+operators[k].label+'</option>';
     }).join('');
