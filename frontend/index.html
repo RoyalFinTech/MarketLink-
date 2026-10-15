@@ -5546,12 +5546,11 @@ function renderVApp(){
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
       '<input class="inp" type="tel" inputmode="tel" placeholder="Business phone" id="va-phone" value="'+f.phone+'" style="flex:1;margin-bottom:0;"></div>';
   } else if(step===1){
-    body='<div onclick="S.vForm.idDoc=\'id_uploaded.jpg\';renderVApp();" style="background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;margin-bottom:11px;">'+
-      (f.idDoc?'<div style="font-size:24px;">✅</div><div style="color:#22C55E;font-size:12px;font-weight:600;margin-top:4px;">ID Document uploaded</div>':
-      '<div style="font-size:28px;">📄</div><div style="color:var(--mu);font-size:12px;margin-top:6px;">Tap to upload National ID / Passport</div>')+'</div>'+
-      '<div onclick="S.vForm.photo=\'shop_photo.jpg\';renderVApp();" style="background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;">'+
-      (f.photo?'<div style="font-size:24px;">✅</div><div style="color:#22C55E;font-size:12px;font-weight:600;margin-top:4px;">Shop photo uploaded</div>':
-      '<div style="font-size:28px;">📷</div><div style="color:var(--mu);font-size:12px;margin-top:6px;">Tap to upload Shop Photograph</div>')+'</div>';
+    body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
+      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:11px;cursor:pointer;"><input id="va-id-file" type="file" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'idDocFile\')">'+
+      '<div style="font-size:25px;margin-top:8px;">📄</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">National ID or Passport</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.idDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
+      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input id="va-shop-file" type="file" accept="image/jpeg,image/png,image/webp" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'photoFile\')">'+
+      '<div style="font-size:25px;margin-top:8px;">📷</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">Shop photograph / logo (optional)</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.photoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;margin-bottom:14px;">'+
       [['Business',f.bname],['Shop',f.sname],['Address',f.saddr],['Category',f.cat],['Phone',f.phone],['ID',f.idDoc||'—'],['Photo',f.photo||'—']].map(function(r){
@@ -5573,6 +5572,7 @@ function renderVApp(){
     '<h4 style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">Step '+(step+1)+': '+steps[step]+'</h4>'+
     body+btnRow;
 }
+function vendorAppFileSelected(input,key){var file=input&&input.files&&input.files[0];if(!file)return;S.vForm=S.vForm||{};S.vForm[key]=file;S.vForm[key==='idDocFile'?'idDocName':'photoName']=file.name;renderVApp();}
 function vAppNext(){
   if(S.vStep===0){
     S.vForm.bname=(G('va-bname')&&G('va-bname').value.trim())||'';
@@ -5595,9 +5595,9 @@ function submitVApp(){
 // ═══════════════════════════════════════════════════════════
 // RIDER APPLICATION
 // ═══════════════════════════════════════════════════════════
-function raDocsSelected(inp){
+function raDocsSelected(inp,target){
   if(!inp.files||!inp.files[0]) return;
-  var f=inp.files[0];
+  var f=inp.files[0];target=target||'idDocFile';S.rForm=S.rForm||{};S.rForm[target]=f;S.rForm[target==='idDocFile'?'idDocName':target==='licenseDocFile'?'licenseDocName':'vehiclePhotoName']=f.name;
   S.rForm.docs=f.name;
   // Update the visible label so the user sees the filename without re-rendering the whole form
   var lbl=G('ra-docs-input');
@@ -5634,10 +5634,10 @@ function renderRApp(){
   } else if(step===1){
     body='<input class="inp" placeholder="Plate Number (e.g. BJL 1234 A)" id="ra-plate" value="'+f.plate+'">'+
       '<input class="inp" placeholder="Driver\'s Licence Number" id="ra-lic" value="'+f.licence+'">'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;">'+
-      '<input type="file" id="ra-docs-input" accept="image/*,.pdf" style="display:none;" onchange="raDocsSelected(this)">'+
-      '<div id="ra-doc-preview">'+(f.docs?'<div style="font-size:24px;">✅</div><div style="color:#22C55E;font-size:12px;font-weight:600;margin-top:4px;">'+f.docs+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">Tap to replace</div>':
-      '<div style="font-size:28px;">📄</div><div style="color:var(--mu);font-size:12px;margin-top:6px;">Tap to upload ID, licence & registration</div>')+'</div></label>';
+      '<div style="font-size:12px;line-height:1.5;color:var(--mu);margin:3px 0 12px;">Upload clear, genuine documents so the team can verify your identity and vehicle. Your application stays pending until reviewed.</div>'+
+      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-id-input" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'idDocFile\')"><div style="font-size:22px;margin-top:6px;">🪪</div><div style="color:var(--tx);font-size:12px;font-weight:600;">National ID / Passport</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.idDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
+      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-lic-input" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'licenseDocFile\')"><div style="font-size:22px;margin-top:6px;">📄</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Driver’s licence / permit</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.licenseDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
+      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input type="file" id="ra-vehicle-input" accept="image/jpeg,image/png,image/webp" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'vehiclePhotoFile\')"><div style="font-size:22px;margin-top:6px;">🛵</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Vehicle photo (optional)</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.vehiclePhotoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;">'+
       [['Name',f.fname],['Phone',f.phone],['Address',f.addr],['Plate',f.plate],['Licence',f.licence],['Emergency',f.emergency]].map(function(r){
