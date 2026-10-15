@@ -130,7 +130,7 @@ async function acceptDelivery(deliveryId, riderId) {
     if(!online) throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
     const { rows:[updated] } = await client.query("UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",[riderId,deliveryId]);
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
-    await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'self','accepted',now())",[deliveryId,riderId]);
+    await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'manual','accepted',now())",[deliveryId,riderId]);
     const { rows:[o] } = await client.query('SELECT customer_id FROM orders WHERE id=$1',[updated.order_id]);
     if(o) await client.query("INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_assigned','Rider Assigned 🛵','A rider has accepted your delivery.','delivery',$2)",[o.customer_id,deliveryId]);
     return updated;
