@@ -416,6 +416,72 @@ const KNOWLEDGE_BASE = [
     question: 'Are the call and WhatsApp numbers different?',
     answer: 'Yes. For a direct phone call, use +220 87 407 1510. For WhatsApp messages, use +220 407 1510. Make sure you choose the number for the contact method you want to use.',
   },
+
+  {
+    id: 'gm-network-phone-format',
+    category: 'account',
+    roles: ['all'],
+    keywords: ['Africell phone number', 'QCell number', 'Comium number', 'Gamcel number', 'network dropdown', 'seven digit phone', 'Gambia phone format'],
+    question: 'How do I enter my Gambian phone number?',
+    answer: 'Choose the mobile network shown on your SIM card, then enter the seven digits printed as your subscriber number. Africell adds 87, QCell adds 83, and Comium adds 86 automatically. The Gamcel option uses the legacy seven-digit format without an added prefix and currently accepts numbers beginning with 9. Check the selected network before continuing. Never share your PIN or one-time verification code with anyone.',
+  },
+  {
+    id: 'vendor-product-upload-simple',
+    category: 'vendors',
+    roles: ['vendor'],
+    keywords: ['upload product', 'add item', 'product price', 'stock quantity', 'product photo', 'vendor product listing'],
+    question: 'How do I add a product and set its price?',
+    answer: 'In the vendor dashboard, open Products and choose Add product. Use a clear photo, a short name customers understand, the correct category, a plain-language description, the selling price in Gambian dalasi (D), and the quantity available. Check the price and stock before saving. Update or pause a listing when the price changes or the item is out of stock. Do not list an item you cannot supply.',
+  },
+  {
+    id: 'vendor-promotions-apply',
+    category: 'vendors',
+    roles: ['vendor'],
+    keywords: ['promote product', 'featured listing', 'promotion banner', 'advertising request', 'sponsored product', 'promotion duration'],
+    question: 'How can I request a promotion for my shop?',
+    answer: 'Use the Promotions or Contact Admin option if it is available in your dashboard. Prepare the promotion title, products or shop to feature, banner image, requested start and end dates, and your contact details. Admin must review and approve the creative and confirm the price and payment terms before anything is published. Do not assume a banner is live just because you submitted it, and do not pay an unofficial personal account.',
+  },
+  {
+    id: 'vendor-orders-checklist',
+    category: 'vendors',
+    roles: ['vendor'],
+    keywords: ['vendor order checklist', 'confirm stock', 'pack order', 'rider pickup', 'delivery handover'],
+    question: 'What should I do when a new order arrives?',
+    answer: 'First check the items, quantities, prices and stock. Accept the order only if you can fulfil it; contact the customer or support if something is unclear. Pack the items securely, mark preparation status using the dashboard actions, and hand the correct order to the assigned rider. Confirm the handover in the app and keep the order reference until delivery is complete.',
+  },
+  {
+    id: 'rider-gps-location',
+    category: 'riders',
+    roles: ['rider'],
+    keywords: ['GPS', 'location permission', 'rider coordinates', 'navigation', 'wrong location', 'share location'],
+    question: 'How do I use GPS and navigation for a delivery?',
+    answer: 'Allow location access while using MarketLink and keep your phone location service turned on during an active delivery. Check that the pickup and delivery addresses are correct before starting navigation. If the map pin is wrong, contact the customer or vendor to confirm a nearby landmark and update the address through the available app flow. GPS can drift indoors or between buildings, so confirm the real pickup point. Only share live location for an active delivery when the app requests it.',
+  },
+  {
+    id: 'rider-find-assignment',
+    category: 'riders',
+    roles: ['rider'],
+    keywords: ['find delivery jobs', 'no rider requests', 'online availability', 'rider assignment', 'vendor looking for rider'],
+    question: 'How do I receive delivery requests?',
+    answer: 'Complete your rider profile and required approval first. Set yourself online and keep your phone connected. Check the pickup area, delivery area and any distance or earnings information shown before accepting a task. If no jobs appear, check your online status, location permission, connection and pending profile requirements. A vendor may need to request or assign a rider through the order flow; do not accept a delivery that is not shown as assigned to you.',
+  },
+  {
+    id: 'delivery-handover-simple',
+    category: 'orders',
+    roles: ['customer', 'vendor', 'rider'],
+    keywords: ['how delivery works', 'pickup handover', 'delivery fee', 'cash on delivery', 'proof of delivery'],
+    question: 'How does delivery work from start to finish?',
+    answer: 'The customer places an order. The vendor confirms stock and prepares the package. A rider is assigned, collects the correct package, and travels to the customer’s confirmed address. The rider hands over the order and records delivery in MarketLink. Payment and order status depend on the payment method selected and the confirmations received by the system. If something goes wrong, use the order reference when contacting support; never mark an order delivered before it has been handed over.',
+  },
+  {
+    id: 'affiliate-commission-clarification',
+    category: 'affiliate',
+    roles: ['customer'],
+    keywords: ['affiliate 22 percent', 'affiliate rate', 'commission percentage', 'affiliate earnings percentage'],
+    question: 'What is the MarketLink affiliate commission rate?',
+    answer: 'The current customer affiliate reward configured in the app is 2% on qualifying purchases, not 22%. A promotional banner or message must not be read as a guaranteed rate unless the dashboard and the applicable campaign terms confirm it. Rewards depend on valid referral tracking and the order meeting the programme rules.',
+  },
+
 ];
 
 module.exports = { KNOWLEDGE_BASE };
