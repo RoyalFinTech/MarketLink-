@@ -126,8 +126,8 @@ async function acceptDelivery(deliveryId, riderId) {
     }
     if(d.status!=='unassigned') throw new AppError('This delivery is no longer available.',409,'DELIVERY_NOT_AVAILABLE');
     if(d.rider_id && String(d.rider_id)!==String(riderId)) throw new AppError('This delivery is already assigned.',409,'DELIVERY_NOT_AVAILABLE');
-    if(!(await client.query('SELECT user_id FROM riders WHERE user_id=$1 AND is_online=TRUE',[riderId])).rows.length)
-      throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
+    const { rows:[online] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1 AND is_online=TRUE',[riderId]);
+    if(!online) throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
     const { rows:[updated] } = await client.query("UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",[riderId,deliveryId]);
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
     await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'self','accepted',now())",[deliveryId,riderId]);
@@ -150,7 +150,6 @@ async function declineDelivery(deliveryId, riderId) {
     return updated;
   });
 }
-
 async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
   const { rows: [d] } = await query('SELECT * FROM deliveries WHERE id = $1', [deliveryId]);
   if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
