@@ -6700,6 +6700,9 @@ window.addEventListener('unhandledrejection',function(e){
   function decorateOne(id,target){
     var old=document.getElementById(id);if(!old||!old.parentElement||old.dataset.mlCarrierDecorated==='1')return;
     var parent=old.parentElement, initial=(window.S&&S[stateKey(target)])||old.value||'';
+    /* The legacy auth row was a horizontal flex container. Reset it before adding
+       the guidance card so the card sits below the phone control, never beside it. */
+    parent.style.display='block';parent.style.position='relative';parent.style.width='100%';parent.style.minWidth='0';parent.style.margin='0 0 14px';parent.style.overflow='visible';parent.style.boxSizing='border-box';
     parent.innerHTML=networkMarkup(target,initial);
     var sel=document.getElementById(target+'-operator'), inp=document.getElementById(target+'-national');
     if(!sel||!inp)return;
