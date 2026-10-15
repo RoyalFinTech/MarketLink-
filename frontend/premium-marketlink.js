@@ -1349,7 +1349,8 @@
       var shopPhotoUrl=null;
       if(f.photoFile){var photoUpload=await ML_API.uploads.upload(f.photoFile,'vendor-logo');shopPhotoUrl=photoUpload&&photoUpload.url||null;}
       if(btn)btn.textContent='Submitting application…';
-      await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:f.phone,nationalId:undefined,idDocumentUrl:idUpload&&idUpload.url,shopPhotoUrl:shopPhotoUrl,description:f.sname});
+      var vendorPhone=window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:f.phone;
+      await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:vendorPhone,nationalId:undefined,idDocumentUrl:idUpload&&idUpload.url,shopPhotoUrl:shopPhotoUrl,description:f.sname});
       closeSheet('sh-vapp');toast('Vendor application submitted. Documents saved securely; your application is awaiting Admin approval.','success');
       S._vendorLiveLoaded=false;renderPremiumProfile();
     }catch(e){if(btn){btn.disabled=false;btn.textContent='Submit Application 🎉';}toast(e.error||e.message||'Vendor application could not be submitted. Please try again.','error');}
@@ -1366,7 +1367,9 @@
       var vehiclePhotoUrl=null;
       if(f.vehiclePhotoFile){var vehicleUpload=await ML_API.uploads.upload(f.vehiclePhotoFile,'rider-photo');vehiclePhotoUrl=vehicleUpload&&vehicleUpload.url||null;}
       if(btn)btn.textContent='Submitting application…';
-      await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:f.emergency,address:f.addr,idDocumentUrl:idUpload&&idUpload.url,licenseDocumentUrl:licenseUpload&&licenseUpload.url,vehiclePhotoUrl:vehiclePhotoUrl});
+      var emergencyPhone=f.emergency;
+      if(emergencyPhone&&window.PhoneUtil)emergencyPhone=window.PhoneUtil.normalize(emergencyPhone,'GM').e164;
+      await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:emergencyPhone,address:f.addr,idDocumentUrl:idUpload&&idUpload.url,licenseDocumentUrl:licenseUpload&&licenseUpload.url,vehiclePhotoUrl:vehiclePhotoUrl});
       closeSheet('sh-rapp');toast('Rider application submitted. Documents saved securely; awaiting Admin approval.','success');
       S._riderLiveLoaded=false;renderPremiumProfile();
     }catch(e){if(btn){btn.disabled=false;btn.textContent='Submit Application 🎉';}toast(e.error||e.message||'Rider application could not be submitted. Please try again.','error');}
