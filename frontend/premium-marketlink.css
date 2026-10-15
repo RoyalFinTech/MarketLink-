@@ -1070,3 +1070,30 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
   #toast.ml-toast-card .ml-toast-brand>div span{font-size:7px;letter-spacing:.07em}
 }
 
+/* MarketLink phone entry: compact, readable helper card under the input. */
+.ml-phone-guidance{
+  display:block!important;position:relative!important;clear:both!important;
+  width:100%!important;max-width:100%!important;box-sizing:border-box!important;
+  margin:7px 0 13px!important;padding:8px 11px!important;
+  border:1px solid rgba(245,184,61,.35)!important;border-left:3px solid #F5B83D!important;
+  border-radius:10px!important;background:#071521!important;color:#FFFFFF!important;
+  font-size:12px!important;line-height:1.45!important;overflow-wrap:anywhere!important;
+}
+.ml-phone-guidance>div{display:block!important;margin:2px 0!important;color:#F8FAFC!important}
+.ml-phone-guidance b{color:#FFE08A!important;font-weight:800!important}
+.ml-phone-guidance .ml-phone-guidance-title{display:flex!important;align-items:center!important;gap:7px!important;margin:0 0 4px!important;color:#FFD778!important;font-size:12px!important}
+.ml-phone-guidance .ml-phone-guidance-title strong{color:#FFD778!important}
+.ml-phone-guidance .ml-phone-guidance-example{margin-top:3px!important;color:#DDEBF4!important;font-size:11px!important;line-height:1.4!important}
+.ml-phone-guidance .ml-phone-guidance-help{display:block!important;margin-top:3px!important;color:#5EEAD4!important;font-size:11px!important;font-weight:700!important}
+.ml-gm-phone{position:relative!important;z-index:1!important;min-height:46px!important}
+.ml-gm-phone select,.ml-gm-phone select option{
+  color:#FFFFFF!important;background-color:#071521!important;
+  -webkit-text-fill-color:#FFFFFF!important;color-scheme:dark!important;
+}
+.ml-gm-phone select{min-width:112px!important}
+#ml-live-promo-ticker .ml-ticker-brand img{object-fit:contain!important;background:#FFFFFF!important}
+@media(max-width:420px){
+  .ml-phone-guidance{font-size:11.5px!important;padding:8px 9px!important;margin:6px 0 12px!important}
+  .ml-phone-guidance .ml-phone-guidance-title{font-size:11.5px!important}
+  .ml-gm-phone select{min-width:105px!important;flex:1 1 118px!important}
+}
