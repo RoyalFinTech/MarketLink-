@@ -438,22 +438,26 @@ button:active{opacity:0.82;}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 </style>
 <link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-locale-tracking-r6"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-locale-tracking-r6" defer></script><style id="marketlink-gambian-phone-contrast">
-/* Consistent, high-contrast carrier picker in light and dark system themes. */
-select[id$="-operator"]{
-  color-scheme:dark!important;
-  color:#fff!important;
-  background-color:#071521!important;
-  -webkit-text-fill-color:#fff!important;
+/* Force readable native controls even when the device/browser uses a light theme. */
+select[id$="-operator"],.ml-gm-phone select{
+  appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
+  color:#FFFFFF!important;background:#071521!important;-webkit-text-fill-color:#FFFFFF!important;
+  font-family:inherit!important;opacity:1!important;text-shadow:none!important;
 }
-select[id$="-operator"] option{
-  color:#fff!important;
-  background-color:#071521!important;
-  font-weight:600!important;
+select[id$="-operator"] option,.ml-gm-phone select option{
+  color:#FFFFFF!important;background-color:#071521!important;font-weight:650!important;
+  -webkit-text-fill-color:#FFFFFF!important;
 }
-.ml-gm-phone{color:#fff!important;background:#071521!important}
-.ml-gm-phone select,.ml-gm-phone input{color:#fff!important;background-color:#071521!important}
-.ml-gm-phone input::placeholder{color:#9DB0BC!important;opacity:1}
-#ml-live-promo-ticker{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100vw!important}
+.ml-gm-phone{color:#FFFFFF!important;background:#071521!important;border-color:rgba(245,184,61,.5)!important}
+.ml-gm-phone select,.ml-gm-phone input{color:#FFFFFF!important;background-color:#071521!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important}
+.ml-gm-phone input::placeholder{color:#C0CDD6!important;opacity:1}
+.ml-gm-phone + div{font-size:12px!important;line-height:1.65!important;color:#FFD166!important}
+.ml-gm-phone + div strong{color:#FFE7A8!important}
+.ml-gm-phone + div span{color:#FFFFFF!important}
+.ml-ticker-flag svg{width:21px;height:14px;display:inline-block;vertical-align:middle;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.2)}
+#ml-live-promo-ticker{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100vw!important;z-index:9998!important}
+#ml-live-promo-ticker .ml-ticker-item{color:#FFFFFF!important}
+#ml-live-promo-ticker .ml-ticker-item strong{color:#FFD778!important}
 </style>
 </head>
 <body>
@@ -6674,7 +6678,7 @@ window.addEventListener('unhandledrejection',function(e){
     }).join('');
     return '<div class="ml-gm-phone" style="display:flex;align-items:stretch;gap:0;width:100%;margin-bottom:6px;border:1px solid rgba(148,163,184,.35);border-radius:12px;overflow:hidden;background:#071521;min-width:0;box-shadow:0 0 0 1px rgba(245,184,61,.08) inset;">'+
       '<span style="display:flex;align-items:center;padding:0 10px;font-size:13px;color:#fff;white-space:nowrap;background:#0B1F2E;">'+
-      '<span aria-label="Flag of The Gambia" title="The Gambia" style="font-size:20px;margin-right:7px;">🇬🇲</span><strong>+220</strong></span>'+
+      '<span style="display:inline-flex;align-items:center;margin-right:7px;">'+gambiaFlagMarkup()+'</span><strong>+220</strong></span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="appearance:auto;color-scheme:dark;max-width:49%;min-width:0;flex:0 1 160px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 8px;background:#071521;color:#fff;font-weight:700;font-size:12px;">'+opts+'</select>'+
       '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="1234567" value="'+nat.slice(0,7)+'" style="flex:1;min-width:0;width:0;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
       '<input type="hidden" id="'+(target==='admin'?'admin-staffid':target==='reg'?'rphone':'lphone')+'" value="">'+
@@ -6870,7 +6874,7 @@ window.addEventListener('unhandledrejection',function(e){
     style.textContent='#app{position:relative}#ml-live-promo-ticker{position:absolute;top:0;left:0;right:0;height:30px;z-index:40;overflow:hidden;display:flex;align-items:center;background:linear-gradient(90deg,#071521,#102d3a,#071521);border-bottom:1px solid rgba(245,166,35,.45);box-shadow:0 4px 16px rgba(0,0,0,.18)}#ml-live-promo-ticker .ml-ticker-track{display:flex;align-items:center;gap:34px;white-space:nowrap;min-width:max-content;animation:mlTickerScroll 35s linear infinite;color:#fff;font-size:10px;font-weight:700;letter-spacing:.02em;padding-left:100%}#ml-live-promo-ticker .ml-ticker-item{display:inline-flex;align-items:center;gap:7px}#ml-live-promo-ticker .ml-ticker-dot{width:6px;height:6px;border-radius:50%;background:#F5A623;box-shadow:0 0 9px #F5A623;animation:mlTickerPulse 1.3s ease-in-out infinite}#ml-live-promo-ticker strong{color:#FFD778}#ml-live-promo-ticker .ml-ticker-cta{border:1px solid rgba(245,166,35,.55);border-radius:99px;padding:3px 8px;color:#FFD778;background:rgba(245,166,35,.08)}.screen{top:30px!important;height:calc(100% - 30px)!important}.tab-pane{height:calc(100vh - 94px)}@keyframes mlTickerScroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}@keyframes mlTickerPulse{0%,100%{opacity:.45;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}@media(prefers-reduced-motion:reduce){#ml-live-promo-ticker .ml-ticker-track{animation:none;padding-left:12px;min-width:0;white-space:normal;gap:12px}}';
     document.head.appendChild(style);
     var bar=document.createElement('div');bar.id='ml-live-promo-ticker';bar.setAttribute('role','region');bar.setAttribute('aria-label','MarketLink promotions and updates');
-    bar.innerHTML='<div class="ml-ticker-track"><span class="ml-ticker-item"><i class="ml-ticker-dot"></i><span aria-label="Flag of The Gambia" title="The Gambia" style="font-size:17px;">🇬🇲</span> <strong>MARKETLINK GAMBIA</strong></span><span class="ml-ticker-item">🔗 Affiliate rewards: <strong>2% on eligible delivered purchases</strong></span><span class="ml-ticker-item">🏪 Vendors: request a featured promotion <span class="ml-ticker-cta">Admin approval required</span></span><span class="ml-ticker-item">🛵 Riders: keep GPS on during active deliveries</span><span class="ml-ticker-item">🔔 Track orders and delivery updates in your dashboard</span><span class="ml-ticker-item">⭐ Safe shopping: confirm price, stock and seller details</span><span class="ml-ticker-item"><i class="ml-ticker-dot"></i>🇬🇲 <strong>MARKETLINK GAMBIA</strong></span><span class="ml-ticker-item">🔗 Affiliate rewards: <strong>2% on eligible delivered purchases</strong></span><span class="ml-ticker-item">🏪 Vendors: request a featured promotion <span class="ml-ticker-cta">Admin approval required</span></span><span class="ml-ticker-item">🛵 Riders: keep GPS on during active deliveries</span></div>';
+    bar.innerHTML='<div class="ml-ticker-track"><span class="ml-ticker-item"><i class="ml-ticker-dot"></i><span class="ml-ticker-flag">'+gambiaFlagMarkup()+'</span> <strong>MARKETLINK GAMBIA</strong></span><span class="ml-ticker-item">🔗 Affiliate rewards: <strong>2% on eligible delivered purchases</strong></span><span class="ml-ticker-item">🏪 Vendors: request a featured promotion <span class="ml-ticker-cta">Admin approval required</span></span><span class="ml-ticker-item">🛵 Riders: keep GPS on during active deliveries</span><span class="ml-ticker-item">🔔 Track orders and delivery updates in your dashboard</span><span class="ml-ticker-item">⭐ Safe shopping: confirm price, stock and seller details</span><span class="ml-ticker-item"><i class="ml-ticker-dot"></i><span class="ml-ticker-flag">'+gambiaFlagMarkup()+'</span> <strong>MARKETLINK GAMBIA</strong></span><span class="ml-ticker-item">🔗 Affiliate rewards: <strong>2% on eligible delivered purchases</strong></span><span class="ml-ticker-item">🏪 Vendors: request a featured promotion <span class="ml-ticker-cta">Admin approval required</span></span><span class="ml-ticker-item">🛵 Riders: keep GPS on during active deliveries</span></div>';
     app.insertBefore(bar,app.firstChild);
   }
   initMarketLinkTicker();
