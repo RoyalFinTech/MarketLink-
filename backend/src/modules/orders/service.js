@@ -165,6 +165,7 @@ function _assertTransitionAllowed(order,targetStatus,userId,roles){const isAdmin
 async function settleOrderFinancials(orderId){return withTransaction(async(client)=>{
   const {rows:[order]}=await client.query(`SELECT o.*,d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE`,[orderId]);
   if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+  if(order.status!=='delivered')return{settled:false,reason:'ORDER_NOT_DELIVERED'};
   if(order.payment_status!=='confirmed')return{settled:false,reason:'PAYMENT_NOT_CONFIRMED'};
   const {rows:[commission]}=await client.query('SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE',[orderId]);
   if(!commission||commission.status==='paid')return{settled:true,alreadySettled:true};
