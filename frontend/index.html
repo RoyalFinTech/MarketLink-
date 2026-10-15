@@ -1827,7 +1827,7 @@ function logoBlock(size,tagline,animateWing,floatAndFlyIn){
     '</div>';
 }
 function gambiaFlagMarkup(){
-  return '<svg class=\"gmf-svg\" role=\"img\" aria-label=\"Flag of The Gambia\" title=\"The Gambia\" viewBox=\"0 0 18 12\" xmlns=\"http://www.w3.org/2000/svg\" width=\"26\" height=\"18\" viewBox=\"0 0 18 12\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" style=\"width:26px;height:18px;display:inline-block;vertical-align:middle;flex-shrink:0;border-radius:2px;overflow:hidden;\">'+
+  return '<svg class=\"gmf-svg\" role=\"img\" aria-label=\"Flag of The Gambia\" title=\"The Gambia\" viewBox=\"0 0 18 12\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" style=\"width:26px;height:18px;display:inline-block;vertical-align:middle;flex-shrink:0;border-radius:2px;overflow:hidden;\">'+
     '<rect width=\"18\" height=\"12\" fill=\"#FFFFFF\"/>'+
     '<rect x=\"0\" y=\"0\" width=\"18\" height=\"4\" fill=\"#CE1126\"/>'+
     '<rect x=\"0\" y=\"4.6667\" width=\"18\" height=\"2.6666\" fill=\"#0C1C8C\"/>'+
@@ -6682,7 +6682,7 @@ window.addEventListener('unhandledrejection',function(e){
       '<select id="'+target+'-operator" aria-label="Mobile network" style="appearance:auto;color-scheme:dark;max-width:49%;min-width:0;flex:0 1 160px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 8px;background:#071521;color:#fff;font-weight:700;font-size:12px;">'+opts+'</select>'+
       '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="1234567" value="'+nat.slice(0,7)+'" style="flex:1;min-width:0;width:0;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
       '<input type="hidden" id="'+(target==='admin'?'admin-staffid':target==='reg'?'rphone':'lphone')+'" value="">'+
-      '</div><div style="font-size:12px;line-height:1.55;color:#F5B83D;background:rgba(245,184,61,.07);border-left:3px solid #F5B83D;border-radius:0 7px 7px 0;padding:8px 10px;margin:4px 0 14px 2px;">🇬🇲 <strong>Choose your network</strong>, then enter the 7 digits printed after the network prefix. <span style="display:block;color:#F8FBFC;margin-top:3px;">Example: Africell 87 + 1234567. We add the country code and network prefix for you.</span><span id="'+target+'-phone-help" style="display:block;margin-top:4px;color:#5EEAD4;font-weight:600;"></span></div>';
+      '</div><div style="font-size:12px;line-height:1.55;color:#F5B83D;background:rgba(245,184,61,.07);border-left:3px solid #F5B83D;border-radius:0 7px 7px 0;padding:10px 11px;margin:6px 0 16px 2px;"><span style="display:inline-flex;vertical-align:middle;margin-right:5px;">'+gambiaFlagMarkup()+'</span> <strong>Choose your network</strong>, then enter the 7 digits printed after the network prefix. <span style="display:block;color:#F8FBFC;margin-top:3px;">Example: Africell 87 + 1234567. We add the country code and network prefix for you.</span><span id="'+target+'-phone-help" style="display:block;margin-top:4px;color:#5EEAD4;font-weight:600;"></span></div>';
   }
   function nationalValue(target){
     var sel=document.getElementById(target+'-operator'), inp=document.getElementById(target+'-national');
