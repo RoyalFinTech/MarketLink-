@@ -6,6 +6,7 @@ const isAdmin = u => (u?.roles||[]).some(r => ['admin','super_admin','moderator'
 exports.list       = wrap(async (req,res) => res.json({ success:true, data: await svc.list({ ...req.query, isAdmin: isAdmin(req.user) }) }));
 exports.getById    = wrap(async (req,res) => res.json({ success:true, data: await svc.getById(req.params.id, req.user.id, req.user.roles) }));
 exports.getTracking= wrap(async (req,res) => res.json({ success:true, data: await svc.getTracking(req.params.id,req.user.id,req.user.roles) }));
-exports.assign     = wrap(async (req,res) => res.json({ success:true, data: await svc.assignRider(req.params.id, req.body.riderId, { id: req.user.id, isAuto: false }) }));
+exports.availableRiders = wrap(async (req,res) => res.json({ success:true, data: await svc.listAvailableRiders(req.params.id,req.user.id,req.user.roles) }));
+exports.assign     = wrap(async (req,res) => res.json({ success:true, data: await svc.assignRider(req.params.id, req.body.riderId, { id: req.user.id, roles:req.user.roles, isAuto: false }) }));
 exports.accept     = wrap(async (req,res) => res.json({ success:true, data: await svc.acceptDelivery(req.params.id, req.user.id) }));
 exports.updateStatus=wrap(async (req,res) => res.json({ success:true, data: await svc.updateStatus(req.params.id, req.body.status, req.user.id, req.user.roles, req.body) }));
