@@ -1825,8 +1825,41 @@
   window.rRequestWithdrawal=liveRiderRequestWithdrawal;
   window.rDecline=liveRiderDecline;
   window.vRequestPayout=liveVendorRequestPayout;
-  window.vAddPromo=function(){toast('Vendor promotions are not exposed by the current backend. No local promotion is created.','info');};
-  window.vRemovePromo=function(){toast('Vendor promotions are not exposed by the current backend.','info');};
+  window.vAddPromo=function(){
+    var old=document.getElementById('ml-promo-request-modal');if(old)old.remove();
+    var overlay=document.createElement('div');overlay.id='ml-promo-request-modal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:10050;background:rgba(3,8,18,.78);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:14px;';
+    overlay.innerHTML='<section style="width:min(100%,540px);max-height:92dvh;overflow:auto;background:var(--sf,#111827);color:var(--tx,#fff);border:1px solid rgba(245,166,35,.28);border-radius:22px;box-shadow:0 25px 90px rgba(0,0,0,.45);padding:20px;">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:10px;letter-spacing:.14em;color:#F5A623;font-weight:800;">VENDOR GROWTH</div><h2 style="font-size:21px;margin:5px 0 5px;">Request a promotion ✨</h2><p style="font-size:12px;line-height:1.55;color:var(--mu,#9ca3af);margin:0 0 15px;">Ask MarketLink Admin to feature your shop or products. Your promotion will not go live until the creative, price, payment and dates are confirmed.</p></div><button id="ml-promo-close" type="button" style="width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--tx,#fff);font-size:22px;">×</button></div>'+
+      '<form id="ml-promo-form" style="display:grid;gap:11px;">'+
+      '<label style="font-size:12px;font-weight:700;">Promotion title<input id="ml-promo-title" required maxlength="120" placeholder="e.g. Weekend rice and grocery offers" style="display:block;width:100%;margin-top:6px;box-sizing:border-box;padding:12px;border-radius:11px;border:1px solid rgba(148,163,184,.35);background:rgba(255,255,255,.04);color:var(--tx,#fff);"></label>'+
+      '<label style="font-size:12px;font-weight:700;">What would you like to promote?<textarea id="ml-promo-description" maxlength="2000" rows="3" placeholder="Tell Admin which products, offer and target customers." style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border-radius:11px;border:1px solid rgba(148,163,184,.35);background:rgba(255,255,255,.04);color:var(--tx,#fff);resize:vertical;"></textarea></label>'+
+      '<label style="font-size:12px;font-weight:700;">Promotion placement<select id="ml-promo-placement" style="display:block;width:100%;margin-top:6px;padding:12px;border-radius:11px;border:1px solid rgba(148,163,184,.35);background:var(--sf,#111827);color:var(--tx,#fff);"><option value="featured_banner">Featured banner</option><option value="vendor_spotlight">Vendor spotlight</option><option value="search_boost">Promote products in search</option><option value="category_banner">Category banner</option></select></label>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><label style="font-size:12px;font-weight:700;">Duration<select id="ml-promo-duration" style="display:block;width:100%;margin-top:6px;padding:12px;border-radius:11px;border:1px solid rgba(148,163,184,.35);background:var(--sf,#111827);color:var(--tx,#fff);"><option value="24">24 hours</option><option value="72">3 days</option><option value="168">7 days</option><option value="336">14 days</option><option value="720">30 days</option></select></label><label style="font-size:12px;font-weight:700;">Suggested budget (D)<input id="ml-promo-budget" type="number" min="0" step="1" value="100" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border-radius:11px;border:1px solid rgba(148,163,184,.35);background:rgba(255,255,255,.04);color:var(--tx,#fff);"></label></div>'+
+      '<label style="font-size:12px;font-weight:700;">Banner image (optional)<input id="ml-promo-banner" type="file" accept="image/jpeg,image/png,image/webp" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:10px;border-radius:11px;border:1px dashed rgba(245,166,35,.45);color:var(--tx,#fff);"></label>'+
+      '<div style="padding:11px 12px;border-radius:12px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);font-size:11px;line-height:1.55;color:var(--mu,#cbd5e1);">⭐ Admin reviews your request and confirms the final price. Upload a banner you own or have permission to use. Payment must be confirmed before publication. Submitting this form is a request, not a purchase or a guarantee of placement.</div>'+
+      '<button id="ml-promo-submit" type="submit" style="border:0;border-radius:12px;padding:13px;background:linear-gradient(135deg,#F5A623,#FFD778);color:#172033;font-weight:800;">Send request to Admin</button><button id="ml-promo-terms" type="button" style="border:1px solid rgba(148,163,184,.3);border-radius:12px;padding:11px;background:transparent;color:var(--tx,#fff);font-weight:700;">Download promotion terms</button><div id="ml-promo-feedback" role="status" style="font-size:12px;line-height:1.5;"></div></form></section>';
+    document.body.appendChild(overlay);
+    var close=function(){overlay.remove();};overlay.querySelector('#ml-promo-close').onclick=close;
+    overlay.addEventListener('click',function(e){if(e.target===overlay)close();});
+    overlay.querySelector('#ml-promo-terms').onclick=function(){
+      var terms='MarketLink Vendor Promotion Request Terms\n\n1. Submitting a request does not publish or guarantee a promotion.\n2. MarketLink Admin reviews the title, description, creative, placement and requested duration.\n3. Admin confirms the final price, payment method and schedule before payment is due.\n4. A promotion is published only after approval and confirmed payment.\n5. Vendors must own or have permission to use uploaded images and advertising copy.\n6. Misleading claims, prohibited products and counterfeit listings may be rejected.\n7. Keep the request reference and payment receipt for support.\n';
+      var a=document.createElement('a');a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(terms);a.download='MarketLink-Promotion-Terms.txt';document.body.appendChild(a);a.click();a.remove();
+    };
+    overlay.querySelector('#ml-promo-form').onsubmit=async function(e){
+      e.preventDefault();var button=overlay.querySelector('#ml-promo-submit'),feedback=overlay.querySelector('#ml-promo-feedback');
+      var title=overlay.querySelector('#ml-promo-title').value.trim(),file=overlay.querySelector('#ml-promo-banner').files[0],bannerUrl=null;
+      if(!title){feedback.textContent='Please enter a promotion title.';return;}
+      button.disabled=true;button.textContent='Sending request…';feedback.textContent='Saving your request securely…';
+      try{
+        if(file){var uploaded=await ML_API.uploads.upload(file,'banner');bannerUrl=uploaded&&uploaded.url;if(!bannerUrl)throw new Error('The banner upload did not return a saved image URL.');}
+        var result=await ML_API.promotions.create({title:title,description:overlay.querySelector('#ml-promo-description').value.trim(),placement:overlay.querySelector('#ml-promo-placement').value,durationHours:Number(overlay.querySelector('#ml-promo-duration').value),requestedBudgetGmd:Number(overlay.querySelector('#ml-promo-budget').value||0),bannerUrl:bannerUrl});
+        feedback.textContent='Request submitted. Reference: '+((result.data&&result.data.id)||'saved')+'. Admin will review it and confirm the final price and payment steps.';
+        button.textContent='Request sent ✓';button.disabled=true;toast('Promotion request sent to Admin.','success');
+      }catch(err){feedback.textContent=(err&&err.error)||err.message||'Could not submit your promotion request. Please try again.';button.disabled=false;button.textContent='Send request to Admin';toast(feedback.textContent,'error');}
+    };
+  };
+  window.vRemovePromo=function(){window.vAddPromo();};
   window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
