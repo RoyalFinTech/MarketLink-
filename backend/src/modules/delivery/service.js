@@ -118,15 +118,35 @@ async function acceptDelivery(deliveryId, riderId) {
   return withTransaction(async (client) => {
     const { rows:[d] } = await client.query('SELECT * FROM deliveries WHERE id=$1 FOR UPDATE',[deliveryId]);
     if(!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const { rows:[rider] } = await client.query("SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved'",[riderId]);
+    if(!rider) throw new AppError('Only an approved rider can accept a delivery.',403,'RIDER_UNAVAILABLE');
+    if(d.status==='assigned' && String(d.rider_id)===String(riderId)) {
+      await client.query("UPDATE rider_assignments SET status='accepted',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
+      return d;
+    }
     if(d.status!=='unassigned') throw new AppError('This delivery is no longer available.',409,'DELIVERY_NOT_AVAILABLE');
-    if(d.rider_id && d.rider_id!==riderId) throw new AppError('This delivery is already assigned.',409,'DELIVERY_NOT_AVAILABLE');
-    const { rows:[rider] } = await client.query("SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE",[riderId]);
-    if(!rider) throw new AppError('Rider is not approved or not online.',403,'RIDER_UNAVAILABLE');
+    if(d.rider_id && String(d.rider_id)!==String(riderId)) throw new AppError('This delivery is already assigned.',409,'DELIVERY_NOT_AVAILABLE');
+    if(!(await client.query('SELECT user_id FROM riders WHERE user_id=$1 AND is_online=TRUE',[riderId])).rows.length)
+      throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
     const { rows:[updated] } = await client.query("UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",[riderId,deliveryId]);
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
-    await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status) VALUES($1,$2,$2,'self','pending')",[deliveryId,riderId]);
+    await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'self','accepted',now())",[deliveryId,riderId]);
     const { rows:[o] } = await client.query('SELECT customer_id FROM orders WHERE id=$1',[updated.order_id]);
     if(o) await client.query("INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_assigned','Rider Assigned 🛵','A rider has accepted your delivery.','delivery',$2)",[o.customer_id,deliveryId]);
+    return updated;
+  });
+}
+async function declineDelivery(deliveryId, riderId) {
+  return withTransaction(async (client) => {
+    const { rows:[d] } = await client.query('SELECT * FROM deliveries WHERE id=$1 FOR UPDATE',[deliveryId]);
+    if(!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    if(d.status!=='assigned'||String(d.rider_id)!==String(riderId))
+      throw new AppError('You can only decline a delivery assigned to you.',403,'FORBIDDEN');
+    await client.query("UPDATE rider_assignments SET status='declined',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
+    const {rows:[updated]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 RETURNING *",[deliveryId]);
+    await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[d.order_id]);
+    const {rows:[order]}=await client.query('SELECT vendor_id FROM orders WHERE id=$1',[d.order_id]);
+    if(order) await client.query("INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_declined','Rider declined delivery','The assigned rider cannot take this delivery. Please choose another rider.','delivery',$2)",[order.vendor_id,deliveryId]);
     return updated;
   });
 }
@@ -206,4 +226,4 @@ async function getTracking(deliveryId, actorId, roles) {
   return d;
 }
 
-module.exports = { getById, list, assignRider, listAvailableRiders, updateStatus, getTracking };
+module.exports = { getById, list, assignRider, listAvailableRiders, acceptDelivery, declineDelivery, updateStatus, getTracking };
