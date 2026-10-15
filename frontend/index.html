@@ -6701,9 +6701,10 @@ window.addEventListener('unhandledrejection',function(e){
       return oldRegister.apply(this,arguments);
     };
   }
-  if(typeof window.doAdminLogin==='function'){
+  function ensureAdminLoginCarrierWrapper(){
+    if(typeof window.doAdminLogin!=='function'||window.doAdminLogin.__mlCarrierWrapped)return;
     var oldAdminLogin=window.doAdminLogin;
-    window.doAdminLogin=async function(){
+    var wrappedAdminLogin=async function(){
       var id=document.getElementById('admin-staffid');
       if(id&&id.dataset.mlCarrierInput==='1'){
         try{
@@ -6716,22 +6717,9 @@ window.addEventListener('unhandledrejection',function(e){
       }
       return oldAdminLogin.apply(this,arguments);
     };
+    wrappedAdminLogin.__mlCarrierWrapped=true;window.doAdminLogin=wrappedAdminLogin;
   }
-  function decorateAdminPhone(){
-    var old=document.getElementById('admin-staffid');if(!old||old.dataset.mlCarrierInput==='1')return;
-    var wrap=document.createElement('div');wrap.style.cssText='margin-bottom:16px;';
-    wrap.innerHTML=networkMarkup('admin','');
-    wrap.querySelector('.ml-gm-phone').style.marginBottom='0';
-    old.parentNode.insertBefore(wrap,old);
-    old.style.display='none';old.dataset.mlCarrierInput='1';
-    var sel=wrap.querySelector('#admin-operator'),inp=wrap.querySelector('#admin-national');
-    if(sel)sel.addEventListener('change',function(){var h=wrap.querySelector('#admin-phone-help');if(h)h.textContent=sel.value==='GAMCEL'?'Gamcel uses the 7-digit number without an added prefix.':'Your network prefix ('+operators[sel.value].prefix+') is added automatically.';});
-    if(inp)inp.addEventListener('input',function(){inp.value=digits(inp.value).slice(0,7);});
-  }
-  if(typeof window.openAdminLogin==='function'){
-    var oldOpenAdmin=window.openAdminLogin;
-    window.openAdminLogin=function(){oldOpenAdmin.apply(this,arguments);setTimeout(decorateAdminPhone,0);};
-  }
+  ensureAdminLoginCarrierWrapper();
   if(typeof window.authErr==='function'){
     var oldAuthErr=window.authErr;
     window.authErr=function(msg){oldAuthErr(msg);try{if(typeof window.toast==='function')window.toast(msg,'error');}catch(e){}};
@@ -6789,8 +6777,8 @@ window.addEventListener('unhandledrejection',function(e){
     app.insertBefore(bar,app.firstChild);
   }
   initMarketLinkTicker();
-  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();initMarketLinkTicker();});
-  setTimeout(function(){decorateAuthPhones();initMarketLinkTicker();},0);
+  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();initMarketLinkTicker();ensureAdminLoginCarrierWrapper();setTimeout(decorateAdminPhone,0);});
+  setTimeout(function(){decorateAuthPhones();initMarketLinkTicker();ensureAdminLoginCarrierWrapper();},0);
 })();
 </script>
 
