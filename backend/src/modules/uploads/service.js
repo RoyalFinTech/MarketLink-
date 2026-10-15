@@ -183,11 +183,12 @@ async function upload(file, purpose, uploaderId) {
   const provider=getStorageProvider();
   let stored;
   if(provider==='database') {
-    if(!isProfilePhoto(purpose)) {
+    const publicBanner=safePurpose(purpose)==='banner';
+    if(!isProfilePhoto(purpose)&&!publicBanner) {
       throw new AppError('Secure cloud storage is not configured for this type of file. Please contact MarketLink support.',503,'STORAGE_NOT_CONFIGURED');
     }
-    // Profile images are small and bounded; keep the binary in Postgres when cloud
-    // object storage is not configured instead of making profile uploads unavailable.
+    // Small profile photos and vendor banners can use the durable database fallback
+    // when object storage credentials are unavailable; other file types still fail closed.
     const id=crypto.randomUUID();
     const url=publicApiBase()+'/api/v1/uploads/'+id+'/profile-content';
     const {rows:[record]}=await query(
@@ -208,8 +209,10 @@ async function upload(file, purpose, uploaderId) {
 }
 async function getPublicProfileContent(fileId) {
   const {rows:[f]}=await query("SELECT content_bytes,content_type,purpose,file_type FROM file_uploads WHERE id=$1 AND deleted_at IS NULL",[fileId]);
-  if(!f || !f.content_bytes || !['profile-photo','profile_photo','profile photo'].includes(String(f.purpose||'').toLowerCase()) || f.file_type!=='image') {
-    throw new AppError('Profile photo not found.',404,'FILE_NOT_FOUND');
+  const purpose=String(f&&f.purpose||'').toLowerCase().replace(/_/g,'-');
+  const isPublicImage=['profile-photo','profile image','avatar','banner'].includes(purpose);
+  if(!f || !f.content_bytes || !isPublicImage || f.file_type!=='image') {
+    throw new AppError('Public image not found.',404,'FILE_NOT_FOUND');
   }
   return {buffer:f.content_bytes,contentType:f.content_type || 'image/jpeg'};
 }
