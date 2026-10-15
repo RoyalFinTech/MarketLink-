@@ -6758,6 +6758,32 @@ window.addEventListener('unhandledrejection',function(e){
       }
     },40);
   },true);
+  function decorateOnboardingPhone(id,target,fieldKey,replaceParent){
+    var old=document.getElementById(id);if(!old||old.dataset.mlNetworkDone==='1')return;
+    var initial=old.value||((window.S&&S[target==='va'?'vForm':'rForm']||{})[fieldKey])||'';
+    var digitsOnly=function(v){return String(v||'').replace(/\D/g,'');};
+    var raw=digitsOnly(initial),op='AFRICELL';
+    if(raw.indexOf('220')===0&&raw.length>9)raw=raw.slice(3);
+    if(raw.slice(0,2)==='87'||raw.slice(0,2)==='83'||raw.slice(0,2)==='86'){op=raw.slice(0,2)==='87'?'AFRICELL':raw.slice(0,2)==='83'?'QCELL':'COMIUM';raw=raw.slice(2);}
+    else if(raw.length===7&&raw.charAt(0)==='9')op='GAMCEL';
+    raw=raw.slice(-7);
+    var operators={AFRICELL:{label:'Africell (87)',prefix:'87'},QCELL:{label:'QCell (83)',prefix:'83'},COMIUM:{label:'Comium (86)',prefix:'86'},GAMCEL:{label:'Gamcel (no new prefix)',prefix:''}};
+    var options=Object.keys(operators).map(function(k){return '<option value="'+k+'" '+(k===op?'selected':'')+'>'+operators[k].label+'</option>';}).join('');
+    var wrap=document.createElement('div');wrap.style.cssText='width:100%;min-width:0;margin:0 0 7px;';
+    wrap.innerHTML='<div style="display:flex;align-items:stretch;width:100%;min-width:0;border:1px solid rgba(148,163,184,.3);border-radius:11px;overflow:hidden;background:rgba(255,255,255,.035);"><span style="display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--mu);white-space:nowrap;">🇬🇲 +220</span><select id="'+target+'-operator" aria-label="Mobile network" style="max-width:48%;min-width:0;flex:0 1 150px;border:0;border-left:1px solid rgba(148,163,184,.2);border-right:1px solid rgba(148,163,184,.2);background:var(--sfl);color:var(--tx);font-size:11px;padding:0 5px;">'+options+'</select><input id="'+target+'-national" type="tel" inputmode="numeric" maxlength="7" placeholder="1234567" aria-label="Seven-digit mobile number" value="'+raw+'" style="flex:1;min-width:0;width:0;border:0;background:transparent;color:var(--tx);padding:12px 8px;font-size:14px;letter-spacing:.04em;"></div><input type="hidden" id="'+id+'" value=""><div style="font-size:10.5px;color:var(--mu);line-height:1.4;margin:4px 0 0 2px;">Select your network and enter the 7 digits. The prefix is added automatically.</div>';
+    if(replaceParent&&old.parentElement){old.parentElement.replaceWith(wrap);}else{old.replaceWith(wrap);}
+    var hidden=wrap.querySelector('#'+id),sel=wrap.querySelector('#'+target+'-operator'),inp=wrap.querySelector('#'+target+'-national');
+    function update(){var n=digitsOnly(inp.value).slice(0,7);inp.value=n;var selected=sel.value;var prefix=operators[selected].prefix;if(selected==='GAMCEL'&&n.length===7&&n.charAt(0)!=='9'){inp.setCustomValidity('Gamcel numbers must start with 9.');}else inp.setCustomValidity('');hidden.value=prefix+n;if(window.S){var obj=target==='va'?S.vForm:S.rForm;if(obj)obj[fieldKey]=hidden.value;}}
+    sel.addEventListener('change',update);inp.addEventListener('input',update);inp.addEventListener('paste',function(){setTimeout(update,0);});update();old.dataset.mlNetworkDone='1';
+  }
+  if(typeof window.renderVApp==='function'){
+    var oldRenderVendorApp=window.renderVApp;
+    window.renderVApp=function(){oldRenderVendorApp.apply(this,arguments);decorateOnboardingPhone('va-phone','va','phone',true);};
+  }
+  if(typeof window.renderRApp==='function'){
+    var oldRenderRiderApp=window.renderRApp;
+    window.renderRApp=function(){oldRenderRiderApp.apply(this,arguments);decorateOnboardingPhone('ra-phone','ra','phone',true);decorateOnboardingPhone('ra-emg','ra-emg','emergency',false);};
+  }
   function initMarketLinkTicker(){
     var app=document.getElementById('app');if(!app||document.getElementById('ml-live-promo-ticker'))return;
     var style=document.createElement('style');style.id='ml-live-promo-ticker-style';
