@@ -6360,7 +6360,9 @@ window.addEventListener('unhandledrejection',function(e){
     if(s.indexOf('00')===0)s='+'+s.slice(2);
     var gm=s.indexOf('+220')===0||(s.charAt(0)!=='+'&&iso==='GM');
     if(gm){
-      var n=s.indexOf('+220')===0?s.slice(4):s.replace(/\D/g,''), m=gm9(n);
+      var n=s.indexOf('+220')===0?s.slice(4):s.replace(/\D/g,'');
+      if(n.length===7&&n.charAt(0)==='9')return {e164:'+220'+n,countryIso:'GM',national:n,operator:'UNATTRIBUTED_9'};
+      var m=gm9(n);
       if(!m)throw new Error('Please check your Gambian mobile number.');
       var e='+220'+m,L=lpn();
       if(L&&L.isValidPhoneNumber&&!L.isValidPhoneNumber(e))throw new Error('Please check your Gambian mobile number.');
