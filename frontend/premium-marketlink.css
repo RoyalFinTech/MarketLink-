@@ -1097,3 +1097,15 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
   .ml-phone-guidance .ml-phone-guidance-title{font-size:11.5px!important}
   .ml-gm-phone select{min-width:105px!important;flex:1 1 118px!important}
 }
+
+/* Auth input robustness: keep phone controls and helper copy in their own rows. */
+.ml-gm-phone{display:flex!important;align-items:center!important;flex-wrap:wrap!important;gap:8px!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important}
+.ml-gm-phone select,.ml-gm-phone input{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+.ml-gm-phone input{flex:1 1 120px!important}
+.ml-phone-guidance{position:relative!important;z-index:0!important;white-space:normal!important}
+.ml-gm-phone:focus-within{outline:2px solid rgba(245,184,61,.42)!important;outline-offset:2px}
+.ml-gm-phone select:focus-visible,.ml-gm-phone input:focus-visible{outline:2px solid #F5B83D!important;outline-offset:1px}
+.lm .ml-phone-guidance{background:#F7FAFC!important;color:#172B36!important;border-color:#D7B65D!important}
+.lm .ml-phone-guidance>div,.lm .ml-phone-guidance .ml-phone-guidance-example{color:#334E5C!important}
+.lm .ml-phone-guidance .ml-phone-guidance-help{color:#087B80!important}
+@media(max-width:360px){.ml-gm-phone select{flex:1 1 100%!important;width:100%!important}.ml-gm-phone input{flex:1 1 100%!important;width:100%!important}}
