@@ -183,7 +183,7 @@ async function upload(file, purpose, uploaderId) {
   const provider=getStorageProvider();
   let stored;
   if(provider==='database') {
-    const publicBanner=safePurpose(purpose)==='banner';
+    const publicBanner=['banner','vendor-logo','rider-photo'].includes(safePurpose(purpose));
     const privateOnboardingDoc=['vendor-document','rider-document','license-document'].includes(safePurpose(purpose));
     if(!isProfilePhoto(purpose)&&!publicBanner&&!privateOnboardingDoc) {
       throw new AppError('Secure cloud storage is not configured for this type of file. Please contact MarketLink support.',503,'STORAGE_NOT_CONFIGURED');
@@ -211,7 +211,7 @@ async function upload(file, purpose, uploaderId) {
 async function getPublicProfileContent(fileId) {
   const {rows:[f]}=await query("SELECT content_bytes,content_type,purpose,file_type FROM file_uploads WHERE id=$1 AND deleted_at IS NULL",[fileId]);
   const purpose=String(f&&f.purpose||'').toLowerCase().replace(/_/g,'-');
-  const isPublicImage=['profile-photo','profile image','avatar','banner'].includes(purpose);
+  const isPublicImage=['profile-photo','profile image','avatar','banner','vendor-logo','rider-photo'].includes(purpose);
   if(!f || !f.content_bytes || !isPublicImage || f.file_type!=='image') {
     throw new AppError('Public image not found.',404,'FILE_NOT_FOUND');
   }
