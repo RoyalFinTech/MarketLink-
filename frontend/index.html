@@ -1538,6 +1538,7 @@ var ML_API = (function(){
     categories: categories, orders: orders, delivery: delivery,
     payments: payments, notifications: notifications, affiliates: affiliates,
     uploads: uploads, vendors: vendors, riders: riders, admin: admin,
+    promotions: { create: function(d){ return post('/promotions',d); }, mine: function(){ return get('/promotions/mine'); }, adminList: function(qs){ return get('/promotions/admin/requests',qs); }, adminReview: function(id,d){ return patch('/promotions/admin/requests/'+encodeURIComponent(id),d); } },
     assistant: assistant,
     adminKnowledge: adminKnowledge,
     checkBackend: checkBackend, isBackendAvailable: isBackendAvailable,
