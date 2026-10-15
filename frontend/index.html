@@ -6627,6 +6627,7 @@ window.addEventListener('unhandledrejection',function(e){
       '<span aria-label="Flag of The Gambia" style="font-size:19px;margin-right:6px;">🇬🇲</span>+220</span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="max-width:49%;min-width:0;flex:0 1 160px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 7px;background:transparent;color:var(--tx,#17212b);font-weight:600;font-size:12px;">'+opts+'</select>'+
       '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="1234567" value="'+nat.slice(0,7)+'" style="flex:1;min-width:0;width:0;border:0;border-radius:0;background:transparent;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
+      (target==='admin'?'':'<input type="hidden" id="'+(target==='reg'?'rphone':'lphone')+'" value="">')+
       '</div><div style="font-size:11px;line-height:1.45;color:var(--mu,#64748b);margin:0 0 13px 2px;">Select your network, then enter the 7-digit number'+
       '<span id="'+target+'-phone-help" style="display:block;margin-top:2px;opacity:.9;"></span></div>';
   }
@@ -6683,6 +6684,7 @@ window.addEventListener('unhandledrejection',function(e){
   function selectedPhone(target){
     var national=nationalValue(target);
     if(window.S){S[stateKey(target)]=national;S[carrierKey(target)]=(document.getElementById(target+'-operator')||{}).value||'AFRICELL';}
+    var hidden=document.getElementById(target==='reg'?'rphone':'lphone');if(hidden)hidden.value=national;
     return national;
   }
   if(typeof window.doLogin==='function'){
