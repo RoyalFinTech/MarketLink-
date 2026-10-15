@@ -108,6 +108,13 @@ function normalizePhone(raw, defaultCountryIso) {
   const looksGambian = s.startsWith('+220') || (!s.startsWith('+') && defaultCountryIso === 'GM');
   if (looksGambian) {
     const national = s.startsWith('+220') ? s.slice(4) : s.replace(/\D/g, '');
+    // The UI network picker explicitly labels Gamcel as the legacy 7-digit
+    // range with no inserted operator prefix. Accept that documented form
+    // only for numbers beginning with 9; all other Gambian inputs continue
+    // through the post-migration 9-digit validation below.
+    if (national.length === 7 && national[0] === '9') {
+      return { e164: '+220' + national, countryIso: 'GM', national, operator: 'UNATTRIBUTED_9' };
+    }
     const migrated = toGambianNational9(national);
     if (!migrated) throw new Error('Please check your Gambian mobile number.');
     const e164 = '+220' + migrated;
