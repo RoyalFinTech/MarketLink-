@@ -29,6 +29,9 @@ router.post('/register',
       .optional().trim().isLength({ max: 60 }),
     body('nationalId')
       .optional().trim().isLength({ max: 60 }),
+    body('idDocumentUrl').optional({ nullable: true }).isURL({ require_protocol: true }),
+    body('licenseDocumentUrl').optional({ nullable: true }).isURL({ require_protocol: true }),
+    body('vehiclePhotoUrl').optional({ nullable: true }).isURL({ require_protocol: true }),
     body('emergencyContact')
       .optional().trim().isLength({ max: 20 }),
     body('address')
