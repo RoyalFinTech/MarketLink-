@@ -228,8 +228,20 @@
     'Phone number':'Nọmba ekwentị','Verify':'Nyochaa','Submit':'Zipụ','Add to cart':'Tinye na nkata','Place order':'Debe iwu','View details':'Lee nkọwa',
     'Latest order updates':'Mmelite iwu kacha ọhụrụ','No active orders':'Enweghị iwu na-arụ ọrụ','Save':'Chekwa','Retry':'Nwaa ọzọ','Loading…':'Na-ebunye…'
   });
+  dictionaries.mnk={
+    'Home':'Sotoo','Categories':'Fankoo','Orders':'Sariyaŋo','Cart':'Sakoo','Alerts':'Kibaroo','Profile':'Profil','Search':'Wuli',
+    'Continue':'Taa a la','Next':'Nata','Back':'Kombori','Create account':'Kontoo daɲaa','Register':'Seyitandi','Log in':'Donkoto',
+    'Login':'Donkoto','Phone Number':'Telefoni nimero','Phone number':'Telefoni nimero','Full Name':'Tumaŋo tiŋo',
+    '4-digit PIN':'PIN nimero 4','Sign In':'Donkoto','Sign in to your account':'I kontoo la donkoto',
+    'Welcome back 👋':'I be kɛlɛŋ, a ni ce!','New here? ':'Jankaroo be? ','Create account':'Kontoo daɲaa',
+    'Join MarketLink today':'Bi MarketLink la jɛŋ','Admin Portal':'Admin la soodoo','Language':'Kanŋo',
+    'Save changes':'Jaatɛŋolu mara','Cancel':'Dafa','Edit profile':'Profil bɛnbɛn','Order history':'Sariyaŋolu tariku',
+    'Frequently asked questions':'Saa koŋolu la jaabi','Help Centre':'Dɛmɛ soodoo','App language':'Aplikasioŋ kanŋo',
+    'Add to cart':'Sakoo la don','Place order':'Sariyaŋo kɛ','Delivered':'Sankata','Cancelled':'Dafata'
+  };
   var coverage={
     en:'English is the default. All untranslated text remains in its original wording.',
+    mnk:'Mandinka beta: selected login and common interface labels translated; some text remains in English. Please have a fluent Mandinka speaker review the wording.',
     fr:'French beta: core labels translated; some text remains in English. Please report unclear wording.',
     wo:'Wolof draft: selected labels translated. Native-speaker review is still needed before this can be called complete.',
     'zh-Hans':'Chinese beta: selected interface labels translated; some text remains in English.',
