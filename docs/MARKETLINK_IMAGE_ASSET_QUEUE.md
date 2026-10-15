@@ -47,3 +47,11 @@ Also review whether clearer high-resolution hero photos are needed for the login
 - Check cropping and sharpness at desktop and mobile sizes.
 - Verify light and dark themes preserve card-label contrast.
 - Confirm all existing logo assets remain unmodified and no random logo is introduced.
+
+
+## Implementation checkpoint — 2026-10-15
+
+- Mobile category-image containment fix (`14323c8`) is now marked live by Render after a delayed deployment completed on 2026-10-14 at 21:47 UTC.
+- Sign-in request timeout was raised to 120 seconds in `frontend/index.html` (`6c1fe8a`) to avoid cutting off a sleeping free-tier API during cold start. Verify this commit is included in the next frontend deployment before considering the fix live.
+- Backend logs from 2026-10-14 show multiple database queries taking about 1.0–1.4 seconds. This is a performance signal to investigate, not proof that it is the sole cause of the sign-in hang.
+- High-resolution category photography remains queued; current category mapping must keep its image/emoji fallbacks until replacement assets are added and checked.
