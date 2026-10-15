@@ -9,7 +9,8 @@ const ADMIN = ['admin','super_admin','moderator'];
 router.get('/', authenticate, authorize(...ADMIN), ctrl.list);
 router.get('/:id', authenticate, [param('id').isUUID()], validate, ctrl.getById);
 router.get('/:id/tracking', authenticate, [param('id').isUUID()], validate, ctrl.getTracking);
-router.post('/:id/assign', authenticate, authorize(...ADMIN),
+router.get('/:id/available-riders', authenticate, authorize('vendor',...ADMIN), [param('id').isUUID()], validate, ctrl.availableRiders);
+router.post('/:id/assign', authenticate, authorize('vendor',...ADMIN),
   [param('id').isUUID(), body('riderId').isUUID().withMessage('riderId is required.')],
   validate, ctrl.assign);
 router.post('/:id/accept', authenticate, authorize('rider'),
