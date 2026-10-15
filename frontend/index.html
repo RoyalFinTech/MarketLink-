@@ -6625,7 +6625,7 @@ window.addEventListener('unhandledrejection',function(e){
       '<span aria-label="Flag of The Gambia" style="font-size:19px;margin-right:6px;">🇬🇲</span>+220</span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="max-width:49%;min-width:0;flex:0 1 160px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 7px;background:transparent;color:var(--tx,#17212b);font-weight:600;font-size:12px;">'+opts+'</select>'+
       '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="1234567" value="'+nat.slice(0,7)+'" style="flex:1;min-width:0;width:0;border:0;border-radius:0;background:transparent;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
-      (target==='admin'?'':'<input type="hidden" id="'+(target==='reg'?'rphone':'lphone')+'" value="">')+
+      '<input type="hidden" id="'+(target==='admin'?'admin-staffid':target==='reg'?'rphone':'lphone')+'" value="">'+
       '</div><div style="font-size:11px;line-height:1.45;color:var(--mu,#64748b);margin:0 0 13px 2px;">Select your network, then enter the 7-digit number'+
       '<span id="'+target+'-phone-help" style="display:block;margin-top:2px;opacity:.9;"></span></div>';
   }
@@ -6700,6 +6700,17 @@ window.addEventListener('unhandledrejection',function(e){
       catch(e){if(typeof window.authErr==='function')window.authErr(e.message);return;}
       return oldRegister.apply(this,arguments);
     };
+  }
+  function decorateAdminPhone(){
+    var old=document.getElementById('admin-staffid');if(!old||old.dataset.mlCarrierDecorated==='1'||!old.parentElement)return;
+    var initial=old.value||'',parent=old.parentElement;
+    parent.innerHTML=networkMarkup('admin',initial);
+    var hidden=document.getElementById('admin-staffid'),sel=document.getElementById('admin-operator'),inp=document.getElementById('admin-national');
+    if(!hidden||!sel||!inp)return;
+    hidden.dataset.mlCarrierInput='1';hidden.dataset.mlCarrierDecorated='1';
+    function update(){var n=digits(inp.value).slice(0,7);inp.value=n;var op=sel.value;if(op==='GAMCEL'&&n.length===7&&n.charAt(0)!=='9'){inp.setCustomValidity('Gamcel numbers must start with 9.');}else inp.setCustomValidity('');hidden.value=(operators[op].prefix||'')+n;if(window.S)S.adminPhone=hidden.value;}
+    sel.addEventListener('change',function(){update();setCarrier('admin',sel.value);});
+    inp.addEventListener('input',update);inp.addEventListener('paste',function(){setTimeout(update,0);});update();setCarrier('admin',sel.value);
   }
   function ensureAdminLoginCarrierWrapper(){
     if(typeof window.doAdminLogin!=='function'||window.doAdminLogin.__mlCarrierWrapped)return;
@@ -6778,8 +6789,8 @@ window.addEventListener('unhandledrejection',function(e){
     app.insertBefore(bar,app.firstChild);
   }
   initMarketLinkTicker();
-  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();initMarketLinkTicker();ensureAdminLoginCarrierWrapper();setTimeout(decorateAdminPhone,0);});
-  setTimeout(function(){decorateAuthPhones();initMarketLinkTicker();ensureAdminLoginCarrierWrapper();},0);
+  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();initMarketLinkTicker();decorateAdminPhone();ensureAdminLoginCarrierWrapper();});
+  setTimeout(function(){decorateAuthPhones();initMarketLinkTicker();decorateAdminPhone();ensureAdminLoginCarrierWrapper();},0);
 })();
 </script>
 
