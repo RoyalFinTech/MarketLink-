@@ -1401,6 +1401,7 @@ var ML_API = (function(){
     assignRider:function(id,riderId){return post('/delivery/'+encodeURIComponent(id)+'/assign',{riderId:riderId});},
     updateStatus:function(id, status, extra){ return patch('/delivery/'+id+'/status', Object.assign({status:status}, extra||{})); },
     accept: function(id){ return post('/delivery/'+id+'/accept'); },
+    decline: function(id){ return post('/delivery/'+id+'/decline'); },
     myDeliveries:function(qs){ return get('/riders/me/deliveries', qs); },
     updateLocation: function(lat, lng, deliveryId){ return post('/riders/location', {lat:lat, lng:lng, deliveryId:deliveryId||undefined}); },
     setAvailability: function(isOnline){ return patch('/riders/availability', {isOnline:isOnline}); },
@@ -5521,7 +5522,7 @@ async function rAccept(id){
     renderRDash(); toast('Delivery accepted! 🛵 Head to the store.');
   }catch(e){toast(e.error||'Could not accept this delivery.','error');}
 }
-function rDecline(id){S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});renderRDash();toast('Delivery declined.','error');}
+async function rDecline(id){try{await ML_API.delivery.decline(id);S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});renderRDash();toast('Delivery declined. The vendor can now assign another rider.','info');}catch(e){toast(e.error||'Could not decline this delivery. Please refresh and try again.','error');}}
 async function rNextStep(){
   S.delStepIdx++;
   if(S.delStepIdx<DEL_TOASTS.length) toast(DEL_TOASTS[S.delStepIdx]);
