@@ -6709,10 +6709,10 @@ window.addEventListener('unhandledrejection',function(e){
       if(id&&id.dataset.mlCarrierInput==='1'){
         try{
           var sel=document.getElementById('admin-operator'),inp=document.getElementById('admin-national');
-          var op=sel&&operators[sel.value]?sel.value:'AFRICELL',n=digits(inp&&inp.value);
+          var adminOperators={AFRICELL:{prefix:'87'},QCELL:{prefix:'83'},COMIUM:{prefix:'86'},GAMCEL:{prefix:''}};
+          var op=sel&&adminOperators[sel.value]?sel.value:'AFRICELL',n=String(inp&&inp.value||'').replace(/\\D/g,'');
           if(n.length!==7)throw new Error('Enter all 7 digits of the admin mobile number.');
-          if(op==='GAMCEL'&&n.charAt(0)!=='9')throw new Error('Gamcel numbers must start with 9. Please check the number.');
-          id.value='+220'+(operators[op].prefix||'')+n;
+          id.value='+220'+(adminOperators[op].prefix||'')+n;
         }catch(e){if(typeof window.adminAuthErr==='function')window.adminAuthErr(e.message);return;}
       }
       return oldAdminLogin.apply(this,arguments);
@@ -6744,6 +6744,7 @@ window.addEventListener('unhandledrejection',function(e){
   function decorateOnboardingPhone(id,target,fieldKey,replaceParent){
     var old=document.getElementById(id);if(!old||old.dataset.mlNetworkDone==='1')return;
     var initial=old.value||((window.S&&S[target==='va'?'vForm':'rForm']||{})[fieldKey])||'';
+    var carrierOptions={AFRICELL:{label:'Africell (87)',prefix:'87'},QCELL:{label:'QCell (83)',prefix:'83'},COMIUM:{label:'Comium (86)',prefix:'86'},GAMCEL:{label:'Gamcel (no new prefix)',prefix:''}};
     var digitsOnly=function(v){return String(v||'').replace(/\D/g,'');};
     var raw=digitsOnly(initial),op='AFRICELL';
     if(raw.indexOf('220')===0&&raw.length>9)raw=raw.slice(3);
@@ -6751,12 +6752,12 @@ window.addEventListener('unhandledrejection',function(e){
     else if(raw.length===7&&raw.charAt(0)==='9')op='GAMCEL';
     raw=raw.slice(-7);
     var operators={AFRICELL:{label:'Africell (87)',prefix:'87'},QCELL:{label:'QCell (83)',prefix:'83'},COMIUM:{label:'Comium (86)',prefix:'86'},GAMCEL:{label:'Gamcel (no new prefix)',prefix:''}};
-    var options=Object.keys(operators).map(function(k){return '<option value="'+k+'" '+(k===op?'selected':'')+'>'+operators[k].label+'</option>';}).join('');
+    var options=Object.keys(carrierOptions).map(function(k){return '<option value="'+k+'" '+(k===op?'selected':'')+'>'+carrierOptions[k].label+'</option>';}).join('');
     var wrap=document.createElement('div');wrap.style.cssText='width:100%;min-width:0;margin:0 0 7px;';
     wrap.innerHTML='<div style="display:flex;align-items:stretch;width:100%;min-width:0;border:1px solid rgba(148,163,184,.3);border-radius:11px;overflow:hidden;background:rgba(255,255,255,.035);"><span style="display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--mu);white-space:nowrap;">🇬🇲 +220</span><select id="'+target+'-operator" aria-label="Mobile network" style="max-width:48%;min-width:0;flex:0 1 150px;border:0;border-left:1px solid rgba(148,163,184,.2);border-right:1px solid rgba(148,163,184,.2);background:var(--sfl);color:var(--tx);font-size:11px;padding:0 5px;">'+options+'</select><input id="'+target+'-national" type="tel" inputmode="numeric" maxlength="7" placeholder="1234567" aria-label="Seven-digit mobile number" value="'+raw+'" style="flex:1;min-width:0;width:0;border:0;background:transparent;color:var(--tx);padding:12px 8px;font-size:14px;letter-spacing:.04em;"></div><input type="hidden" id="'+id+'" value=""><div style="font-size:10.5px;color:var(--mu);line-height:1.4;margin:4px 0 0 2px;">Select your network and enter the 7 digits. The prefix is added automatically.</div>';
     if(replaceParent&&old.parentElement){old.parentElement.replaceWith(wrap);}else{old.replaceWith(wrap);}
     var hidden=wrap.querySelector('#'+id),sel=wrap.querySelector('#'+target+'-operator'),inp=wrap.querySelector('#'+target+'-national');
-    function update(){var n=digitsOnly(inp.value).slice(0,7);inp.value=n;var selected=sel.value;var prefix=operators[selected].prefix;if(selected==='GAMCEL'&&n.length===7&&n.charAt(0)!=='9'){inp.setCustomValidity('Gamcel numbers must start with 9.');}else inp.setCustomValidity('');hidden.value=prefix+n;if(window.S){var obj=target==='va'?S.vForm:S.rForm;if(obj)obj[fieldKey]=hidden.value;}}
+    function update(){var n=digitsOnly(inp.value).slice(0,7);inp.value=n;var selected=sel.value;var prefix=carrierOptions[selected].prefix;if(selected==='GAMCEL'&&n.length===7&&n.charAt(0)!=='9'){inp.setCustomValidity('Gamcel numbers must start with 9.');}else inp.setCustomValidity('');hidden.value=prefix+n;if(window.S){var obj=target==='va'?S.vForm:S.rForm;if(obj)obj[fieldKey]=hidden.value;}}
     sel.addEventListener('change',update);inp.addEventListener('input',update);inp.addEventListener('paste',function(){setTimeout(update,0);});update();old.dataset.mlNetworkDone='1';
   }
   if(typeof window.renderVApp==='function'){
