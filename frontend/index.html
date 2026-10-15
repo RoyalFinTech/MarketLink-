@@ -1885,16 +1885,46 @@ function injectLogos(){
 // SPLASH
 // ═══════════════════════════════════════════════════════════
 (function startSplash(){
-  injectLogos();
-  var prog=0, bar=G('splprog'), st=G('splstatus'), rider=G('splrider');
-  var pi=setInterval(function(){
-    prog=Math.min(100,prog+0.7);
-    bar.style.width=prog+'%';
-    if(prog>=100){st.textContent='Ready!';clearInterval(pi);}
-  },35);
-  setTimeout(function(){rider.style.left='42%';},800);
-  setTimeout(function(){rider.style.transition='left 1s ease-in';rider.style.left='115%';},3200);
-  setTimeout(function(){if(typeof window.goOnboard==='function')window.goOnboard();},4800);
+  // Startup must never leave users trapped on the splash screen if logo animation
+  // or a decorative element fails. Keep the splash animation non-blocking.
+  var advanced=false, timers=[];
+  function advanceFromSplash(){
+    if(advanced)return;
+    advanced=true;
+    timers.forEach(function(t){clearTimeout(t);});
+    try{
+      if(typeof window.goOnboard==='function'){window.goOnboard();return;}
+      var splash=document.getElementById('scr-splash'), onboard=document.getElementById('scr-onboard');
+      if(splash)splash.classList.remove('active');
+      if(onboard){onboard.classList.add('active');if(typeof window.renderPremiumOnboarding==='function')window.renderPremiumOnboarding(true);else if(typeof window.renderOnboard==='function')window.renderOnboard();}
+    }catch(err){
+      // Last-resort recovery: show the existing auth screen rather than a dead splash.
+      var splashFallback=document.getElementById('scr-splash'), authFallback=document.getElementById('scr-auth');
+      if(splashFallback)splashFallback.classList.remove('active');
+      if(authFallback)authFallback.classList.add('active');
+      try{if(typeof window.goAuth==='function')window.goAuth();}catch(ignore){}
+    }
+  }
+  // Independent watchdog still runs if decorative splash setup throws.
+  timers.push(setTimeout(advanceFromSplash,5200));
+  try{
+    if(typeof injectLogos==='function')injectLogos();
+    var prog=0, bar=G('splprog'), st=G('splstatus'), rider=G('splrider');
+    if(bar&&st){
+      var pi=setInterval(function(){
+        prog=Math.min(100,prog+0.7);
+        bar.style.width=prog+'%';
+        if(prog>=100){st.textContent='Ready!';clearInterval(pi);}
+      },35);
+    }
+    if(rider){
+      timers.push(setTimeout(function(){rider.style.left='42%';},800));
+      timers.push(setTimeout(function(){rider.style.transition='left 1s ease-in';rider.style.left='115%';},3200));
+    }
+    timers.push(setTimeout(advanceFromSplash,4800));
+  }catch(err){
+    advanceFromSplash();
+  }
 })();
 
 // ═══════════════════════════════════════════════════════════
