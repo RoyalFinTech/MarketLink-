@@ -437,7 +437,25 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 </style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-locale-tracking-r6"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-locale-tracking-r6" defer></script></head>
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-locale-tracking-r6"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-locale-tracking-r6" defer></script><style id="marketlink-gambian-phone-contrast">
+/* Consistent, high-contrast carrier picker in light and dark system themes. */
+select[id$="-operator"]{
+  color-scheme:dark!important;
+  color:#fff!important;
+  background-color:#071521!important;
+  -webkit-text-fill-color:#fff!important;
+}
+select[id$="-operator"] option{
+  color:#fff!important;
+  background-color:#071521!important;
+  font-weight:600!important;
+}
+.ml-gm-phone{color:#fff!important;background:#071521!important}
+.ml-gm-phone select,.ml-gm-phone input{color:#fff!important;background-color:#071521!important}
+.ml-gm-phone input::placeholder{color:#9DB0BC!important;opacity:1}
+#ml-live-promo-ticker{position:sticky!important;top:0!important}
+</style>
+</head>
 <body>
 <div id="app">
 <div id="toast"></div>
