@@ -6758,8 +6758,18 @@ window.addEventListener('unhandledrejection',function(e){
       }
     },40);
   },true);
-  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();});
-  setTimeout(decorateAuthPhones,0);
+  function initMarketLinkTicker(){
+    var app=document.getElementById('app');if(!app||document.getElementById('ml-live-promo-ticker'))return;
+    var style=document.createElement('style');style.id='ml-live-promo-ticker-style';
+    style.textContent='#app{position:relative}#ml-live-promo-ticker{position:absolute;top:0;left:0;right:0;height:30px;z-index:40;overflow:hidden;display:flex;align-items:center;background:linear-gradient(90deg,#071521,#102d3a,#071521);border-bottom:1px solid rgba(245,166,35,.45);box-shadow:0 4px 16px rgba(0,0,0,.18)}#ml-live-promo-ticker .ml-ticker-track{display:flex;align-items:center;gap:34px;white-space:nowrap;min-width:max-content;animation:mlTickerScroll 35s linear infinite;color:#fff;font-size:10px;font-weight:700;letter-spacing:.02em;padding-left:100%}#ml-live-promo-ticker .ml-ticker-item{display:inline-flex;align-items:center;gap:7px}#ml-live-promo-ticker .ml-ticker-dot{width:6px;height:6px;border-radius:50%;background:#F5A623;box-shadow:0 0 9px #F5A623;animation:mlTickerPulse 1.3s ease-in-out infinite}#ml-live-promo-ticker strong{color:#FFD778}#ml-live-promo-ticker .ml-ticker-cta{border:1px solid rgba(245,166,35,.55);border-radius:99px;padding:3px 8px;color:#FFD778;background:rgba(245,166,35,.08)}.screen{top:30px!important;height:calc(100% - 30px)!important}.tab-pane{height:calc(100vh - 94px)}@keyframes mlTickerScroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}@keyframes mlTickerPulse{0%,100%{opacity:.45;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}@media(prefers-reduced-motion:reduce){#ml-live-promo-ticker .ml-ticker-track{animation:none;padding-left:12px;min-width:0;white-space:normal;gap:12px}}';
+    document.head.appendChild(style);
+    var bar=document.createElement('div');bar.id='ml-live-promo-ticker';bar.setAttribute('role','region');bar.setAttribute('aria-label','MarketLink promotions and updates');
+    bar.innerHTML='<div class="ml-ticker-track"><span class="ml-ticker-item"><i class="ml-ticker-dot"></i>🇬🇲 <strong>MARKETLINK GAMBIA</strong></span><span class="ml-ticker-item">🔗 Affiliate rewards: <strong>2% on eligible delivered purchases</strong></span><span class="ml-ticker-item">🏪 Vendors: request a featured promotion <span class="ml-ticker-cta">Admin approval required</span></span><span class="ml-ticker-item">🛵 Riders: keep GPS on during active deliveries</span><span class="ml-ticker-item">🔔 Track orders and delivery updates in your dashboard</span><span class="ml-ticker-item">⭐ Safe shopping: confirm price, stock and seller details</span><span class="ml-ticker-item"><i class="ml-ticker-dot"></i>🇬🇲 <strong>MARKETLINK GAMBIA</strong></span><span class="ml-ticker-item">🔗 Affiliate rewards: <strong>2% on eligible delivered purchases</strong></span><span class="ml-ticker-item">🏪 Vendors: request a featured promotion <span class="ml-ticker-cta">Admin approval required</span></span><span class="ml-ticker-item">🛵 Riders: keep GPS on during active deliveries</span></div>';
+    app.insertBefore(bar,app.firstChild);
+  }
+  initMarketLinkTicker();
+  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();initMarketLinkTicker();});
+  setTimeout(function(){decorateAuthPhones();initMarketLinkTicker();},0);
 })();
 </script>
 
