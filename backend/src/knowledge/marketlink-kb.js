@@ -439,7 +439,7 @@ const KNOWLEDGE_BASE = [
     roles: ['vendor'],
     keywords: ['promote product', 'featured listing', 'promotion banner', 'advertising request', 'sponsored product', 'promotion duration'],
     question: 'How can I request a promotion for my shop?',
-    answer: 'Use the Promotions or Contact Admin option if it is available in your dashboard. Prepare the promotion title, products or shop to feature, banner image, requested start and end dates, and your contact details. Admin must review and approve the creative and confirm the price and payment terms before anything is published. Do not assume a banner is live just because you submitted it, and do not pay an unofficial personal account.',
+    answer: 'Open the Vendor Promotion Desk or Request a promotion in MarketLink. Enter a clear title, describe the products or offer, choose a placement (featured banner, shop spotlight, search boost or category banner), select a duration from 24 hours to 30 days, and enter a suggested budget in Gambian dalasi. The form currently starts at D100 as a suggested budget; this is not a guaranteed final price. You may upload a JPG, PNG or WebP banner you own or have permission to use. Admin reviews the request, confirms the final price and payment steps, and checks the schedule. The promotion goes live only after approval, a valid banner and confirmed payment. Keep your request reference and receipt; never pay an unofficial personal account.',
   },
   {
     id: 'vendor-orders-checklist',
@@ -463,7 +463,7 @@ const KNOWLEDGE_BASE = [
     roles: ['rider'],
     keywords: ['find delivery jobs', 'no rider requests', 'online availability', 'rider assignment', 'vendor looking for rider'],
     question: 'How do I receive delivery requests?',
-    answer: 'Complete your rider profile and required approval first. Set yourself online and keep your phone connected. Check the pickup area, delivery area and any distance or earnings information shown before accepting a task. If no jobs appear, check your online status, location permission, connection and pending profile requirements. A vendor may need to request or assign a rider through the order flow; do not accept a delivery that is not shown as assigned to you.',
+    answer: 'Complete the rider application with your full name, Gambian phone number, home address, vehicle plate and licence number. Upload a clear National ID or passport and driver’s licence/permit; a vehicle photo is optional. Submit the application and wait for Admin approval. Once approved, set yourself online, allow location access while using the app, and keep your phone connected. Accept only deliveries assigned to you. If no jobs appear, check approval status, online status, GPS permission, internet connection and your delivery zone.',
   },
   {
     id: 'delivery-handover-simple',
@@ -472,6 +472,30 @@ const KNOWLEDGE_BASE = [
     keywords: ['how delivery works', 'pickup handover', 'delivery fee', 'cash on delivery', 'proof of delivery'],
     question: 'How does delivery work from start to finish?',
     answer: 'The customer places an order. The vendor confirms stock and prepares the package. A rider is assigned, collects the correct package, and travels to the customer’s confirmed address. The rider hands over the order and records delivery in MarketLink. Payment and order status depend on the payment method selected and the confirmations received by the system. If something goes wrong, use the order reference when contacting support; never mark an order delivered before it has been handed over.',
+  },
+  {
+    id: 'gambian-phone-network-selector',
+    category: 'account',
+    roles: ['customer', 'vendor', 'rider'],
+    keywords: ['Africell', 'QCell', 'Comium', 'Gamcel', 'phone network', 'seven digit phone', 'phone number format', 'login phone'],
+    question: 'How do I enter my Gambian phone number?',
+    answer: 'Choose your mobile network from the list: Africell, QCell, Comium or Gamcel. Enter only the seven digits requested in the number box; MarketLink adds the selected network prefix where applicable. Check the network and digits before continuing. For Gamcel, follow the on-screen instruction because the legacy number format does not use the new operator prefix. Your number is used for sign-in and account verification.',
+  },
+  {
+    id: 'vendor-document-upload-help',
+    category: 'vendors',
+    roles: ['vendor'],
+    keywords: ['vendor application documents', 'upload ID', 'shop logo', 'shop photo', 'vendor verification', 'KYC'],
+    question: 'What do I need to complete vendor onboarding?',
+    answer: 'Enter your business name, shop name, address, category and phone number. On the Documents step, upload a genuine National ID or passport. A shop photo or logo is optional. Select a real JPG, PNG or PDF file and wait for the filename to appear. Then review and submit the application. Selecting a file alone does not submit it. Your vendor profile remains pending until MarketLink Admin reviews it; you may need to wait before all selling tools become available.',
+  },
+  {
+    id: 'rider-document-upload-help',
+    category: 'riders',
+    roles: ['rider'],
+    keywords: ['rider ID upload', 'driver licence upload', 'vehicle photo', 'rider verification documents'],
+    question: 'Which documents must a rider upload?',
+    answer: 'Upload a genuine National ID or passport and your driver’s licence or permit. A clear vehicle photo is optional. Choose a JPG, PNG or PDF where the field allows it, wait until the filename appears, then submit the application. The documents are stored for review and your rider profile stays pending until Admin approves it. Do not upload someone else’s documents or an unreadable image.',
   },
   {
     id: 'affiliate-commission-clarification',
