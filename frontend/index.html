@@ -5597,17 +5597,12 @@ function submitVApp(){
 // ═══════════════════════════════════════════════════════════
 function raDocsSelected(inp,target){
   if(!inp.files||!inp.files[0]) return;
-  var f=inp.files[0];target=target||'idDocFile';S.rForm=S.rForm||{};S.rForm[target]=f;S.rForm[target==='idDocFile'?'idDocName':target==='licenseDocFile'?'licenseDocName':'vehiclePhotoName']=f.name;
-  S.rForm.docs=f.name;
-  // Update the visible label so the user sees the filename without re-rendering the whole form
-  var lbl=G('ra-docs-input');
-  if(lbl && lbl.parentElement){
-    var preview=lbl.parentElement.querySelector('#ra-doc-preview');
-    if(preview){
-      preview.innerHTML='<div style="font-size:24px;">✅</div><div style="color:#22C55E;font-size:12px;font-weight:600;margin-top:4px;">'+f.name+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">Tap to replace</div>';
-    }
-  }
-  toast(f.name+' ready to upload 📄');
+  var file=inp.files[0];target=target||'idDocFile';S.rForm=S.rForm||{};
+  S.rForm[target]=file;
+  S.rForm[target==='idDocFile'?'idDocName':target==='licenseDocFile'?'licenseDocName':'vehiclePhotoName']=file.name;
+  S.rForm.docs=file.name;
+  renderRApp();
+  toast(file.name+' selected. It will be uploaded when you submit the application.','info');
 }
 function openRiderApp(){
   S.rStep=0;
