@@ -2166,7 +2166,7 @@ function renderOTPRow(){
   });
 }
 
-async async function doLogin(){
+async function doLogin(){
   var p=G('lphone'); if(!p) return;
   S.loginPhone=p.value.trim();
   if(!S.loginPhone){authErr('Enter your phone number');return;}
