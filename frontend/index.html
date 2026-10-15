@@ -6812,6 +6812,40 @@ window.addEventListener('unhandledrejection',function(e){
     var oldRenderRiderApp=window.renderRApp;
     window.renderRApp=function(){oldRenderRiderApp.apply(this,arguments);decorateOnboardingPhone('ra-phone','ra','phone',true);decorateOnboardingPhone('ra-emg','ra-emg','emergency',false);};
   }
+  async function mlSubmitVendorApplication(){
+    var f=window.S&&S.vForm||{};
+    if(!window.ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated()){toast('Please sign in before submitting a vendor application.','error');return;}
+    if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.phone){toast('Complete the business details first.','error');S.vStep=0;renderVApp();return;}
+    if(!f.idDocFile){toast('Upload your National ID or Passport first.','error');S.vStep=1;renderVApp();return;}
+    try{
+      toast('Uploading vendor documents…','info');
+      var idFile=await ML_API.uploads.upload(f.idDocFile,'vendor-document');
+      var shopUrl=null;
+      if(f.photoFile){var shop=await ML_API.uploads.upload(f.photoFile,'vendor-logo');shopUrl=shop&&shop.url||null;}
+      var phone=window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:f.phone;
+      await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:phone,description:f.sname,idDocumentUrl:idFile&&idFile.url,shopPhotoUrl:shopUrl});
+      closeSheet('sh-vapp');toast('Vendor application submitted. Admin will review your documents.','success');S._vendorLiveLoaded=false;renderProfile();
+    }catch(e){toast(e.error||e.message||'Could not submit the vendor application.','error');}
+  }
+  async function mlSubmitRiderApplication(){
+    var f=window.S&&S.rForm||{};
+    if(!window.ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated()){toast('Please sign in before submitting a rider application.','error');return;}
+    if(!f.fname||!f.phone||!f.addr||!f.plate||!f.licence){toast('Complete the rider details first.','error');S.rStep=0;renderRApp();return;}
+    if(!f.idDocFile||!f.licenseDocFile){toast('Upload your National ID and driver licence / permit first.','error');S.rStep=1;renderRApp();return;}
+    try{
+      toast('Uploading rider documents…','info');
+      var idFile=await ML_API.uploads.upload(f.idDocFile,'rider-document');
+      var licenseFile=await ML_API.uploads.upload(f.licenseDocFile,'license-document');
+      var vehicleUrl=null;
+      if(f.vehiclePhotoFile){var vehicle=await ML_API.uploads.upload(f.vehiclePhotoFile,'rider-photo');vehicleUrl=vehicle&&vehicle.url||null;}
+      var emergency=f.emergency;
+      if(emergency&&window.PhoneUtil)emergency=window.PhoneUtil.normalize(emergency,'GM').e164;
+      await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:emergency,address:f.addr,idDocumentUrl:idFile&&idFile.url,licenseDocumentUrl:licenseFile&&licenseFile.url,vehiclePhotoUrl:vehicleUrl});
+      closeSheet('sh-rapp');toast('Rider application submitted. Admin will review your documents.','success');S._riderLiveLoaded=false;renderProfile();
+    }catch(e){toast(e.error||e.message||'Could not submit the rider application.','error');}
+  }
+  window.submitVApp=mlSubmitVendorApplication;
+  window.submitRApp=mlSubmitRiderApplication;
   function initMarketLinkTicker(){
     var app=document.getElementById('app');if(!app||document.getElementById('ml-live-promo-ticker'))return;
     var style=document.createElement('style');style.id='ml-live-promo-ticker-style';
