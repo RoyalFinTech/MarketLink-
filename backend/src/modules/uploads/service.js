@@ -184,13 +184,14 @@ async function upload(file, purpose, uploaderId) {
   let stored;
   if(provider==='database') {
     const publicBanner=safePurpose(purpose)==='banner';
-    if(!isProfilePhoto(purpose)&&!publicBanner) {
+    const privateOnboardingDoc=['vendor-document','rider-document','license-document'].includes(safePurpose(purpose));
+    if(!isProfilePhoto(purpose)&&!publicBanner&&!privateOnboardingDoc) {
       throw new AppError('Secure cloud storage is not configured for this type of file. Please contact MarketLink support.',503,'STORAGE_NOT_CONFIGURED');
     }
     // Small profile photos and vendor banners can use the durable database fallback
     // when object storage credentials are unavailable; other file types still fail closed.
     const id=crypto.randomUUID();
-    const url=publicApiBase()+'/api/v1/uploads/'+id+'/profile-content';
+    const url=publicApiBase()+'/api/v1/uploads/'+id+(privateOnboardingDoc?'/content':'/profile-content');
     const {rows:[record]}=await query(
       'INSERT INTO file_uploads (id,uploaded_by,file_url,file_type,purpose,file_size_kb,content_bytes,content_type,storage_backend) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
       [id,uploaderId||null,url,type,purpose,Math.ceil(file.size/1024),file.buffer,file.mimetype,'database']
