@@ -63,8 +63,12 @@ async function list({ page=1, limit=20, status, riderId, vendorId, isAdmin=false
 }
 
 async function assignRider(deliveryId, riderId, actor) {
-  const { rows: [d] } = await query('SELECT * FROM deliveries WHERE id = $1', [deliveryId]);
+  const { rows: [d] } = await query('SELECT d.*,o.vendor_id FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id = $1', [deliveryId]);
   if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
+  const actorRoles=actor&&Array.isArray(actor.roles)?actor.roles:[];
+  const actorIsAdmin=actorRoles.some(r=>['admin','super_admin','moderator'].includes(r));
+  const actorIsVendor=actorRoles.includes('vendor')&&String(d.vendor_id)===String(actor.id);
+  if(!actorIsAdmin&&!actorIsVendor)throw new AppError('Only the order’s vendor or an Admin can assign its rider.',403,'FORBIDDEN');
   if (!['unassigned','failed'].includes(d.status))
     throw new AppError(`Cannot assign rider to delivery with status: ${d.status}`, 400, 'INVALID_STATUS');
 
@@ -91,6 +95,23 @@ async function assignRider(deliveryId, riderId, actor) {
     logger.info('Rider assigned', { deliveryId, riderId, actor: actor?.id });
     return updated;
   });
+}
+
+async function listAvailableRiders(deliveryId, actorId, roles) {
+  const {rows:[delivery]}=await query(
+    'SELECT d.id,d.status,o.vendor_id,COALESCE(d.pickup_lat,v.latitude) AS pickup_lat,COALESCE(d.pickup_lng,v.longitude) AS pickup_lng FROM deliveries d JOIN orders o ON o.id=d.order_id JOIN vendors v ON v.user_id=o.vendor_id WHERE d.id=$1',
+    [deliveryId]
+  );
+  if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+  const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
+  if(!isAdmin&&String(delivery.vendor_id)!==String(actorId))throw new AppError('You can only find riders for your own orders.',403,'FORBIDDEN');
+  if(!['unassigned','failed','assigned'].includes(delivery.status))throw new AppError('Riders can only be searched before pickup. Refresh the order status and try again.',409,'INVALID_STATUS');
+  const hasPickup=delivery.pickup_lat!==null&&delivery.pickup_lng!==null;
+  const {rows}=await query(
+    'SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,r.current_lat,r.current_lng,r.last_location_at,CASE WHEN r.current_lat IS NOT NULL AND r.current_lng IS NOT NULL AND $1::boolean THEN 6371*2*ASIN(SQRT(LEAST(1,POWER(SIN(RADIANS(r.current_lat-$2::numeric)/2),2)+COS(RADIANS($2::numeric))*COS(RADIANS(r.current_lat))*POWER(SIN(RADIANS(r.current_lng-$3::numeric)/2),2)))) ELSE NULL END AS distance_km FROM riders r JOIN users u ON u.id=r.user_id WHERE r.kyc_status=$4 AND r.is_online=TRUE ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30',
+    [hasPickup,delivery.pickup_lat,delivery.pickup_lng,'approved']
+  );
+  return rows.map(r=>Object.assign({},r,{distance_km:r.distance_km===null?null:Number(Number(r.distance_km).toFixed(1)),location_fresh:!!(r.last_location_at&&Date.now()-new Date(r.last_location_at).getTime()<30*60*1000)}));
 }
 
 async function acceptDelivery(deliveryId, riderId) {
@@ -185,4 +206,4 @@ async function getTracking(deliveryId, actorId, roles) {
   return d;
 }
 
-module.exports = { getById, list, assignRider, updateStatus, getTracking };
+module.exports = { getById, list, assignRider, listAvailableRiders, updateStatus, getTracking };
