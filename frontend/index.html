@@ -6723,7 +6723,7 @@ window.addEventListener('unhandledrejection',function(e){
         try{
           var sel=document.getElementById('admin-operator'),inp=document.getElementById('admin-national');
           var adminOperators={AFRICELL:{prefix:'87'},QCELL:{prefix:'83'},COMIUM:{prefix:'86'},GAMCEL:{prefix:''}};
-          var op=sel&&adminOperators[sel.value]?sel.value:'AFRICELL',n=String(inp&&inp.value||'').replace(/\\D/g,'');
+          var op=sel&&adminOperators[sel.value]?sel.value:'AFRICELL',n=String(inp&&inp.value||'').replace(/\D/g,'');
           if(n.length!==7)throw new Error('Enter all 7 digits of the admin mobile number.');
           id.value='+220'+(adminOperators[op].prefix||'')+n;
         }catch(e){if(typeof window.adminAuthErr==='function')window.adminAuthErr(e.message);return;}
