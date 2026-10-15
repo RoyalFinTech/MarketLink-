@@ -6588,5 +6588,175 @@ window.addEventListener('unhandledrejection',function(e){
   });
 })();
 </script>
+
+<script>
+/* MarketLink Gambian carrier picker + PIN auto-submit */
+(function(){
+  'use strict';
+  var operators={
+    AFRICELL:{label:'Africell (87)',prefix:'87'},
+    QCELL:{label:'QCell (83)',prefix:'83'},
+    COMIUM:{label:'Comium (86)',prefix:'86'},
+    GAMCEL:{label:'Gamcel (no new prefix)',prefix:''}
+  };
+  function digits(v){return String(v||'').replace(/\D/g,'');}
+  function stateKey(target){return target==='reg'?'regPhone':'loginPhone';}
+  function carrierKey(target){return target==='reg'?'regOperator':'loginOperator';}
+  function currentNational(target){
+    var raw=digits((window.S&&S[stateKey(target)])||'');
+    if(raw.indexOf('220')===0&&raw.length>9)raw=raw.slice(3);
+    if(raw.length===9&&operatorsByPrefix(raw.slice(0,2)))return raw.slice(2);
+    return raw.slice(-7);
+  }
+  function operatorsByPrefix(p){return p==='87'?'AFRICELL':p==='83'?'QCELL':p==='86'?'COMIUM':null;}
+  function inferCarrier(raw,target){
+    var d=digits(raw);
+    if(d.indexOf('220')===0&&d.length>9)d=d.slice(3);
+    if(operatorsByPrefix(d.slice(0,2)))return operatorsByPrefix(d.slice(0,2));
+    if(d.length===7&&d.charAt(0)==='9')return 'GAMCEL';
+    return (window.S&&S[carrierKey(target)])||'AFRICELL';
+  }
+  function networkMarkup(target,initial){
+    var selected=inferCarrier(initial,target);
+    var nat=currentNational(target);
+    var opts=Object.keys(operators).map(function(k){
+      return '<option value="'+k+'" '+(k===selected?'selected':'')+'>'+operators[k].label+'</option>';
+    }).join('');
+    return '<div class="ml-gm-phone" style="display:flex;align-items:stretch;gap:0;width:100%;margin-bottom:6px;border:1px solid rgba(148,163,184,.35);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.035);min-width:0;">'+
+      '<span style="display:flex;align-items:center;padding:0 9px;font-size:12px;color:var(--mu,#64748b);white-space:nowrap;">'+
+      '<span aria-label="Flag of The Gambia" style="font-size:19px;margin-right:6px;">🇬🇲</span>+220</span>'+
+      '<select id="'+target+'-operator" aria-label="Mobile network" style="max-width:49%;min-width:0;flex:0 1 160px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 7px;background:transparent;color:var(--tx,#17212b);font-weight:600;font-size:12px;">'+opts+'</select>'+
+      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="1234567" value="'+nat.slice(0,7)+'" style="flex:1;min-width:0;width:0;border:0;border-radius:0;background:transparent;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
+      '</div><div style="font-size:11px;line-height:1.45;color:var(--mu,#64748b);margin:0 0 13px 2px;">Select your network, then enter the 7-digit number'+
+      '<span id="'+target+'-phone-help" style="display:block;margin-top:2px;opacity:.9;"></span></div>';
+  }
+  function nationalValue(target){
+    var sel=document.getElementById(target+'-operator'), inp=document.getElementById(target+'-national');
+    var op=sel&&operators[sel.value]?sel.value:'AFRICELL';
+    var n=digits(inp&&inp.value);
+    if(n.length!==7)throw new Error('Enter all 7 digits of your mobile number.');
+    if(op==='GAMCEL'&&n.charAt(0)!=='9')throw new Error('Gamcel numbers must start with 9. Please check the number.');
+    return (operators[op].prefix||'')+n;
+  }
+  function setCarrier(target,op){
+    if(window.S)S[carrierKey(target)]=op;
+    var help=document.getElementById(target+'-phone-help');
+    if(help)help.textContent=op==='GAMCEL'?'Gamcel uses the 7-digit number without an added prefix.':'Your network prefix ('+operators[op].prefix+') is added automatically.';
+  }
+  function decorateOne(id,target){
+    var old=document.getElementById(id);if(!old||!old.parentElement||old.dataset.mlCarrierDecorated==='1')return;
+    var parent=old.parentElement, initial=(window.S&&S[stateKey(target)])||old.value||'';
+    parent.innerHTML=networkMarkup(target,initial);
+    var sel=document.getElementById(target+'-operator'), inp=document.getElementById(target+'-national');
+    if(!sel||!inp)return;
+    old.dataset.mlCarrierDecorated='1';
+    if(window.S)S[carrierKey(target)]=sel.value;
+    setCarrier(target,sel.value);
+    sel.addEventListener('change',function(){setCarrier(target,sel.value);});
+    inp.addEventListener('input',function(){
+      var d=digits(inp.value);
+      if(d.length===9&&operatorsByPrefix(d.slice(0,2))){
+        sel.value=operatorsByPrefix(d.slice(0,2));d=d.slice(2);
+        setCarrier(target,sel.value);
+      }
+      inp.value=d.slice(0,7);
+      if(window.S)S[stateKey(target)]=inp.value;
+    });
+    inp.addEventListener('paste',function(){
+      setTimeout(function(){
+        var d=digits(inp.value);
+        if(d.length===9&&operatorsByPrefix(d.slice(0,2))){sel.value=operatorsByPrefix(d.slice(0,2));d=d.slice(2);setCarrier(target,sel.value);}
+        inp.value=d.slice(0,7);
+        if(window.S)S[stateKey(target)]=inp.value;
+      },0);
+    });
+  }
+  function decorateAuthPhones(){
+    if(!window.S)return;
+    if(S.authMode==='login')decorateOne('lphone','login');
+    if(S.authMode==='register')decorateOne('rphone','reg');
+  }
+  if(typeof window.renderAuth==='function'){
+    var previousRenderAuth=window.renderAuth;
+    window.renderAuth=function(){previousRenderAuth.apply(this,arguments);decorateAuthPhones();};
+  }
+  function selectedPhone(target){
+    var national=nationalValue(target);
+    if(window.S){S[stateKey(target)]=national;S[carrierKey(target)]=(document.getElementById(target+'-operator')||{}).value||'AFRICELL';}
+    return national;
+  }
+  if(typeof window.doLogin==='function'){
+    var oldLogin=window.doLogin;
+    window.doLogin=async function(){
+      try{S.loginCountry='GM';S.loginPhone=selectedPhone('login');}
+      catch(e){if(typeof window.authErr==='function')window.authErr(e.message);return;}
+      return oldLogin.apply(this,arguments);
+    };
+  }
+  if(typeof window.doRegister==='function'){
+    var oldRegister=window.doRegister;
+    window.doRegister=async function(){
+      try{S.regCountry='GM';S.regPhone=selectedPhone('reg');}
+      catch(e){if(typeof window.authErr==='function')window.authErr(e.message);return;}
+      return oldRegister.apply(this,arguments);
+    };
+  }
+  if(typeof window.doAdminLogin==='function'){
+    var oldAdminLogin=window.doAdminLogin;
+    window.doAdminLogin=async function(){
+      var id=document.getElementById('admin-staffid');
+      if(id&&id.dataset.mlCarrierInput==='1'){
+        try{
+          var sel=document.getElementById('admin-operator'),inp=document.getElementById('admin-national');
+          var op=sel&&operators[sel.value]?sel.value:'AFRICELL',n=digits(inp&&inp.value);
+          if(n.length!==7)throw new Error('Enter all 7 digits of the admin mobile number.');
+          if(op==='GAMCEL'&&n.charAt(0)!=='9')throw new Error('Gamcel numbers must start with 9. Please check the number.');
+          id.value='+220'+(operators[op].prefix||'')+n;
+        }catch(e){if(typeof window.adminAuthErr==='function')window.adminAuthErr(e.message);return;}
+      }
+      return oldAdminLogin.apply(this,arguments);
+    };
+  }
+  function decorateAdminPhone(){
+    var old=document.getElementById('admin-staffid');if(!old||old.dataset.mlCarrierInput==='1')return;
+    var wrap=document.createElement('div');wrap.style.cssText='margin-bottom:16px;';
+    wrap.innerHTML=networkMarkup('admin','');
+    wrap.querySelector('.ml-gm-phone').style.marginBottom='0';
+    old.parentNode.insertBefore(wrap,old);
+    old.style.display='none';old.dataset.mlCarrierInput='1';
+    var sel=wrap.querySelector('#admin-operator'),inp=wrap.querySelector('#admin-national');
+    if(sel)sel.addEventListener('change',function(){var h=wrap.querySelector('#admin-phone-help');if(h)h.textContent=sel.value==='GAMCEL'?'Gamcel uses the 7-digit number without an added prefix.':'Your network prefix ('+operators[sel.value].prefix+') is added automatically.';});
+    if(inp)inp.addEventListener('input',function(){inp.value=digits(inp.value).slice(0,7);});
+  }
+  if(typeof window.openAdminLogin==='function'){
+    var oldOpenAdmin=window.openAdminLogin;
+    window.openAdminLogin=function(){oldOpenAdmin.apply(this,arguments);setTimeout(decorateAdminPhone,0);};
+  }
+  if(typeof window.authErr==='function'){
+    var oldAuthErr=window.authErr;
+    window.authErr=function(msg){oldAuthErr(msg);try{if(typeof window.toast==='function')window.toast(msg,'error');}catch(e){}};
+  }
+  if(typeof window.adminAuthErr==='function'){
+    var oldAdminErr=window.adminAuthErr;
+    window.adminAuthErr=function(msg){oldAdminErr(msg);try{if(typeof window.toast==='function')window.toast(msg,'error');}catch(e){}};
+  }
+  document.addEventListener('input',function(e){
+    if(!e.target||!e.target.classList||!e.target.classList.contains('pinb'))return;
+    setTimeout(function(){
+      if(!window.S||S.authMode!=='login'||!document.getElementById('lbtn'))return;
+      var row=document.getElementById('pin-row');
+      if(!row)return;
+      var pins=Array.prototype.map.call(row.querySelectorAll('input'),function(x){return digits(x.value);}).join('');
+      if(pins.length===4&&S.pin&&S.pin.join('').length===4&&!window.__mlAutoLoginBusy){
+        window.__mlAutoLoginBusy=true;
+        Promise.resolve(window.doLogin()).finally(function(){window.__mlAutoLoginBusy=false;});
+      }
+    },40);
+  },true);
+  document.addEventListener('DOMContentLoaded',function(){decorateAuthPhones();});
+  setTimeout(decorateAuthPhones,0);
+})();
+</script>
+
 </body>
 </html>
