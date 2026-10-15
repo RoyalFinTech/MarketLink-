@@ -162,7 +162,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
 
 async function getTracking(deliveryId, actorId, roles) {
   const { rows: [d] } = await query(
-    `SELECT d.id, d.order_id, d.status, d.estimated_minutes, d.picked_up_at,
+    `SELECT d.id, d.order_id, d.rider_id, d.status, d.estimated_minutes, d.picked_up_at,
             o.customer_id, o.vendor_id,
             r.current_lat, r.current_lng, r.last_location_at,
             u.full_name AS rider_name,
