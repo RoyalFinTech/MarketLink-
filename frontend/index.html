@@ -2084,6 +2084,7 @@ function renderPinRow(rowId,arr){
       var v=e.target.value.replace(/\D/,'');
       arr[i]=v; inp.value=v; inp.classList.toggle('filled',!!v);
       if(v&&i<3){var nx=row.children[i+1];if(nx)nx.focus();}
+      if(rowId==='pin-row'&&S.authMode==='login'&&S.pin.every(function(d){return String(d||'').length===1;})&&!S._pinAutoSubmit){S._pinAutoSubmit=true;setTimeout(function(){S._pinAutoSubmit=false;if(S.authMode==='login'&&S.pin.every(function(d){return String(d||'').length===1;}))doLogin();},160);}
     });
     inp.addEventListener('keydown',function(e){
       if(e.key==='Backspace'&&!arr[i]&&i>0){var pv=row.children[i-1];if(pv)pv.focus();}
@@ -2144,6 +2145,7 @@ async function doLogin(){
       msg=err.error;
     }
     authErr(msg);
+    if(typeof toast==='function')toast(msg,'error');
   }
 }
 
