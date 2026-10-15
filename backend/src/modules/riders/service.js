@@ -20,8 +20,8 @@ function auditLog(actor, action, entityId, before, after) {
 
 // ── REGISTER ─────────────────────────────────────────────────────────
 async function register(userId, data) {
-  const { vehicleType, plateNumber, licenseNumber, nationalId,
-          emergencyContact, address, deliveryZone } = data;
+  const { vehicleType, plateNumber, licenseNumber, nationalId, idDocumentUrl,
+          licenseDocumentUrl, vehiclePhotoUrl, emergencyContact, address, deliveryZone } = data;
 
   const { rows: existing } = await query(
     'SELECT user_id FROM riders WHERE user_id = $1', [userId]);
@@ -31,10 +31,12 @@ async function register(userId, data) {
     const { rows: [rider] } = await client.query(
       `INSERT INTO riders
          (user_id, vehicle_type, plate_number, license_number, national_id,
+          id_document_url, license_document_url, vehicle_photo_url,
           emergency_contact, address, delivery_zone, kyc_status, is_online)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',FALSE) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',FALSE) RETURNING *`,
       [userId, vehicleType || null, plateNumber || null, licenseNumber || null,
-       nationalId || null, emergencyContact || null, address || null, deliveryZone || null]
+       nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null,
+       emergencyContact || null, address || null, deliveryZone || null]
     );
 
     // Grant rider role
