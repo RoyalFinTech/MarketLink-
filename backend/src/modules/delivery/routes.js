@@ -16,6 +16,9 @@ router.post('/:id/assign', authenticate, authorize('vendor',...ADMIN),
 router.post('/:id/accept', authenticate, authorize('rider'),
   [param('id').isUUID()],
   validate, ctrl.accept);
+router.post('/:id/decline', authenticate, authorize('rider'),
+  [param('id').isUUID()],
+  validate, ctrl.decline);
 router.patch('/:id/status', authenticate, authorize('rider',...ADMIN),
   [param('id').isUUID(),
    body('status').isIn(['picked_up','in_transit','delivered','failed','cancelled']).withMessage('Invalid status.'),
