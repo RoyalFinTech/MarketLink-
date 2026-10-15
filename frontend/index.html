@@ -1397,6 +1397,8 @@ var ML_API = (function(){
   // ── DELIVERY ─────────────────────────────────────────────────
   var delivery = {
     getTracking: function(id){ return get('/delivery/'+id+'/tracking'); },
+    availableRiders:function(id){return get('/delivery/'+encodeURIComponent(id)+'/available-riders');},
+    assignRider:function(id,riderId){return post('/delivery/'+encodeURIComponent(id)+'/assign',{riderId:riderId});},
     updateStatus:function(id, status, extra){ return patch('/delivery/'+id+'/status', Object.assign({status:status}, extra||{})); },
     accept: function(id){ return post('/delivery/'+id+'/accept'); },
     myDeliveries:function(qs){ return get('/riders/me/deliveries', qs); },
