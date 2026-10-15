@@ -3617,10 +3617,10 @@ async function loadVendorLiveData(){
     if(S.vProfile) S.vOnline=!!S.vProfile.is_open;
     var rows=Array.isArray(od)?od:(od&&Array.isArray(od.items)?od.items:[]);
     S.vOrders=rows.map(function(o){return {
-      id:o.id||o.order_number, order_number:o.order_number, customer:o.customer_name||'Customer',
-      items:'Order items available in order details', total:Number(o.total||0), status:o.status||'pending',
+      id:o.id||o.order_number, order_number:o.order_number, deliveryId:o.delivery_id||null, customer:o.customer_name||'Customer',
+      items:'Order items available in order details', total:Number(o.total||0), status:({pending:'Pending',accepted:'Accepted',preparing:'Preparing',awaiting_rider:'Awaiting Rider',rider_assigned:'Rider Assigned',picked_up:'Picked Up',on_the_way:'On the Way',delivered:'Delivered',cancelled:'Cancelled'})[o.status]||o.status||'Pending',
       rawStatus:o.status, time:o.placed_at?new Date(o.placed_at).toLocaleString():'',
-      rider:o.rider_id||null, timeline:[o.placed_at?'Order placed — '+new Date(o.placed_at).toLocaleString():'Order placed']
+      rider:o.rider_name||o.rider_id||null, timeline:[o.placed_at?'Order placed — '+new Date(o.placed_at).toLocaleString():'Order placed']
     };});
     var prows=Array.isArray(pd)?pd:(pd&&Array.isArray(pd.items)?pd.items:[]);
     S.vProds=prows.map(function(p){return {
@@ -3660,7 +3660,8 @@ function renderVDash(){
           '<div style="color:#0D7377;font-size:13px;font-weight:700;">D '+o.total+'</div>'+
           '<div style="display:flex;gap:7px;">'+
           (o.status==='Pending'?'<button class="btn btn-ok btn-sm" onclick="vAccept(\''+o.id+'\')">✅ Accept</button><button class="btn btn-er btn-sm" onclick="vReject(\''+o.id+'\')">❌ Reject</button>':'')+
-          (o.status==='Preparing'?'<button class="btn btn-p btn-sm" onclick="vReqRider(\''+o.id+'\')">🛵 Auto-Assign</button><button style="display:none" class="btn btn-s btn-sm" onclick="vManualAssign(\''+o.id+'\')">👤 Pick Rider</button>':'')+
+          (o.status==='Accepted'?'<button class="btn btn-p btn-sm" onclick="vStartPreparing(\''+o.id+'\')">📦 Start preparing</button>':'')+
+          (o.status==='Preparing'?'<button class="btn btn-p btn-sm" onclick="vReqRider(\''+o.id+'\')">🛵 Find a rider</button>':'')+
           (o.status==='Rider Assigned'?'<span style="color:#8B5CF6;font-size:11px;font-weight:600;">🛵 '+(o.rider||'Rider')+' en route</span>':'')+
           '</div></div></div>';
       });
@@ -3790,34 +3791,61 @@ async function vReject(id){
     NotificationCenter.push('customer','order_cancelled','Sorry — order '+id+' was cancelled by the vendor.');
   }catch(e){toast(e.error||'Could not reject order.','error');}
 }
-async function vReqRider(id){
+async function vStartPreparing(id){
   try{
-    await ML_API.orders.updateStatus(id,'awaiting_rider','Vendor requested a rider.');
-    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Awaiting Rider'}):o;});
-    renderVDash(); toast('Rider requested. Waiting for an available rider. 🛵'); refreshNotifBadges();
-  }catch(e){toast(e.error||'Could not request a rider.','error');}
+    await ML_API.orders.updateStatus(id,'preparing','Vendor has started preparing the order.');
+    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Preparing',rawStatus:'preparing'}):o;});
+    renderVDash();toast('Order marked as being prepared. Pack the items before requesting a rider.','success');
+  }catch(e){toast(e.error||'Could not update this order.','error');}
+}
+async function vReqRider(id){
+  var order=S.vOrders.find(function(o){return String(o.id)===String(id);});
+  if(!order||!order.deliveryId){toast('Delivery details are not loaded yet. Refresh the vendor dashboard and try again.','error');return;}
+  try{
+    if(order.rawStatus==='preparing'||order.status==='Preparing'){
+      await ML_API.orders.updateStatus(id,'awaiting_rider','Vendor requested an available rider.');
+      order.status='Awaiting Rider';order.rawStatus='awaiting_rider';
+    }
+    renderVDash();
+    await vManualAssign(id);
+  }catch(e){toast(e.error||'Could not request a rider. Please check the order status and try again.','error');}
 }
 var AVAILABLE_RIDERS=[];
-function vManualAssign(orderId){
+async function vManualAssign(orderId){
+  var order=S.vOrders.find(function(o){return String(o.id)===String(orderId);});
+  if(!order||!order.deliveryId){toast('This order has no delivery record yet.','error');return;}
   S._manualAssignOrderId=orderId;
   var el=G('notif-body');
-  if(el){
-    el.innerHTML='<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">Select a rider for '+orderId+'</div>'+
+  if(!el)return;
+  el.innerHTML='<div style="color:var(--tx);font-size:15px;font-weight:800;margin-bottom:5px;">Find an available rider 🛵</div><div style="color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:13px;">Only approved riders who are online are listed. Distance is an estimate from the shop pin when GPS coordinates are available.</div><div style="color:var(--mu);font-size:12px;padding:16px;text-align:center;">Searching nearby riders…</div>';
+  openSheet('sh-notif');
+  try{
+    var response=await ML_API.delivery.availableRiders(order.deliveryId);
+    AVAILABLE_RIDERS=Array.isArray(response&&response.data)?response.data:[];
+    if(!AVAILABLE_RIDERS.length){
+      el.innerHTML='<div style="color:var(--tx);font-size:15px;font-weight:800;margin-bottom:6px;">No riders online right now</div><div style="color:var(--mu);font-size:12px;line-height:1.6;margin-bottom:14px;">Keep the order ready, ask the customer to allow a little extra time, or try again in a few minutes. A rider must be approved and online to appear here.</div><button class="btn btn-p" style="width:100%;" onclick="vManualAssign(\\''+String(orderId)+'\\')">🔄 Search again</button>';
+      return;
+    }
+    el.innerHTML='<div style="color:var(--tx);font-size:15px;font-weight:800;margin-bottom:5px;">Choose a rider 🛵</div><div style="color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:13px;">'+AVAILABLE_RIDERS.length+' available rider(s). Choose one to assign this delivery.</div>'+
       AVAILABLE_RIDERS.map(function(r){
-        return '<div onclick="vConfirmManualAssign(\''+r+'\')" style="padding:12px;background:var(--sfl);border-radius:11px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,0.07);">'+
-          '<span style="font-size:18px;">🛵</span><span style="color:var(--tx);font-size:13px;font-weight:600;">'+r+'</span></div>';
+        var distance=r.distance_km==null?'Distance unavailable':Number(r.distance_km).toFixed(1)+' km away';
+        var gps=r.location_fresh?'📍 Recent GPS':'📍 GPS may be out of date';
+        return '<div style="padding:12px;background:var(--sfl);border-radius:12px;margin-bottom:9px;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.08);"><div style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(245,166,35,.12);font-size:20px;">🛵</div><div style="flex:1;min-width:0;"><div style="color:var(--tx);font-size:12px;font-weight:800;">'+sanitizeText(r.full_name||'MarketLink Rider')+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(r.vehicle_type||'Delivery rider')+' · '+sanitizeText(r.delivery_zone||'Zone not set')+'</div><div style="color:var(--mu);font-size:10px;margin-top:3px;">'+distance+' · '+gps+(r.rating_avg?' · ⭐ '+Number(r.rating_avg).toFixed(1):'')+'</div></div><button class="btn btn-p btn-sm" onclick="vConfirmManualAssign(\\''+String(r.id)+'\\')">Assign</button></div>';
       }).join('');
-    openSheet('sh-notif');
+  }catch(e){
+    el.innerHTML='<div style="color:var(--tx);font-size:14px;font-weight:800;margin-bottom:6px;">Could not load riders</div><div style="color:var(--mu);font-size:12px;line-height:1.5;margin-bottom:12px;">'+sanitizeText(e.error||'Check your connection and try again.')+'</div><button class="btn btn-p" style="width:100%;" onclick="vManualAssign(\\''+String(orderId)+'\\')">Retry</button>';
   }
 }
-function vConfirmManualAssign(riderName){
-  var id=S._manualAssignOrderId;
-  S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Rider Assigned',rider:riderName}):o;});
-  NotificationCenter.push('customer','rider_assigned',riderName+' has been assigned to your order 🛵');
-  NotificationCenter.push('rider','new_delivery','New delivery request for order '+id);
-  closeSheet('sh-notif');
-  renderVDash();
-  toast(riderName+' manually assigned to '+id);
+async function vConfirmManualAssign(riderId){
+  var orderId=S._manualAssignOrderId;
+  var order=S.vOrders.find(function(o){return String(o.id)===String(orderId);});
+  if(!order||!order.deliveryId){toast('Delivery details are missing. Please refresh the dashboard.','error');return;}
+  try{
+    await ML_API.delivery.assignRider(order.deliveryId,riderId);
+    var chosen=AVAILABLE_RIDERS.find(function(r){return String(r.id)===String(riderId);});
+    S.vOrders=S.vOrders.map(function(o){return String(o.id)===String(orderId)?Object.assign({},o,{status:'Rider Assigned',rawStatus:'rider_assigned',rider:chosen&&chosen.full_name||'Assigned rider'}):o;});
+    closeSheet('sh-notif');renderVDash();toast('Rider assigned. The rider can now open the delivery and navigate to pickup.','success');refreshNotifBadges();
+  }catch(e){toast(e.error||'Could not assign this rider. Try refreshing the rider list.','error');}
 }
 function vAddProd(){
   var n=G('vp-name'),p=G('vp-price'),e=G('vp-emoji'),s=G('vp-stock');
