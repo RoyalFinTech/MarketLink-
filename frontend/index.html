@@ -1911,6 +1911,10 @@ function injectLogos(){
       try{if(typeof window.goAuth==='function')window.goAuth();}catch(ignore){}
     }
   }
+  // Warm the Render API while the splash/onboarding screens are visible. This
+  // lets a sleeping instance wake before the user submits their PIN, without
+  // blocking the splash, onboarding, or authentication UI.
+  try{if(window.ML_API&&typeof window.ML_API.checkBackend==='function'){window.ML_API.checkBackend().catch(function(){});}}catch(warmupError){}
   // Independent watchdog still runs if decorative splash setup throws.
   timers.push(setTimeout(advanceFromSplash,5200));
   try{
