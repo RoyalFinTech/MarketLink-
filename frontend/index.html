@@ -5657,7 +5657,8 @@ async function rRequestWithdrawal(amount){
 // ═══════════════════════════════════════════════════════════
 function openVendorApp(){
   S.vStep=0;
-  S.vForm={bname:'',sname:'',saddr:'',cat:'',phone:'',idDoc:'',photo:''};
+  var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\\+220/,'').replace(/\\D/g,'');
+  S.vForm={bname:'',sname:'',saddr:'',cat:'',phone:accountPhone,email:(S.user&&S.user.email)||'',description:'',idDoc:'',photo:'',idDocFile:null,photoFile:null};
   renderVApp(); openSheet('sh-vapp');
 }
 function renderVApp(){
@@ -5672,14 +5673,17 @@ function renderVApp(){
 
   var body='';
   if(step===0){
-    body='<input class="inp" placeholder="Business Name" id="va-bname" value="'+f.bname+'">'+
-      '<input class="inp" placeholder="Shop Name" id="va-sname" value="'+f.sname+'">'+
-      '<input class="inp" placeholder="Shop Address" id="va-saddr" value="'+f.saddr+'">'+
+    body='<div style="padding:10px 12px;background:rgba(13,115,119,.10);border:1px solid rgba(13,115,119,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applying as:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+' · '+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'<br>Your MarketLink account details are linked automatically.</div>'+
+      '<input class="inp" placeholder="Business / registered name" id="va-bname" value="'+sanitizeText(f.bname||'')+'" autocomplete="organization">'+
+      '<input class="inp" placeholder="Shop / display name" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
+      '<input class="inp" placeholder="Shop address (area, town, landmark)" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
       '<select id="va-cat" style="width:100%;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;appearance:none;">'+
-      cats.map(function(c){return '<option value="'+c+'"'+(f.cat===c?' selected':'')+'>'+( c||'Select category')+'</option>';}).join('')+'</select>'+
+      cats.map(function(c){return '<option value="'+c+'"'+(f.cat===c?' selected':'')+'>'+(c||'Select business category')+'</option>';}).join('')+'</select>'+
+      '<label style="display:block;color:var(--mu);font-size:10px;font-weight:700;margin:0 0 5px 2px;">WhatsApp / business contact number</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="Business phone" id="va-phone" value="'+f.phone+'" style="flex:1;margin-bottom:0;"></div>';
+      '<input class="inp" type="tel" inputmode="tel" placeholder="7-digit WhatsApp number" id="va-phone" value="'+sanitizeText(f.phone||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<textarea class="inp" id="va-description" rows="3" placeholder="Short business description (optional)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;max-height:120px;resize:vertical;margin-top:10px;line-height:1.45;">'+sanitizeText(f.description||'')+'</textarea>';
   } else if(step===1){
     body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
       '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:11px;cursor:pointer;"><input id="va-id-file" type="file" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'idDocFile\')">'+
@@ -5707,7 +5711,15 @@ function renderVApp(){
     '<h4 style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">Step '+(step+1)+': '+steps[step]+'</h4>'+
     body+btnRow;
 }
-function vendorAppFileSelected(input,key){var file=input&&input.files&&input.files[0];if(!file)return;S.vForm=S.vForm||{};S.vForm[key]=file;S.vForm[key==='idDocFile'?'idDocName':'photoName']=file.name;renderVApp();}
+function vendorAppFileSelected(input,key){
+  var file=input&&input.files&&input.files[0];if(!file)return;
+  var isDoc=key==='idDocFile';
+  var allowed=isDoc?['image/jpeg','image/png','application/pdf']:['image/jpeg','image/png','image/webp'];
+  var max=isDoc?10*1024*1024:5*1024*1024;
+  if(allowed.indexOf(file.type)<0){toast(isDoc?'Choose a JPG, PNG or PDF identity document.':'Choose a JPG, PNG or WebP shop logo/photo.','error');input.value='';return;}
+  if(file.size<=0||file.size>max){toast('The selected file is empty or too large. Maximum: '+(isDoc?'10 MB':'5 MB')+'.','error');input.value='';return;}
+  S.vForm=S.vForm||{};S.vForm[key]=file;S.vForm[key==='idDocFile'?'idDocName':'photoName']=file.name;renderVApp();
+}
 function vAppNext(){
   if(S.vStep===0){
     S.vForm.bname=(G('va-bname')&&G('va-bname').value.trim())||'';
@@ -5715,6 +5727,10 @@ function vAppNext(){
     S.vForm.saddr=(G('va-saddr')&&G('va-saddr').value.trim())||'';
     S.vForm.cat=(G('va-cat')&&G('va-cat').value)||'';
     S.vForm.phone=(G('va-phone')&&G('va-phone').value.trim())||'';
+    S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
+    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!S.vForm.phone){
+      toast('Please complete the business name, shop name, address, category and WhatsApp number.','error');return;
+    }
   }
   S.vStep++; renderVApp();
 }
@@ -5731,17 +5747,22 @@ function submitVApp(){
 // RIDER APPLICATION
 // ═══════════════════════════════════════════════════════════
 function raDocsSelected(inp,target){
-  if(!inp.files||!inp.files[0]) return;
-  var file=inp.files[0];target=target||'idDocFile';S.rForm=S.rForm||{};
-  S.rForm[target]=file;
+  if(!inp.files||!inp.files[0])return;
+  var file=inp.files[0];target=target||'idDocFile';
+  var isDoc=target==='idDocFile'||target==='licenseDocFile';
+  var allowed=isDoc?['image/jpeg','image/png','application/pdf']:['image/jpeg','image/png','image/webp'];
+  var max=isDoc?10*1024*1024:5*1024*1024;
+  if(allowed.indexOf(file.type)<0){toast(isDoc?'Choose a JPG, PNG or PDF document.':'Choose a JPG, PNG or WebP vehicle photo.','error');inp.value='';return;}
+  if(file.size<=0||file.size>max){toast('The selected file is empty or too large. Maximum: '+(isDoc?'10 MB':'5 MB')+'.','error');inp.value='';return;}
+  S.rForm=S.rForm||{};S.rForm[target]=file;
   S.rForm[target==='idDocFile'?'idDocName':target==='licenseDocFile'?'licenseDocName':'vehiclePhotoName']=file.name;
-  S.rForm.docs=file.name;
-  renderRApp();
-  toast(file.name+' selected. It will be uploaded when you submit the application.','info');
+  S.rForm.docs=file.name;renderRApp();
+  toast(file.name+' selected. It will be uploaded securely when you submit.','info');
 }
 function openRiderApp(){
   S.rStep=0;
-  S.rForm={fname:'',phone:'',addr:'',plate:'',licence:'',emergency:'',docs:''};
+  var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\\+220/,'').replace(/\\D/g,'');
+  S.rForm={fname:(S.user&&S.user.name)||S.profileName||'',phone:accountPhone,addr:'',plate:'',licence:'',vehicleType:'motorbike',deliveryZone:'',emergency:'',docs:'',idDocFile:null,licenseDocFile:null,vehiclePhotoFile:null};
   renderRApp(); openSheet('sh-rapp');
 }
 function renderRApp(){
@@ -5755,12 +5776,13 @@ function renderRApp(){
 
   var body='';
   if(step===0){
-    body='<input class="inp" placeholder="Full Name" id="ra-fname" value="'+f.fname+'">'+
+    body='<div style="padding:10px 12px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applicant:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+' · '+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'<br>Your existing account identity is linked automatically.</div>'+
+      '<input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone" id="ra-phone" value="'+f.phone+'" style="flex:1;margin-bottom:0;"></div>'+
-      '<input class="inp" placeholder="Residential Address" id="ra-addr" value="'+f.addr+'">'+
-      '<input class="inp" placeholder="Emergency Contact Number" id="ra-emg" type="tel" inputmode="tel" value="'+f.emergency+'">';
+      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone" id="ra-phone" value="'+sanitizeText(f.phone||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<input class="inp" placeholder="Residential address (area, town, landmark)" id="ra-addr" value="'+sanitizeText(f.addr||'')+'">'+
+      '<input class="inp" placeholder="Emergency contact number" id="ra-emg" type="tel" inputmode="tel" value="'+sanitizeText(f.emergency||'')+'">';
   } else if(step===1){
     body='<input class="inp" placeholder="Plate Number (e.g. BJL 1234 A)" id="ra-plate" value="'+f.plate+'">'+
       '<input class="inp" placeholder="Driver\'s Licence Number" id="ra-lic" value="'+f.licence+'">'+
@@ -5795,6 +5817,11 @@ function rAppNext(){
   } else if(S.rStep===1){
     S.rForm.plate=(G('ra-plate')&&G('ra-plate').value.trim())||'';
     S.rForm.licence=(G('ra-lic')&&G('ra-lic').value.trim())||'';
+    S.rForm.vehicleType=(G('ra-vehicle-type')&&G('ra-vehicle-type').value)||'motorbike';
+    S.rForm.deliveryZone=(G('ra-zone')&&G('ra-zone').value.trim())||'';
+    if(!S.rForm.plate||!S.rForm.licence){
+      toast('Please enter your vehicle plate number and driving licence number.','error');return;
+    }
   }
   S.rStep++; renderRApp();
 }
@@ -6637,17 +6664,67 @@ window.addEventListener('unhandledrejection',function(e){
     catch(e){if(btn){btn.textContent='Create Account';btn.disabled=false;}var m=e.error||'Registration failed. Please try again.';if(e.code==='INVALID_OTP')m='Incorrect OTP. Tap "Resend" to get a new code.';if(e.code==='OTP_EXPIRED')m='OTP has expired. Tap "Resend" to get a new code.';authErr(m);if(e.code==='INVALID_OTP'||e.code==='OTP_EXPIRED'){S.authMode='otp';S.otp=['','','','','',''];setTimeout(renderAuth,300);}}
   };
 
-  function vendorSubmit(){
-    var p={businessName:S.vForm.bname,businessCategory:S.vForm.cat,businessAddress:S.vForm.saddr,description:S.vForm.sname};
-    if(S.vForm.phone){try{p.phone=normalize(S.vForm.phone,S.vFormCountry||'GM').e164;}catch(e){toast(e.message,'error');return;}}
-    var b=document.querySelector('#sh-vapp .btn-p');if(b){b.textContent='Submitting…';b.disabled=true;}
-    ML_API.vendors.register(p).then(function(){closeSheet('sh-vapp');if(S.roles.indexOf('vendor')<0)S.roles.push('vendor');addRoleTabs();renderProfile();toast('Vendor application submitted! Review within 48hrs. 🎉');}).catch(function(e){if(b){b.textContent='Submit Application 🎉';b.disabled=false;}toast(e.error||'Could not submit application. Please try again.','error');});
+  async function vendorSubmit(){
+    var form=S.vForm||{};
+    if(!form.bname||!form.bname.trim()){toast('Enter your business or registered name.','error');return;}
+    if(!form.sname||!form.sname.trim()){toast('Enter the shop name customers will see.','error');return;}
+    if(!form.saddr||!form.saddr.trim()){toast('Enter the shop address, including the area and town.','error');return;}
+    if(!form.cat){toast('Choose your business category.','error');return;}
+    var b=document.querySelector('#sh-vapp .btn-p');if(b){b.textContent='Uploading and submitting…';b.disabled=true;}
+    var uploaded=[];
+    try{
+      var p={
+        businessName:form.bname.trim(),
+        businessCategory:form.cat,
+        businessAddress:form.saddr.trim(),
+        description:[form.sname?'Shop name: '+form.sname.trim():'',form.description||''].filter(Boolean).join('\\n\\n')||undefined
+      };
+      if(form.phone){p.phone=normalize(form.phone,S.vFormCountry||'GM').e164;}
+      if(form.email&&String(form.email).trim())p.email=String(form.email).trim();
+      if(form.idDocFile){
+        var idUpload=await ML_API.uploads.upload(form.idDocFile,'vendor-document');
+        p.idDocumentUrl=idUpload.url;uploaded.push(idUpload.url);
+      }
+      if(form.photoFile){
+        var logoUpload=await ML_API.uploads.upload(form.photoFile,'vendor-logo');
+        p.logoUrl=logoUpload.url;p.shopPhotoUrl=logoUpload.url;uploaded.push(logoUpload.url);
+      }
+      await ML_API.vendors.register(p);
+      closeSheet('sh-vapp');
+      if(S.roles.indexOf('vendor')<0)S.roles.push('vendor');
+      addRoleTabs();renderProfile();
+      toast('Vendor application submitted. Your account details and uploaded files are saved for Admin review.','success');
+    }catch(e){
+      for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}
+      if(b){b.textContent='Submit Application 🎉';b.disabled=false;}
+      toast(e&&e.error||'Could not submit the vendor application. Please try again.','error');
+    }finally{
+      if(b&&b.isConnected){b.disabled=false;if(b.textContent==='Uploading and submitting…')b.textContent='Submit Application 🎉';}
+    }
   }
-  function riderSubmit(){
-    if(S.rForm.phone){try{normalize(S.rForm.phone,S.rFormCountry||'GM');}catch(e){toast(e.message,'error');return;}}
-    var p={plateNumber:S.rForm.plate,licenseNumber:S.rForm.licence,emergencyContact:S.rForm.emergency,address:S.rForm.addr};
-    var b=document.querySelector('#sh-rapp .btn-pu');if(b){b.textContent='Submitting…';b.disabled=true;}
-    ML_API.riders.register(p).then(function(){closeSheet('sh-rapp');if(S.roles.indexOf('rider')<0)S.roles.push('rider');addRoleTabs();renderProfile();toast('Rider application submitted! Review within 48hrs. 🚀');}).catch(function(e){if(b){b.textContent='Submit Application 🚀';b.disabled=false;}toast(e.error||'Could not submit application. Please try again.','error');});
+  async function riderSubmit(){
+    var form=S.rForm||{};
+    if(!form.plate||!String(form.plate).trim()){toast('Enter your vehicle plate number.','error');return;}
+    if(!form.licence||!String(form.licence).trim()){toast('Enter your driving licence number.','error');return;}
+    var b=document.querySelector('#sh-rapp .btn-pu');if(b){b.textContent='Uploading and submitting…';b.disabled=true;}
+    var uploaded=[];
+    try{
+      var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined};
+      if(form.idDocFile){var riderId=await ML_API.uploads.upload(form.idDocFile,'rider-document');p.idDocumentUrl=riderId.url;uploaded.push(riderId.url);}
+      if(form.licenseDocFile){var licenseUpload=await ML_API.uploads.upload(form.licenseDocFile,'license-document');p.licenseDocumentUrl=licenseUpload.url;uploaded.push(licenseUpload.url);}
+      if(form.vehiclePhotoFile){var vehicleUpload=await ML_API.uploads.upload(form.vehiclePhotoFile,'rider-photo');p.vehiclePhotoUrl=vehicleUpload.url;uploaded.push(vehicleUpload.url);}
+      await ML_API.riders.register(p);
+      closeSheet('sh-rapp');
+      if(S.roles.indexOf('rider')<0)S.roles.push('rider');
+      addRoleTabs();renderProfile();
+      toast('Rider application submitted. Your account details and documents are saved for Admin review.','success');
+    }catch(e){
+      for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}
+      if(b){b.textContent='Submit Application 🚀';b.disabled=false;}
+      toast(e&&e.error||'Could not submit the rider application. Please try again.','error');
+    }finally{
+      if(b&&b.isConnected){b.disabled=false;if(b.textContent==='Uploading and submitting…')b.textContent='Submit Application 🚀';}
+    }
   }
   window.submitVApp=vendorSubmit;window.submitRApp=riderSubmit;
 
