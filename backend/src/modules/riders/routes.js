@@ -10,6 +10,11 @@ const ADMIN = ['admin', 'super_admin', 'moderator'];
 
 // ── Public ────────────────────────────────────────────────────────────
 router.get('/', ctrl.list);
+router.get('/admin/applications', authenticate, authorize('admin','super_admin','moderator'),
+  [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100}),
+   query('kycStatus').optional().isIn(['pending','approved','rejected','suspended'])],
+  validate, ctrl.adminApplications
+);
 
 // ── Rider self-service ────────────────────────────────────────────────
 // NOTE: all literal routes below (/register, /profile, /me/..., /location,
