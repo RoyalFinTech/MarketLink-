@@ -27,6 +27,11 @@ exports.list = wrap(async (req, res) => {
   const result = await svc.list({ ...req.query, isAdmin: isAdmin(req.user) });
   res.json({ success: true, data: result });
 });
+exports.adminApplications = wrap(async (req, res) => {
+  if (!isAdmin(req.user)) throw new AppError('Admin access required.', 403, 'FORBIDDEN');
+  const result = await svc.list({ ...req.query, kycStatus: req.query.kycStatus || 'pending', isAdmin: true });
+  res.json({ success: true, data: result });
+});
 
 exports.getById = wrap(async (req, res) => {
   const includePrivate = isAdmin(req.user) || req.user?.id === req.params.id;
