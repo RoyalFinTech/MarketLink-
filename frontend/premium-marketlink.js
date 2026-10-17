@@ -1340,39 +1340,96 @@
   }
   async function submitVendor(){
     if(!apiOk()){toast('Please sign in first.','error');return;}
-    var f=S.vForm;
-    if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.phone){toast('Complete the business details first.','error');return;}
+    var f=S.vForm||{};
+    if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.phone){
+      toast('Complete the business name, shop name, address, category and WhatsApp number first.','error');return;
+    }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
-    var btn=document.querySelector('#vapp-body .btn-p');if(btn){btn.disabled=true;btn.textContent='Uploading documents…';}
+    var btn=document.querySelector('#vapp-body .btn-p'),uploaded=[];
+    if(btn){btn.disabled=true;btn.textContent='Uploading documents…';}
     try{
       var idUpload=await ML_API.uploads.upload(f.idDocFile,'vendor-document');
+      if(idUpload&&idUpload.url)uploaded.push(idUpload.url);
       var shopPhotoUrl=null;
-      if(f.photoFile){var photoUpload=await ML_API.uploads.upload(f.photoFile,'vendor-logo');shopPhotoUrl=photoUpload&&photoUpload.url||null;}
+      if(f.photoFile){
+        var photoUpload=await ML_API.uploads.upload(f.photoFile,'vendor-logo');
+        shopPhotoUrl=photoUpload&&photoUpload.url||null;
+        if(shopPhotoUrl)uploaded.push(shopPhotoUrl);
+      }
       if(btn)btn.textContent='Submitting application…';
       var vendorPhone=window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:f.phone;
-      await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:vendorPhone,nationalId:undefined,idDocumentUrl:idUpload&&idUpload.url,shopPhotoUrl:shopPhotoUrl,description:f.sname});
-      closeSheet('sh-vapp');toast('Vendor application submitted. Documents saved securely; your application is awaiting Admin approval.','success');
-      S._vendorLiveLoaded=false;renderPremiumProfile();
-    }catch(e){if(btn){btn.disabled=false;btn.textContent='Submit Application 🎉';}toast(e.error||e.message||'Vendor application could not be submitted. Please try again.','error');}
+      var businessDescription=[
+        f.sname?'Shop name: '+String(f.sname).trim():'',
+        f.description?String(f.description).trim():''
+      ].filter(Boolean).join('\n\n');
+      await ML_API.vendors.register({
+        businessName:String(f.bname).trim(),
+        businessCategory:f.cat,
+        businessAddress:String(f.saddr).trim(),
+        phone:vendorPhone,
+        email:f.email||undefined,
+        idDocumentUrl:idUpload&&idUpload.url,
+        shopPhotoUrl:shopPhotoUrl,
+        logoUrl:shopPhotoUrl,
+        description:businessDescription||undefined
+      });
+      closeSheet('sh-vapp');
+      toast('Vendor application submitted. Your logo and documents have been saved for Admin review.','success');
+      S._vendorLiveLoaded=false;
+      if(typeof renderPremiumProfile==='function')await renderPremiumProfile();
+    }catch(e){
+      for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}
+      if(btn){btn.disabled=false;btn.textContent='Submit Application 🎉';}
+      toast(e.error||e.message||'Vendor application could not be submitted. Please try again.','error');
+    }finally{
+      if(btn&&btn.isConnected&&btn.disabled){btn.disabled=false;if(btn.textContent==='Uploading documents…'||btn.textContent==='Submitting application…')btn.textContent='Submit Application 🎉';}
+    }
   }
   async function submitRider(){
     if(!apiOk()){toast('Please sign in first.','error');return;}
-    var f=S.rForm;
-    if(!f.fname||!f.phone||!f.addr||!f.plate||!f.licence){toast('Complete your rider details first.','error');return;}
+    var f=S.rForm||{};
+    if(!f.fname||!f.phone||!f.addr||!f.plate||!f.licence){
+      toast('Complete your name, phone, residential address, plate number and licence number first.','error');return;
+    }
     if(!f.idDocFile||!f.licenseDocFile){toast('Upload your National ID and driver’s licence / permit before submitting.','error');return;}
-    var btn=document.querySelector('#rapp-body .btn-pu');if(btn){btn.disabled=true;btn.textContent='Uploading documents…';}
+    var btn=document.querySelector('#rapp-body .btn-pu'),uploaded=[];
+    if(btn){btn.disabled=true;btn.textContent='Uploading documents…';}
     try{
       var idUpload=await ML_API.uploads.upload(f.idDocFile,'rider-document');
+      if(idUpload&&idUpload.url)uploaded.push(idUpload.url);
       var licenseUpload=await ML_API.uploads.upload(f.licenseDocFile,'license-document');
+      if(licenseUpload&&licenseUpload.url)uploaded.push(licenseUpload.url);
       var vehiclePhotoUrl=null;
-      if(f.vehiclePhotoFile){var vehicleUpload=await ML_API.uploads.upload(f.vehiclePhotoFile,'rider-photo');vehiclePhotoUrl=vehicleUpload&&vehicleUpload.url||null;}
+      if(f.vehiclePhotoFile){
+        var vehicleUpload=await ML_API.uploads.upload(f.vehiclePhotoFile,'rider-photo');
+        vehiclePhotoUrl=vehicleUpload&&vehicleUpload.url||null;
+        if(vehiclePhotoUrl)uploaded.push(vehiclePhotoUrl);
+      }
       if(btn)btn.textContent='Submitting application…';
       var emergencyPhone=f.emergency;
       if(emergencyPhone&&window.PhoneUtil)emergencyPhone=window.PhoneUtil.normalize(emergencyPhone,'GM').e164;
-      await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:emergencyPhone,address:f.addr,idDocumentUrl:idUpload&&idUpload.url,licenseDocumentUrl:licenseUpload&&licenseUpload.url,vehiclePhotoUrl:vehiclePhotoUrl});
-      closeSheet('sh-rapp');toast('Rider application submitted. Documents saved securely; awaiting Admin approval.','success');
-      S._riderLiveLoaded=false;renderPremiumProfile();
-    }catch(e){if(btn){btn.disabled=false;btn.textContent='Submit Application 🎉';}toast(e.error||e.message||'Rider application could not be submitted. Please try again.','error');}
+      await ML_API.riders.register({
+        vehicleType:f.vehicleType||'motorbike',
+        plateNumber:String(f.plate).trim(),
+        licenseNumber:String(f.licence).trim(),
+        emergencyContact:emergencyPhone||undefined,
+        address:String(f.addr).trim(),
+        deliveryZone:f.deliveryZone||undefined,
+        idDocumentUrl:idUpload&&idUpload.url,
+        licenseDocumentUrl:licenseUpload&&licenseUpload.url,
+        vehiclePhotoUrl:vehiclePhotoUrl
+      });
+      closeSheet('sh-rapp');
+      toast('Rider application submitted. Your documents are saved securely for Admin review.','success');
+      S._riderLiveLoaded=false;
+      if(typeof renderPremiumProfile==='function')await renderPremiumProfile();
+    }catch(e){
+      for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}
+      if(btn){btn.disabled=false;btn.textContent='Submit Application 🚀';}
+      toast(e.error||e.message||'Rider application could not be submitted. Please try again.','error');
+    }finally{
+      if(btn&&btn.isConnected&&btn.disabled){btn.disabled=false;if(btn.textContent==='Uploading documents…'||btn.textContent==='Submitting application…')btn.textContent='Submit Application 🚀';}
+    }
   }
   async function liveVendorAddProduct(){
     if(!apiOk()){toast('Sign in required.','error');return;}
