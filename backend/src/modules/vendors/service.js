@@ -21,7 +21,7 @@ function actorLog(actor, action, entityId, before, after) {
 // ── REGISTER (called after user account already exists) ──────────────
 async function register(userId, data) {
   const { businessName, businessCategory, businessAddress, phone, email,
-          description, nationalId, idDocumentUrl, shopPhotoUrl, latitude, longitude } = data;
+          description, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
 
   if (!businessName?.trim()) throw new AppError('Business name is required.', 400, 'VALIDATION_ERROR');
 
@@ -34,11 +34,12 @@ async function register(userId, data) {
     const { rows: [vendor] } = await client.query(
       `INSERT INTO vendors
          (user_id, business_name, business_category, business_address, phone, email,
-          description, national_id, id_document_url, shop_photo_url, latitude, longitude, kyc_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending') RETURNING *`,
+          description, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, kyc_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending') RETURNING *`,
       [userId, businessName.trim(), businessCategory || null, businessAddress || null,
        phone || null, email || null, description || null,
-       nationalId || null, idDocumentUrl || null, shopPhotoUrl || null, latitude || null, longitude || null]
+       nationalId || null, idDocumentUrl || null, shopPhotoUrl || null, logoUrl || shopPhotoUrl || null,
+       latitude || null, longitude || null]
     );
 
     // Grant vendor role to user
