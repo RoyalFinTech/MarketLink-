@@ -8,7 +8,7 @@ const isAdmin = u => (u?.roles || []).some(r => ['admin','super_admin','moderato
 function actor(req) {
   return {
     id:   req.user?.id,
-    role: (req.user?.roles || []).find(r => ['admin','super_admin','moderator','vendor'].includes(r)) || 'unknown',
+    role: (req.user?.roles || []).find(r => ['admin','super_admin','moderator'].includes(r)) || (req.user?.roles || []).find(r => r === 'vendor') || 'unknown',
     meta: { ip: req.ip, ua: req.headers['user-agent'] },
   };
 }
@@ -26,6 +26,11 @@ exports.register = wrap(async (req, res) => {
 // GET /vendors  (list — public sees approved only, admin sees all)
 exports.list = wrap(async (req, res) => {
   const result = await svc.list({ ...req.query, actor: actor(req) });
+  res.json({ success: true, data: result });
+});
+exports.adminApplications = wrap(async (req, res) => {
+  if (!isAdmin(req.user)) throw new AppError('Admin access required.', 403, 'FORBIDDEN');
+  const result = await svc.list({ ...req.query, kycStatus: req.query.kycStatus || 'pending', actor: actor(req) });
   res.json({ success: true, data: result });
 });
 
