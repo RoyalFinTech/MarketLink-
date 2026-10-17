@@ -5915,13 +5915,13 @@ function addRoleTabs(){
   if(S.roles.indexOf('vendor')>-1&&!G('ntab-vendor')){
     var t=document.createElement('div'); t.className='ntab'; t.id='ntab-vendor'; t.dataset.tab='vendordash';
     t.innerHTML='<div class="ni">🏪</div><div class="nl">Vendor</div>';
-    t.setAttribute('role','button'); t.setAttribute('tabindex','0'); t.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();t.click();}}; t.onclick=function(){switchTab('vendordash');};
+    t.setAttribute('role','button'); t.setAttribute('tabindex','0'); t.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();t.click();}}; t.onclick=function(){if(window.ML_Premium&&typeof window.ML_Premium.openRoleDashboard==='function')window.ML_Premium.openRoleDashboard('vendor');else toast('Dashboard access verification is unavailable. Please retry.','error');};
     nav.insertBefore(t, profTab);
   }
   if(S.roles.indexOf('rider')>-1&&!G('ntab-rider')){
     var r=document.createElement('div'); r.className='ntab'; r.id='ntab-rider'; r.dataset.tab='riderdash';
     r.innerHTML='<div class="ni">🛵</div><div class="nl">Rider</div>';
-    r.setAttribute('role','button'); r.setAttribute('tabindex','0'); r.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();r.click();}}; r.onclick=function(){switchTab('riderdash');};
+    r.setAttribute('role','button'); r.setAttribute('tabindex','0'); r.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();r.click();}}; r.onclick=function(){if(window.ML_Premium&&typeof window.ML_Premium.openRoleDashboard==='function')window.ML_Premium.openRoleDashboard('rider');else toast('Dashboard access verification is unavailable. Please retry.','error');};
     nav.insertBefore(r, profTab);
   }
 }
