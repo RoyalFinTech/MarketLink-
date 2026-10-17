@@ -1320,8 +1320,12 @@
         ML_API.vendors.getById(S.user.id).catch(function(){return null;}),
         ML_API.riders.getById(S.user.id).catch(function(){return null;})
       ]);
-      vendorApplication=apps[0]&&apps[0].kyc_status?apps[0]:null;
-      riderApplication=apps[1]&&apps[1].kyc_status?apps[1]:null;
+      // ML_API wraps successful responses as {success, data}; unwrap before
+      // reading KYC fields so submitted application status appears in Profile.
+      var vendorRecord=apps[0]&&(apps[0].data||apps[0]);
+      var riderRecord=apps[1]&&(apps[1].data||apps[1]);
+      vendorApplication=vendorRecord&&vendorRecord.kyc_status?vendorRecord:null;
+      riderApplication=riderRecord&&riderRecord.kyc_status?riderRecord:null;
       var appNames=[['Vendor application',vendorApplication],['Rider application',riderApplication]];
       appNames.forEach(function(a){
         if(a[1]&&a[1].kyc_status){
