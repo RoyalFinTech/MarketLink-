@@ -110,6 +110,8 @@ async function list({ page = 1, limit = 20, search, kycStatus, isOnline, zone, i
               r.total_deliveries, r.total_earnings, r.acceptance_rate,
               r.current_lat, r.current_lng, r.last_location_at,
               u.full_name, u.phone
+              ${isAdmin ? `, r.address, r.emergency_contact, r.license_number,
+                r.national_id, r.id_document_url, r.license_document_url, r.vehicle_photo_url, u.email` : ''}
        FROM riders r
        JOIN users u ON u.id = r.user_id
        ${where}
