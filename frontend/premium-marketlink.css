@@ -1130,3 +1130,7 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
   .fab-ai .ml-ai-head svg{width:32px;height:32px}
   .fab-ai .ml-ai-label{font-size:10px}
 }
+
+/* Keep the WhatsApp support glyph legible against its green circular button. */
+.fab-sup img{display:block;width:29px;height:29px;object-fit:contain;filter:brightness(0) invert(1)}
+@media(max-width:680px){.fab-sup{width:48px;height:48px}.fab-sup img{width:27px;height:27px}}
