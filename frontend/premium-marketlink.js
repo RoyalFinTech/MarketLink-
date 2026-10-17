@@ -1431,20 +1431,105 @@
       if(btn&&btn.isConnected&&btn.disabled){btn.disabled=false;if(btn.textContent==='Uploading documents…'||btn.textContent==='Submitting application…')btn.textContent='Submit Application 🚀';}
     }
   }
+  window.marketlinkLoadProductCategories=async function(){
+    var select=G('vp-category');
+    if(!select||select.dataset.loaded==='1'||select.dataset.loading==='1')return;
+    if(!apiOk()){select.innerHTML='<option value="">Sign in to load categories</option>';return;}
+    select.dataset.loading='1';select.innerHTML='<option value="">Loading categories…</option>';
+    try{
+      var response=await ML_API.categories.list({page:1,limit:100}),categories=normalizeProducts(response.data);
+      select.innerHTML='<option value="">Choose a category</option>'+categories.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name||c.category_name||'Category')+'</option>';}).join('');
+      select.dataset.loaded='1';
+      if(!categories.length)select.innerHTML='<option value="">No active categories available</option>';
+    }catch(e){select.innerHTML='<option value="">Could not load categories — tap to retry</option>';select.dataset.loaded='';}
+    finally{select.dataset.loading='';}
+  };
+
+  window.marketlinkProductImageSelected=async function(input){
+    var preview=G('vp-photo-preview'),file=input&&input.files&&input.files[0];
+    if(!preview)return;
+    function fail(message){
+      if(S._productImagePreviewUrl){try{URL.revokeObjectURL(S._productImagePreviewUrl);}catch(e){}}
+      S._productImagePreviewUrl=null;S._productImageFile=null;S._productImageQuality=null;
+      if(input)input.value='';preview.textContent=message;preview.style.color='#ef907c';toast(message,'error');
+    }
+    if(!file){S._productImageFile=null;preview.textContent='Choose a clear product photo to continue.';return;}
+    if(['image/jpeg','image/png','image/webp'].indexOf(file.type)<0){fail('Please choose a JPG, PNG or WebP image.');return;}
+    if(file.size<=0||file.size>5*1024*1024){fail('This image is empty or exceeds 5 MB. Choose a smaller, clear photo.');return;}
+    var url=URL.createObjectURL(file),img=new Image();
+    try{
+      await new Promise(function(resolve,reject){img.onload=resolve;img.onerror=reject;img.src=url;});
+      var width=img.naturalWidth,height=img.naturalHeight;
+      if(width<600||height<600){URL.revokeObjectURL(url);fail('This photo is too small ('+width+' × '+height+'). Please retake or choose an image at least 600 × 600 pixels.');return;}
+      var canvas=document.createElement('canvas');canvas.width=80;canvas.height=80;
+      var ctx=canvas.getContext('2d',{willReadFrequently:true});
+      if(!ctx){URL.revokeObjectURL(url);fail('MarketLink could not inspect this photo. Please choose another image.');return;}
+      ctx.drawImage(img,0,0,80,80);
+      var pixels=ctx.getImageData(0,0,80,80).data,gray=new Float32Array(80*80),sum=0,dark=0,bright=0;
+      for(var i=0,j=0;i<pixels.length;i+=4,j++){
+        var lum=.2126*pixels[i]+.7152*pixels[i+1]+.0722*pixels[i+2];gray[j]=lum;sum+=lum;
+        if(lum<24)dark++;if(lum>246)bright++;
+      }
+      var mean=sum/gray.length,lapSum=0,lapSq=0,count=0;
+      for(var y=1;y<79;y++)for(var x=1;x<79;x++){
+        var k=y*80+x,lap=gray[k-1]+gray[k+1]+gray[k-80]+gray[k+80]-4*gray[k];
+        lapSum+=lap;lapSq+=lap*lap;count++;
+      }
+      var lapMean=lapSum/count,sharpness=lapSq/count-lapMean*lapMean;
+      if(mean<27||(dark/gray.length)>.72||mean>246||(bright/gray.length)>.78){
+        URL.revokeObjectURL(url);fail('The photo looks too dark or overexposed. Retake it in bright, even light with the product clearly visible.');return;
+      }
+      if(sharpness<8&&!confirm('This photo may look soft or blurry. For a better listing, retake it with a steady camera and clear focus. Choose OK only if you have checked the photo and still want to use it.')){
+        URL.revokeObjectURL(url);fail('Please choose a sharper product photo before submitting.');return;
+      }
+      if(S._productImagePreviewUrl){try{URL.revokeObjectURL(S._productImagePreviewUrl);}catch(e){}}
+      S._productImagePreviewUrl=url;S._productImageFile=file;
+      S._productImageQuality={width:width,height:height,brightness:Math.round(mean),sharpness:Math.round(sharpness)};
+      preview.style.color='#6ddbb4';preview.innerHTML='';
+      var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+      var thumbnail=document.createElement('img');thumbnail.src=url;thumbnail.alt='Selected product photo preview';thumbnail.style.cssText='width:76px;height:76px;object-fit:cover;border-radius:10px;border:1px solid rgba(109,219,180,.5)';
+      var label=document.createElement('span');label.textContent='Photo checked · '+width+' × '+height+' px · '+(sharpness<8?'please visually confirm focus':'quality looks acceptable');
+      row.appendChild(thumbnail);row.appendChild(label);preview.appendChild(row);
+    }catch(e){URL.revokeObjectURL(url);fail('MarketLink could not read this image. Please choose a valid photo and try again.');}
+  };
+
   async function liveVendorAddProduct(){
     if(!apiOk()){toast('Sign in required.','error');return;}
-    var n=G('vp-name'),p=G('vp-price'),s=G('vp-stock');
-    var name=n&&n.value.trim(),price=Number(p&&p.value),stock=Number(s&&s.value);
-    if(!name||!Number.isFinite(price)||price<0){toast('Enter a valid product name and price.','error');return;}
+    var n=G('vp-name'),p=G('vp-price'),s=G('vp-stock'),cat=G('vp-category'),desc=G('vp-description'),compare=G('vp-compare');
+    var name=n&&n.value.trim(),price=Number(p&&p.value),stock=s&&s.value.trim()!==''?Number(s.value):null;
+    var compareAt=compare&&compare.value.trim()!==''?Number(compare.value):null;
+    if(!name||name.length>200||!Number.isFinite(price)||price<0){toast('Enter a valid product name and selling price in Dalasi.','error');return;}
+    if(stock!==null&&(!Number.isInteger(stock)||stock<0)){toast('Stock quantity must be a whole number of zero or more.','error');return;}
+    if(compareAt!==null&&(!Number.isFinite(compareAt)||compareAt<=price)){toast('Compare-at price must be higher than the selling price.','error');return;}
+    if(!S._productImageFile){toast('Please choose a clear product photo before adding this listing.','error');return;}
+    if(!cat||!cat.value){await window.marketlinkLoadProductCategories();if(!cat||!cat.value){toast('Choose a product category before submitting.','error');return;}}
+    var categoryId=Number(cat.value);
+    if(!Number.isInteger(categoryId)||categoryId<1){toast('Choose a valid product category.','error');return;}
+    var btn=document.querySelector('#vp-name')&&document.querySelector('#vp-name').parentNode.parentNode.querySelector('.btn-p');
+    if(btn){btn.disabled=true;btn.textContent='Checking and uploading…';}
+    var imageUrl=null,created=false;
     try{
-      var cats=liveCategories;
-      if(!cats.length){var cr=await ML_API.categories.list({page:1,limit:50});cats=normalizeProducts(cr.data);}
-      var categoryId=cats[0]&&cats[0].id;
-      if(!categoryId){toast('No live product category is available yet.','error');return;}
-      var r=await ML_API.products.create({name:name,price:price,categoryId:Number(categoryId),description:'',sku:undefined});
-      if(r.data&&r.data.id&&Number.isFinite(stock))await ML_API.products.updateInventory(r.data.id,{quantity:Math.max(0,Math.floor(stock))});
-      S._vendorLiveLoaded=false;renderVDash();toast('Product submitted to MarketLink ✓');
-    }catch(e){toast(e.error||'Could not create product.','error');}
+      var uploaded=await ML_API.uploads.upload(S._productImageFile,'product-image');
+      imageUrl=uploaded&&uploaded.url;
+      if(!imageUrl)throw new Error('The product image was not saved. Please try again.');
+      if(btn)btn.textContent='Saving product…';
+      var payload={name:name,price:price,categoryId:categoryId,description:(desc&&desc.value.trim())||'',imageUrl:imageUrl};
+      if(compareAt!==null)payload.compareAtPrice=compareAt;
+      var result=await ML_API.products.create(payload);
+      created=Boolean(result&&result.data&&result.data.id);
+      if(!created)throw new Error('MarketLink did not confirm that the product was saved.');
+      if(stock!==null)await ML_API.products.updateInventory(result.data.id,{quantity:stock});
+      if(S._productImagePreviewUrl){try{URL.revokeObjectURL(S._productImagePreviewUrl);}catch(e){}}
+      S._productImageFile=null;S._productImagePreviewUrl=null;S._productImageQuality=null;
+      S._vendorLiveLoaded=false;await renderVDash();
+      toast(stock===null?'Product submitted with its image. Add stock quantity when ready.':'Product and primary image submitted to MarketLink.','success');
+    }catch(e){
+      if(imageUrl&&!created){try{await ML_API.uploads.deleteByUrl(imageUrl);}catch(cleanupError){}}
+      if(created){
+        S._vendorLiveLoaded=false;try{await renderVDash();}catch(renderError){}
+        toast('Your product was created, but another step failed: '+(e.error||e.message||'please check stock quantity and try again.'),'warning');
+      }else{toast(e.error||e.message||'Could not upload the image or save the product. Please try again.','error');}
+    }finally{if(btn&&btn.isConnected){btn.disabled=false;btn.textContent='Upload and Add Product';}}
   }
   async function liveVendorSaveProduct(id){
     var n=G('vpe-name'),p=G('vpe-price'),s=G('vpe-stock');
