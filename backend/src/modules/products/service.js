@@ -21,12 +21,15 @@ async function getById(id) {
   if (!rows.length) throw new AppError('Product not found.',404,'PRODUCT_NOT_FOUND');
   return rows[0];
 }
-async function create({ vendorId, categoryId, brandId, name, description, price, compareAtPrice, sku }) {
+async function create({ vendorId, categoryId, brandId, name, description, price, compareAtPrice, sku, imageUrl }) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+Date.now().toString(36);
   const auto = process.env.PRODUCT_AUTO_APPROVE === 'true';
   const { rows: [p] } = await query(`INSERT INTO products (vendor_id,category_id,brand_id,name,slug,description,price,compare_at_price,sku,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [vendorId, categoryId, brandId||null, name, slug, description||null, price, compareAtPrice||null, sku||null, auto?'active':'pending_review']);
   await query('INSERT INTO inventory (product_id,quantity) VALUES($1,0)', [p.id]);
+  if (imageUrl) {
+    await query('INSERT INTO product_images (product_id,image_url,sort_order,is_primary) VALUES($1,$2,0,TRUE)', [p.id, imageUrl]);
+  }
   return p;
 }
 async function update(id, vendorId, isAdmin, fields) {
