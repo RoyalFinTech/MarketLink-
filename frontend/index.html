@@ -1196,6 +1196,18 @@ var NotificationCenter = (function(){
       save();
       if(typeof refreshNotifBadges==='function') refreshNotifBadges();
     },
+    // Reconcile existing server notifications on every sync so read_at changes
+    // on the backend also clear stale local unread badges without duplicating rows.
+    syncServer:function(audience,notification){
+      if(!notification||notification.id==null)return;
+      if(!store[audience])store[audience]=[];
+      var id=String(notification.id);_serverIds.add(id);
+      var entry={id:notification.id,type:notification.type||'notification',message:notification.message||notification.title||'MarketLink update',time:notification.created_at||new Date().toISOString(),read:!!notification.read_at,fromServer:true};
+      var existing=store[audience].findIndex(function(item){return item.fromServer&&String(item.id)===id;});
+      if(existing>=0)store[audience][existing]=entry;else store[audience].unshift(entry);
+      store[audience]=store[audience].slice(0,40);
+      save();
+    },
     list:function(audience){ return store[audience]||[]; },
     unreadCount:function(audience){ return (store[audience]||[]).filter(function(n){return !n.read;}).length; },
     markAllRead:function(audience){
@@ -1695,7 +1707,40 @@ async function captureAffiliateReferral(){
     }catch(e){}
   }catch(e){}
 }
-async function syncAffiliateProfile(){
+async async function syncServerNotifications(){
+  if(!ML_API.auth.isAuthenticated())return [];
+  try{
+    var response=await ML_API.customers.getNotifications({page:1,limit:100,unreadOnly:false});
+    var items=response&&response.data;
+    if(!Array.isArray(items))items=items&&Array.isArray(items.items)?items.items:[];
+    items.forEach(function(n){
+      if(!n||n.id==null)return;
+      var type=String(n.type||'notification').toLowerCase();
+      var ref=String(n.reference_type||'').toLowerCase();
+      var audience=(ref==='vendor'||type.indexOf('vendor_')===0)?'vendor':
+        (ref==='rider'||type.indexOf('rider_')===0||type.indexOf('delivery_')===0)?'rider':'customer';
+      NotificationCenter.syncServer(audience,{id:n.id,type:n.title||n.type||'MarketLink update',message:n.body||n.message||n.title||'MarketLink update',created_at:n.created_at,read_at:n.read_at});
+    });
+    refreshNotifBadges();
+    return items;
+  }catch(e){console.warn('[MarketLink] Server notifications could not be synchronized:',e&&e.code||e&&e.message||'API_ERROR');return [];}
+}
+async function syncServerProfile(){
+  if(!ML_API.auth.isAuthenticated())return null;
+  try{
+    var response=await ML_API.customers.getProfile(),profile=response&&response.data;
+    if(!profile)return null;
+    S.profileName=profile.full_name||S.profileName||'';
+    S.profilePhone=profile.phone||S.profilePhone||'';
+    S.profilePhoto=profile.profile_photo_url||null;
+    S.rewardPoints=Number(profile.reward_points||0);
+    S.walletBalance=Number(profile.wallet_balance||0);
+    if(S.user){S.user.name=S.profileName||S.user.name;S.user.phone=S.profilePhone||S.user.phone;}
+    return profile;
+  }catch(e){console.warn('[MarketLink] Server profile synchronization deferred:',e&&e.code||e&&e.message||'API_ERROR');return null;}
+}
+
+function syncAffiliateProfile(){
   if(!ML_API.auth.isAuthenticated()) return null;
   try{
     var result=await ML_API.affiliates.me();
