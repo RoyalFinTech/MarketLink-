@@ -1518,6 +1518,7 @@ var ML_API = (function(){
   // ── VENDORS (own dashboard) ───────────────────────────────────
   var vendors = {
     list:                function(qs){  return get('/vendors', qs); },
+    adminApplications:   function(qs){  return get('/vendors/admin/applications', qs); },
     getById:             function(id){   return get('/vendors/'+id); },
     register:            function(d){   return post('/vendors/register', d); },
     updateProfile:       function(d){   return put('/vendors/profile', d); },
@@ -1531,6 +1532,7 @@ var ML_API = (function(){
   // ── RIDERS (own dashboard) ────────────────────────────────────
   var riders = {
     list:              function(qs){    return get('/riders', qs); },
+    adminApplications: function(qs){    return get('/riders/admin/applications', qs); },
     getById:           function(id){    return get('/riders/'+id); },
     register:          function(d){    return post('/riders/register', d); },
     updateProfile:     function(d){    return put('/riders/profile', d); },
