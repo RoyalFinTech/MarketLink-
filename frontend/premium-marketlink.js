@@ -413,8 +413,12 @@
         ?await ML_API.vendors.adminApplications({page:1,limit:50,kycStatus:'pending'})
         :await ML_API.riders.adminApplications({page:1,limit:50,kycStatus:'pending'});
       var rows=normalizeProducts(r.data),root=G('adash-body');if(!root)return;
-      function field(label,value){return value?'<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 106px;color:#8da2b0;font-size:10px;">'+esc(label)+'</b><span style="min-width:0;overflow-wrap:anywhere;color:#e8f0f4;font-size:11px;">'+esc(value)+'</span></div>':'';}
-      function doc(label,url){return url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:8px 10px;margin:4px 5px 0 0;" onclick="window.ML_Premium.viewApplicationDocument(\\''+esc(url)+'\\',\\''+esc(label)+'\\')">View '+esc(label)+'</button>':'';}
+      function field(label,value){
+        return value?'<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 106px;color:#8da2b0;font-size:10px;">'+esc(label)+'</b><span style="min-width:0;overflow-wrap:anywhere;color:#e8f0f4;font-size:11px;">'+esc(value)+'</span></div>':'';
+      }
+      function doc(label,url){
+        return url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:8px 10px;margin:4px 5px 0 0;" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(url)+'&quot;,&quot;'+esc(label)+'&quot;)">View '+esc(label)+'</button>':'';
+      }
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending '+(kind==='vendor'?'vendor':'rider')+' applications</h3><button onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div>'+
       (rows.length?'<div style="display:grid;gap:12px;">'+rows.map(function(a){
         var id=a.user_id||a.id,name=a.owner_name||a.full_name||'Applicant';
@@ -427,7 +431,7 @@
         var docs=kind==='vendor'
           ?doc('National ID / Passport',a.id_document_url)+doc('Shop photo',a.shop_photo_url)
           :doc('National ID / Passport',a.id_document_url)+doc('Driver licence',a.license_document_url)+doc('Vehicle photo',a.vehicle_photo_url);
-        return '<article class="ml-profile-card" style="padding:14px;"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'+image+'<div style="min-width:0;flex:1;"><b style="color:#f6fafb;font-size:14px;">'+esc(title)+'</b><div style="color:#91a4b4;font-size:10px;margin-top:4px;">KYC: '+esc(a.kyc_status||'pending')+' · ID '+esc(id)+'</div></div></div>'+details+'<div style="margin-top:8px;">'+docs+'</div><div style="display:flex;gap:9px;margin-top:12px;"><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(\\''+esc(id)+'\\',\\''+kind+'\\')">Approve</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectApplication(\\''+esc(id)+'\\',\\''+kind+'\\')">Reject</button></div></article>';
+        return '<article class="ml-profile-card" style="padding:14px;"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'+image+'<div style="min-width:0;flex:1;"><b style="color:#f6fafb;font-size:14px;">'+esc(title)+'</b><div style="color:#91a4b4;font-size:10px;margin-top:4px;">KYC: '+esc(a.kyc_status||'pending')+' · ID '+esc(id)+'</div></div></div>'+details+'<div style="margin-top:8px;">'+docs+'</div><div style="display:flex;gap:9px;margin-top:12px;"><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(&quot;'+esc(id)+'&quot;,&quot;'+esc(kind)+'&quot;)">Approve</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectApplication(&quot;'+esc(id)+'&quot;,&quot;'+esc(kind)+'&quot;)">Reject</button></div></article>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No pending applications</b><span>The live database has no pending '+(kind==='vendor'?'vendor':'rider')+' applications.</span></div>')+'</div>';
     }catch(e){toast(e.error||e.message||'Could not load applications.','error');}
   }
