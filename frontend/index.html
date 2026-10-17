@@ -1707,7 +1707,7 @@ async function captureAffiliateReferral(){
     }catch(e){}
   }catch(e){}
 }
-async async function syncServerNotifications(){
+async function syncServerNotifications(){
   if(!ML_API.auth.isAuthenticated())return [];
   try{
     var response=await ML_API.customers.getNotifications({page:1,limit:100,unreadOnly:false});
@@ -1740,7 +1740,7 @@ async function syncServerProfile(){
   }catch(e){console.warn('[MarketLink] Server profile synchronization deferred:',e&&e.code||e&&e.message||'API_ERROR');return null;}
 }
 
-function syncAffiliateProfile(){
+async function syncAffiliateProfile(){
   if(!ML_API.auth.isAuthenticated()) return null;
   try{
     var result=await ML_API.affiliates.me();
