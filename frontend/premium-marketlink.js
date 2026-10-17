@@ -488,12 +488,31 @@
       (isMarketLinkRole('rider')?'<button type="button" class="ml-role-cta-button" onclick="window.ML_Premium.openRoleDashboard(\'rider\')"><span class="ml-role-cta-icon">🛵</span><span class="ml-role-cta-copy"><b>Rider Dashboard</b><small>View deliveries and manage availability.</small></span><span>↗</span></button>':'<button type="button" class="ml-role-cta-button" onclick="openRiderApp()"><span class="ml-role-cta-icon">🛵</span><span class="ml-role-cta-copy"><b>Become a Rider</b><small>Apply to join the delivery network.</small></span><span>↗</span></button>')+
     '</div></section>';
   }
-  function openRoleDashboard(role){
+  async function openRoleDashboard(role){
     var r=String(role||'').toLowerCase();
     if(r==='profile'){switchTab('profile');return;}
-    if(r==='vendor'){if(!isMarketLinkRole('vendor')){toast('Your vendor application must be approved before dashboard access.','error');return;}switchTab('vendordash');return;}
-    if(r==='rider'){if(!isMarketLinkRole('rider')){toast('Your rider application must be approved before dashboard access.','error');return;}switchTab('riderdash');return;}
-    toast('Choose a valid MarketLink dashboard.','error');
+    if(r!=='vendor'&&r!=='rider'){toast('Choose a valid MarketLink dashboard.','error');return;}
+    if(!isMarketLinkRole(r)){toast('Your '+r+' application must be approved before dashboard access.','error');return;}
+    // A role is assigned when an application is submitted, not when Admin
+    // approves it. Always verify the persisted KYC status before opening a
+    // privileged dashboard; the role claim alone is not approval.
+    try{
+      if(!S.user||!S.user.id)throw new Error('Please sign in again to verify your application status.');
+      var response=r==='vendor'?await ML_API.vendors.getById(S.user.id):await ML_API.riders.getById(S.user.id);
+      var profile=response&&response.data;
+      var status=String(profile&&profile.kyc_status||'').toLowerCase();
+      if(status!=='approved'){
+        var message=status==='pending'?'Your '+r+' application is still pending Admin review.':
+          status==='rejected'?'Your '+r+' application was rejected. Please contact MarketLink support.':
+          status==='suspended'?'Your '+r+' account is suspended. Please contact MarketLink support.':
+          'MarketLink could not verify approval for your '+r+' account.';
+        toast(message,'warning');
+        return;
+      }
+      switchTab(r==='vendor'?'vendordash':'riderdash');
+    }catch(e){
+      toast(e&&e.error||e&&e.message||'Could not verify your application status. Please retry.','error');
+    }
   }
   function mlOfficialBrandMarkup(){
     var icon=typeof logoSVG==='function'?logoSVG(34):'';
