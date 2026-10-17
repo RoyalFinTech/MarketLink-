@@ -2183,39 +2183,57 @@ async function doLogin(){
   if(S.pin.join('').length<4){authErr('Enter your 4-digit PIN');return;}
   var enteredPin=S.pin.join('');
   var btn=G('lbtn'); if(btn){btn.textContent='Signing in…';btn.disabled=true;}
+  var user;
+  // Only authentication failures belong on the login form. Dashboard rendering
+  // errors must never be misreported as a failed sign-in after tokens were issued.
   try{
-    var user = await ML_API.auth.login(S.loginPhone, enteredPin);
-    S.user={name:user.fullName||user.full_name,phone:user.phone,id:user.id,accountStatus:'Active'};
-    S.roles=user.roles||['customer'];
-    S.profileName=S.user.name; S.profilePhone=S.user.phone;
-    syncAffiliateProfile();
-    // Enter the app as soon as authentication succeeds. Profile enrichment must
-    // never hold the login screen open while a slow profile/database query completes.
-    goApp(); toast('Welcome back, '+String(S.user.name||'there').split(' ')[0]+'! 🎉');
-    Promise.resolve().then(async function(){
-      try{
-        var profile=await ML_API.customers.getProfile();
-        if(profile&&profile.data){
-          S.rewardPoints=profile.data.reward_points||0;
-          S.walletBalance=parseFloat(profile.data.wallet_balance||0);
-          if(typeof renderPremiumProfile==='function')renderPremiumProfile();
-        }
-      }catch(e){/* Login already succeeded; profile details can retry later. */}
-    });
+    user = await ML_API.auth.login(S.loginPhone, enteredPin);
   }catch(err){
     if(btn){btn.textContent='Sign In';btn.disabled=false;}
     var msg=err.error||'Login failed. Please try again.';
     if(err.code==='USER_NOT_FOUND') msg='No account found with this phone number. Tap "Create account" below.';
     if(err.code==='INVALID_PIN') msg='Incorrect PIN. Please try again.';
     if(err.code==='ACCOUNT_SUSPENDED') msg='This account has been suspended. Contact support.';
-    if(err.code==='NETWORK_ERROR' || err.code==='MISCONFIGURED_BACKEND'){
-      // err.error already carries the specific, actionable message from ML_API's req() —
-      // don't overwrite it with a generic one.
-      msg=err.error;
-    }
+    if(err.code==='NETWORK_ERROR' || err.code==='MISCONFIGURED_BACKEND') msg=err.error;
     authErr(msg);
     if(typeof toast==='function')toast(msg,'error');
+    return;
   }
+  // Authentication succeeded: persist the signed-in state before rendering.
+  S.user={name:user.fullName||user.full_name,phone:user.phone,id:user.id,accountStatus:'Active'};
+  S.roles=user.roles||['customer'];
+  S.profileName=S.user.name; S.profilePhone=S.user.phone;
+  try{syncAffiliateProfile();}catch(syncErr){}
+  if(btn){btn.textContent='Signed in';btn.disabled=true;}
+  try{
+    goApp();
+  }catch(renderErr){
+    // Recover to the authenticated app shell. Never send a signed-in user back
+    // to the login screen just because a dashboard widget failed to render.
+    try{
+      document.querySelectorAll('.screen').forEach(function(screen){screen.classList.remove('active');});
+      var appScreen=G('scr-app');if(appScreen)appScreen.classList.add('active');
+      var nav=G('bnav');if(nav)nav.style.display='flex';
+      var app=G('app');if(app)app.style.display='';
+      var home=G('tab-home');
+      if(home&&!home.innerHTML.trim())home.innerHTML='<div style="padding:24px;text-align:center;color:var(--text,#102333)"><h2>Welcome back!</h2><p>Your account is signed in. Some dashboard content could not load.</p><button class="btn btn-p" onclick="try{renderHome()}catch(e){location.reload()}">Reload dashboard</button></div>';
+    }catch(recoveryErr){}
+    if(typeof toast==='function')toast('You are signed in, but part of the dashboard could not load. Please retry the dashboard.','error');
+  }
+  if(btn){btn.textContent='Sign In';btn.disabled=false;}
+  if(G('auth-err'))G('auth-err').style.display='none';
+  toast('Welcome back, '+String(S.user.name||'there').split(' ')[0]+'! 🎉');
+  // Enrichment is deliberately background-only and cannot undo a successful login.
+  Promise.resolve().then(async function(){
+    try{
+      var profile=await ML_API.customers.getProfile();
+      if(profile&&profile.data){
+        S.rewardPoints=profile.data.reward_points||0;
+        S.walletBalance=parseFloat(profile.data.wallet_balance||0);
+        if(typeof renderPremiumProfile==='function')renderPremiumProfile();
+      }
+    }catch(e){/* Login already succeeded; profile details can retry later. */}
+  });
 }
 
 async function doRegister(){
