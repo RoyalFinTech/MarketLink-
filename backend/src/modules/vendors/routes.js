@@ -39,6 +39,11 @@ const ADMIN = ['admin', 'super_admin', 'moderator'];
  *         description: Admin only
  */
 router.get('/', ctrl.list);
+router.get('/admin/applications', authenticate, authorize('admin','super_admin','moderator'),
+  [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100}),
+   query('kycStatus').optional().isIn(['pending','approved','rejected','suspended'])],
+  validate, ctrl.adminApplications
+);
 
 /**
  * @swagger
