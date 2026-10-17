@@ -1213,9 +1213,17 @@ var NotificationCenter = (function(){
     markAllRead:function(audience){
       (store[audience]||[]).forEach(function(n){n.read=true;});
       save();
-      // Also mark as read on server for the customer audience
-      if(audience==='customer' && ML_API.auth.isAuthenticated()){
-        ML_API.customers.markNotifRead([]).catch(function(){});
+      // Backend notification records are the source of truth for authenticated users.
+      if(ML_API.auth.isAuthenticated()){
+        ML_API.notifications.markRead([]).then(function(){
+          return ML_API.notifications.unreadCount();
+        }).then(function(result){
+          var count=Number(result&&result.data&&result.data.count);
+          if(Number.isFinite(count))S.serverUnreadCount=count;
+          if(typeof refreshNotifBadges==='function')refreshNotifBadges();
+        }).catch(function(){
+          if(typeof refreshNotifBadges==='function')refreshNotifBadges();
+        });
       }
       if(typeof refreshNotifBadges==='function') refreshNotifBadges();
     },
@@ -1638,7 +1646,7 @@ var S = {
   obSlide:0, authMode:'login', pinStep:'create',
   pin:['','','',''], cpin:['','','',''], otp:['','','','','',''],
   regName:'', regPhone:'', loginPhone:'', agreed:false, devOtpDisplay:null,
-  notifRead:[],
+  notifRead:[], serverUnreadCount:null,
   notifSettings:{order:true,promo:true,rider:true,vendor:true,email:false,sms:true,push:true},
   addresses:[],
   payments:[
@@ -1721,6 +1729,13 @@ async function syncServerNotifications(){
         (ref==='rider'||type.indexOf('rider_')===0||type.indexOf('delivery_')===0)?'rider':'customer';
       NotificationCenter.syncServer(audience,{id:n.id,type:n.title||n.type||'MarketLink update',message:n.body||n.message||n.title||'MarketLink update',created_at:n.created_at,read_at:n.read_at});
     });
+    // Count only durable backend records for authenticated badge totals; this
+    // prevents locally generated UI events and mirrored push messages inflating badges.
+    try{
+      var countResponse=await ML_API.notifications.unreadCount();
+      var serverCount=Number(countResponse&&countResponse.data&&countResponse.data.count);
+      if(Number.isFinite(serverCount))S.serverUnreadCount=serverCount;
+    }catch(countError){}
     refreshNotifBadges();
     return items;
   }catch(e){console.warn('[MarketLink] Server notifications could not be synchronized:',e&&e.code||e&&e.message||'API_ERROR');return [];}
@@ -3232,18 +3247,19 @@ function openNotif(){
   openSheet('sh-notif');
 }
 function refreshNotifBadges(){
-  var unread=S.notifRead.filter(function(r){return !r;}).length + NotificationCenter.unreadCount('customer');
+  var hasServerCount=ML_API.auth.isAuthenticated()&&typeof S.serverUnreadCount==='number'&&Number.isFinite(S.serverUnreadCount);
+  var unread=hasServerCount?S.serverUnreadCount:S.notifRead.filter(function(r){return !r;}).length+NotificationCenter.unreadCount('customer');
   var bell=G('nbell'); if(bell){bell.textContent=unread;bell.style.display=unread>0?'flex':'none';}
   var vBell=G('vdash-notif-badge');
-  if(vBell){var vCount=NotificationCenter.unreadCount('vendor');vBell.textContent=vCount;vBell.style.display=vCount>0?'flex':'none';}
+  if(vBell){var vCount=hasServerCount?S.serverUnreadCount:NotificationCenter.unreadCount('vendor');vBell.textContent=vCount;vBell.style.display=vCount>0?'flex':'none';}
   var rBell=G('rdash-notif-badge');
-  if(rBell){var rCount=NotificationCenter.unreadCount('rider');rBell.textContent=rCount;rBell.style.display=rCount>0?'flex':'none';}
+  if(rBell){var rCount=hasServerCount?S.serverUnreadCount:NotificationCenter.unreadCount('rider');rBell.textContent=rCount;rBell.style.display=rCount>0?'flex':'none';}
 }
 function markAllRead(){
   S.notifRead=S.notifRead.map(function(){return true;});
   NotificationCenter.markAllRead('customer');
   openNotif();
-  var bell=G('nbell'); if(bell) bell.style.display='none';
+  refreshNotifBadges();
 }
 
 // ═══════════════════════════════════════════════════════════
