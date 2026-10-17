@@ -105,6 +105,7 @@ router.post('/register',
       .optional().trim().isLength({ max: 60 }),
     body('idDocumentUrl').optional({ nullable: true }).isURL({ require_protocol: true }),
     body('shopPhotoUrl').optional({ nullable: true }).isURL({ require_protocol: true }),
+    body('logoUrl').optional({ nullable: true }).isURL({ require_protocol: true }),
     body('latitude')
       .optional({ nullable: true }).isFloat({ min: -90, max: 90 }),
     body('longitude')
