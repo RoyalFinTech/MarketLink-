@@ -936,6 +936,14 @@ select[id$="-operator"] option,.ml-gm-phone select option{
   </div>
 </div>
 
+<!-- Returning vendor/rider access page -->
+<div id="sh-role-access" class="sheet-ov ml-role-access-ov" role="dialog" aria-modal="true" aria-labelledby="role-access-title">
+ <div class="sheet ml-role-access-sheet">
+  <div class="sheet-hdr"><span id="role-access-title" style="color:var(--tx);font-size:15px;font-weight:800;">🔐 Secure dashboard access</span><button class="sheet-cls" type="button" onclick="closeRoleAccess()">×</button></div>
+  <div id="role-access-body" class="ml-role-access-body"></div>
+ </div>
+</div>
+
 <!-- Vendor App Sheet -->
 <div id="sh-vapp" class="sheet-ov">
   <div class="sheet" style="max-height:92vh;">
@@ -3215,10 +3223,10 @@ function renderProfile(){
 
   var upgradeHTML='';
   if(!hasV||!hasR){
-    upgradeHTML='<div style="display:grid;grid-template-columns:'+((!hasV&&!hasR)?'1fr 1fr':'1fr')+';gap:9px;margin-bottom:16px;">';
-    if(!hasV) upgradeHTML+='<div onclick="openVendorApp()" style="background:linear-gradient(135deg,#0A5C60,#0D7377);border-radius:13px;padding:14px 11px;cursor:pointer;"><div style="font-size:24px;margin-bottom:4px;">🏪</div><div style="color:#fff;font-size:11px;font-weight:700;">Become a Vendor</div><div style="color:rgba(255,255,255,0.6);font-size:9px;margin-top:2px;">Apply now →</div></div>';
-    if(!hasR) upgradeHTML+='<div onclick="openRiderApp()" style="background:linear-gradient(135deg,#5B21B6,#7C3AED);border-radius:13px;padding:14px 11px;cursor:pointer;"><div style="font-size:24px;margin-bottom:4px;">🛵</div><div style="color:#fff;font-size:11px;font-weight:700;">Become a Rider</div><div style="color:rgba(255,255,255,0.6);font-size:9px;margin-top:2px;">Apply now →</div></div>';
-    upgradeHTML+='</div>';
+    upgradeHTML='<section class="ml-role-hub" aria-label="MarketLink business and rider access"><div class="ml-role-hub-title">Grow with MarketLink</div><p>Sell your products to local customers or earn by delivering orders. Choose an application below, or sign in if you already have an approved account.</p><div class="ml-role-hub-actions">';
+    if(!hasV) upgradeHTML+='<div class="ml-role-card"><div class="ml-role-card-icon">🏪</div><div class="ml-role-card-title">Become a Vendor</div><div class="ml-role-card-copy">Create your shop, list products and manage orders.</div><button type="button" class="ml-role-primary" onclick="openVendorApp()">Apply as vendor</button><button type="button" class="ml-role-login" onclick="openRoleAccess(\'vendor\')">Already a registered vendor? Log in →</button></div>';
+    if(!hasR) upgradeHTML+='<div class="ml-role-card rider"><div class="ml-role-card-icon">🛵</div><div class="ml-role-card-title">Become a Delivery Rider</div><div class="ml-role-card-copy">Receive delivery jobs, manage deliveries and track earnings.</div><button type="button" class="ml-role-primary" onclick="openRiderApp()">Apply as rider</button><button type="button" class="ml-role-login" onclick="openRoleAccess(\'rider\')">Already a registered rider? Log in →</button></div>';
+    upgradeHTML+='</div></section>';
   }
   // Admin access has been removed from the customer profile entirely.
   // Admin authentication now lives behind the 🛡️ Admin Portal link on the Login screen footer.
@@ -5665,6 +5673,51 @@ async function rRequestWithdrawal(amount){
 // ═══════════════════════════════════════════════════════════
 // VENDOR APPLICATION
 // ═══════════════════════════════════════════════════════════
+
+// RETURNING VENDOR / RIDER ACCESS
+var _roleAccessType='vendor', _roleAccessPin=['','','',''];
+function openRoleAccess(role){
+ if(role!=='vendor'&&role!=='rider')return;
+ _roleAccessType=role;_roleAccessPin=['','','',''];
+ var title=G('role-access-title'),body=G('role-access-body');
+ if(title)title.textContent=(role==='vendor'?'🏪 Vendor dashboard':'🛵 Rider dashboard')+' · Secure sign in';
+ if(body)body.innerHTML='<div class="ml-role-access-mark">'+logoSVG(42)+'</div><div class="ml-role-access-welcome">Welcome back</div><p class="ml-role-access-intro">Verify your MarketLink account to open your '+(role==='vendor'?'vendor shop dashboard':'delivery rider dashboard')+'. Use the phone number and 4-digit PIN from your original MarketLink account.</p><label class="ml-role-access-label" for="role-access-phone">Account phone number</label><input id="role-access-phone" class="ml-role-access-phone" type="tel" inputmode="tel" autocomplete="tel" value="'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'" placeholder="+220  XXX XXXX"><div class="ml-role-access-label">Enter your 4-digit PIN</div><div id="role-access-pins" class="ml-role-access-pins">'+[0,1,2,3].map(function(i){return '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="off" aria-label="PIN digit '+(i+1)+'" data-role-pin="'+i+'" oninput="roleAccessPinInput(this)" onkeydown="roleAccessPinKey(event,this)">';}).join('')+'</div><div id="role-access-error" class="ml-role-access-error" role="alert" style="display:none"></div><button id="role-access-submit" class="ml-role-primary ml-role-access-submit" type="button" onclick="submitRoleAccess()">Verify and open dashboard</button><button class="ml-role-login ml-role-access-use-pin" type="button" onclick="focusRolePin()">Use PIN instead · PIN is required</button><div class="ml-role-access-foot">🔒 Your PIN is verified by MarketLink securely. Never share it with anyone.</div>';
+ openSheet('sh-role-access');setTimeout(function(){var p=G('role-access-phone');if(p)p.focus();},80);
+}
+function closeRoleAccess(){closeSheet('sh-role-access');}
+function roleAccessPinInput(input){
+ if(!input)return;var i=Number(input.getAttribute('data-role-pin')),v=String(input.value||'').replace(/\D/g,'').slice(-1);input.value=v;_roleAccessPin[i]=v;
+ var pins=document.querySelectorAll('#role-access-pins input');if(v&&i<3)pins[i+1].focus();
+ if(_roleAccessPin.every(function(x){return x!=='';}))submitRoleAccess();
+}
+function roleAccessPinKey(e,input){var i=Number(input.getAttribute('data-role-pin'));if(e.key==='Backspace'&&!input.value&&i>0){var pins=document.querySelectorAll('#role-access-pins input');pins[i-1].focus();}if(e.key==='Enter')submitRoleAccess();}
+function focusRolePin(){var pins=document.querySelectorAll('#role-access-pins input');if(pins.length)pins[0].focus();}
+async function submitRoleAccess(){
+ if(!window.ML_API||!ML_API.auth)return;
+ var phone=G('role-access-phone'),pin=_roleAccessPin.join(''),err=G('role-access-error'),btn=G('role-access-submit');
+ if(!phone||!phone.value.trim()){showRoleAccessError('Enter the phone number used for your MarketLink account.');return;}
+ if(pin.length!==4){showRoleAccessError('Enter all 4 PIN digits.');return;}
+ if(btn){btn.disabled=true;btn.textContent='Verifying securely…';}if(err)err.style.display='none';
+ try{
+  var user=await ML_API.auth.login(phone.value.trim(),pin);
+  var roles=(user.roles||[]).map(function(r){return String(r).toLowerCase();});
+  if(roles.indexOf(_roleAccessType)<0){
+   try{await ML_API.auth.logout();}catch(e){}
+   showRoleAccessError(_roleAccessType==='vendor'?'This account is not registered as a vendor. Apply to become a vendor first, or choose rider access.':'This account is not registered as a delivery rider. Apply to become a rider first, or choose vendor access.');
+   if(btn){btn.disabled=false;btn.textContent='Verify and open dashboard';}return;
+  }
+  S.user={name:user.fullName||user.full_name,phone:user.phone,id:user.id,accountStatus:'Active'};S.roles=roles;S.profileName=S.user.name;S.profilePhone=S.user.phone;
+  try{syncAffiliateProfile();}catch(e){}
+  if(err){err.className='ml-role-access-success';err.textContent='✓ Verification successful. Welcome back! Opening your dashboard…';err.style.display='block';}
+  if(btn)btn.textContent='Welcome back…';
+  setTimeout(function(){closeRoleAccess();try{goApp();}catch(e){toast('You are verified, but the dashboard could not open. Please try again.','error');}toast('Welcome back, '+String(S.user.name||'there').split(' ')[0]+'! Your '+(_roleAccessType==='vendor'?'vendor':'rider')+' dashboard is ready.');},350);
+ }catch(e){
+  showRoleAccessError((e&&e.code==='INVALID_PIN')?'That PIN is incorrect. Please try again.':(e&&e.code==='USER_NOT_FOUND')?'No MarketLink account was found for that phone number. Please check it or create an account.':(e&&e.error)||'We could not verify your sign in. Check your details and try again.');
+  _roleAccessPin=['','','',''];document.querySelectorAll('#role-access-pins input').forEach(function(p){p.value='';});focusRolePin();
+ }finally{if(btn&&btn.isConnected&&btn.textContent!=='Welcome back…'){btn.disabled=false;btn.textContent='Verify and open dashboard';}}
+}
+function showRoleAccessError(message){var e=G('role-access-error');if(!e)return;e.className='ml-role-access-error';e.innerHTML='<span class="ml-role-error-icon">!</span><div><b>We could not complete that</b><p>'+sanitizeText(message)+'</p></div><button type="button" onclick="this.parentNode.style.display=\'none\'">Dismiss</button>';e.style.display='flex';}
+
 function openVendorApp(){
   S.vStep=0;
   var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\+220/,'').replace(/\D/g,'');
