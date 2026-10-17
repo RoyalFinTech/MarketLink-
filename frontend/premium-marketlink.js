@@ -392,13 +392,54 @@
       '<div style="display:flex;gap:8px;margin-top:14px"><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="window.ML_Premium.adminUsers()">Users</button><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="adminLogout()">Sign out</button></div></div>';
     }catch(e){toast(e.error||'Could not load the admin dashboard.','error');}
   }
+  async function viewApplicationDocument(url,label){
+    if(!apiOk()){toast('Please sign in as an administrator to view application documents.','error');return;}
+    if(!url){toast('No document was uploaded for this application.','warning');return;}
+    var token=ML_API.getAccessToken&&ML_API.getAccessToken();
+    if(!token){toast('Your session has expired. Sign in again to view this document.','error');return;}
+    try{
+      var response=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+      if(!response.ok){var data={};try{data=await response.json();}catch(e){}throw new Error(data.error||('Document request failed ('+response.status+').'));}
+      var blob=await response.blob(),objectUrl=URL.createObjectURL(blob);
+      var tab=window.open(objectUrl,'_blank','noopener,noreferrer');
+      if(!tab){var link=document.createElement('a');link.href=objectUrl;link.download=(label||'MarketLink-application-document');document.body.appendChild(link);link.click();link.remove();}
+      setTimeout(function(){try{URL.revokeObjectURL(objectUrl);}catch(e){}},120000);
+    }catch(e){toast(e.message||'Could not open the application document.','error');}
+  }
+
   async function adminApprovals(kind){
     try{
-      var r=kind==='vendor'?await ML_API.vendors.list({page:1,limit:50,kycStatus:'pending'}):await ML_API.riders.list({page:1,limit:50,kycStatus:'pending'});
+      var r=kind==='vendor'
+        ?await ML_API.vendors.adminApplications({page:1,limit:50,kycStatus:'pending'})
+        :await ML_API.riders.adminApplications({page:1,limit:50,kycStatus:'pending'});
       var rows=normalizeProducts(r.data),root=G('adash-body');if(!root)return;
+      function field(label,value){return value?'<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 106px;color:#8da2b0;font-size:10px;">'+esc(label)+'</b><span style="min-width:0;overflow-wrap:anywhere;color:#e8f0f4;font-size:11px;">'+esc(value)+'</span></div>':'';}
+      function doc(label,url){return url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:8px 10px;margin:4px 5px 0 0;" onclick="window.ML_Premium.viewApplicationDocument(\\''+esc(url)+'\\',\\''+esc(label)+'\\')">View '+esc(label)+'</button>':'';}
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending '+(kind==='vendor'?'vendor':'rider')+' applications</h3><button onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div>'+
-      (rows.length?'<div class="ml-profile-card">'+rows.map(function(a){var id=a.user_id||a.id;return '<div class="ml-profile-row"><div class="ico">'+(kind==='vendor'?'🏪':'🛵')+'</div><div class="copy"><b>'+esc(a.business_name||a.full_name||'Applicant')+'</b><span>'+esc(a.business_category||a.vehicle_type||'')+' · KYC: '+esc(a.kyc_status||'pending')+'</span></div><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(\''+esc(id)+'\',\''+kind+'\')">Approve</button></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No pending applications</b><span>The live database has no pending '+(kind==='vendor'?'vendor':'rider')+' applications.</span></div>')+'</div>';
-    }catch(e){toast(e.error||'Could not load approvals.','error');}
+      (rows.length?'<div style="display:grid;gap:12px;">'+rows.map(function(a){
+        var id=a.user_id||a.id,name=a.owner_name||a.full_name||'Applicant';
+        var title=kind==='vendor'?(a.business_name||'Vendor application'):name;
+        var logo=kind==='vendor'?(a.logo_url||a.shop_photo_url||''):(a.vehicle_photo_url||'');
+        var image=logo?'<img src="'+esc(logo)+'" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:#fff;">':'<div class="ico">'+(kind==='vendor'?'🏪':'🛵')+'</div>';
+        var details=kind==='vendor'
+          ?field('Owner',name)+field('Account phone',a.owner_phone||'')+field('Account email',a.owner_email||'')+field('Business name',a.business_name)+field('Shop phone',a.business_phone||'')+field('Business email',a.business_email||'')+field('Category',a.business_category)+field('Address',a.business_address)+field('Description',a.description)
+          :field('Full name',name)+field('Phone',a.phone)+field('Email',a.email)+field('Residential address',a.address)+field('Emergency contact',a.emergency_contact)+field('Vehicle type',a.vehicle_type)+field('Plate number',a.plate_number)+field('Licence number',a.license_number)+field('Delivery zone',a.delivery_zone);
+        var docs=kind==='vendor'
+          ?doc('National ID / Passport',a.id_document_url)+doc('Shop photo',a.shop_photo_url)
+          :doc('National ID / Passport',a.id_document_url)+doc('Driver licence',a.license_document_url)+doc('Vehicle photo',a.vehicle_photo_url);
+        return '<article class="ml-profile-card" style="padding:14px;"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'+image+'<div style="min-width:0;flex:1;"><b style="color:#f6fafb;font-size:14px;">'+esc(title)+'</b><div style="color:#91a4b4;font-size:10px;margin-top:4px;">KYC: '+esc(a.kyc_status||'pending')+' · ID '+esc(id)+'</div></div></div>'+details+'<div style="margin-top:8px;">'+docs+'</div><div style="display:flex;gap:9px;margin-top:12px;"><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(\\''+esc(id)+'\\',\\''+kind+'\\')">Approve</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectApplication(\\''+esc(id)+'\\',\\''+kind+'\\')">Reject</button></div></article>';
+      }).join('')+'</div>':'<div class="ml-empty"><b>No pending applications</b><span>The live database has no pending '+(kind==='vendor'?'vendor':'rider')+' applications.</span></div>')+'</div>';
+    }catch(e){toast(e.error||e.message||'Could not load applications.','error');}
+  }
+
+  async function rejectApplication(id,kind){
+    var reason=prompt('Enter the reason for rejecting this application:');
+    if(!reason||!reason.trim())return;
+    try{
+      if(kind==='vendor')await ML_API.vendors.reject(id,{reason:reason.trim()});
+      else await ML_API.riders.reject(id,{reason:reason.trim()});
+      toast('Application rejected.','success');await adminApprovals(kind);
+    }catch(e){toast(e.error||e.message||'Could not reject this application.','error');}
   }
   async function approveAdmin(id,kind){
     try{if(kind==='vendor')await ML_API.vendors.approve(id,{notes:'Approved from MarketLink Admin Control Center'});else await ML_API.riders.approve(id,{notes:'Approved from MarketLink Admin Control Center'});toast('Application approved ✓');loadAdminDashboard();}
@@ -1876,7 +1917,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers};
+    window.ML_Premium={toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();},renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
