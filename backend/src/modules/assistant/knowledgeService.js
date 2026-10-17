@@ -142,54 +142,78 @@ async function refreshAdminIndex() {
 
 const MIN_SCORE_THRESHOLD = 1.2;
 
-function scoreEntry(indexed, normalizedQuestion, questionTokens, expandedQuestionTokens, role) {
+/**
+ * Score each original question token only once. The previous ranker iterated
+ * over the fully expanded synonym set, so a single word such as "order" could
+ * count as many matches and make an unrelated entry win. Exact FAQ phrases
+ * are now decisive; otherwise, a candidate must cover multiple meaningful
+ * words in the user's question before it can be selected.
+ */
+function scoreEntry(indexed, normalizedQuestion, questionTokens, role) {
   let score = 0;
+  let phraseHits = 0;
+  let matchedTokens = 0;
 
   for (const phrase of indexed.keywordPhrases) {
-    if (phrase && normalizedQuestion.includes(phrase)) score += 3;
-  }
-
-  if (questionTokens.length) {
-    let overlap = 0;
-    for (const t of expandedQuestionTokens) if (indexed.tokenSet.has(t)) overlap++;
-    score += Math.min(overlap, questionTokens.length * 2) / questionTokens.length;
-
-    for (const qt of questionTokens) {
-      if (qt.length < 4 || (expandedQuestionTokens.has(qt) && indexed.tokenSet.has(qt))) continue;
-      if (indexed.rawTokenList.some(kt => kt.length >= 4 && levenshteinAtMost1(qt, kt))) {
-        score += 0.6;
-        break;
-      }
+    if (phrase && normalizedQuestion.includes(phrase)) {
+      score += 3.5;
+      phraseHits++;
     }
   }
 
-  const roles = indexed.entry.roles || ['all'];
-  if (role && (roles.includes('all') || roles.includes(role))) score += 0.5;
-  else if (!role && roles.includes('all')) score += 0.2;
+  for (const qt of questionTokens) {
+    const normalizedToken = stem(qt);
+    if (indexed.tokenSet.has(qt) || indexed.tokenSet.has(normalizedToken)) {
+      score += 1;
+      matchedTokens++;
+      continue;
+    }
 
-  if (indexed.source === 'admin') {
-    score += 1.0;
-    score += Math.max(0, Math.min(2, (indexed.entry.priority || 0) / 25));
+    // Retain typo tolerance, but make it a small supporting signal rather
+    // than allowing one approximate word to dominate the answer selection.
+    if (qt.length >= 4 && indexed.rawTokenList.some(kt => kt.length >= 4 && levenshteinAtMost1(qt, kt))) {
+      score += 0.35;
+      matchedTokens++;
+    }
   }
 
-  return score;
+  const coverage = questionTokens.length ? matchedTokens / questionTokens.length : 0;
+  score += coverage * 0.5;
+
+  const roles = indexed.entry.roles || ['all'];
+  if (role && (roles.includes('all') || roles.includes(role))) score += 0.25;
+  else if (!role && roles.includes('all')) score += 0.1;
+
+  if (indexed.source === 'admin') {
+    score += 0.5;
+    score += Math.max(0, Math.min(1, (indexed.entry.priority || 0) / 50));
+  }
+
+  return { score, phraseHits, matchedTokens, coverage };
 }
 
 async function search(question, role) {
   const normalizedQuestion = normalize(question);
   const questionTokens = tokenize(question);
   if (!normalizedQuestion) return null;
-  const expandedQuestionTokens = expand(questionTokens);
 
   const adminIndex = await refreshAdminIndex();
   const fullIndex = [...adminIndex, ...STATIC_INDEX];
 
   let best = null;
   for (const indexed of fullIndex) {
-    const score = scoreEntry(indexed, normalizedQuestion, questionTokens, expandedQuestionTokens, role);
-    if (!best || score > best.score) best = { entry: indexed.entry, score, source: indexed.source };
+    const matchScore = scoreEntry(indexed, normalizedQuestion, questionTokens, role);
+    if (!best || matchScore.score > best.score) {
+      best = { entry: indexed.entry, ...matchScore, source: indexed.source };
+    }
   }
+
   if (!best || best.score < MIN_SCORE_THRESHOLD) return null;
+
+  // Vague one-word queries should invite clarification instead of returning
+  // a random entry from a broad synonym group. Exact FAQ phrase matches remain
+  // eligible even when the question is short.
+  if (!best.phraseHits && (best.matchedTokens < 2 || best.coverage < 0.5)) return null;
   return best;
 }
 
