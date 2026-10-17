@@ -3787,7 +3787,7 @@ function renderVDash(){
       '<span style="font-size:22px;">🖼️</span><b style="font-size:11px;color:var(--tx);">Choose product photo (required)</b><span style="font-size:10px;color:var(--mu);">JPG, PNG or WebP · up to 5 MB · minimum 600 × 600 px</span>'+
       '<input type="file" id="vp-photo" accept="image/jpeg,image/png,image/webp" onchange="window.marketlinkProductImageSelected&&window.marketlinkProductImageSelected(this)" style="display:block;width:100%;max-width:320px;font-size:11px;color:var(--mu);"></label>'+
       '<div id="vp-photo-preview" role="status" style="font-size:11px;line-height:1.5;color:var(--mu);margin-bottom:9px;"></div>'+
-      '<button class="btn btn-p" onclick="vAddProd()">Upload and Add Product</button></div>';
+      '<button class="btn btn-p" id="vp-add-btn" onclick="vAddProd()">Upload and Add Product</button></div>';
     S.vProds.forEach(function(p){
       var isEditing=S.vEditingProdId===p.id;
       if(isEditing){
@@ -3853,7 +3853,7 @@ function renderVDash(){
     '<div style="background:linear-gradient(160deg,#0F1923,#0A5C60);padding:50px 16px 18px;position:relative;">'+
     '<div class="fb" style="position:absolute;top:0;left:0;right:0;"><div class="g"></div><div class="r"></div><div class="b"></div></div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'+
-    '<div style="display:flex;align-items:center;gap:9px;">'+logoSVG(26)+
+    '<div style="display:flex;align-items:center;gap:9px;">'+(S.vProfile&&S.vProfile.logo_url?'<img src="'+sanitizeText(S.vProfile.logo_url)+'" alt="Shop logo" style="width:34px;height:34px;object-fit:contain;border-radius:9px;background:#fff;padding:2px;border:1px solid rgba(255,255,255,.18);" onerror="this.onerror=null;this.style.display=\'none\';">'+logoSVG(26):logoSVG(26))+
     '<div><div style="color:#fff;font-size:15px;font-weight:700;">Vendor Dashboard</div><div style="color:rgba(255,255,255,0.5);font-size:10px;">🏪 My Store</div></div></div>'+
     '<div style="display:flex;align-items:center;gap:9px;">'+
     '<div onclick="openVendorNotifs()" style="position:relative;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;">🔔'+
@@ -5689,10 +5689,10 @@ function renderVApp(){
       '<input class="inp" placeholder="Shop address (area, town, landmark)" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
       '<select id="va-cat" style="width:100%;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;appearance:none;">'+
       cats.map(function(c){return '<option value="'+c+'"'+(f.cat===c?' selected':'')+'>'+(c||'Select business category')+'</option>';}).join('')+'</select>'+
-      '<label style="display:block;color:var(--mu);font-size:10px;font-weight:700;margin:0 0 5px 2px;">WhatsApp / business contact number</label>'+
+      '<label style="display:block;color:var(--mu);font-size:10px;font-weight:700;margin:0 0 5px 2px;">WhatsApp number after +220 (network prefix + 7 digits)</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="7-digit WhatsApp number" id="va-phone" value="'+sanitizeText(f.phone||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<input class="inp" type="tel" inputmode="tel" placeholder="e.g. 871234567" id="va-phone" value="'+sanitizeText(f.phone||'')+'" style="flex:1;margin-bottom:0;"></div>'+
       '<textarea class="inp" id="va-description" rows="3" placeholder="Short business description (optional)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;max-height:120px;resize:vertical;margin-top:10px;line-height:1.45;">'+sanitizeText(f.description||'')+'</textarea>';
   } else if(step===1){
     body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
