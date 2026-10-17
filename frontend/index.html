@@ -5657,7 +5657,7 @@ async function rRequestWithdrawal(amount){
 // ═══════════════════════════════════════════════════════════
 function openVendorApp(){
   S.vStep=0;
-  var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\\+220/,'').replace(/\\D/g,'');
+  var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\+220/,'').replace(/\D/g,'');
   S.vForm={bname:'',sname:'',saddr:'',cat:'',phone:accountPhone,email:(S.user&&S.user.email)||'',description:'',idDoc:'',photo:'',idDocFile:null,photoFile:null};
   renderVApp(); openSheet('sh-vapp');
 }
@@ -5784,8 +5784,12 @@ function renderRApp(){
       '<input class="inp" placeholder="Residential address (area, town, landmark)" id="ra-addr" value="'+sanitizeText(f.addr||'')+'">'+
       '<input class="inp" placeholder="Emergency contact number" id="ra-emg" type="tel" inputmode="tel" value="'+sanitizeText(f.emergency||'')+'">';
   } else if(step===1){
-    body='<input class="inp" placeholder="Plate Number (e.g. BJL 1234 A)" id="ra-plate" value="'+f.plate+'">'+
-      '<input class="inp" placeholder="Driver\'s Licence Number" id="ra-lic" value="'+f.licence+'">'+
+    body='<label style="display:block;color:var(--mu);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Vehicle type</label>'+
+      '<select id="ra-vehicle-type" style="width:100%;box-sizing:border-box;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;">'+
+      [['motorbike','Motorbike'],['bicycle','Bicycle'],['car','Car'],['van','Van']].map(function(v){return '<option value="'+v[0]+'"'+((f.vehicleType||'motorbike')===v[0]?' selected':'')+'>'+v[1]+'</option>';}).join('')+'</select>'+
+      '<input class="inp" placeholder="Plate Number (e.g. BJL 1234 A)" id="ra-plate" value="'+sanitizeText(f.plate||'')+'">'+
+      '<input class="inp" placeholder="Driver\'s Licence Number" id="ra-lic" value="'+sanitizeText(f.licence||'')+'">'+
+      '<input class="inp" placeholder="Delivery zone / preferred area" id="ra-zone" value="'+sanitizeText(f.deliveryZone||'')+'">'+
       '<div style="font-size:12px;line-height:1.5;color:var(--mu);margin:3px 0 12px;">Upload clear, genuine documents so the team can verify your identity and vehicle. Your application stays pending until reviewed.</div>'+
       '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-id-input" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'idDocFile\')"><div style="font-size:22px;margin-top:6px;">🪪</div><div style="color:var(--tx);font-size:12px;font-weight:600;">National ID / Passport</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.idDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
       '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-lic-input" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'licenseDocFile\')"><div style="font-size:22px;margin-top:6px;">📄</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Driver’s licence / permit</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.licenseDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
@@ -6677,7 +6681,7 @@ window.addEventListener('unhandledrejection',function(e){
         businessName:form.bname.trim(),
         businessCategory:form.cat,
         businessAddress:form.saddr.trim(),
-        description:[form.sname?'Shop name: '+form.sname.trim():'',form.description||''].filter(Boolean).join('\\n\\n')||undefined
+        description:[form.sname?'Shop name: '+form.sname.trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
       };
       if(form.phone){p.phone=normalize(form.phone,S.vFormCountry||'GM').e164;}
       if(form.email&&String(form.email).trim())p.email=String(form.email).trim();
