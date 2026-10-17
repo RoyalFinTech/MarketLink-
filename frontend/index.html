@@ -3276,7 +3276,7 @@ function uploadPhoto(){var input=G('photo-inp');if(input){input.value='';input.c
 async function handlePhoto(inp){
   if(!inp||!inp.files||!inp.files[0]) return;
   var file=inp.files[0];
-  if(!/^image\\/(jpeg|png)$/.test(file.type)){toast('Please choose a JPG or PNG profile photo.','error');inp.value='';return;}
+  if(!/^image\/(jpeg|png)$/.test(file.type)){toast('Please choose a JPG or PNG profile photo.','error');inp.value='';return;}
   if(file.size>5*1024*1024){toast('Profile photo must be 5 MB or smaller.','error');inp.value='';return;}
   if(!window.ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated||!ML_API.auth.isAuthenticated()){
     toast('Please sign in again before uploading your profile photo.','error');inp.value='';return;
