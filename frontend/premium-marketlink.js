@@ -1135,11 +1135,11 @@
     }
   }
   async function markPremiumNotificationRead(id){
-    try{await ML_API.customers.markNotifRead([id]);toast('Notification marked as read.','success');await renderPremiumNotificationsPage(G('profile-body'));}
+    try{await ML_API.customers.markNotifRead([id]);if(typeof syncServerNotifications==='function')await syncServerNotifications();toast('Notification marked as read.','success');await renderPremiumNotificationsPage(G('profile-body'));}
     catch(e){toast(e.error||'Could not update the notification.','error');}
   }
   async function markAllPremiumNotificationsRead(){
-    try{await ML_API.customers.markNotifRead([]);toast('Notifications marked as read.','success');await renderPremiumNotificationsPage(G('profile-body'));}
+    try{await ML_API.customers.markNotifRead([]);if(typeof syncServerNotifications==='function')await syncServerNotifications();toast('Notifications marked as read.','success');await renderPremiumNotificationsPage(G('profile-body'));}
     catch(e){toast(e.error||'Could not update notifications.','error');}
   }
   function renderPremiumPrivacySettings(root){
