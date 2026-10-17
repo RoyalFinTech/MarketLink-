@@ -120,8 +120,10 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
               v.logo_url, v.banner_url, v.description, v.rating_avg, v.rating_count,
               v.is_open, v.vacation_mode, v.kyc_status, v.commission_pct,
               v.total_sales, v.total_revenue, v.created_at,
-              u.full_name AS owner_name,
-              (SELECT count(*) FROM products p
+              u.full_name AS owner_name
+              ${isAdmin ? `, v.phone AS business_phone, v.email AS business_email,
+                v.id_document_url, v.shop_photo_url, u.phone AS owner_phone, u.email AS owner_email` : ''}
+              , (SELECT count(*) FROM products p
                WHERE p.vendor_id = v.user_id AND p.status = 'active') AS active_products
        FROM vendors v
        JOIN users u ON u.id = v.user_id
