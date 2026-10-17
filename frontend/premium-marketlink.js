@@ -1546,7 +1546,7 @@
     if(!cat||!cat.value){await window.marketlinkLoadProductCategories();if(!cat||!cat.value){toast('Choose a product category before submitting.','error');return;}}
     var categoryId=Number(cat.value);
     if(!Number.isInteger(categoryId)||categoryId<1){toast('Choose a valid product category.','error');return;}
-    var btn=document.querySelector('#vp-name')&&document.querySelector('#vp-name').parentNode.parentNode.querySelector('.btn-p');
+    var btn=G('vp-add-btn');
     if(btn){btn.disabled=true;btn.textContent='Checking and uploading…';}
     var imageUrl=null,created=false;
     try{
