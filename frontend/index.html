@@ -2188,11 +2188,15 @@ function renderOTPRow(){
 
 async function doLogin(){
   var p=G('lphone'); if(!p) return;
+  // The PIN input auto-submits and the Sign In button can be tapped at nearly
+  // the same time. Ignore a second call while the first request is in flight.
+  var loginButton=G('lbtn');
+  if(loginButton&&loginButton.disabled)return;
   S.loginPhone=p.value.trim();
   if(!S.loginPhone){authErr('Enter your phone number');return;}
   if(S.pin.join('').length<4){authErr('Enter your 4-digit PIN');return;}
   var enteredPin=S.pin.join('');
-  var btn=G('lbtn'); if(btn){btn.textContent='Signing in…';btn.disabled=true;}
+  var btn=loginButton; if(btn){btn.textContent='Signing in…';btn.disabled=true;}
   var user;
   // Only authentication failures belong on the login form. Dashboard rendering
   // errors must never be misreported as a failed sign-in after tokens were issued.
@@ -2205,8 +2209,9 @@ async function doLogin(){
     if(err.code==='INVALID_PIN') msg='Incorrect PIN. Please try again.';
     if(err.code==='ACCOUNT_SUSPENDED') msg='This account has been suspended. Contact support.';
     if(err.code==='NETWORK_ERROR' || err.code==='MISCONFIGURED_BACKEND') msg=err.error;
+    // authErr is the single authentication-error surface. Some UI layers
+    // mirror it into the toast, so do not emit a second duplicate toast here.
     authErr(msg);
-    if(typeof toast==='function')toast(msg,'error');
     return;
   }
   // Authentication succeeded: persist the signed-in state before rendering.
