@@ -2262,6 +2262,7 @@ async function doLogin(){
   // errors must never be misreported as a failed sign-in after tokens were issued.
   try{
     user = await ML_API.auth.login(S.loginPhone, enteredPin);
+    try{localStorage.setItem('ml_last_login_phone',S.loginPhone);}catch(storageError){}
   }catch(err){
     if(btn){btn.textContent='Sign In';btn.disabled=false;}
     var msg=err.error||'Login failed. Please try again.';
@@ -6966,7 +6967,7 @@ window.addEventListener('unhandledrejection',function(e){
     var opts=Object.keys(operators).map(function(k){
       return '<option value="'+k+'" '+(k===selected?'selected':'')+'>'+operators[k].label+'</option>';
     }).join('');
-    return '<div class="ml-gm-phone" style="display:flex;flex-wrap:wrap;align-items:stretch;gap:0;width:100%;margin-bottom:6px;border:1px solid rgba(245,184,61,.5);border-radius:12px;overflow:visible;background:#071521;min-width:0;box-shadow:0 0 0 1px rgba(245,184,61,.08) inset;">'+
+    return '<div class="ml-gm-phone" style="display:grid;grid-template-columns:auto minmax(112px,.9fr) minmax(110px,1fr);align-items:stretch;gap:0;width:100%;margin-bottom:6px;border:1px solid rgba(245,184,61,.5);border-radius:12px;overflow:hidden;background:#071521;min-width:0;box-shadow:0 0 0 1px rgba(245,184,61,.08) inset;">'+
       '<span style="display:flex;align-items:center;padding:0 10px;font-size:13px;color:#fff;white-space:nowrap;background:#0B1F2E;">'+
       '<span style="display:inline-flex;align-items:center;margin-right:7px;">'+gambiaFlagMarkup()+'</span><strong>+220</strong></span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="appearance:auto;color-scheme:dark;max-width:49%;min-width:100px;flex:1 1 125px;height:46px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 8px;background:#071521;color:#fff;font-weight:700;font-size:12px;">'+opts+'</select>'+
@@ -6990,6 +6991,7 @@ window.addEventListener('unhandledrejection',function(e){
   function decorateOne(id,target){
     var old=document.getElementById(id);if(!old||!old.parentElement||old.dataset.mlCarrierDecorated==='1')return;
     var parent=old.parentElement, initial=(window.S&&S[stateKey(target)])||old.value||'';
+    if(target==='login'&&!initial){try{initial=localStorage.getItem('ml_last_login_phone')||'';}catch(e){}}
     /* The legacy auth row was a horizontal flex container. Reset it before adding
        the guidance card so the card sits below the phone control, never beside it. */
     parent.style.display='block';parent.style.position='relative';parent.style.width='100%';parent.style.minWidth='0';parent.style.margin='0 0 14px';parent.style.overflow='visible';parent.style.boxSizing='border-box';
