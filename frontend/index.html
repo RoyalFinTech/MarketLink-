@@ -5746,7 +5746,7 @@ async function rRequestWithdrawal(amount){
 // ═══════════════════════════════════════════════════════════
 
 // RETURNING VENDOR / RIDER ACCESS
-var _roleAccessType='vendor', _roleAccessPin=['','','',''];
+var _roleAccessType='vendor', _roleAccessPin=['','','',''], _roleAccessBusy=false;
 function openRoleAccess(role){
  if(role!=='vendor'&&role!=='rider')return;
  _roleAccessType=role;_roleAccessPin=['','','',''];
@@ -5765,12 +5765,14 @@ function roleAccessPinKey(e,input){var i=Number(input.getAttribute('data-role-pi
 function focusRolePin(){var pins=document.querySelectorAll('#role-access-pins input');if(pins.length)pins[0].focus();}
 async function submitRoleAccess(){
  if(!window.ML_API||!ML_API.auth)return;
+ if(_roleAccessBusy)return;
  var phone=G('role-access-phone'),pin=_roleAccessPin.join(''),err=G('role-access-error'),btn=G('role-access-submit');
  if(!phone||!phone.value.trim()){showRoleAccessError('Enter the phone number used for your MarketLink account.');return;}
  if(pin.length!==4){showRoleAccessError('Enter all 4 PIN digits.');return;}
- if(btn){btn.disabled=true;btn.textContent='Verifying securely…';}if(err)err.style.display='none';
+ _roleAccessBusy=true;if(btn){btn.disabled=true;btn.textContent='Verifying securely…';}if(err)err.style.display='none';
  try{
   var user=await ML_API.auth.login(phone.value.trim(),pin);
+  try{localStorage.setItem('ml_last_login_phone',phone.value.trim());}catch(storageError){}
   var roles=(user.roles||[]).map(function(r){return String(r).toLowerCase();});
   if(roles.indexOf(_roleAccessType)<0){
    try{await ML_API.auth.logout();}catch(e){}
@@ -5785,7 +5787,7 @@ async function submitRoleAccess(){
  }catch(e){
   showRoleAccessError((e&&e.code==='INVALID_PIN')?'That PIN is incorrect. Please try again.':(e&&e.code==='USER_NOT_FOUND')?'No MarketLink account was found for that phone number. Please check it or create an account.':(e&&e.error)||'We could not verify your sign in. Check your details and try again.');
   _roleAccessPin=['','','',''];document.querySelectorAll('#role-access-pins input').forEach(function(p){p.value='';});focusRolePin();
- }finally{if(btn&&btn.isConnected&&btn.textContent!=='Welcome back…'){btn.disabled=false;btn.textContent='Verify and open dashboard';}}
+ }finally{_roleAccessBusy=false;if(btn&&btn.isConnected&&btn.textContent!=='Welcome back…'){btn.disabled=false;btn.textContent='Verify and open dashboard';}}
 }
 function showRoleAccessError(message){var e=G('role-access-error');if(!e)return;e.className='ml-role-access-error';e.innerHTML='<span class="ml-role-error-icon">!</span><div><b>We could not complete that</b><p>'+sanitizeText(message)+'</p></div><button type="button" onclick="this.parentNode.style.display=\'none\'">Dismiss</button>';e.style.display='flex';}
 
