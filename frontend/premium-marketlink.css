@@ -1161,3 +1161,28 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 .ml-role-access-error button{border:0;background:transparent;color:#991b1b;font-weight:800;font-size:10px;margin-left:auto}
 .ml-role-access-success{display:block;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;border-radius:12px;padding:12px;font-size:12px;margin:12px 0}
 @media(max-width:390px){.ml-role-hub{padding:12px}.ml-role-hub-actions{grid-template-columns:1fr}.ml-role-card-copy{min-height:0}.ml-role-access-pins{gap:8px}.ml-role-access-pins input{width:49px;height:54px}}
+
+
+/* MarketLink onboarding readability and auth form spacing QA */
+#scr-onboard .ml-ob-copy h1{color:#fff!important;line-height:1.08!important;letter-spacing:-.035em;text-wrap:balance;text-shadow:0 2px 16px rgba(0,0,0,.24)}
+#scr-onboard .ml-ob-copy p{color:#e6f0f4!important;font-size:clamp(14px,1.2vw,17px)!important;line-height:1.75!important;max-width:48ch;text-shadow:0 1px 8px rgba(0,0,0,.35)}
+#scr-onboard .ml-ob-eyebrow{color:#79f0e4!important}
+#scr-onboard .ml-ob-visual-bottom{padding:clamp(17px,2.3vw,28px)!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:20px!important;background:linear-gradient(180deg,rgba(4,18,29,.76),rgba(4,18,29,.94))!important;box-shadow:0 14px 40px rgba(0,0,0,.3)!important;backdrop-filter:blur(8px)}
+#scr-onboard .ml-ob-visual-bottom h2{color:#fff!important;font-size:clamp(21px,2vw,29px)!important;line-height:1.2!important;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+#scr-onboard .ml-ob-visual-bottom p{color:#f1f6f8!important;font-size:clamp(13px,1.1vw,15px)!important;line-height:1.65!important;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+#scr-onboard .ml-ob-chips span,#scr-onboard .ml-ob-inline-meta{color:#f3f8fa!important}
+#scr-onboard .ml-ob-next{font-weight:800!important;letter-spacing:.01em;min-height:48px}
+#scr-onboard .ml-ob-dots button{width:9px;height:9px}
+#scr-auth #auth-body>h2{color:#fff!important;text-shadow:0 1px 8px rgba(0,0,0,.2)}
+#scr-auth #auth-body>p{color:#c6d5df!important;line-height:1.55!important;font-size:14px!important;margin-bottom:18px!important}
+#scr-auth #auth-body label{color:#cbd9e2!important;font-size:12px!important}
+#scr-auth #auth-body .inp{background:#071521!important;color:#f8fafc!important;-webkit-text-fill-color:#f8fafc!important;border:1px solid #425465!important;border-radius:12px!important}
+#scr-auth #auth-body .inp::placeholder{color:#9aafbd!important;-webkit-text-fill-color:#9aafbd!important;opacity:1!important}
+#scr-auth #auth-body .pinr>input,#scr-auth #auth-body .pinr input{border-color:#526274!important;background:#1c2938!important;color:#fff!important}
+#scr-auth #auth-body .btn-p{box-shadow:0 10px 24px rgba(0,0,0,.2)}
+@media(max-width:760px){
+ #scr-onboard .ml-ob-copy h1{font-size:clamp(30px,8vw,42px)!important}
+ #scr-onboard .ml-ob-copy p{font-size:14px!important;line-height:1.65!important}
+ #scr-onboard .ml-ob-visual-bottom{padding:17px!important}
+ #scr-onboard .ml-ob-visual-bottom h2{font-size:22px!important}
+}
