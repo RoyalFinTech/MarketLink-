@@ -3289,13 +3289,16 @@ function renderProfile(){
     photoHTML='<div style="font-size:26px;">👤</div>';
   }
 
-  var upgradeHTML='';
-  if(!hasV||!hasR){
-    upgradeHTML='<section class="ml-role-hub" aria-label="MarketLink business and rider access"><div class="ml-role-hub-title">Grow with MarketLink</div><p>Sell your products to local customers or earn by delivering orders. Choose an application below, or sign in if you already have an approved account.</p><div class="ml-role-hub-actions">';
-    if(!hasV) upgradeHTML+='<div class="ml-role-card"><div class="ml-role-card-icon">🏪</div><div class="ml-role-card-title">Become a Vendor</div><div class="ml-role-card-copy">Create your shop, list products and manage orders.</div><button type="button" class="ml-role-primary" onclick="openVendorApp()">Apply as vendor</button><button type="button" class="ml-role-login" onclick="openRoleAccess(\'vendor\')">Already a registered vendor? Log in →</button></div>';
-    if(!hasR) upgradeHTML+='<div class="ml-role-card rider"><div class="ml-role-card-icon">🛵</div><div class="ml-role-card-title">Become a Delivery Rider</div><div class="ml-role-card-copy">Receive delivery jobs, manage deliveries and track earnings.</div><button type="button" class="ml-role-primary" onclick="openRiderApp()">Apply as rider</button><button type="button" class="ml-role-login" onclick="openRoleAccess(\'rider\')">Already a registered rider? Log in →</button></div>';
-    upgradeHTML+='</div></section>';
-  }
+  var upgradeHTML='<section class="ml-role-hub" aria-label="MarketLink vendor and rider dashboard access"><div class="ml-role-hub-title">Vendor & Rider Access</div><p>Returning team members can open their dashboard, or securely sign in with the phone number and 4-digit PIN from their MarketLink account.</p><div class="ml-role-hub-actions">';
+  upgradeHTML+='<div class="ml-role-card"><div class="ml-role-card-icon">🏪</div><div class="ml-role-card-title">Vendor Dashboard</div><div class="ml-role-card-copy">'+(hasV?'Manage your shop, products and customer orders.':'Create a shop, list products and manage orders.')+'</div>';
+  if(hasV) upgradeHTML+='<button type="button" class="ml-role-primary" onclick="window.ML_Premium&&window.ML_Premium.openRoleDashboard?window.ML_Premium.openRoleDashboard(\'vendor\'):openRoleAccess(\'vendor\')">Open vendor dashboard</button>';
+  else upgradeHTML+='<button type="button" class="ml-role-primary" onclick="openVendorApp()">Apply as vendor</button>';
+  upgradeHTML+='<button type="button" class="ml-role-login" onclick="openRoleAccess(\'vendor\')">Returning vendor? Sign in →</button></div>';
+  upgradeHTML+='<div class="ml-role-card rider"><div class="ml-role-card-icon">🛵</div><div class="ml-role-card-title">Rider Dashboard</div><div class="ml-role-card-copy">'+(hasR?'Manage delivery jobs, track orders and review earnings.':'Receive delivery jobs, manage deliveries and track earnings.')+'</div>';
+  if(hasR) upgradeHTML+='<button type="button" class="ml-role-primary" onclick="window.ML_Premium&&window.ML_Premium.openRoleDashboard?window.ML_Premium.openRoleDashboard(\'rider\'):openRoleAccess(\'rider\')">Open rider dashboard</button>';
+  else upgradeHTML+='<button type="button" class="ml-role-primary" onclick="openRiderApp()">Apply as rider</button>';
+  upgradeHTML+='<button type="button" class="ml-role-login" onclick="openRoleAccess(\'rider\')">Returning rider? Sign in →</button></div>';
+  upgradeHTML+='</div></section>';
   // Admin access has been removed from the customer profile entirely.
   // Admin authentication now lives behind the 🛡️ Admin Portal link on the Login screen footer.
 
