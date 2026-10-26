@@ -2032,7 +2032,12 @@ function goApp(){
   renderHome();renderCart();renderOrders();renderProfile();
   updateCartBadge();
   var marketLinkRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
-  var roleLanding=marketLinkRoles.indexOf('vendor')>-1?'vendor':marketLinkRoles.indexOf('rider')>-1?'rider':null;
+  // Preserve the role the returning user explicitly selected. Accounts with
+  // both roles must not always be sent to Vendor when they selected Rider.
+  var preferredRole=window.ML_PreferredDashboardRole;
+  window.ML_PreferredDashboardRole=null;
+  var roleLanding=(preferredRole&&marketLinkRoles.indexOf(preferredRole)>-1)?preferredRole:
+    (marketLinkRoles.indexOf('vendor')>-1?'vendor':marketLinkRoles.indexOf('rider')>-1?'rider':null);
   if(roleLanding&&window.ML_Premium&&typeof window.ML_Premium.openRoleDashboard==='function')window.ML_Premium.openRoleDashboard(roleLanding);
   setTimeout(initFAB,100);
   // Check backend availability and sync data from server
@@ -5783,7 +5788,10 @@ async function submitRoleAccess(){
   try{syncAffiliateProfile();}catch(e){}
   if(err){err.className='ml-role-access-success';err.textContent='✓ Verification successful. Welcome back! Opening your dashboard…';err.style.display='block';}
   if(btn)btn.textContent='Welcome back…';
-  setTimeout(function(){closeRoleAccess();try{goApp();}catch(e){toast('You are verified, but the dashboard could not open. Please try again.','error');}toast('Welcome back, '+String(S.user.name||'there').split(' ')[0]+'! Your '+(_roleAccessType==='vendor'?'vendor':'rider')+' dashboard is ready.');},350);
+  // Keep the chosen role through goApp(); its KYC guard decides whether the
+  // dashboard opens or explains that the application is still pending.
+  window.ML_PreferredDashboardRole=_roleAccessType;
+  setTimeout(function(){closeRoleAccess();try{goApp();toast('Welcome back, '+String(S.user.name||'there').split(' ')[0]+'! Checking your '+(_roleAccessType==='vendor'?'vendor':'rider')+' dashboard access…','info');}catch(e){toast('You are verified, but the dashboard could not open. Please try again.','error');}window.ML_PreferredDashboardRole=null;},350);
  }catch(e){
   showRoleAccessError((e&&e.code==='INVALID_PIN')?'That PIN is incorrect. Please try again.':(e&&e.code==='USER_NOT_FOUND')?'No MarketLink account was found for that phone number. Please check it or create an account.':(e&&e.error)||'We could not verify your sign in. Check your details and try again.');
   _roleAccessPin=['','','',''];document.querySelectorAll('#role-access-pins input').forEach(function(p){p.value='';});focusRolePin();
