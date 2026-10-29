@@ -1579,3 +1579,88 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
   opacity:1 !important;
   text-shadow:none !important;
 }
+
+
+/* Phone control contrast hotfix: defeat the light-form select/span overrides.
+   Keep the network menu, country code and national-number field on one dark surface. */
+.ml-gm-phone {
+  background:#06121D !important;
+  border-color:#647989 !important;
+}
+.ml-gm-phone > span {
+  background:#123044 !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  border-right:1px solid #526A79 !important;
+}
+.ml-gm-phone > span,
+.ml-gm-phone > span * {
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+.ml-gm-phone > span strong {
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  font-weight:850 !important;
+  letter-spacing:.02em !important;
+}
+.ml-gm-phone select,
+.ml-gm-phone select option {
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  background-color:#06121D !important;
+  color-scheme:dark !important;
+  opacity:1 !important;
+}
+.ml-gm-phone select {
+  border-left-color:#526A79 !important;
+  border-right-color:#526A79 !important;
+  font-weight:800 !important;
+}
+.ml-gm-phone select option:checked {
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  background-color:#155E75 !important;
+}
+.ml-gm-phone input[type="tel"],
+.ml-gm-phone input.inp {
+  background:#06121D !important;
+  background-color:#06121D !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  caret-color:#F5B83D !important;
+}
+.ml-gm-phone input[type="tel"]::placeholder,
+.ml-gm-phone input.inp::placeholder {
+  color:#C5D4DE !important;
+  -webkit-text-fill-color:#C5D4DE !important;
+  opacity:1 !important;
+}
+#scr-auth #auth-body .ml-gm-phone > span,
+#scr-auth #auth-body .ml-gm-phone > span strong {
+  background:#123044 !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  opacity:1 !important;
+}
+#scr-auth #auth-body .ml-gm-phone select,
+#scr-auth #auth-body .ml-gm-phone select option {
+  background-color:#06121D !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  color-scheme:dark !important;
+  opacity:1 !important;
+}
+#scr-admin-login .ml-gm-phone > span,
+#scr-admin-login .ml-gm-phone > span strong {
+  background:#123044 !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+}
+#scr-admin-login .ml-gm-phone select,
+#scr-admin-login .ml-gm-phone select option {
+  background-color:#06121D !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+  color-scheme:dark !important;
+}
