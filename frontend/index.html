@@ -7141,17 +7141,26 @@ window.addEventListener('unhandledrejection',function(e){
       // PIN auto-submit and manual taps must share one guarded request.
       if(S._loginInFlight)return;
       S._loginInFlight=true;
-      var button=document.getElementById('lbtn');
+      var returning=!!(document.getElementById('scr-returning')&&document.getElementById('scr-returning').classList.contains('active'));
+      var button=document.getElementById(returning?'return-login-btn':'lbtn');
       try{
         S.loginCountry='GM';
-        S.loginPhone=selectedPhone('login');
+        // The returning-user screen already carries the remembered E.164 phone
+        // number and intentionally has no network selector or 7-digit input.
+        if(returning){
+          var remembered=document.getElementById('return-phone');
+          S.loginPhone=remembered&&remembered.value?remembered.value.trim():'';
+          if(!S.loginPhone)throw new Error('No saved phone number was found. Choose “Not you?” to sign in with another account.');
+        }else{
+          S.loginPhone=selectedPhone('login');
+        }
         return await oldLogin.apply(this,arguments);
       }catch(e){
         if(typeof window.authErr==='function')window.authErr(e&&e.message||'Please check your phone number and try again.');
       }finally{
         S._loginInFlight=false;
-        button=document.getElementById('lbtn');
-        if(button){button.disabled=false;button.textContent='Sign In';}
+        button=document.getElementById(returning?'return-login-btn':'lbtn');
+        if(button){button.disabled=false;button.textContent=returning?'Unlock MarketLink →':'Sign In';}
       }
     };
   }
