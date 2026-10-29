@@ -1204,3 +1204,65 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 /* Floating support action uses a clear white telephone glyph, not a blank green dot. */
 .fab-sup{color:#fff!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .fab-sup svg{display:block;flex:0 0 auto;fill:currentColor}
+
+/* ═══ MarketLink returning-user access + PWA install + white first-run surfaces ═══ */
+#scr-splash>div:first-child{background:#fff!important;color:#172b36!important}
+#scr-splash .fb{display:none!important}
+#scr-splash [style*="rgba(255,255,255,0.04)"]{background:rgba(23,43,54,.10)!important}
+#scr-splash #splstatus,#scr-splash #splprog-label,#scr-splash .spl-status{color:#526975!important}
+#scr-splash #splprog{background:#e8eef1!important}
+#scr-onboard.ml-onboard-screen{background:#fff!important;color:#172b36!important}
+#scr-onboard.ml-onboard-screen>.fb{display:none!important}
+#scr-onboard .ml-ob-topbar{background:#fff!important;color:#172b36!important}
+#scr-onboard .ml-ob-topbar-right>span{color:#526975!important}
+#scr-onboard .ml-ob-skip{background:#fff!important;color:#172b36!important;border:1px solid #dce5e9!important}
+#scr-onboard .ml-ob-slide,#scr-onboard .ml-ob-layout,#scr-onboard .ml-ob-copy{color:#172b36!important}
+#scr-onboard .ml-ob-eyebrow{color:#0d7377!important}
+#scr-onboard .ml-ob-description{color:#526975!important}
+#scr-onboard .ml-ob-chips span{background:#f4f8f9!important;color:#344d59!important;border-color:#dfe8eb!important}
+#scr-onboard .ml-ob-inline-meta{color:#172b36!important}
+#scr-onboard .ml-ob-inline-meta small{color:#526975!important}
+#scr-onboard .ml-ob-footer{background:#fff!important;border-top:1px solid #edf1f3!important}
+#scr-onboard .ml-ob-next{background:#0d7377!important;color:#fff!important}
+#scr-onboard .ml-ob-dots button{background:#d5e0e4!important}
+#scr-onboard .ml-ob-dots button.active{background:#0d7377!important}
+#scr-auth{background:#fff!important;color:#172b36!important;overflow-y:auto!important}
+#scr-auth>div:first-child{background:#fff!important;color:#172b36!important;border-bottom:1px solid #edf1f3}
+#scr-auth .fb{display:none!important}
+#scr-auth .ml-language-login-wrap,#scr-auth .ml-language-login-wrap label{color:#526975!important}
+#scr-auth #auth-body{background:#fff!important;--dk:#fff;--tx:#172b36;--mu:#526975;--pr:#0d7377;color:#172b36!important}
+#scr-auth #auth-body .inp{background:#fff!important;color:#172b36!important;border-color:#d6e1e6!important}
+#scr-auth #auth-body .pinb{background:#f8fbfc!important;color:#172b36!important;border-color:#d6e1e6!important}
+#scr-auth #auth-body .ml-auth-role-return{background:#f7fafb!important;border-color:#dce6e9!important}
+#scr-auth #auth-body .ml-auth-role-return-title,#scr-auth #auth-body .ml-auth-role-return-copy{color:#344d59!important}
+.ml-returning-screen{background:#fff!important;color:#172b36!important;overflow-y:auto!important;display:none;align-items:center;justify-content:center;padding:24px 18px 36px!important}
+.ml-returning-screen.active{display:flex!important}
+.ml-returning-card{width:min(100%,430px);margin:auto;padding:clamp(22px,5vw,38px);border:1px solid #e5ecef;border-radius:28px;background:#fff;box-shadow:0 20px 70px rgba(22,54,68,.10);text-align:center}
+.ml-returning-brand{display:flex;justify-content:center;align-items:center;gap:9px;margin-bottom:28px;color:#172b36;font-size:13px;font-weight:900;letter-spacing:.07em}
+.ml-returning-brand img{width:38px;height:38px;object-fit:contain}
+.ml-returning-brand b{color:#0d7377}
+.ml-returning-avatar{width:60px;height:60px;border-radius:20px;display:grid;place-items:center;margin:0 auto 17px;background:#eaf7f6;font-size:27px}
+.ml-return-eyebrow{margin-bottom:8px;color:#0d7377;font-size:10px;font-weight:900;letter-spacing:.16em}
+.ml-returning-card h1{font-size:clamp(23px,5vw,30px);line-height:1.2;font-weight:850;letter-spacing:-.035em;color:#172b36}
+.ml-return-copy{max-width:310px;margin:10px auto 18px;color:#617580;font-size:13px;line-height:1.65}
+.ml-return-phone{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:6px 12px;margin-bottom:22px;border:1px solid #e1ecef;border-radius:99px;background:#f8fbfc;color:#526975;font-size:12px;font-weight:750;letter-spacing:.03em}
+.ml-return-label{display:block;margin-bottom:10px;color:#344d59;font-size:12px;font-weight:800}
+.ml-return-pin-row{display:flex;justify-content:center;gap:clamp(9px,3vw,14px);margin:0 auto 18px}
+.ml-return-pin-row .pinb{width:clamp(48px,14vw,60px)!important;height:58px!important;border:1.5px solid #dce7eb!important;border-radius:15px!important;background:#f8fbfc!important;color:#172b36!important;font-size:24px!important;font-weight:800!important;box-shadow:none!important}
+.ml-return-pin-row .pinb:focus{outline:3px solid rgba(13,115,119,.13);border-color:#0d7377!important;background:#fff!important}
+.ml-return-error{margin:0 0 14px;padding:10px 12px;border:1px solid #fecaca;border-radius:12px;background:#fff1f2;color:#b42332;font-size:12px;line-height:1.5;text-align:left}
+.ml-return-submit{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:51px;border:0;border-radius:15px;background:linear-gradient(110deg,#0d7377,#0b5f63);color:#fff;font-size:14px;font-weight:850;box-shadow:0 8px 20px rgba(13,115,119,.18);cursor:pointer}
+.ml-return-submit:disabled{opacity:.65;cursor:wait}
+.ml-return-switch{margin:18px auto 0;padding:8px 10px;border:0;background:transparent;color:#0d7377;font-size:12px;font-weight:750;cursor:pointer}
+.ml-return-secure{margin-top:20px;color:#84949b;font-size:10px;line-height:1.5}
+#ml-install-prompt{position:fixed;z-index:10050;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:10px;padding:12px 12px 12px 14px;border:1px solid #e0e9ec;border-radius:18px;background:rgba(255,255,255,.98);box-shadow:0 12px 44px rgba(16,42,54,.18);color:#172b36;opacity:0;transform:translateY(18px);pointer-events:none;transition:opacity .22s ease,transform .22s ease;max-width:520px;margin:0 auto}
+#ml-install-prompt.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+.ml-install-mark{flex:0 0 40px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#f4f8f9;overflow:hidden}
+.ml-install-mark img{width:34px;height:34px;object-fit:contain}
+.ml-install-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.ml-install-copy strong{font-size:12px;font-weight:900;color:#172b36}
+.ml-install-copy span{font-size:10px;line-height:1.4;color:#617580}
+#ml-install-action{flex:0 0 auto;padding:10px 13px;border:0;border-radius:11px;background:#0d7377;color:#fff;font-size:11px;font-weight:850;cursor:pointer}
+.ml-install-close{flex:0 0 25px;width:25px;height:25px;border:0;border-radius:50%;background:#f0f4f5;color:#526975;font-size:18px;line-height:1;cursor:pointer}
+@media(min-width:700px){#ml-install-prompt{left:auto;right:24px;bottom:24px}}
+@media(prefers-reduced-motion:reduce){#ml-install-prompt{transition:none}}
