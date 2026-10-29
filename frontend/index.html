@@ -74,7 +74,7 @@
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0F1923">
+<meta name="theme-color" content="#FFFFFF">\n<link rel="manifest" href="./manifest.webmanifest">
 <title>MarketLink – Your Local Marketplace for The Gambia</title>
 <link rel="icon" type="image/png" href="./assets/marketlink-logo.png">
 <link rel="apple-touch-icon" href="./assets/marketlink-logo.png">
@@ -437,7 +437,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r8"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r8" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r9"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r9" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -511,6 +511,25 @@ select[id$="-operator"] option,.ml-gm-phone select option{
   <button type="button" class="ntab ml-global-notification-tab" onclick="window.ML_Premium&&window.ML_Premium.openProfilePage('notifSet')" aria-label="Open MarketLink notifications"><div class="ni">🔔<span class="ml-bell-badge" id="ml-global-notification-count" style="display:none">0</span></div><div class="nl">Alerts</div></button>
   <div class="ntab" data-tab="profile"><div class="ni">👤</div><div class="nl">Profile</div></div>
 </nav>
+
+<!-- ═══ RETURNING CUSTOMER QUICK UNLOCK ═══ -->
+<div id="scr-returning" class="screen ml-returning-screen" aria-labelledby="ml-return-title">
+  <div class="ml-returning-card">
+    <div class="ml-returning-brand"><img src="./assets/marketlink-logo.png" alt="MarketLink logo"><span>MARKETLINK <b>GAMBIA</b></span></div>
+    <div class="ml-returning-avatar" aria-hidden="true">👋</div>
+    <p class="ml-return-eyebrow">WELCOME BACK</p>
+    <h1 id="ml-return-title">Your market is waiting.</h1>
+    <p class="ml-return-copy">Enter your 4-digit PIN to securely continue to your MarketLink dashboard.</p>
+    <div id="ml-return-phone" class="ml-return-phone" aria-live="polite"></div>
+    <input id="return-phone" type="hidden" autocomplete="username">
+    <div id="return-auth-err" class="ml-return-error" role="alert" style="display:none"></div>
+    <label class="ml-return-label" for="return-pin-row">Your 4-digit PIN</label>
+    <div id="return-pin-row" class="pinr ml-return-pin-row" aria-label="Four-digit PIN"></div>
+    <button type="button" class="ml-return-submit" id="return-login-btn" onclick="doLogin()">Unlock MarketLink <span aria-hidden="true">→</span></button>
+    <button type="button" class="ml-return-switch" onclick="mlForgetRememberedDevice()">Not you? Use another account</button>
+    <p class="ml-return-secure"><span aria-hidden="true">🔒</span> Your PIN is verified securely by MarketLink.</p>
+  </div>
+</div>
 
 <!-- ═══ SPLASH ═══ -->
 <div id="scr-splash" class="screen active">
@@ -7207,5 +7226,101 @@ window.addEventListener('unhandledrejection',function(e){
 })();
 </script>
 
-</body>
+<script>
+/* MarketLink returning-user routing, install prompt and PWA registration. */
+(function(){
+  'use strict';
+  var ONBOARD_KEY='ml_onboarding_seen_v1';
+  var PHONE_KEY='ml_last_login_phone';
+  function safeGet(key){try{return localStorage.getItem(key)||'';}catch(e){return '';}}
+  function safeSet(key,value){try{localStorage.setItem(key,value);}catch(e){}}
+  function active(id){var el=document.getElementById(id);return !!(el&&el.classList.contains('active'));}
+  function originalOnboard(){try{if(typeof window.__mlOriginalGoOnboard==='function')window.__mlOriginalGoOnboard();else if(typeof window.goOnboard==='function')window.goOnboard();}catch(e){if(typeof window.goAuth==='function')window.goAuth();}}
+  function routeAfterSplash(){
+    var phone=safeGet(PHONE_KEY);
+    if(phone){window.renderReturningAccess();return;}
+    if(safeGet(ONBOARD_KEY)==='1'){if(typeof window.goAuth==='function')window.goAuth();else{var a=document.getElementById('scr-auth');if(a)a.classList.add('active');}return;}
+    originalOnboard();
+  }
+  window.renderReturningAccess=function(){
+    var phone=safeGet(PHONE_KEY);
+    if(!phone){if(typeof window.goAuth==='function')window.goAuth();return;}
+    if(window.S){S.authMode='login';S.loginPhone=phone;S.pin=['','','',''];}
+    var hidden=document.getElementById('return-phone');
+    if(hidden)hidden.value=phone;
+    var label=document.getElementById('ml-return-phone');
+    if(label){var d=phone.replace(/\D/g,'');label.textContent=d.length>4?'Account ending •••• '+d.slice(-4):'Your saved MarketLink account';}
+    var err=document.getElementById('return-auth-err');if(err){err.textContent='';err.style.display='none';}
+    var button=document.getElementById('return-login-btn');if(button){button.disabled=false;button.textContent='Unlock MarketLink →';}
+    if(typeof window.showScreen==='function')window.showScreen('scr-returning');
+    if(typeof window.renderPinRow==='function')window.renderPinRow('return-pin-row',window.S?S.pin:['','','','']);
+    setTimeout(function(){var row=document.getElementById('return-pin-row');if(row&&row.children[0])row.children[0].focus({preventScroll:true});},80);
+  };
+  window.mlForgetRememberedDevice=function(){
+    var ok=window.confirm('Use another account on this device? Your saved phone number will be removed from this browser. You can still sign in with your account PIN.');
+    if(!ok)return;
+    try{localStorage.removeItem(PHONE_KEY);}catch(e){}
+    if(window.S){S.pin=['','','',''];S.loginPhone='';}
+    safeSet(ONBOARD_KEY,'1');
+    if(typeof window.goAuth==='function')window.goAuth();
+  };
+  window.__mlRouteAfterSplash=routeAfterSplash;
+  document.addEventListener('DOMContentLoaded',function(){
+    window.__mlOriginalGoOnboard=window.goOnboard;
+    window.goOnboard=routeAfterSplash;
+    var originalGoAuth=window.goAuth;
+    window.goAuth=function(){safeSet(ONBOARD_KEY,'1');if(typeof originalGoAuth==='function')originalGoAuth();else{var auth=document.getElementById('scr-auth');if(auth)auth.classList.add('active');}};
+    var skip=document.querySelector('#scr-onboard .ml-ob-skip, #scr-onboard button[onclick*="goAuth"]');
+    if(skip)skip.addEventListener('click',function(){safeSet(ONBOARD_KEY,'1');},true);
+    if(typeof window.obNext==='function'){
+      var originalNext=window.obNext;
+      window.obNext=function(){
+        var dots=document.querySelectorAll('#ob-dots button'),activeDot=document.querySelector('#ob-dots button.active');
+        if(dots.length&&activeDot&&dots[dots.length-1]===activeDot)safeSet(ONBOARD_KEY,'1');
+        return originalNext.apply(this,arguments);
+      };
+    }
+    // If this is an established device, route directly to PIN even if the old
+    // onboarding script attempted to prepare its first slide.
+    if(safeGet(PHONE_KEY)) {
+      var splash=document.getElementById('scr-splash');if(splash&&splash.classList.contains('active'))return;
+      routeAfterSplash();
+    }
+    // PWA installability: browsers decide when native install is eligible.
+    var deferredPrompt=null, installBanner=null;
+    function ensureBanner(){
+      if(installBanner)return installBanner;
+      installBanner=document.createElement('aside');
+      installBanner.id='ml-install-prompt';
+      installBanner.setAttribute('aria-label','Install MarketLink');
+      installBanner.innerHTML='<div class="ml-install-mark"><img src="./assets/marketlink-logo.png" alt=""></div><div class="ml-install-copy"><strong>Install MarketLink</strong><span id="ml-install-hint">Add the app to your home screen for faster access.</span></div><button type="button" id="ml-install-action">Install</button><button type="button" class="ml-install-close" aria-label="Dismiss install prompt">×</button>';
+      document.body.appendChild(installBanner);
+      installBanner.querySelector('.ml-install-close').addEventListener('click',function(){installBanner.classList.remove('visible');try{sessionStorage.setItem('ml_install_dismissed','1');}catch(e){}});
+      installBanner.querySelector('#ml-install-action').addEventListener('click',async function(){
+        if(deferredPrompt){deferredPrompt.prompt();try{await deferredPrompt.userChoice;}catch(e){}deferredPrompt=null;installBanner.classList.remove('visible');return;}
+        var hint=document.getElementById('ml-install-hint');
+        if(hint)hint.textContent=/iphone|ipad|ipod/i.test(navigator.userAgent)?'On iPhone/iPad: tap Share, then “Add to Home Screen”.':'Open your browser menu and choose “Install app” or “Add to Home screen”.';
+      });
+      return installBanner;
+    }
+    function maybeShowInstall(){
+      try{if(sessionStorage.getItem('ml_install_dismissed')==='1')return;}catch(e){}
+      var standalone=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
+      if(standalone||navigator.standalone===true)return;
+      var banner=ensureBanner();
+      if(!deferredPrompt){var hint=document.getElementById('ml-install-hint');if(hint&&/iphone|ipad|ipod/i.test(navigator.userAgent))hint.textContent='Add MarketLink to your home screen from the Share menu.';}
+      banner.classList.add('visible');
+    }
+    window.addEventListener('beforeinstallprompt',function(event){event.preventDefault();deferredPrompt=event;maybeShowInstall();});
+    window.addEventListener('appinstalled',function(){if(installBanner)installBanner.classList.remove('visible');deferredPrompt=null;});
+    setTimeout(function(){if(!window.matchMedia||!window.matchMedia('(display-mode: standalone)').matches)maybeShowInstall();},2200);
+    if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+      navigator.serviceWorker.register('./service-worker.js',{scope:'./'}).then(function(reg){
+        if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
+        console.info('[MarketLink PWA] Service worker registered.',reg.scope);
+      }).catch(function(error){console.warn('[MarketLink PWA] Service worker registration failed.',error);});
+    }
+  });
+})();
+</script>\n</body>
 </html>
