@@ -1308,3 +1308,66 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #scr-auth #auth-body .ml-auth-role-return-actions button{color:#0b5f62!important;background:#fff!important}
 #scr-auth .ml-language-login-wrap label{color:#fff!important;opacity:1!important}
 #scr-auth .ml-language-login-wrap select{color:#172b36!important;background:#fff!important}
+
+
+/* MarketLink production readability correction — onboarding, auth and operator guidance. */
+#scr-onboard .ml-ob-description,
+#scr-onboard .ml-ob-copy p,
+#scr-onboard .ml-ob-chips,
+#scr-onboard .ml-ob-chips span,
+#scr-onboard .ml-ob-inline-meta,
+#scr-onboard .ml-ob-inline-meta small {
+  color: #233747 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+#scr-onboard .ml-ob-copy h1 { color:#071521 !important; opacity:1 !important; }
+#scr-onboard .ml-ob-copy h1 em,
+#scr-onboard .ml-ob-eyebrow { color:#946000 !important; opacity:1 !important; }
+#scr-onboard #ob-dots,
+#scr-onboard .ml-ob-dots { display:flex !important; align-items:center !important; gap:10px !important; opacity:1 !important; }
+#scr-onboard #ob-dots button,
+#scr-onboard .ml-ob-dots button,
+#scr-onboard [data-ml-ob-dot] {
+  display:inline-block !important; width:12px !important; min-width:12px !important;
+  height:12px !important; min-height:12px !important; padding:0 !important;
+  border:2px solid #647887 !important; border-radius:999px !important;
+  background:#E5EDF2 !important; opacity:1 !important; box-shadow:0 0 0 1px rgba(7,21,33,.12) !important;
+}
+#scr-onboard #ob-dots button.active,
+#scr-onboard .ml-ob-dots button.active,
+#scr-onboard [data-ml-ob-dot].active,
+#scr-onboard #ob-dots button[aria-current="true"],
+#scr-onboard .ml-ob-dots button[aria-current="true"] {
+  background:#F5B83D !important; border-color:#071521 !important; transform:scale(1.08);
+}
+#scr-auth label, #scr-auth .hint, #scr-auth .helper-text,
+#scr-auth small, #scr-auth .muted, #scr-auth .field-help,
+#scr-auth .ml-phone-guidance,
+#scr-auth .ml-phone-guidance-example,
+#scr-auth .ml-phone-guidance-help,
+#scr-auth .ml-phone-guidance-title,
+#va-operator + small, #ra-operator + small,
+#scr-vendor-onboard label, #scr-rider-onboard label,
+#scr-vendor-onboard small, #scr-rider-onboard small,
+#scr-vendor-onboard .hint, #scr-rider-onboard .hint,
+#scr-vendor-onboard .ml-phone-guidance, #scr-rider-onboard .ml-phone-guidance {
+  opacity:1 !important; text-shadow:none !important;
+}
+#scr-auth .ml-phone-guidance,
+#scr-vendor-onboard .ml-phone-guidance,
+#scr-rider-onboard .ml-phone-guidance,
+#scr-auth .ml-phone-guidance-example,
+#scr-vendor-onboard .ml-phone-guidance-example,
+#scr-rider-onboard .ml-phone-guidance-example {
+  color:#F1F7FB !important; -webkit-text-fill-color:#F1F7FB !important;
+  background:#0B1F2E !important; line-height:1.55 !important;
+}
+#scr-auth .ml-phone-guidance-title,
+#scr-vendor-onboard .ml-phone-guidance-title,
+#scr-rider-onboard .ml-phone-guidance-title { color:#FFD778 !important; -webkit-text-fill-color:#FFD778 !important; }
+#scr-auth .ml-phone-guidance-help,
+#scr-vendor-onboard .ml-phone-guidance-help,
+#scr-rider-onboard .ml-phone-guidance-help { color:#5EEAD4 !important; -webkit-text-fill-color:#5EEAD4 !important; }
+#scr-auth input::placeholder, #scr-vendor-onboard input::placeholder,
+#scr-rider-onboard input::placeholder { color:#A9BAC8 !important; -webkit-text-fill-color:#A9BAC8 !important; opacity:1 !important; }
