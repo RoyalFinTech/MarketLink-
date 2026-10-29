@@ -1266,3 +1266,11 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 .ml-install-close{flex:0 0 25px;width:25px;height:25px;border:0;border-radius:50%;background:#f0f4f5;color:#526975;font-size:18px;line-height:1;cursor:pointer}
 @media(min-width:700px){#ml-install-prompt{left:auto;right:24px;bottom:24px}}
 @media(prefers-reduced-motion:reduce){#ml-install-prompt{transition:none}}
+
+/* Final splash contrast pass for the requested all-white first-run surfaces. */
+#scr-splash>div:first-child>div[style*="margin-bottom:10px"]>div[style*="font-size:11px"]{color:#526975!important}
+#scr-splash>div:first-child>div[style*="bottom:22px"]>div:first-child{color:#7c8d95!important}
+#scr-splash>div:first-child>div[style*="bottom:22px"]>div:last-child{color:#b77916!important}
+#scr-splash>div:first-child>div[style*="margin-top:26px"]>div:first-child{background:#e8eef1!important}
+#scr-splash #spl-logo img{filter:none!important}
+#scr-onboard .ml-ob-layout-runtime,#scr-onboard .ml-ob-copy{background:#fff!important}
