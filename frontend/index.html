@@ -438,7 +438,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r15"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r12" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r16"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r12" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -619,7 +619,7 @@ select[id$="-operator"] option,.ml-gm-phone select option{
   <div style="padding:26px 20px 60px;background:#0B0F17;min-height:60vh;">
     <div id="admin-auth-err" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:10px 13px;color:#EF4444;font-size:12px;margin-bottom:16px;display:none;"></div>
     <label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:6px;">Staff ID</label>
-    <input class="inp" type="text" autocapitalize="characters" placeholder="+220 7xx xxxx" id="admin-staffid" style="margin-bottom:16px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;">
+    <input class="inp" type="text" autocapitalize="characters" placeholder="e.g. 871234567" id="admin-staffid" style="margin-bottom:16px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;">
     <label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:6px;">Password</label>
     <input class="inp" type="password" placeholder="Enter 4-digit PIN" id="admin-password" style="margin-bottom:22px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;" onkeydown="if(event.key==='Enter')doAdminLogin()">
     <button class="btn" style="width:100%;background:linear-gradient(135deg,#7C3AED,#4C1D95);color:#fff;" onclick="doAdminLogin()" id="admin-lbtn">🔐 Sign In to Admin Portal</button>
@@ -7069,7 +7069,7 @@ window.addEventListener('unhandledrejection',function(e){
       '<span style="display:flex;align-items:center;padding:0 10px;font-size:13px;color:#fff;white-space:nowrap;background:#0B1F2E;">'+
       '<span style="display:inline-flex;align-items:center;margin-right:7px;">'+gambiaFlagMarkup()+'</span><strong>+220</strong></span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="appearance:auto;color-scheme:dark;max-width:49%;min-width:100px;flex:1 1 125px;height:46px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 8px;background:#071521;color:#fff;font-weight:700;font-size:12px;">'+opts+'</select>'+
-      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="1234567" value="'+nat.slice(0,7)+'" style="flex:1 1 115px;min-width:110px;width:0;height:46px;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
+      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="e.g. 1234567" value="'+nat.slice(0,7)+'" style="flex:1 1 115px;min-width:110px;width:0;height:46px;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
       '<input type="hidden" id="'+(target==='admin'?'admin-staffid':target==='reg'?'rphone':'lphone')+'" value="">'+
       '</div><div class="ml-phone-guidance"><div class="ml-phone-guidance-title">'+gambiaFlagMarkup()+' <strong>Your Gambian number</strong></div><div>Enter only the <b>7 digits</b> shown on your number. Select your network above.</div><div class="ml-phone-guidance-example">MarketLink adds the correct network prefix automatically.</div><span id="'+target+'-phone-help" class="ml-phone-guidance-help"></span></div>';
   }
