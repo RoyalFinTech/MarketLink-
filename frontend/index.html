@@ -438,7 +438,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r11"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r11" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r12"><script src="./marketlink-i18n.js?v=marketlink-locale-r1" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r12" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -6813,12 +6813,58 @@ window.addEventListener('unhandledrejection',function(e){
   window.confirmResetPin=async function(){var p=S.resetPin.join(''),c=S.resetPinConfirm.join('');if(p.length!==4){resetErr('Enter a 4-digit PIN');return;}if(p!==c){resetErr('PINs do not match');return;}try{await ML_API.auth.confirmPinReset(S.resetPhoneE164,S.resetOtpPending,p);S.resetStep='success';renderReset();}catch(e){resetErr(e.error||'Could not reset PIN. Please try again.');}};
 
   window.doLogin=async function(){
-    var p=G('lphone');if(!p)return;S.loginPhone=p.value.trim();
-    if(!S.loginPhone){authErr('Enter your phone number');return;}if(S.pin.join('').length<4){authErr('Enter your 4-digit PIN');return;}
-    var n;try{await phoneReady;n=normalize(S.loginPhone,S.loginCountry);}catch(e){authErr(e.message);return;}
-    var btn=G('lbtn');if(btn){btn.textContent='Signing in…';btn.disabled=true;}
-    try{var u=await ML_API.auth.login(n.e164,S.pin.join(''));S.user={name:u.fullName||u.full_name,phone:u.phone,id:u.id,accountStatus:'Active'};S.roles=u.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;goApp();toast('Welcome back, '+S.user.name.split(' ')[0]+'! 🎉');ML_API.customers.getProfile().then(function(pr){if(pr&&pr.data){S.rewardPoints=pr.data.reward_points||0;S.walletBalance=parseFloat(pr.data.wallet_balance||0);}}).catch(function(err){console.warn('[MarketLink] Profile sync after sign-in deferred:',err&&err.code||'API_ERROR');});}
-    catch(e){if(btn){btn.textContent='Sign In';btn.disabled=false;}authErr(e.error||'Login failed. Please try again.');}
+    var returning=G('scr-returning')&&G('scr-returning').classList.contains('active');
+    var p=returning?G('return-phone'):G('lphone'); if(!p)return;
+    var raw=p.value.trim();
+    if(!raw){authErr('Enter your phone number');return;}
+    if(S.pin.join('').length!==4){authErr('Enter your 4-digit PIN');return;}
+    var n;
+    try{await phoneReady;n=normalize(raw,returning?'GM':(S.loginCountry||'GM'));}
+    catch(e){authErr(e.message||'Enter a valid Gambian phone number');return;}
+    var btn=returning?G('return-login-btn'):G('lbtn');
+    if(btn&&btn.disabled)return;
+    if(btn){btn.textContent='Signing in…';btn.disabled=true;}
+    var user;
+    try{user=await ML_API.auth.login(n.e164,S.pin.join(''));}
+    catch(e){
+      if(btn){btn.textContent=returning?'Unlock MarketLink →':'Sign In';btn.disabled=false;}
+      var msg=e.error||'Login failed. Please try again.';
+      if(e.code==='USER_NOT_FOUND')msg=returning?'We could not find the saved account. Choose “Not you?” to sign in with another account.':'No account found with this phone number. Tap “Create account” below.';
+      if(e.code==='INVALID_PIN'){msg='Incorrect PIN. Please try again.';S.pin=['','','',''];renderPinRow(returning?'return-pin-row':'pin-row',S.pin);}
+      if(e.code==='ACCOUNT_SUSPENDED')msg='This account has been suspended. Contact support.';
+      authErr(msg);return;
+    }
+    S.loginPhone=n.e164;
+    try{localStorage.setItem('ml_last_login_phone',n.e164);localStorage.setItem('ml_onboarding_seen_v1','1');}catch(storageError){}
+    S.user={name:user.fullName||user.full_name||'MarketLink member',phone:user.phone||n.e164,id:user.id,accountStatus:'Active'};
+    S.roles=user.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;
+    if(btn){btn.textContent='Signed in';btn.disabled=true;}
+    try{if(typeof syncAffiliateProfile==='function')syncAffiliateProfile();}catch(ignoreSync){}
+    try{
+      if(typeof goApp==='function')goApp();else showScreen('scr-app');
+      if(G('auth-err'))G('auth-err').style.display='none';
+      if(G('return-auth-err'))G('return-auth-err').style.display='none';
+      toast('Welcome back, '+String(S.user.name).split(' ')[0]+'! 🎉','success');
+    }catch(renderError){
+      console.error('[MarketLink] Signed in; dashboard routing needs retry:',renderError);
+      document.querySelectorAll('.screen').forEach(function(screen){screen.classList.remove('active');});
+      if(G('scr-app'))G('scr-app').classList.add('active');
+      if(G('bnav'))G('bnav').style.display='flex';
+      toast('You are signed in, but some dashboard content needs to reload.','warning');
+    }
+    if(btn){btn.textContent=returning?'Unlock MarketLink →':'Sign In';btn.disabled=false;}
+    Promise.resolve().then(async function(){
+      try{
+        var profile=await ML_API.customers.getProfile();
+        if(profile&&profile.data){
+          liveProfile=profile.data;S.rewardPoints=profile.data.reward_points||0;
+          S.walletBalance=parseFloat(profile.data.wallet_balance||0);
+          S.profilePhoto=profile.data.profile_photo_url||S.profilePhoto||null;
+          if(typeof renderPremiumProfile==='function')renderPremiumProfile();
+          if(typeof renderPremiumHome==='function')renderPremiumHome();
+        }
+      }catch(profileError){console.warn('[MarketLink] Profile sync after sign-in deferred:',profileError&&profileError.code||'API_ERROR');}
+    });
   };
 
   window.doRegister=async function(){
