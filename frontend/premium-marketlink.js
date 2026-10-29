@@ -906,6 +906,35 @@
       reader.readAsDataURL(file);
     });
   }
+  async function makeProfilePhotoPreview(file){
+    if(typeof createImageBitmap==='function'){
+      var bitmap=await createImageBitmap(file);
+      var canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+      canvas.width=512;canvas.height=512;
+      var scale=Math.max(512/bitmap.width,512/bitmap.height),sw=512/scale,sh=512/scale,sx=(bitmap.width-sw)/2,sy=(bitmap.height-sh)/2;
+      if(ctx)ctx.drawImage(bitmap,sx,sy,sw,sh,0,0,512,512);
+      if(bitmap.close)bitmap.close();
+      if(ctx)return canvas.toDataURL('image/jpeg',0.78);
+    }
+    return await new Promise(function(resolve,reject){
+      var reader=new FileReader();
+      reader.onerror=function(){reject(new Error('Could not prepare a local preview for this photo.'));};
+      reader.onload=function(){
+        var image=new Image();
+        image.onerror=function(){reject(new Error('Could not prepare a local preview for this photo.'));};
+        image.onload=function(){
+          var canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+          canvas.width=512;canvas.height=512;
+          if(!ctx){resolve('');return;}
+          var scale=Math.max(512/image.naturalWidth,512/image.naturalHeight),sw=512/scale,sh=512/scale;
+          ctx.drawImage(image,(image.naturalWidth-sw)/2,(image.naturalHeight-sh)/2,sw,sh,0,0,512,512);
+          resolve(canvas.toDataURL('image/jpeg',0.78));
+        };
+        image.src=String(reader.result||'');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
   async function saveProfilePhoto(file){
     if(!file)return false;
     if(!apiOk()){toast('Please sign in again before changing your profile photo.','error');return false;}
@@ -921,7 +950,8 @@
       }
     }catch(imageReadError){toast(imageReadError.message||'Could not read this image. Please choose a valid JPG or PNG.','error');return false;}
     var oldPhoto=liveProfile&&liveProfile.profile_photo_url||S.profilePhoto||null;
-    var uploadedUrl=null;
+    var uploadedUrl=null,previewUrl='';
+    try{previewUrl=await makeProfilePhotoPreview(file);}catch(previewError){}
     try{
       toast('Uploading your profile photo…','info');
       var uploaded=await ML_API.uploads.upload(file,'profile-photo');
@@ -932,6 +962,14 @@
       if(!liveProfile)liveProfile={};
       liveProfile.profile_photo_url=uploadedUrl;
       S.profilePhoto=uploadedUrl;
+      if(S.user){S.user.profilePhotoUrl=uploadedUrl;S.user.avatarUrl=uploadedUrl;}
+      try{
+        if(previewUrl){
+          localStorage.setItem('ml_profile_photo_preview',previewUrl);
+          localStorage.setItem('ml_profile_photo_preview_url',uploadedUrl);
+        }
+        localStorage.setItem('ml_profile_photo_url',uploadedUrl);
+      }catch(storageError){}
       renderPremiumProfile();
       toast('Your profile photo has been updated.','success');
       if(oldPhoto&&oldPhoto!==uploadedUrl){
@@ -960,6 +998,7 @@
       var refreshed=await ML_API.customers.getProfile();
       liveProfile=refreshed&&refreshed.data||liveProfile;
       S.profilePhoto=null;
+      try{localStorage.removeItem('ml_profile_photo_preview');localStorage.removeItem('ml_profile_photo_preview_url');localStorage.removeItem('ml_profile_photo_url');}catch(storageError){}
       renderPremiumProfile();
       toast('Your profile photo has been removed.','success');
     }catch(e){toast(e.error||'Could not remove your profile photo. Please try again.','error');}
@@ -1338,7 +1377,7 @@
     }
     var photo=S.profilePhoto||p.profile_photo_url||null;
     var photoSrc=photo?String(photo)+(String(photo).indexOf('?')>=0?'&':'?')+'mlphoto='+encodeURIComponent(String(photo).length+'-'+(liveProfile&&liveProfile.updated_at||Date.now())):'';
-    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photoSrc)+'" alt="Profile photo" loading="eager" decoding="async" onerror="this.onerror=null;this.style.display=\'none\';var fallback=this.parentNode&&this.parentNode.querySelector(\'.ml-default-avatar\');if(fallback)fallback.style.display=\'block\';">':'');
+    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photoSrc)+'" alt="Profile photo" loading="eager" decoding="async" onerror="this.onerror=null;var preview=null,previewUrl=null;try{preview=localStorage.getItem(\'ml_profile_photo_preview\');previewUrl=localStorage.getItem(\'ml_profile_photo_preview_url\');}catch(e){}if(preview&&previewUrl==='+JSON.stringify(String(photo))+'){this.src=preview;this.style.display=\'block\';}else{this.style.display=\'none\';var fallback=this.parentNode&&this.parentNode.querySelector(\'.ml-default-avatar\');if(fallback)fallback.style.display=\'block\';}">':'');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
     var upgradeHtml='',userRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
     if(userRoles.indexOf('vendor')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-upgrade-icon">🏪</span><span><b>Open Vendor Dashboard</b><span>Manage products, orders and store activity</span></span><span class="arrow">›</span></button>';
