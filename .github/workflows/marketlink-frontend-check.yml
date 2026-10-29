@@ -1,0 +1,26 @@
+name: MarketLink frontend checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/scripts/check-marketlink-frontend.mjs'
+      - '.github/workflows/marketlink-frontend-check.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/scripts/check-marketlink-frontend.mjs'
+      - '.github/workflows/marketlink-frontend-check.yml'
+  workflow_dispatch:
+jobs:
+  frontend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Parse frontend JavaScript and validate PWA setup
+        run: node .github/scripts/check-marketlink-frontend.mjs
