@@ -6818,7 +6818,7 @@ window.addEventListener('unhandledrejection',function(e){
     if(window.__mlLoginRequestInFlight)return;
     window.__mlLoginRequestInFlight=true;
     var returning=G('scr-returning')&&G('scr-returning').classList.contains('active');
-    var p=returning?G('return-phone'):G('lphone'); if(!p)return;
+    var p=returning?G('return-phone'):G('lphone'); if(!p){window.__mlLoginRequestInFlight=false;return;}
     var raw=p.value.trim();
     if(!raw){window.__mlLoginRequestInFlight=false;authErr('Enter your phone number');return;}
     if(S.pin.join('').length!==4){window.__mlLoginRequestInFlight=false;authErr('Enter your 4-digit PIN');return;}
