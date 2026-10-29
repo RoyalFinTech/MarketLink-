@@ -1371,3 +1371,93 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #scr-rider-onboard .ml-phone-guidance-help { color:#5EEAD4 !important; -webkit-text-fill-color:#5EEAD4 !important; }
 #scr-auth input::placeholder, #scr-vendor-onboard input::placeholder,
 #scr-rider-onboard input::placeholder { color:#A9BAC8 !important; -webkit-text-fill-color:#A9BAC8 !important; opacity:1 !important; }
+
+
+/* MarketLink QA hotfix: readable auth copy and correct onboarding contrast.
+   Auth screens use a light form surface; onboarding uses a dark campaign surface. */
+#scr-auth #auth-body {
+  background: #F8FAFC !important;
+  color: #172B36 !important;
+  color-scheme: light;
+}
+#scr-auth #auth-body h1,
+#scr-auth #auth-body h2,
+#scr-auth #auth-body h3,
+#scr-auth #auth-body p,
+#scr-auth #auth-body label,
+#scr-auth #auth-body span,
+#scr-auth #auth-body small,
+#scr-auth #auth-body strong,
+#scr-auth #auth-body em {
+  opacity: 1 !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: currentColor;
+}
+#scr-auth #auth-body h1,
+#scr-auth #auth-body h2,
+#scr-auth #auth-body h3,
+#scr-auth #auth-body p,
+#scr-auth #auth-body label,
+#scr-auth #auth-body small,
+#scr-auth #auth-body span:not(.ml-auth-error-icon) {
+  color: #172B36 !important;
+}
+#scr-auth #auth-body input,
+#scr-auth #auth-body select {
+  color: #172B36 !important;
+  background-color: #FFFFFF !important;
+  border-color: #AABAC5 !important;
+  opacity: 1 !important;
+}
+#scr-auth #auth-body input::placeholder {
+  color: #536B78 !important;
+  -webkit-text-fill-color: #536B78 !important;
+  opacity: 1 !important;
+}
+#scr-auth #auth-body .ml-auth-role-return {
+  background: #EEF4F7 !important;
+  border: 1px solid #C6D3DB !important;
+  color: #172B36 !important;
+}
+#scr-auth #auth-body .ml-auth-role-return-title { color:#172B36 !important; }
+#scr-auth #auth-body .ml-auth-role-return-copy { color:#405766 !important; }
+#scr-auth #auth-body .ml-auth-role-return-actions button {
+  color:#075D61 !important; background:#FFFFFF !important; border-color:#AABAC5 !important;
+}
+#scr-auth #auth-body div[style*="rgba(255,255,255,0.2)"] {
+  color:#536B78 !important;
+}
+#scr-auth #auth-body div[style*="rgba(255,255,255,0.2)"] span {
+  color:#946000 !important;
+}
+#scr-auth #auth-body #auth-err,
+#scr-auth #auth-body #auth-err * {
+  color:#B42318 !important;
+  -webkit-text-fill-color:#B42318 !important;
+}
+#scr-auth #auth-body .btn,
+#scr-auth #auth-body .btn-p,
+#scr-auth #auth-body button {
+  opacity:1 !important;
+  -webkit-text-fill-color: currentColor;
+}
+
+/* Undo the earlier dark-text override on the dark onboarding canvas. */
+#scr-onboard .ml-ob-description,
+#scr-onboard .ml-ob-copy p,
+#scr-onboard .ml-ob-chips,
+#scr-onboard .ml-ob-chips span,
+#scr-onboard .ml-ob-inline-meta,
+#scr-onboard .ml-ob-inline-meta small {
+  color:#F0F5F7 !important;
+  -webkit-text-fill-color:#F0F5F7 !important;
+  opacity:1 !important;
+  text-shadow:0 1px 4px rgba(0,0,0,.6) !important;
+}
+#scr-onboard .ml-ob-copy h1 { color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; }
+#scr-onboard .ml-ob-copy h1 em,
+#scr-onboard .ml-ob-eyebrow { color:#FFD36C !important; -webkit-text-fill-color:#FFD36C !important; }
+#scr-onboard .ml-ob-chips span {
+  background:rgba(255,255,255,.09) !important;
+  border:1px solid rgba(255,255,255,.22) !important;
+}
