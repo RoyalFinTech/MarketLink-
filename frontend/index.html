@@ -7308,6 +7308,8 @@ window.addEventListener('unhandledrejection',function(e){
       try{if(sessionStorage.getItem('ml_install_dismissed')==='1')return;}catch(e){}
       var standalone=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
       if(standalone||navigator.standalone===true)return;
+      var mobileDevice=/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+      if(!deferredPrompt&&!mobileDevice)return;
       var banner=ensureBanner();
       if(!deferredPrompt){var hint=document.getElementById('ml-install-hint');if(hint&&/iphone|ipad|ipod/i.test(navigator.userAgent))hint.textContent='Add MarketLink to your home screen from the Share menu.';}
       banner.classList.add('visible');
