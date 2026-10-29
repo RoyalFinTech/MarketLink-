@@ -1489,3 +1489,93 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
   #scr-auth #auth-logo {max-width:min(68vw,280px) !important;}
   #scr-auth #auth-body {max-height:none !important;overflow:visible !important;}
 }
+
+
+/* MarketLink QA contrast repair: dashboard labels and vendor onboarding.
+   The login shortcuts sit outside #auth-body, so the light-form text rules did not reach them. */
+#scr-auth>div[aria-label="Vendor and rider dashboard sign in"] {
+  background:#F8FAFC !important;
+}
+#scr-auth>div[aria-label="Vendor and rider dashboard sign in"] button {
+  color:#12313D !important;
+  -webkit-text-fill-color:#12313D !important;
+  background:#FFFFFF !important;
+  border-color:#B8CBD4 !important;
+  text-shadow:none !important;
+  opacity:1 !important;
+}
+#scr-auth>div[aria-label="Vendor and rider dashboard sign in"] button br {
+  display:block !important;
+}
+#scr-auth>div[aria-label="Vendor and rider dashboard sign in"] button span {
+  display:inline-block !important;
+  margin-top:3px !important;
+  color:#087477 !important;
+  -webkit-text-fill-color:#087477 !important;
+  font-weight:850 !important;
+  opacity:1 !important;
+}
+#scr-auth>div[aria-label="Vendor and rider dashboard sign in"] button:last-child span {
+  color:#6541A5 !important;
+  -webkit-text-fill-color:#6541A5 !important;
+}
+#scr-auth>div[aria-label="Vendor and rider dashboard sign in"] button:focus-visible {
+  outline:3px solid #D99A18 !important;
+  outline-offset:3px !important;
+}
+
+/* Vendor/rider onboarding carousel: guarantee readable copy on both text and image panels. */
+#scr-onboard .ml-ob-copy,
+#scr-onboard .ml-ob-copy *,
+#scr-onboard .ml-ob-visual,
+#scr-onboard .ml-ob-visual * {
+  opacity:1 !important;
+  text-shadow:0 1px 3px rgba(0,0,0,.55);
+}
+#scr-onboard .ml-ob-copy h1,
+#scr-onboard .ml-ob-copy h1 span,
+#scr-onboard .ml-ob-copy h1:not(em) {
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+}
+#scr-onboard .ml-ob-copy h1 em,
+#scr-onboard .ml-ob-eyebrow,
+#scr-onboard .ml-ob-eyebrow *,
+#scr-onboard .ml-ob-visual-top,
+#scr-onboard .ml-ob-visual-top * {
+  color:#FFD36C !important;
+  -webkit-text-fill-color:#FFD36C !important;
+}
+#scr-onboard .ml-ob-description,
+#scr-onboard .ml-ob-copy p,
+#scr-onboard .ml-ob-chips,
+#scr-onboard .ml-ob-chips span,
+#scr-onboard .ml-ob-chips span b,
+#scr-onboard .ml-ob-inline-meta,
+#scr-onboard .ml-ob-inline-meta b,
+#scr-onboard .ml-ob-inline-meta small,
+#scr-onboard .ml-ob-visual-bottom h2,
+#scr-onboard .ml-ob-visual-bottom p,
+#scr-onboard .ml-ob-visual-pills span,
+#scr-onboard .ml-ob-reward span,
+#scr-onboard .ml-ob-reward small {
+  color:#F8FBFD !important;
+  -webkit-text-fill-color:#F8FBFD !important;
+  opacity:1 !important;
+}
+#scr-onboard .ml-ob-chips span {
+  background:rgba(7,24,35,.78) !important;
+  border:1px solid rgba(255,255,255,.42) !important;
+}
+#scr-onboard .ml-ob-visual-bottom {
+  background:linear-gradient(180deg,rgba(5,18,30,0),rgba(5,18,30,.38)) !important;
+}
+#scr-onboard .ml-ob-visual-bottom h2,
+#scr-onboard .ml-ob-visual-bottom p {
+  text-shadow:0 2px 8px rgba(0,0,0,.85) !important;
+}
+#scr-onboard .ml-ob-next,
+#scr-onboard .ml-ob-skip {
+  opacity:1 !important;
+  text-shadow:none !important;
+}
