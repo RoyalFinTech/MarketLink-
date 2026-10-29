@@ -1292,3 +1292,19 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 .ml-vendor-app input::placeholder,.ml-rider-app input::placeholder,#scr-vendor-apply input::placeholder,#scr-rider-apply input::placeholder{color:#5b6b75!important;opacity:1!important}
 .ml-vendor-app label,.ml-rider-app label,#scr-vendor-apply label,#scr-rider-apply label{color:#263e4b!important;opacity:1!important}
 .ml-vendor-app small,.ml-rider-app small,#scr-vendor-apply small,#scr-rider-apply small{color:#405766!important;opacity:1!important}
+
+
+/* MarketLink high-contrast correction v12 — target the actual rendered onboarding/auth elements */
+#ob-dots.ml-ob-dots button{width:10px!important;height:10px!important;min-width:10px!important;min-height:10px!important;background:#9aaeb9!important;border:2px solid #fff!important;box-shadow:0 0 0 2px #253746!important;opacity:1!important}
+#ob-dots.ml-ob-dots button.active{width:30px!important;height:10px!important;background:#f5b83d!important;border:2px solid #fff!important;box-shadow:0 0 0 2px #253746!important}
+#scr-onboard .ml-ob-description{color:#f0f5f7!important;text-shadow:0 1px 4px rgba(0,0,0,.6)!important}
+#scr-onboard .ml-ob-copy h1{color:#fff!important;text-shadow:0 2px 12px rgba(0,0,0,.55)!important}
+#scr-onboard .ml-ob-copy h1 em{color:#ffd36c!important}
+#scr-auth #auth-body h1,#scr-auth #auth-body h2,#scr-auth #auth-body h3,#scr-auth #auth-body label,#scr-auth #auth-body p,#scr-auth #auth-body span{color:#172b36!important;text-shadow:none!important;opacity:1!important}
+#scr-auth #auth-body input,#scr-auth #auth-body select{color:#172b36!important;background:#fff!important}
+#scr-auth #auth-body input::placeholder{color:#536b78!important;opacity:1!important}
+#scr-auth #auth-body .ml-auth-role-return-title{color:#172b36!important}
+#scr-auth #auth-body .ml-auth-role-return-copy{color:#405766!important}
+#scr-auth #auth-body .ml-auth-role-return-actions button{color:#0b5f62!important;background:#fff!important}
+#scr-auth .ml-language-login-wrap label{color:#fff!important;opacity:1!important}
+#scr-auth .ml-language-login-wrap select{color:#172b36!important;background:#fff!important}
