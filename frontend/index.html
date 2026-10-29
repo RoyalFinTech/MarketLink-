@@ -2329,7 +2329,8 @@ async function doLogin(){
       var home=G('tab-home');
       if(home&&!home.innerHTML.trim())home.innerHTML='<div style="padding:24px;text-align:center;color:var(--text,#102333)"><h2>Welcome back!</h2><p>Your account is signed in. Some dashboard content could not load.</p><button class="btn btn-p" onclick="try{renderHome()}catch(e){location.reload()}">Reload dashboard</button></div>';
     }catch(recoveryErr){}
-    if(typeof toast==='function')toast('You are signed in, but part of the dashboard could not load. Please retry the dashboard.','error');
+    // Authentication already succeeded; dashboard recovery is not a login failure.
+    if(typeof toast==='function')toast('You are signed in, but part of the dashboard could not load. Please retry the dashboard.','warning');
   }
   if(btn){btn.textContent='Sign In';btn.disabled=false;}
   if(G('auth-err'))G('auth-err').style.display='none';
