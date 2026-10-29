@@ -1274,3 +1274,21 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #scr-splash>div:first-child>div[style*="margin-top:26px"]>div:first-child{background:#e8eef1!important}
 #scr-splash #spl-logo img{filter:none!important}
 #scr-onboard .ml-ob-layout-runtime,#scr-onboard .ml-ob-copy{background:#fff!important}
+
+
+/* MarketLink visibility pass — high-contrast onboarding, auth and role application forms */
+#scr-onboard .ml-ob-dots button{width:10px!important;height:10px!important;min-width:10px!important;background:#9aabb5!important;border:2px solid #f7fbfd!important;box-shadow:0 0 0 2px rgba(7,19,29,.55)!important;opacity:1!important}
+#scr-onboard .ml-ob-dots button.active{width:30px!important;height:10px!important;background:#f5b83d!important;border-color:#fff!important;box-shadow:0 0 0 2px rgba(7,19,29,.55)!important}
+#scr-onboard .ml-ob-dots{min-height:14px!important;align-items:center!important}
+#scr-onboard .ml-ob-description{color:#d7e2e8!important}
+#scr-onboard .ml-ob-copy h1{color:#fff!important;text-shadow:0 2px 14px rgba(0,0,0,.25)}
+#scr-onboard .ml-ob-copy h1 em{color:#ffd36c!important}
+#scr-auth #auth-logo,#scr-auth #auth-body{color:#172b36}
+#scr-auth #auth-body h1,#scr-auth #auth-body h2,#scr-auth #auth-body h3,#scr-auth #auth-body label{color:#172b36!important;text-shadow:none!important}
+#scr-auth #auth-body p,#scr-auth #auth-body small,#scr-auth #auth-body .hint,#scr-auth #auth-body .help-text{color:#405766!important;opacity:1!important}
+#scr-auth #auth-body input,#scr-auth #auth-body select{color:#172b36!important;background:#fff!important}
+#scr-auth #auth-body input::placeholder{color:#647987!important;opacity:1!important}
+#scr-auth #auth-body .ml-auth-role-return-copy,#scr-auth #auth-body .ml-auth-role-return-title{color:#344d59!important;opacity:1!important}
+.ml-vendor-app input::placeholder,.ml-rider-app input::placeholder,#scr-vendor-apply input::placeholder,#scr-rider-apply input::placeholder{color:#5b6b75!important;opacity:1!important}
+.ml-vendor-app label,.ml-rider-app label,#scr-vendor-apply label,#scr-rider-apply label{color:#263e4b!important;opacity:1!important}
+.ml-vendor-app small,.ml-rider-app small,#scr-vendor-apply small,#scr-rider-apply small{color:#405766!important;opacity:1!important}
