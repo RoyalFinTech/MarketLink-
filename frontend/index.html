@@ -6814,20 +6814,21 @@ window.addEventListener('unhandledrejection',function(e){
   window.confirmResetPin=async function(){var p=S.resetPin.join(''),c=S.resetPinConfirm.join('');if(p.length!==4){resetErr('Enter a 4-digit PIN');return;}if(p!==c){resetErr('PINs do not match');return;}try{await ML_API.auth.confirmPinReset(S.resetPhoneE164,S.resetOtpPending,p);S.resetStep='success';renderReset();}catch(e){resetErr(e.error||'Could not reset PIN. Please try again.');}};
 
   window.doLogin=async function(){
-    // One shared lock prevents the PIN-row auto-submit, document-level listener,
-    // and button click from racing and creating contradictory login results.
+    // Check the shared request lock before reading form state. A disabled button
+    // can belong to another auth flow, so never acquire a lock and then return.
     if(window.__mlLoginRequestInFlight)return;
-    window.__mlLoginRequestInFlight=true;
     var returning=G('scr-returning')&&G('scr-returning').classList.contains('active');
-    var p=returning?G('return-phone'):G('lphone'); if(!p){window.__mlLoginRequestInFlight=false;return;}
+    var p=returning?G('return-phone'):G('lphone');
+    if(!p)return;
+    var btn=returning?G('return-login-btn'):G('lbtn');
+    if(btn&&btn.disabled)return;
+    window.__mlLoginRequestInFlight=true;
     var raw=p.value.trim();
     if(!raw){window.__mlLoginRequestInFlight=false;authErr('Enter your phone number');return;}
     if(S.pin.join('').length!==4){window.__mlLoginRequestInFlight=false;authErr('Enter your 4-digit PIN');return;}
     var n;
     try{await phoneReady;n=normalize(raw,returning?'GM':(S.loginCountry||'GM'));}
     catch(e){window.__mlLoginRequestInFlight=false;authErr(e.message||'Enter a valid Gambian phone number');return;}
-    var btn=returning?G('return-login-btn'):G('lbtn');
-    if(btn&&btn.disabled)return;
     if(btn){btn.textContent='Signing in…';btn.disabled=true;}
     var user;
     try{user=await ML_API.auth.login(n.e164,S.pin.join(''));}
