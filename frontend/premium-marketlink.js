@@ -884,7 +884,7 @@
     if(!apiOk())return;
     try{
       var r=await ML_API.customers.getProfile();liveProfile=r.data||liveProfile;
-      if(liveProfile){S.profileName=liveProfile.full_name||'';S.profilePhone=liveProfile.phone||'';S.profilePhoto=liveProfile.profile_photo_url||null;}
+      if(liveProfile){S.profileName=liveProfile.full_name||S.profileName||'';S.profilePhone=liveProfile.phone||S.profilePhone||'';S.profilePhoto=liveProfile.profile_photo_url||S.profilePhoto||null;}
     }catch(e){}
   }
   async function getProfileImageDimensions(file){
@@ -1336,8 +1336,9 @@
         }
       });
     }
-    var photo=p.profile_photo_url||S.profilePhoto;
-    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photo)+'" alt="Profile photo" loading="lazy" decoding="async" onerror="this.onerror=null;this.remove();">':'');
+    var photo=S.profilePhoto||p.profile_photo_url||null;
+    var photoSrc=photo?String(photo)+(String(photo).indexOf('?')>=0?'&':'?')+'mlphoto='+encodeURIComponent(String(photo).length+'-'+(liveProfile&&liveProfile.updated_at||Date.now())):'';
+    var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photoSrc)+'" alt="Profile photo" loading="eager" decoding="async" onerror="this.onerror=null;this.style.display=\'none\';var fallback=this.parentNode&&this.parentNode.querySelector(\'.ml-default-avatar\');if(fallback)fallback.style.display=\'block\';">':'');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
     var upgradeHtml='',userRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
     if(userRoles.indexOf('vendor')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-upgrade-icon">🏪</span><span><b>Open Vendor Dashboard</b><span>Manage products, orders and store activity</span></span><span class="arrow">›</span></button>';
