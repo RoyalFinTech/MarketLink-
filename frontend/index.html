@@ -7202,14 +7202,9 @@ window.addEventListener('unhandledrejection',function(e){
     wrappedAdminLogin.__mlCarrierWrapped=true;window.doAdminLogin=wrappedAdminLogin;
   }
   ensureAdminLoginCarrierWrapper();
-  if(typeof window.authErr==='function'){
-    var oldAuthErr=window.authErr;
-    window.authErr=function(msg){oldAuthErr(msg);try{if(typeof window.toast==='function')window.toast(msg,'error');}catch(e){}};
-  }
-  if(typeof window.adminAuthErr==='function'){
-    var oldAdminErr=window.adminAuthErr;
-    window.adminAuthErr=function(msg){oldAdminErr(msg);try{if(typeof window.toast==='function')window.toast(msg,'error');}catch(e){}};
-  }
+  // Keep authentication validation/errors on their inline form surfaces.
+  // Mirroring every authErr() into a global error toast caused the persistent
+  // “We could not complete that” failure card for ordinary empty/invalid input.
   document.addEventListener('input',function(e){
     if(!e.target||!e.target.classList||!e.target.classList.contains('pinb'))return;
     setTimeout(function(){
