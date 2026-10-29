@@ -602,6 +602,10 @@ select[id$="-operator"] option,.ml-gm-phone select option{
     <div id="auth-logo" style="display:flex;flex-direction:column;align-items:center;gap:6px;"></div>
   </div>
   <div id="auth-body" style="padding:24px 20px 60px;background:var(--dk);min-height:60vh;"></div>
+  <div aria-label="Vendor and rider dashboard sign in" style="padding:0 20px 28px;background:var(--dk);display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+    <button type="button" onclick="openRoleAccess('vendor')" style="width:100%;min-width:0;border:1px solid rgba(13,115,119,.4);background:var(--card, #fff);color:var(--tx);border-radius:11px;padding:12px 8px;font-size:11px;font-weight:700;cursor:pointer;">Vendor account<br><span style="color:#0D7377;">Open dashboard →</span></button>
+    <button type="button" onclick="openRoleAccess('rider')" style="width:100%;min-width:0;border:1px solid rgba(124,58,237,.35);background:var(--card, #fff);color:var(--tx);border-radius:11px;padding:12px 8px;font-size:11px;font-weight:700;cursor:pointer;">Rider account<br><span style="color:#7C3AED;">Open dashboard →</span></button>
+  </div>
 </div>
 
 <!-- ═══ ADMIN PORTAL (separate from customer auth) ═══ -->
