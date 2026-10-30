@@ -6990,7 +6990,7 @@ window.addEventListener('unhandledrejection',function(e){
         businessAddress:form.saddr.trim(),
         latitude:form.latitude==null?undefined:form.latitude,
         longitude:form.longitude==null?undefined:form.longitude,
-        description:[form.sname?'Shop name: '+form.sname.trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
+        description:[form.sname?'Shop name: '+form.sname.trim():'',form.registrationNo?'Registration / permit: '+String(form.registrationNo).trim():'',form.services?'Products / services: '+String(form.services).trim():'',form.hours?'Opening hours: '+String(form.hours).trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
       };
       if(form.phone){p.phone=normalize(form.phone,S.vFormCountry||'GM').e164;}
       if(form.whatsappNumber){p.whatsappNumber=form.whatsappNumber;}
