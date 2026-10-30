@@ -741,9 +741,15 @@
     var orderCount=liveProfile?Number(liveProfile.total_orders||0):0;
     var spent=liveProfile?Number(liveProfile.total_spent||0):0;
     var wallet=liveWallet?Number(liveWallet.balance||0):Number(S.walletBalance||0);
+    var profilePhoto=S.profilePhoto||(liveProfile&&liveProfile.profile_photo_url)||(S.user&&(S.user.profilePhotoUrl||S.user.avatarUrl))||null;
+    try{profilePhoto=profilePhoto||localStorage.getItem('ml_profile_photo_url')||null;}catch(photoReadError){}
+    var profileInitial=esc(String(firstName()||'U').trim().charAt(0).toUpperCase()||'U');
+    var profileAvatar=profilePhoto
+      ?'<img src="'+esc(String(profilePhoto)+(String(profilePhoto).indexOf('?')>=0?'&':'?')+'mlavatar='+Date.now())+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><span class="ml-dashboard-avatar-fallback" style="display:none;">'+profileInitial+'</span>'
+      :'<span class="ml-dashboard-avatar-fallback">'+profileInitial+'</span>';
     root.innerHTML=
       '<div class="ml-premium-home">'+
-      '<div class="ml-home-top"><div>'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-live-dot">Live marketplace</div></div>'+
+      '<div class="ml-home-top"><div class="ml-home-welcome">'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-home-top-actions"><div class="ml-live-dot">Live marketplace</div><button type="button" class="ml-dashboard-avatar" onclick="switchTab(\'profile\')" aria-label="Open your profile" title="Open your profile">'+profileAvatar+'</button></div></div>'+
       '<div class="ml-home-discovery"><button type="button" class="ml-btn ml-btn-primary" onclick="var s=document.getElementById(\'hsearch\');if(s)s.focus()">🔎 Search marketplace</button><button type="button" class="ml-btn ml-btn-secondary" onclick="switchTab(\'orders\')">📦 Track my orders</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.renderCategories()">🛍️ Browse categories</button></div>'+
       '<div class="ml-home-search"><span aria-hidden="true">🔎</span><input id="hsearch" type="search" autocomplete="off" placeholder="Search products, vendors or categories…" aria-label="Search products, vendors or categories" oninput="window.doSearch(this.value)"><button type="button" onclick="var q=document.getElementById(\'hsearch\');if(q)window.doSearch(q.value)">Search</button></div>'+
       promoCarouselMarkup()+
