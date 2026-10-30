@@ -1669,3 +1669,21 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 .ml-avatar,.ml-profile-avatar,.ml-profile-hero .ml-avatar{position:relative!important;overflow:hidden!important}
 .ml-avatar .ml-default-avatar,.ml-profile-avatar .ml-default-avatar{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
 .ml-avatar .ml-avatar-photo,.ml-profile-avatar .ml-avatar-photo{position:absolute!important;inset:0!important;z-index:2!important;width:100%!important;height:100%!important;object-fit:cover!important;border-radius:inherit!important;background:#0B2531!important}
+
+/* Dashboard profile shortcut: responsive, touch-friendly and consistent with the saved profile photo. */
+.ml-home-top{align-items:flex-start!important}
+.ml-home-welcome{min-width:0;flex:1}
+.ml-home-top-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-shrink:0}
+.ml-dashboard-avatar{width:46px;height:46px;min-width:46px;border-radius:50%;padding:0;overflow:hidden;display:flex;align-items:center;justify-content:center;border:2px solid var(--ml-gold);background:#0B2531;cursor:pointer;box-shadow:0 0 0 3px rgba(245,184,61,.12);transition:transform .16s ease,box-shadow .16s ease}
+.ml-dashboard-avatar:hover,.ml-dashboard-avatar:focus-visible{transform:translateY(-1px);box-shadow:0 0 0 4px rgba(245,184,61,.22);outline:2px solid #F5B83D;outline-offset:2px}
+.ml-dashboard-avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.ml-dashboard-avatar-fallback{width:100%;height:100%;align-items:center;justify-content:center;background:linear-gradient(135deg,#0D7377,#071521);color:#F8FBFC;font-size:18px;font-weight:800}
+@media(max-width:600px){
+ .ml-premium-home{padding-left:12px;padding-right:12px}
+ .ml-home-top{gap:10px!important}
+ .ml-home-top-actions{gap:8px;flex-direction:column-reverse;align-items:flex-end}
+ .ml-dashboard-avatar{width:42px;height:42px;min-width:42px}
+ .ml-home-top-actions .ml-live-dot{font-size:9px;white-space:nowrap}
+ .ml-home-welcome .ml-hero-title{font-size:clamp(22px,6vw,30px)}
+ .ml-home-welcome .ml-hero-sub{font-size:11px;max-width:34ch}
+}
