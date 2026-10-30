@@ -21,7 +21,7 @@ function auditLog(actor, action, entityId, before, after) {
 // ── REGISTER ─────────────────────────────────────────────────────────
 async function register(userId, data) {
   const { vehicleType, plateNumber, licenseNumber, nationalId, idDocumentUrl,
-          licenseDocumentUrl, vehiclePhotoUrl, emergencyContact, address, deliveryZone,
+          licenseDocumentUrl, vehiclePhotoUrl, profilePhotoUrl, emergencyContact, address, deliveryZone,
           mobileNumber, whatsappNumber, latitude, longitude } = data;
 
   const { rows: existing } = await query(
