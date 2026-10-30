@@ -6978,6 +6978,7 @@ window.addEventListener('unhandledrejection',function(e){
     if(!form.sname||!form.sname.trim()){toast('Enter the shop name customers will see.','error');return;}
     if(!form.saddr||!form.saddr.trim()){toast('Enter the shop address, including the area and town.','error');return;}
     if(!form.cat){toast('Choose your business category.','error');return;}
+    if(!form.idDocFile){toast('Upload an identity document before submitting.','error');S.vStep=1;renderVApp();return;}
     var b=document.querySelector('#sh-vapp .btn-p');if(b){b.textContent='Uploading and submitting…';b.disabled=true;}
     var uploaded=[];
     try{
