@@ -54,6 +54,15 @@ async function register(userId, data) {
     await client.query(
       `INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
 
+    // Notify all admin roles so new applications appear in the admin notification center.
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
+       SELECT DISTINCT ur.user_id, 'vendor_application_submitted', 'New vendor application', $2, 'vendor', $1
+       FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+       WHERE r.name IN ('admin','super_admin','moderator')`,
+      [userId, `Vendor application from ${businessName.trim()} is awaiting review.`]
+    );
+
     logger.info('Vendor registered', { userId, businessName });
     return vendor;
   });
