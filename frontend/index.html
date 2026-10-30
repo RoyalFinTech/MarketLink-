@@ -7017,7 +7017,7 @@ window.addEventListener('unhandledrejection',function(e){
       var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined,mobileNumber:form.phone||S.profilePhone||undefined,whatsappNumber:form.whatsappNumber||undefined,latitude:form.latitude==null?undefined:form.latitude,longitude:form.longitude==null?undefined:form.longitude};
       if(form.idDocFile){var riderId=await ML_API.uploads.upload(form.idDocFile,'rider-document');p.idDocumentUrl=riderId.url;uploaded.push(riderId.url);}
       if(form.licenseDocFile){var licenseUpload=await ML_API.uploads.upload(form.licenseDocFile,'license-document');p.licenseDocumentUrl=licenseUpload.url;uploaded.push(licenseUpload.url);}
-      if(form.profilePhotoFile){var profileUpload=await ML_API.uploads.upload(form.profilePhotoFile,'rider-profile-photo');p.profilePhotoUrl=profileUpload.url;uploaded.push(profileUpload.url);}
+      if(form.profilePhotoFile){var profileUpload=await ML_API.uploads.upload(form.profilePhotoFile,'profile-photo');p.profilePhotoUrl=profileUpload.url;uploaded.push(profileUpload.url);}
       if(form.vehiclePhotoFile){var vehicleUpload=await ML_API.uploads.upload(form.vehiclePhotoFile,'rider-photo');p.vehiclePhotoUrl=vehicleUpload.url;uploaded.push(vehicleUpload.url);}
       await ML_API.riders.register(p);
       closeSheet('sh-rapp');
