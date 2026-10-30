@@ -5870,23 +5870,31 @@ function openVendorApp(){
 function marketlinkVendorCategoryGroup(label){
   var s=String(label||'').toLowerCase();
   if(/nigerian food/.test(s))return 'Nigerian Food';
-  if(/international|import & export|international trade/.test(s))return 'International';
   if(/gambian food/.test(s))return 'Gambian Food';
+  if(/international|import & export/.test(s))return 'International';
+  if(/agricultural|farm produce|crop farming|livestock|poultry farming|fish farming|fertilizer|farm equipment|seeds|agriculture/.test(s))return 'Agriculture & Farming';
   if(/restaurant|catering|street food|bakery|cake|snacks|juice|drinks|water supplier|food & restaurant/.test(s))return 'Restaurants';
-  if(/grocery|supermarket|fruit|vegetable|eggs|poultry|fish|seafood|meat|butchery|rice|grain|cooking oil|spices|farm produce|crop farming|livestock|fish farming|agricultural|fertilizer|seed|food processing|wholesale & distribution|retail & general trading|market stall|hawker|itinerant trader|door-to-door|roadside shop|market trader|women’s market stall|women-led enterprise|youth-led enterprise|home-based business|manufacturing & production|packaging & labelling/.test(s))return 'Groceries';
-  if(/pharmacy|healthcare|medical|dental|health products|childcare|elder care|pet & animal|security services|insurance services/.test(s))return 'Pharmacies';
-  if(/electronics|computer|laptop|mobile phone|telecommunications|internet|electrical|solar|appliance|technical support|software & it|web & app|cyber café|fintech|payment services|banking & financial|mobile money|equipment & machinery|industrial supplies/.test(s))return 'Electronics';
-  if(/fashion|clothing|tailoring|dressmaking|fabric|textile|shoe|footwear|bag|jewellery|watch|uniform|leather goods|batik|tie-dye|baby & maternity|children’s products|toys/.test(s))return 'Fashion';
-  if(/beauty|cosmetic|hair salon|barber|makeup|skincare|spa|nail technician|wigs|hair products/.test(s))return 'Beauty';
-  if(/furniture|carpentry|cleaning|janitorial|laundry|dry cleaning|waste collection|recycling|soap & household|handmade|crafts|handicrafts|art & local|school & education|tutoring|books & stationery|office supplies|office equipment|office & professional|accounting|legal & consulting|human resources|public services|church & community|ngo & social|professional freelancer/.test(s))return 'Household';
-  if(/construction|building|cement|blocks|sand, gravel|quarry|paint|welding|metal fabrication|glass|aluminium|roofing|ceiling|tiles|flooring|interior design|architecture|engineering|property & real estate|rentals & property|industrial supplies|machinery|wholesale building/.test(s))return 'Construction';
-  if(/vehicle|transport|taxi|car hire|motorbike|tricycle|delivery|courier|moving|haulage|auto sales|spare parts|mechanic|tyres|batteries|fuel|lubricants|travel & tourism|hotel & guest house|tour guide/.test(s))return 'Vehicles';
-  if(/software|digital|content creator|graphic design|branding|marketing|advertising|media production|audio production|photography|videography|event planning|entertainment|music & audio|film & media|printing & photocopying/.test(s))return 'Digital Goods';
-  if(/food|gambian/.test(s))return 'Gambian Food';
+  if(/grocery|supermarket|fruit|vegetable|eggs|poultry products|fish & seafood|meat & butchery|rice|grain|cooking oil|spices|food processing/.test(s))return 'Groceries';
+  if(/pharmacy/.test(s))return 'Pharmacies';
+  if(/healthcare|medical|dental|health products|childcare|elder care|pet & animal|wellness/.test(s))return 'Health & Wellness';
+  if(/electronics|computer|laptop|mobile phone|telecommunications|internet|electrical|solar|appliance|technical support|repair & technical/.test(s))return 'Electronics';
+  if(/software|web & app|digital|cyber café|fintech|payment|mobile money|banking|graphic design|branding|marketing|advertising|content creator|printing & photocopying/.test(s))return 'Digital Goods';
+  if(/fashion|clothing|tailoring|dressmaking|fabric|textile|shoe|footwear|bag|jewellery|watch|uniform|leather goods|batik|tie-dye|baby & maternity|children’s products|toys|cosmetics|beauty products|hair products|wigs|makeup|skincare|nail technician|hair salon|barber/.test(s))return /cosmetic|beauty products|hair products|wigs|makeup|skincare|nail technician|hair salon|barber/.test(s)?'Beauty':'Fashion';
+  if(/construction|building|cement|blocks|sand, gravel|quarry|paint|welding|metal fabrication|glass|aluminium|roofing|ceiling|tiles|flooring|interior design|architecture|engineering|wholesale building/.test(s))return 'Construction';
+  if(/vehicle|transport|taxi|car hire|motorbike|tricycle|delivery|courier|moving|haulage|auto sales|spare parts|mechanic|tyres|batteries|fuel|lubricants/.test(s))return 'Vehicles';
+  if(/office supplies|office equipment|office & professional|accounting|legal & consulting|human resources|recruitment|professional freelancer|insurance services|security services|public services|administration/.test(s))return 'Office & Professional Services';
+  if(/school|education|tutoring|training|books & stationery|church & community|ngo & social|community services|childcare|daycare/.test(s))return 'Education & Community';
+  if(/manufacturing|production|packaging|industrial supplies|equipment & machinery/.test(s))return 'Manufacturing & Production';
+  if(/travel|tourism|hotel|guest house|tour guide|excursions/.test(s))return 'Travel & Hospitality';
+  if(/photography|videography|event planning|decoration|entertainment|dj|music|audio production|film & media|handmade|crafts|handicrafts|art & local/.test(s))return 'Arts & Events';
+  if(/wholesale|distribution|retail|general trading|market stall|hawker|street seller|itinerant trader|door-to-door|roadside shop|market trader|women’s market stall|women-led|youth-led|home-based|small home|women-led enterprise/.test(s))return 'Retail & General Trading';
+  if(/furniture|carpentry|cleaning|janitorial|laundry|dry cleaning|waste collection|recycling|soap & household/.test(s))return 'Household';
+  if(/property|rentals|real estate/.test(s))return 'Services';
+  if(/food/.test(s))return 'Restaurants';
   return 'Services';
 }
 function marketlinkVendorCategoryOptions(categories,selected){
-  var order=['Gambian Food','Nigerian Food','International','Restaurants','Groceries','Pharmacies','Electronics','Fashion','Beauty','Household','Construction','Vehicles','Services','Digital Goods'];
+  var order=['Gambian Food','Nigerian Food','International','Restaurants','Groceries','Agriculture & Farming','Retail & General Trading','Pharmacies','Health & Wellness','Electronics','Digital Goods','Fashion','Beauty','Household','Construction','Vehicles','Office & Professional Services','Education & Community','Manufacturing & Production','Travel & Hospitality','Arts & Events','Services'];
   var grouped={};categories.filter(Boolean).forEach(function(label){var group=marketlinkVendorCategoryGroup(label);(grouped[group]||(grouped[group]=[])).push(label);});
   return '<option value="">Select business category</option>'+order.filter(function(g){return grouped[g]&&grouped[g].length;}).map(function(g){
     return '<optgroup label="'+g+'">'+grouped[g].map(function(label){return '<option value="'+sanitizeText(label)+'"'+(selected===label?' selected':'')+'>'+sanitizeText(label)+'</option>';}).join('')+'</optgroup>';
