@@ -1438,7 +1438,8 @@
     if(userRoles.indexOf('rider')>-1)upgradeHtml+='<button type="button" onclick="window.ML_Premium.openRoleDashboard(\'rider\')"><span class="ml-upgrade-icon">🛵</span><span><b>Open Rider Dashboard</b><span>View assigned deliveries and earnings</span></span><span class="arrow">›</span></button>';
     else if(riderApplication)upgradeHtml+='<button type="button" class="ml-role-application-state" onclick="window.ML_Premium.openProfilePage(\'help\')"><span class="ml-upgrade-icon">🛵</span><span><b>Rider application: '+esc(String(riderApplication.kyc_status))+'</b><span>Check status or contact support. You do not need to submit another application.</span></span><span class="arrow">›</span></button>';
     else upgradeHtml+='<button type="button" onclick="openRiderApp()"><span class="ml-upgrade-icon">🛵</span><span><b>Become a rider</b><span>Apply to deliver local orders</span></span><span class="arrow">›</span></button>';
-    var profileItems=[\n      {icon:'💬',title:'Messages',desc:'Chat privately with MarketLink vendors and customers',page:'messages'},
+    var profileItems=[
+      {icon:'💬',title:'Messages',desc:'Chat privately with MarketLink vendors and customers',page:'messages'},
       {icon:'❤️',title:'Wishlist',desc:'Products you have saved',page:'wishlist'},
       {icon:'🔗',title:'Affiliate Program',desc:'Your link, referrals and eligible 2% rewards',page:'affiliate'},
       {icon:'⚖️',title:'Compare Products',desc:'Review products you selected to compare',page:'compare'},
