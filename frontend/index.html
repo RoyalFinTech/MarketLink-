@@ -3880,6 +3880,10 @@ function renderVDash(){
   var active=S.vOrders.filter(function(o){return o.status==='Preparing';}).length;
   var scMap={Pending:'#FF6B2B',Preparing:'#0D7377','Awaiting Rider':'#8B5CF6',Delivered:'#22C55E',Cancelled:'#EF4444'};
 
+  var profileSummary=S.vProfile?'<section style="margin:12px 13px 0;padding:12px;border:1px solid rgba(13,115,119,.25);border-radius:12px;background:var(--sf);">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"><b style="font-size:12px;color:var(--tx);">My business profile</b><span style="font-size:10px;font-weight:800;text-transform:uppercase;color:'+(String(S.vProfile.kyc_status||'pending')==='approved'?'#22C55E':String(S.vProfile.kyc_status||'pending')==='rejected'?'#EF4444':'#F5A623')+';">'+sanitizeText(S.vProfile.kyc_status||'pending')+'</span></div>'+
+    [['Business',S.vProfile.business_name],['Category',S.vProfile.business_category],['Address',S.vProfile.business_address],['Business phone',S.vProfile.phone||S.vProfile.business_phone],['Business email',S.vProfile.email||S.vProfile.business_email],['Application details',S.vProfile.description]].filter(function(row){return row[1];}).map(function(row){return '<div style="display:flex;gap:8px;padding:5px 0;border-top:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 95px;color:var(--mu);font-size:10px;">'+sanitizeText(row[0])+'</b><span style="min-width:0;overflow-wrap:anywhere;color:var(--tx);font-size:11px;">'+sanitizeText(row[1])+'</span></div>';}).join('')+
+    (String(S.vProfile.kyc_status||'pending')==='pending'?'<p style="font-size:10px;line-height:1.5;color:var(--mu);margin:8px 0 0;">Your application is awaiting Admin review. You will receive a notification when it is approved or declined.</p>':'')+'</section>':'';
   var content='';
   if(S.vSubTab==='orders'){
     if(S.vOrders.length===0){
@@ -3999,7 +4003,7 @@ function renderVDash(){
       return '<div style="background:rgba(255,255,255,0.07);border-radius:11px;padding:10px;text-align:center;border:1px solid rgba(255,255,255,0.09);">'+
         '<div style="font-size:18px;margin-bottom:3px;">'+s[0]+'</div><div style="color:'+s[3]+';font-size:14px;font-weight:700;">'+s[1]+'</div>'+
         '<div style="color:rgba(255,255,255,0.45);font-size:9px;margin-top:1px;">'+s[2]+'</div></div>';
-    }).join('')+'</div></div>'+
+    }).join('')+'</div></div>'+profileSummary+
     '<div class="snav">'+
     tabs.map(function(t,i){
       return '<div onclick="S.vSubTab=\''+t+'\';renderVDash();" class="stab" style="font-weight:'+(S.vSubTab===t?700:400)+';color:'+(S.vSubTab===t?'#0D7377':'var(--mu)')+';border-bottom-color:'+(S.vSubTab===t?'#0D7377':'transparent')+';">'+tabLabels[i]+'</div>';
