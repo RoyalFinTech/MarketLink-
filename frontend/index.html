@@ -3406,12 +3406,12 @@ async function handlePhoto(inp){
   var camera=document.querySelector('.pfoto-cam');
   var localPreview='';
   try{
-    localPreview=await new Promise(function(resolve){var reader=new FileReader();reader.onload=function(){resolve(String(reader.result||'');};reader.onerror=function(){resolve('');};reader.readAsDataURL(file);});
+    localPreview=await new Promise(function(resolve){var reader=new FileReader();reader.onload=function(){resolve(String(reader.result||''));};reader.onerror=function(){resolve('');};reader.readAsDataURL(file);});
     if(camera){camera.textContent='…';camera.setAttribute('aria-label','Uploading profile photo');}
     toast('Uploading profile photo…','info');
     var uploaded=await ML_API.uploads.upload(file,'profile-photo');
     var photoUrl=uploaded&&uploaded.url;
-    if(!photoUrl||!/^https?:\\/\\//i.test(photoUrl))throw new Error('The server did not return a valid saved profile photo URL.');
+    if(!photoUrl||!/^https?:\/\//i.test(photoUrl))throw new Error('The server did not return a valid saved profile photo URL.');
     var saved=await ML_API.customers.updateProfile({profilePhotoUrl:photoUrl});
     if(!saved||saved.success===false)throw new Error('The photo was uploaded but the profile did not confirm saving it.');
     S.profilePhoto=photoUrl;
