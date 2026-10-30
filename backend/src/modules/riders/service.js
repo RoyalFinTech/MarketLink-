@@ -32,9 +32,9 @@ async function register(userId, data) {
     const { rows: [rider] } = await client.query(
       `INSERT INTO riders
          (user_id, vehicle_type, plate_number, license_number, national_id,
-          id_document_url, license_document_url, vehicle_photo_url,
+          id_document_url, license_document_url, vehicle_photo_url, profile_photo_url,
           emergency_contact, address, delivery_zone, mobile_number, whatsapp_number, current_lat, current_lng, kyc_status, is_online)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending',FALSE) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE) RETURNING *`,
       [userId, vehicleType || null, plateNumber || null, licenseNumber || null,
        nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null,
        emergencyContact || null, address || null, deliveryZone || null, mobileNumber || null, whatsappNumber || null, latitude ?? null, longitude ?? null]
