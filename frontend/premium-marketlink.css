@@ -1687,3 +1687,8 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
  .ml-home-welcome .ml-hero-title{font-size:clamp(22px,6vw,30px)}
  .ml-home-welcome .ml-hero-sub{font-size:11px;max-width:34ch}
 }
+
+.ml-dashboard-avatar-compact{width:34px;height:34px;min-width:34px;flex-shrink:0}
+@media(max-width:480px){
+ #tab-vendordash .ml-dashboard-avatar-compact,#tab-riderdash .ml-dashboard-avatar-compact{width:30px;height:30px;min-width:30px}
+}
