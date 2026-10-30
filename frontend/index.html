@@ -5858,6 +5858,39 @@ function openVendorApp(){
   S.vForm={bname:'',sname:'',saddr:'',cat:'',phone:accountPhone,email:(S.user&&S.user.email)||'',registrationNo:'',services:'',hours:'',description:'',idDoc:'',photo:'',idDocFile:null,photoFile:null};
   renderVApp(); openSheet('sh-vapp');
 }
+function marketlinkVendorCategoryGroup(label){
+  var s=String(label||'').toLowerCase();
+  if(/restaurant|catering|street food|bakery|cake|snacks|juice|drinks|water supplier/.test(s))return 'Restaurants';
+  if(/grocery|supermarket|fruit|vegetable|eggs|poultry|fish|seafood|meat|butchery|rice|grain|cooking oil|spices|farm produce|crop farming|livestock|fish farming|agricultural|fertilizer|seed|food processing/.test(s))return 'Groceries';
+  if(/pharmacy|healthcare|medical|dental|health products/.test(s))return 'Pharmacies';
+  if(/electronics|computer|laptop|mobile phone|telecommunications|internet|electrical|solar|appliance|technical support/.test(s))return 'Electronics';
+  if(/fashion|clothing|tailoring|dressmaking|fabric|textile|shoe|footwear|bag|jewellery|watch|uniform|leather goods|batik|tie-dye/.test(s))return 'Fashion';
+  if(/beauty|cosmetic|hair salon|barber|makeup|skincare|spa|nail technician|wigs/.test(s))return 'Beauty';
+  if(/furniture|carpentry|cleaning|janitorial|laundry|dry cleaning|waste collection|recycling|soap & household|home-based|handmade|crafts|handicrafts/.test(s))return 'Household';
+  if(/construction|building|cement|blocks|sand, gravel|quarry|paint|welding|metal fabrication|glass|aluminium|roofing|ceiling|tiles|flooring|interior design|architecture|engineering|industrial supplies|machinery/.test(s))return 'Construction';
+  if(/vehicle|transport|taxi|car hire|motorbike|tricycle|delivery|courier|moving|haulage|auto sales|spare parts|mechanic|tyres|batteries|fuel|lubricants|rental/.test(s))return 'Vehicles';
+  if(/software|web & app|digital|fintech|payment|content creator|graphic design|branding|marketing|advertising|media production|audio production|photography|videography/.test(s))return 'Digital Goods';
+  if(/food|international|nigerian|gambian/.test(s))return 'Gambian Food';
+  return 'Services';
+}
+function marketlinkVendorCategoryOptions(categories,selected){
+  var order=['Gambian Food','Restaurants','Groceries','Pharmacies','Electronics','Fashion','Beauty','Household','Construction','Vehicles','Services','Digital Goods','International'];
+  var grouped={};categories.filter(Boolean).forEach(function(label){var group=marketlinkVendorCategoryGroup(label);(grouped[group]||(grouped[group]=[])).push(label);});
+  return '<option value="">Select business category</option>'+order.filter(function(g){return grouped[g]&&grouped[g].length;}).map(function(g){
+    return '<optgroup label="'+g+'">'+grouped[g].map(function(label){return '<option value="'+sanitizeText(label)+'"'+(selected===label?' selected':'')+'>'+sanitizeText(label)+'</option>';}).join('')+'</optgroup>';
+  }).join('');
+}
+function marketlinkCaptureGPS(kind){
+  if(!navigator.geolocation){toast('This browser does not provide GPS location. Enter the address manually.','error');return;}
+  toast('Waiting for your phone GPS permission…','info');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var target=kind==='vendor'?(S.vForm||(S.vForm={} )):(S.rForm||(S.rForm={}));
+    target.latitude=Number(pos.coords.latitude.toFixed(7));target.longitude=Number(pos.coords.longitude.toFixed(7));
+    var out=document.getElementById(kind==='vendor'?'va-gps-status':'ra-gps-status');
+    if(out)out.textContent='GPS saved: '+target.latitude+', '+target.longitude;
+    toast(kind==='vendor'?'Shop GPS saved.':'GPS permission granted. Live delivery sharing will be requested for an assigned delivery.','success');
+  },function(err){toast(err&&err.code===1?'Location permission was denied. Enable it in browser settings or enter the address manually.':'Could not read GPS. Check location services and try again.','error');},{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+}
 function renderVApp(){
   var el=G('vapp-body'); if(!el) return;
   var steps=['Business Info','Documents','Review'];
@@ -5875,7 +5908,7 @@ function renderVApp(){
       '<input class="inp" placeholder="Shop / display name" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
       '<input class="inp" placeholder="Shop address (area, town, landmark)" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
       '<select id="va-cat" style="width:100%;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;appearance:none;">'+
-      cats.map(function(c){return '<option value="'+c+'"'+(f.cat===c?' selected':'')+'>'+(c||'Select business category')+'</option>';}).join('')+'</select>'+
+      marketlinkVendorCategoryOptions(cats,f.cat)+'</select>'+
       '<label style="display:block;color:var(--mu);font-size:10px;font-weight:700;margin:0 0 5px 2px;">WhatsApp number after +220 (network prefix + 7 digits)</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
