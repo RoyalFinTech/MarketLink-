@@ -43,6 +43,11 @@ router.post('/register',
       .optional().trim().isLength({ max: 500 }),
     body('deliveryZone')
       .optional().trim().isLength({ max: 120 }),
+    body('mobileNumber').optional({ nullable: true }).isMobilePhone('any'),
+    body('whatsappNumber').optional({ nullable: true }).isMobilePhone('any'),
+    body('profilePhotoUrl').optional({ nullable: true }).isURL(),
+    body('latitude').optional({ nullable: true }).isFloat({ min: -90, max: 90 }),
+    body('longitude').optional({ nullable: true }).isFloat({ min: -180, max: 180 }),
   ],
   validate, ctrl.register
 );
