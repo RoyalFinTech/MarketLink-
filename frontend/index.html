@@ -7308,8 +7308,7 @@ window.addEventListener('unhandledrejection',function(e){
       closeSheet('sh-rapp');toast('Rider application submitted. Admin will review your documents.','success');S._riderLiveLoaded=false;renderProfile();
     }catch(e){toast(e.error||e.message||'Could not submit the rider application.','error');}
   }
-  window.submitVApp=mlSubmitVendorApplication;
-  window.submitRApp=mlSubmitRiderApplication;
+  // Keep the earlier backend-wired submit handlers; do not replace them with the legacy reduced payload.
   function initMarketLinkTicker(){
     var app=document.getElementById('app');if(!app||document.getElementById('ml-live-promo-ticker'))return;
     var style=document.createElement('style');style.id='ml-live-promo-ticker-style';
