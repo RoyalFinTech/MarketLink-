@@ -3317,9 +3317,15 @@ function renderProfile(){
   if(S.profilePage==='compare'){renderComparePage();return;}
 
   var hasV=S.roles.indexOf('vendor')>-1, hasR=S.roles.indexOf('rider')>-1;
+  var savedPhotoUrl=S.profilePhoto||S.user&& (S.user.profilePhotoUrl||S.user.avatarUrl)||null;
+  var savedPhotoPreview=null;
+  try{savedPhotoUrl=savedPhotoUrl||localStorage.getItem('ml_profile_photo_url')||null;savedPhotoPreview=localStorage.getItem('ml_profile_photo_preview')||null;}catch(photoStorageError){}
   var photoHTML='';
-  if(S.profilePhoto){
-    photoHTML='<img src="'+S.profilePhoto+'" style="width:100%;height:100%;object-fit:cover;">';
+  if(savedPhotoUrl){
+    var photoSrc=String(savedPhotoUrl)+(String(savedPhotoUrl).indexOf('?')>=0?'&':'?')+'mlphoto='+Date.now();
+    photoHTML='<img src="'+photoSrc+'" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;var preview=null;try{preview=localStorage.getItem(\\'ml_profile_photo_preview\\');}catch(e){}if(preview){this.src=preview;this.style.display=\\'block\\';}else{this.style.display=\\'none\\';}">';
+  } else if(savedPhotoPreview){
+    photoHTML='<img src="'+savedPhotoPreview+'" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">';
   } else {
     photoHTML='<div style="font-size:26px;">👤</div>';
   }
@@ -3398,16 +3404,19 @@ async function handlePhoto(inp){
     toast('Please sign in again before uploading your profile photo.','error');inp.value='';return;
   }
   var camera=document.querySelector('.pfoto-cam');
+  var localPreview='';
   try{
+    localPreview=await new Promise(function(resolve){var reader=new FileReader();reader.onload=function(){resolve(String(reader.result||'');};reader.onerror=function(){resolve('');};reader.readAsDataURL(file);});
     if(camera){camera.textContent='…';camera.setAttribute('aria-label','Uploading profile photo');}
     toast('Uploading profile photo…','info');
     var uploaded=await ML_API.uploads.upload(file,'profile-photo');
     var photoUrl=uploaded&&uploaded.url;
-    if(!photoUrl)throw new Error('The server did not return a profile photo URL.');
+    if(!photoUrl||!/^https?:\\/\\//i.test(photoUrl))throw new Error('The server did not return a valid saved profile photo URL.');
     var saved=await ML_API.customers.updateProfile({profilePhotoUrl:photoUrl});
+    if(!saved||saved.success===false)throw new Error('The photo was uploaded but the profile did not confirm saving it.');
     S.profilePhoto=photoUrl;
     if(S.user){S.user.profilePhotoUrl=photoUrl;S.user.avatarUrl=photoUrl;}
-    try{localStorage.setItem('ml_profile_photo_url',photoUrl);}catch(storageError){}
+    try{localStorage.setItem('ml_profile_photo_url',photoUrl);if(localPreview)localStorage.setItem('ml_profile_photo_preview',localPreview);localStorage.setItem('ml_profile_photo_preview_url',photoUrl);}catch(storageError){}
     renderProfile();toast('Profile photo saved successfully.','success');
   }catch(err){
     toast((err&& (err.error||err.message))||'Could not upload your profile photo. Please try again.','error');
