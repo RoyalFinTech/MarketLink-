@@ -5928,7 +5928,7 @@ function renderVApp(){
       '<div style="font-size:25px;margin-top:8px;">📷</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">Shop photograph / logo (optional)</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.photoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;margin-bottom:14px;">'+
-      [['Business',f.bname],['Shop',f.sname],['Address',f.saddr],['Category',f.cat],['Phone',f.phone],['Email',f.email||'—'],['Registration',f.registrationNo||'—'],['Products / services',f.services||'—'],['Opening hours',f.hours||'—'],['About',f.description||'—'],['ID document',f.idDocName||'Not attached'],['Shop photo',f.photoName||'Not attached']].map(function(r){
+      [['Business',f.bname],['Shop',f.sname],['Address',f.saddr],['Category',f.cat],['Marketplace category',marketlinkVendorCategoryGroup(f.cat)],['Account phone',f.phone],['WhatsApp',f.whatsappNumber||'Not added'],['Shop GPS',f.latitude!=null?f.latitude+', '+f.longitude:'Not shared'],['Email',f.email||'—'],['Registration',f.registrationNo||'—'],['Products / services',f.services||'—'],['Opening hours',f.hours||'—'],['About',f.description||'—'],['ID document',f.idDocName||'Not attached'],['Shop photo',f.photoName||'Not attached']].map(function(r){
         return '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">'+
           '<span style="color:var(--mu);font-size:12px;">'+r[0]+'</span>'+
           '<span style="color:var(--tx);font-size:12px;font-weight:600;max-width:55%;text-align:right;overflow-wrap:anywhere;">'+sanitizeText(r[1]||'—')+'</span></div>';
@@ -5995,14 +5995,14 @@ function raDocsSelected(inp,target){
   if(allowed.indexOf(file.type)<0){toast(isDoc?'Choose a JPG, PNG or PDF document.':'Choose a JPG, PNG or WebP vehicle photo.','error');inp.value='';return;}
   if(file.size<=0||file.size>max){toast('The selected file is empty or too large. Maximum: '+(isDoc?'10 MB':'5 MB')+'.','error');inp.value='';return;}
   S.rForm=S.rForm||{};S.rForm[target]=file;
-  S.rForm[target==='idDocFile'?'idDocName':target==='licenseDocFile'?'licenseDocName':'vehiclePhotoName']=file.name;
+  S.rForm[target==='idDocFile'?'idDocName':target==='licenseDocFile'?'licenseDocName':target==='profilePhotoFile'?'profilePhotoName':'vehiclePhotoName']=file.name;
   S.rForm.docs=file.name;renderRApp();
   toast(file.name+' selected. It will be uploaded securely when you submit.','info');
 }
 function openRiderApp(){
   S.rStep=0;
   var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\\+220/,'').replace(/\\D/g,'');
-  S.rForm={fname:(S.user&&S.user.name)||S.profileName||'',phone:accountPhone,addr:'',plate:'',licence:'',vehicleType:'motorbike',deliveryZone:'',emergency:'',docs:'',idDocFile:null,licenseDocFile:null,vehiclePhotoFile:null};
+  S.rForm={fname:(S.user&&S.user.name)||S.profileName||'',phone:accountPhone,whatsappNumber:'',addr:'',plate:'',licence:'',vehicleType:'motorbike',deliveryZone:'',emergency:'',latitude:null,longitude:null,docs:'',idDocFile:null,licenseDocFile:null,vehiclePhotoFile:null,profilePhotoFile:null};
   renderRApp(); openSheet('sh-rapp');
 }
 function renderRApp(){
@@ -6037,7 +6037,7 @@ function renderRApp(){
       '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input type="file" id="ra-vehicle-input" accept="image/jpeg,image/png,image/webp" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'vehiclePhotoFile\')"><div style="font-size:22px;margin-top:6px;">🛵</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Vehicle photo (optional)</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.vehiclePhotoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;">'+
-      [['Name',f.fname],['Phone',f.phone],['Address',f.addr],['Plate',f.plate],['Licence',f.licence],['Emergency',f.emergency]].map(function(r){
+      [['Name',f.fname],['Account phone',f.phone],['WhatsApp',f.whatsappNumber||'Not added'],['Address',f.addr],['GPS',f.latitude!=null?f.latitude+', '+f.longitude:'Not shared'],['Plate',f.plate],['Licence',f.licence],['Emergency',f.emergency],['Rider photo',f.profilePhotoName||'Not attached'],['Vehicle photo',f.vehiclePhotoName||'Not attached']].map(function(r){
         return '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">'+
           '<span style="color:var(--mu);font-size:12px;">'+r[0]+'</span>'+
           '<span style="color:var(--tx);font-size:12px;font-weight:600;">'+r[1]+'</span></div>';
@@ -7008,6 +7008,8 @@ window.addEventListener('unhandledrejection',function(e){
   async function riderSubmit(){
     var form=S.rForm||{};
     if(!form.plate||!String(form.plate).trim()){toast('Enter your vehicle plate number.','error');return;}
+    if(!form.idDocFile||!form.licenseDocFile){toast('Upload your National ID and driver licence / permit first.','error');S.rStep=1;renderRApp();return;}
+    if(!form.profilePhotoFile){toast('Take or upload your rider profile photo before submitting.','error');S.rStep=1;renderRApp();return;}
     if(!form.licence||!String(form.licence).trim()){toast('Enter your driving licence number.','error');return;}
     var b=document.querySelector('#sh-rapp .btn-pu');if(b){b.textContent='Uploading and submitting…';b.disabled=true;}
     var uploaded=[];
@@ -7015,6 +7017,7 @@ window.addEventListener('unhandledrejection',function(e){
       var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined,mobileNumber:form.phone||S.profilePhone||undefined,whatsappNumber:form.whatsappNumber||undefined,latitude:form.latitude==null?undefined:form.latitude,longitude:form.longitude==null?undefined:form.longitude};
       if(form.idDocFile){var riderId=await ML_API.uploads.upload(form.idDocFile,'rider-document');p.idDocumentUrl=riderId.url;uploaded.push(riderId.url);}
       if(form.licenseDocFile){var licenseUpload=await ML_API.uploads.upload(form.licenseDocFile,'license-document');p.licenseDocumentUrl=licenseUpload.url;uploaded.push(licenseUpload.url);}
+      if(form.profilePhotoFile){var profileUpload=await ML_API.uploads.upload(form.profilePhotoFile,'rider-profile-photo');p.profilePhotoUrl=profileUpload.url;uploaded.push(profileUpload.url);}
       if(form.vehiclePhotoFile){var vehicleUpload=await ML_API.uploads.upload(form.vehiclePhotoFile,'rider-photo');p.vehiclePhotoUrl=vehicleUpload.url;uploaded.push(vehicleUpload.url);}
       await ML_API.riders.register(p);
       closeSheet('sh-rapp');
