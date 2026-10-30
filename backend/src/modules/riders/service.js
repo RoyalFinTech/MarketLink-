@@ -50,6 +50,15 @@ async function register(userId, data) {
     await client.query(
       `INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
 
+    // Notify administrators that a new rider application needs review.
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
+       SELECT DISTINCT ur.user_id, 'rider_application_submitted', 'New rider application', $2, 'rider', $1
+       FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+       WHERE r.name IN ('admin','super_admin','moderator')`,
+      [userId, `Rider application from user ${userId} is awaiting review.`]
+    );
+
     logger.info('Rider registered', { userId, vehicleType });
     return rider;
   });
