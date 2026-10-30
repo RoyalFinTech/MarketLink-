@@ -36,7 +36,7 @@ async function register(userId, data) {
           emergency_contact, address, delivery_zone, mobile_number, whatsapp_number, current_lat, current_lng, kyc_status, is_online)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE) RETURNING *`,
       [userId, vehicleType || null, plateNumber || null, licenseNumber || null,
-       nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null,
+       nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null, profilePhotoUrl || null,
        emergencyContact || null, address || null, deliveryZone || null, mobileNumber || null, whatsappNumber || null, latitude ?? null, longitude ?? null]
     );
 
