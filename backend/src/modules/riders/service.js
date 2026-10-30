@@ -121,7 +121,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, isOnline, zone, i
               r.current_lat, r.current_lng, r.last_location_at,
               u.full_name, u.phone
               ${isAdmin ? `, r.address, r.emergency_contact, r.license_number,
-                r.national_id, r.id_document_url, r.license_document_url, r.vehicle_photo_url, u.email` : ''}
+                r.national_id, r.id_document_url, r.license_document_url, r.vehicle_photo_url, r.profile_photo_url, r.mobile_number, r.whatsapp_number, u.email` : ''}
        FROM riders r
        JOIN users u ON u.id = r.user_id
        ${where}
