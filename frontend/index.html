@@ -6975,10 +6975,14 @@ window.addEventListener('unhandledrejection',function(e){
       var p={
         businessName:form.bname.trim(),
         businessCategory:form.cat,
+        businessCategoryGroup:marketlinkVendorCategoryGroup(form.cat),
         businessAddress:form.saddr.trim(),
+        latitude:form.latitude==null?undefined:form.latitude,
+        longitude:form.longitude==null?undefined:form.longitude,
         description:[form.sname?'Shop name: '+form.sname.trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
       };
       if(form.phone){p.phone=normalize(form.phone,S.vFormCountry||'GM').e164;}
+      if(form.whatsappNumber){p.whatsappNumber=form.whatsappNumber;}
       if(form.email&&String(form.email).trim())p.email=String(form.email).trim();
       if(form.idDocFile){
         var idUpload=await ML_API.uploads.upload(form.idDocFile,'vendor-document');
@@ -7008,7 +7012,7 @@ window.addEventListener('unhandledrejection',function(e){
     var b=document.querySelector('#sh-rapp .btn-pu');if(b){b.textContent='Uploading and submitting…';b.disabled=true;}
     var uploaded=[];
     try{
-      var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined};
+      var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined,mobileNumber:form.phone||S.profilePhone||undefined,whatsappNumber:form.whatsappNumber||undefined,latitude:form.latitude==null?undefined:form.latitude,longitude:form.longitude==null?undefined:form.longitude};
       if(form.idDocFile){var riderId=await ML_API.uploads.upload(form.idDocFile,'rider-document');p.idDocumentUrl=riderId.url;uploaded.push(riderId.url);}
       if(form.licenseDocFile){var licenseUpload=await ML_API.uploads.upload(form.licenseDocFile,'license-document');p.licenseDocumentUrl=licenseUpload.url;uploaded.push(licenseUpload.url);}
       if(form.vehiclePhotoFile){var vehicleUpload=await ML_API.uploads.upload(form.vehiclePhotoFile,'rider-photo');p.vehiclePhotoUrl=vehicleUpload.url;uploaded.push(vehicleUpload.url);}
@@ -7306,11 +7310,11 @@ window.addEventListener('unhandledrejection',function(e){
   }
   if(typeof window.renderVApp==='function'){
     var oldRenderVendorApp=window.renderVApp;
-    window.renderVApp=function(){oldRenderVendorApp.apply(this,arguments);decorateOnboardingPhone('va-phone','va','phone',true);};
+    window.renderVApp=function(){oldRenderVendorApp.apply(this,arguments);decorateOnboardingPhone('va-phone','va','whatsappNumber',true);};
   }
   if(typeof window.renderRApp==='function'){
     var oldRenderRiderApp=window.renderRApp;
-    window.renderRApp=function(){oldRenderRiderApp.apply(this,arguments);decorateOnboardingPhone('ra-phone','ra','phone',true);decorateOnboardingPhone('ra-emg','ra-emg','emergency',false);};
+    window.renderRApp=function(){oldRenderRiderApp.apply(this,arguments);decorateOnboardingPhone('ra-phone','ra','whatsappNumber',true);decorateOnboardingPhone('ra-emg','ra-emg','emergency',false);};
   }
   async function mlSubmitVendorApplication(){
     var f=window.S&&S.vForm||{};
