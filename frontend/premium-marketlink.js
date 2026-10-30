@@ -423,7 +423,7 @@
       (rows.length?'<div style="display:grid;gap:12px;">'+rows.map(function(a){
         var id=a.user_id||a.id,name=a.owner_name||a.full_name||'Applicant';
         var title=kind==='vendor'?(a.business_name||'Vendor application'):name;
-        var logo=kind==='vendor'?(a.logo_url||a.shop_photo_url||''):(a.vehicle_photo_url||'');
+        var logo=kind==='vendor'?(a.logo_url||a.shop_photo_url||''):(a.profile_photo_url||a.vehicle_photo_url||'');
         var image=logo?'<img src="'+esc(logo)+'" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:#fff;">':'<div class="ico">'+(kind==='vendor'?'🏪':'🛵')+'</div>';
         var details=kind==='vendor'
           ?field('Owner',name)+field('Account phone',a.owner_phone||'')+field('Account email',a.owner_email||'')+field('Business name',a.business_name)+field('Shop phone',a.business_phone||'')+field('Business email',a.business_email||'')+field('Category',a.business_category)+field('Marketplace group',a.business_category_group)+field('WhatsApp',a.whatsapp_number)+field('Address',a.business_address)+field('GPS',a.latitude!=null&&a.longitude!=null?a.latitude+', '+a.longitude:'')+field('Description',a.description)
