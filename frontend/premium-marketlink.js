@@ -1375,7 +1375,7 @@
         }
       });
     }
-    var photo=S.profilePhoto||p.profile_photo_url||null;
+    var photo=S.profilePhoto||p.profile_photo_url||(function(){try{return localStorage.getItem('ml_profile_photo_url')||null;}catch(e){return null;}})()||null;
     var photoSrc=photo?String(photo)+(String(photo).indexOf('?')>=0?'&':'?')+'mlphoto='+encodeURIComponent(String(photo).length+'-'+(liveProfile&&liveProfile.updated_at||Date.now())):'';
     var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photoSrc)+'" alt="Profile photo" loading="eager" decoding="async" onerror="this.onerror=null;var preview=null;try{preview=localStorage.getItem(\'ml_profile_photo_preview\');}catch(e){}if(preview){this.src=preview;this.style.display=\'block\';}else{this.style.display=\'none\';var fallback=this.parentNode&&this.parentNode.querySelector(\'.ml-default-avatar\');if(fallback)fallback.style.display=\'block\';}">':'');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
@@ -2163,7 +2163,7 @@
   window.setDefAddr=setDefaultAddress;
   window.delAddr=deleteAddress;
   window.doAdminLogin=liveAdminLogin;
-  window.renderPremiumAdminLogin=function(){var i=G('admin-staffid'),p=G('admin-password');if(i){i.placeholder='Admin phone number';i.type='tel';i.inputMode='tel';}if(p){p.placeholder='4-digit PIN';p.maxLength=4;}};
+  window.renderPremiumAdminLogin=function(){var i=G('admin-staffid'),p=G('admin-password');if(i){i.placeholder='e.g. 871234567';i.type='tel';i.inputMode='tel';i.autocomplete='username';}if(p){p.placeholder='4-digit PIN';p.maxLength=4;}};
   window.handlePhoto=function(inp){if(inp&&inp.files&&inp.files[0])saveProfilePhoto(inp.files[0]);};
   window.uploadPhoto=function(){var el=document.getElementById('ml-profile-photo-input');if(el)el.click();};
   // Remove the persistent fake/offline demo banner when backend is available.
