@@ -1585,6 +1585,15 @@ var ML_API = (function(){
     reject:              function(id,d){ return post('/vendors/'+id+'/reject',d||{});},
   };
 
+  // ── CUSTOMER/VENDOR MESSAGING ─────────────────────────────────
+  var messaging = {
+    start: function(d){ return post('/messaging/conversations',d); },
+    list: function(qs){ return get('/messaging/conversations',qs); },
+    messages: function(id,qs){ return get('/messaging/conversations/'+encodeURIComponent(id)+'/messages',qs); },
+    send: function(id,body){ return post('/messaging/conversations/'+encodeURIComponent(id)+'/messages',{body:body}); },
+    markRead: function(id){ return post('/messaging/conversations/'+encodeURIComponent(id)+'/read',{}); }
+  };
+
   // ── RIDERS (own dashboard) ────────────────────────────────────
   var riders = {
     list:              function(qs){    return get('/riders', qs); },
@@ -1626,7 +1635,7 @@ var ML_API = (function(){
     auth: auth, customers: customers, products: products,
     categories: categories, orders: orders, delivery: delivery,
     payments: payments, notifications: notifications, affiliates: affiliates,
-    uploads: uploads, vendors: vendors, riders: riders, admin: admin,
+    uploads: uploads, vendors: vendors, riders: riders, messaging: messaging, admin: admin,
     promotions: { create: function(d){ return post('/promotions',d); }, mine: function(){ return get('/promotions/mine'); }, adminList: function(qs){ return get('/promotions/admin/requests',qs); }, adminReview: function(id,d){ return patch('/promotions/admin/requests/'+encodeURIComponent(id),d); } },
     assistant: assistant,
     adminKnowledge: adminKnowledge,
