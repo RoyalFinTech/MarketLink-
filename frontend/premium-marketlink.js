@@ -1473,8 +1473,11 @@
       if(btn)btn.textContent='Submitting application…';
       var vendorPhone=window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:f.phone;
       var businessDescription=[
-        f.sname?'Shop name: '+String(f.sname).trim():'',
-        f.description?String(f.description).trim():''
+        f.sname?'Shop/display name: '+String(f.sname).trim():'',
+        f.registrationNo?'Business registration / permit: '+String(f.registrationNo).trim():'',
+        f.services?'Products / services offered: '+String(f.services).trim():'',
+        f.hours?'Opening hours / working days: '+String(f.hours).trim():'',
+        f.description?'About / service area: '+String(f.description).trim():''
       ].filter(Boolean).join('\n\n');
       await ML_API.vendors.register({
         businessName:String(f.bname).trim(),
