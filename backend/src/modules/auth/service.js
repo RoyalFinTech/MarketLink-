@@ -28,8 +28,8 @@ async function requestPinReset(rawPhone){
 }
 async function confirmPinReset({phone:rawPhone,otp,newPin}){
   const phone=canonicalPhone(rawPhone);
-  if(!/^\\d{6}$/.test(String(otp||'')))throw new AppError('Enter the 6-digit reset code.',400,'INVALID_OTP');
-  if(!/^\\d{4}$/.test(String(newPin||'')))throw new AppError('Your new PIN must contain 4 digits.',400,'INVALID_PIN');
+  if(!/^\d{6}$/.test(String(otp||'')))throw new AppError('Enter the 6-digit reset code.',400,'INVALID_OTP');
+  if(!/^\d{4}$/.test(String(newPin||'')))throw new AppError('Your new PIN must contain 4 digits.',400,'INVALID_PIN');
   const rec=await verifyOtp(phone,'pin_reset',String(otp));
   if(!rec.user_id)throw new AppError('This reset code is not linked to an account. Request a new code.',400,'OTP_NOT_FOUND');
   const pinHash=await bcrypt.hash(String(newPin),12);
