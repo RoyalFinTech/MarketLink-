@@ -1664,3 +1664,8 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
   -webkit-text-fill-color:#FFFFFF !important;
   color-scheme:dark !important;
 }
+
+/* QA: uploaded profile photo must sit above the default SVG avatar. */
+.ml-avatar,.ml-profile-avatar,.ml-profile-hero .ml-avatar{position:relative!important;overflow:hidden!important}
+.ml-avatar .ml-default-avatar,.ml-profile-avatar .ml-default-avatar{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+.ml-avatar .ml-avatar-photo,.ml-profile-avatar .ml-avatar-photo{position:absolute!important;inset:0!important;z-index:2!important;width:100%!important;height:100%!important;object-fit:cover!important;border-radius:inherit!important;background:#0B2531!important}
