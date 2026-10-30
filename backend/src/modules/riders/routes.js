@@ -26,8 +26,8 @@ router.post('/register',
   authenticate,
   [
     body('vehicleType')
-      .optional().isIn(['motorbike','bicycle','car','van'])
-      .withMessage('vehicleType must be motorbike, bicycle, car, or van.'),
+      .optional().isIn(['motorbike','tricycle','bicycle','car','van','truck','other'])
+      .withMessage('Choose a supported vehicle type.'),
     body('plateNumber')
       .optional().trim().isLength({ max: 30 }),
     body('licenseNumber')
