@@ -5841,14 +5841,14 @@ function showRoleAccessError(message){var e=G('role-access-error');if(!e)return;
 function openVendorApp(){
   S.vStep=0;
   var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\+220/,'').replace(/\D/g,'');
-  S.vForm={bname:'',sname:'',saddr:'',cat:'',phone:accountPhone,email:(S.user&&S.user.email)||'',description:'',idDoc:'',photo:'',idDocFile:null,photoFile:null};
+  S.vForm={bname:'',sname:'',saddr:'',cat:'',phone:accountPhone,email:(S.user&&S.user.email)||'',registrationNo:'',services:'',hours:'',description:'',idDoc:'',photo:'',idDocFile:null,photoFile:null};
   renderVApp(); openSheet('sh-vapp');
 }
 function renderVApp(){
   var el=G('vapp-body'); if(!el) return;
   var steps=['Business Info','Documents','Review'];
   var f=S.vForm, step=S.vStep;
-  var cats=['','Food & Restaurant','Grocery','Pharmacy','Electronics','Fashion','Beauty','Household'];
+  var cats=['','Food & Restaurant','Grocery & Mini-Mart','Supermarket','Fruit & Vegetable Seller','Eggs & Poultry Products','Fish & Seafood Seller','Meat & Butchery','Rice & Grain Seller','Cooking Oil & Spices','Bakery & Bread','Cake & Pastry','Snacks & Street Food','Juice & Drinks','Water Supplier','Catering & Event Food','Farm Produce','Crop Farming','Livestock & Animal Rearing','Poultry Farming','Fish Farming & Aquaculture','Agricultural Inputs & Seeds','Fertilizer & Farm Equipment','Food Processing & Packaging','Fashion & Clothing','Women’s Clothing','Men’s Clothing','Children’s Clothing','Tailoring & Dressmaking','Fabric & Textiles','Shoes & Footwear','Bags & Accessories','Jewellery & Watches','Cosmetics & Beauty Products','Hair Salon & Barber','Makeup Artist','Skincare & Spa','Nail Technician','Hair Products & Wigs','Women-led Enterprise','Baby & Maternity Products','Children’s Products & Toys','School Uniforms','Books & Stationery','School & Education Services','Tutoring & Training','Office Supplies','Office Equipment','Office & Professional Services','Accounting & Bookkeeping','Legal & Consulting Services','Human Resources & Recruitment','Printing & Photocopying','Graphic Design & Branding','Marketing & Advertising','Photography & Videography','Event Planning & Decoration','Entertainment & DJs','Music & Audio Production','Film & Media Production','Content Creator','Software & IT Services','Web & App Development','Computer & Laptop Sales','Mobile Phones & Accessories','Electronics & Appliances','Repair & Technical Support','Telecommunications & Internet','Cyber Café & Digital Services','Solar & Renewable Energy','Electrical Services','Plumbing Services','Construction & Building Contractor','Building Materials & Hardware','Cement & Blocks','Sand, Gravel & Quarry Products','Paints & Finishing Materials','Carpentry & Furniture','Welding & Metal Fabrication','Glass & Aluminium Works','Roofing & Ceiling','Tiles & Flooring','Interior Design & Decoration','Architecture & Engineering','Property & Real Estate','Rentals & Property Management','Cleaning & Janitorial Services','Laundry & Dry Cleaning','Waste Collection & Recycling','Transport & Logistics','Taxi & Car Hire','Motorbike & Tricycle Transport','Delivery & Courier','Moving & Haulage','Auto Sales & Spare Parts','Vehicle Repair & Mechanics','Tyres & Batteries','Fuel & Lubricants','Travel & Tourism','Hotel & Guest House','Tour Guide & Excursions','Healthcare & Medical Supplies','Pharmacy & Health Products','Medical & Dental Services','Childcare & Daycare','Elder Care & Home Care','Pet & Animal Services','Security Services','Insurance Services','Banking & Financial Services','Mobile Money Agent','Fintech & Payment Services','Import & Export','Wholesale & Distribution','Retail & General Trading','Market Stall Trader','Hawker / Street Seller','Mobile Vendor / Itinerant Trader','Door-to-Door Seller','Roadside Shop / Kiosk','Market Trader','Women’s Market Stall','Youth-led Enterprise','Small Home-based Business','Handmade & Crafts','Art & Local Handicrafts','Leather Goods','Batik & Tie-Dye','Soap & Household Products','Manufacturing & Production','Packaging & Labelling','Industrial Supplies','Equipment & Machinery','Wholesale Building Supplies','Church & Community Services','NGO & Social Enterprise','Public Services & Administration','Professional Freelancer','Other Local Business'];
 
   var stepBar='<div class="step-bar">'+steps.map(function(_,i){
     return '<div class="step-seg" style="background:'+(i<=step?'#0D7377':'rgba(255,255,255,0.1)')+'"></div>';
@@ -5866,7 +5866,11 @@ function renderVApp(){
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
       '<input class="inp" type="tel" inputmode="tel" placeholder="e.g. 871234567" id="va-phone" value="'+sanitizeText(f.phone||'')+'" style="flex:1;margin-bottom:0;"></div>'+
-      '<textarea class="inp" id="va-description" rows="3" placeholder="Short business description (optional)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;max-height:120px;resize:vertical;margin-top:10px;line-height:1.45;">'+sanitizeText(f.description||'')+'</textarea>';
+      '<input class="inp" type="email" id="va-email" placeholder="Business email (optional)" value="'+sanitizeText(f.email||'')+'" autocomplete="email">'+
+      '<input class="inp" id="va-regno" placeholder="Business registration / permit number (optional)" value="'+sanitizeText(f.registrationNo||'')+'">'+
+      '<textarea class="inp" id="va-services" rows="3" placeholder="Products or services offered (what do you sell or do?)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;resize:vertical;line-height:1.45;">'+sanitizeText(f.services||'')+'</textarea>'+
+      '<input class="inp" id="va-hours" placeholder="Opening hours / working days (optional)" value="'+sanitizeText(f.hours||'')+'">'+
+      '<textarea class="inp" id="va-description" rows="3" placeholder="About your business, experience and service area (optional)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;max-height:120px;resize:vertical;line-height:1.45;">'+sanitizeText(f.description||'')+'</textarea>';
   } else if(step===1){
     body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
       '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:11px;cursor:pointer;"><input id="va-id-file" type="file" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'idDocFile\')">'+
@@ -5875,10 +5879,10 @@ function renderVApp(){
       '<div style="font-size:25px;margin-top:8px;">📷</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">Shop photograph / logo (optional)</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.photoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;margin-bottom:14px;">'+
-      [['Business',f.bname],['Shop',f.sname],['Address',f.saddr],['Category',f.cat],['Phone',f.phone],['ID',f.idDoc||'—'],['Photo',f.photo||'—']].map(function(r){
+      [['Business',f.bname],['Shop',f.sname],['Address',f.saddr],['Category',f.cat],['Phone',f.phone],['Email',f.email||'—'],['Registration',f.registrationNo||'—'],['Products / services',f.services||'—'],['Opening hours',f.hours||'—'],['About',f.description||'—'],['ID document',f.idDocName||'Not attached'],['Shop photo',f.photoName||'Not attached']].map(function(r){
         return '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">'+
           '<span style="color:var(--mu);font-size:12px;">'+r[0]+'</span>'+
-          '<span style="color:var(--tx);font-size:12px;font-weight:600;max-width:55%;text-align:right;">'+r[1]+'</span></div>';
+          '<span style="color:var(--tx);font-size:12px;font-weight:600;max-width:55%;text-align:right;overflow-wrap:anywhere;">'+sanitizeText(r[1]||'—')+'</span></div>';
       }).join('')+'</div>'+
       '<div style="background:rgba(245,166,35,0.1);border-radius:12px;padding:12px;border:1px solid rgba(245,166,35,0.3);">'+
       '<div style="color:#F5A623;font-size:12px;font-weight:600;">📋 What happens next?</div>'+
@@ -5910,6 +5914,10 @@ function vAppNext(){
     S.vForm.saddr=(G('va-saddr')&&G('va-saddr').value.trim())||'';
     S.vForm.cat=(G('va-cat')&&G('va-cat').value)||'';
     S.vForm.phone=(G('va-phone')&&G('va-phone').value.trim())||'';
+    S.vForm.email=(G('va-email')&&G('va-email').value.trim())||'';
+    S.vForm.registrationNo=(G('va-regno')&&G('va-regno').value.trim())||'';
+    S.vForm.services=(G('va-services')&&G('va-services').value.trim())||'';
+    S.vForm.hours=(G('va-hours')&&G('va-hours').value.trim())||'';
     S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
     if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!S.vForm.phone){
       toast('Please complete the business name, shop name, address, category and WhatsApp number.','error');return;
