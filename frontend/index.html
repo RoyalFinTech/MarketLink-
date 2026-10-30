@@ -5869,8 +5869,10 @@ function openVendorApp(){
 }
 function marketlinkVendorCategoryGroup(label){
   var s=String(label||'').toLowerCase();
-  if(/nigerian food|international|import & export|international trade/.test(s))return 'International';
-  if(/restaurant|catering|street food|bakery|cake|snacks|juice|drinks|water supplier|food & restaurant|gambian food|nigerian food/.test(s))return 'Restaurants';
+  if(/nigerian food/.test(s))return 'Nigerian Food';
+  if(/international|import & export|international trade/.test(s))return 'International';
+  if(/gambian food/.test(s))return 'Gambian Food';
+  if(/restaurant|catering|street food|bakery|cake|snacks|juice|drinks|water supplier|food & restaurant/.test(s))return 'Restaurants';
   if(/grocery|supermarket|fruit|vegetable|eggs|poultry|fish|seafood|meat|butchery|rice|grain|cooking oil|spices|farm produce|crop farming|livestock|fish farming|agricultural|fertilizer|seed|food processing|wholesale & distribution|retail & general trading|market stall|hawker|itinerant trader|door-to-door|roadside shop|market trader|women’s market stall|women-led enterprise|youth-led enterprise|home-based business|manufacturing & production|packaging & labelling/.test(s))return 'Groceries';
   if(/pharmacy|healthcare|medical|dental|health products|childcare|elder care|pet & animal|security services|insurance services/.test(s))return 'Pharmacies';
   if(/electronics|computer|laptop|mobile phone|telecommunications|internet|electrical|solar|appliance|technical support|software & it|web & app|cyber café|fintech|payment services|banking & financial|mobile money|equipment & machinery|industrial supplies/.test(s))return 'Electronics';
@@ -5884,7 +5886,7 @@ function marketlinkVendorCategoryGroup(label){
   return 'Services';
 }
 function marketlinkVendorCategoryOptions(categories,selected){
-  var order=['Gambian Food','Restaurants','Groceries','Pharmacies','Electronics','Fashion','Beauty','Household','Construction','Vehicles','Services','Digital Goods','International'];
+  var order=['Gambian Food','Nigerian Food','International','Restaurants','Groceries','Pharmacies','Electronics','Fashion','Beauty','Household','Construction','Vehicles','Services','Digital Goods'];
   var grouped={};categories.filter(Boolean).forEach(function(label){var group=marketlinkVendorCategoryGroup(label);(grouped[group]||(grouped[group]=[])).push(label);});
   return '<option value="">Select business category</option>'+order.filter(function(g){return grouped[g]&&grouped[g].length;}).map(function(g){
     return '<optgroup label="'+g+'">'+grouped[g].map(function(label){return '<option value="'+sanitizeText(label)+'"'+(selected===label?' selected':'')+'>'+sanitizeText(label)+'</option>';}).join('')+'</optgroup>';
