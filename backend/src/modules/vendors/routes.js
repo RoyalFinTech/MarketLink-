@@ -98,6 +98,10 @@ router.post('/register',
       .isLength({ max: 150 }).withMessage('Business name must be 150 chars or fewer.'),
     body('businessCategory')
       .optional().trim().isLength({ max: 80 }),
+    body('businessCategoryGroup')
+      .optional().trim().isLength({ max: 80 }),
+    body('whatsappNumber')
+      .optional({ nullable: true }).isMobilePhone('any').withMessage('Invalid WhatsApp number.'),
     body('businessAddress')
       .optional().trim().isLength({ max: 500 }),
     body('phone')
@@ -132,6 +136,8 @@ router.put('/profile',
   [
     body('businessName').optional().trim().notEmpty().isLength({ max: 150 }),
     body('businessCategory').optional().trim().isLength({ max: 80 }),
+    body('businessCategoryGroup').optional().trim().isLength({ max: 80 }),
+    body('whatsappNumber').optional({ nullable: true }).isMobilePhone('any'),
     body('businessAddress').optional().trim().isLength({ max: 500 }),
     body('phone').optional().isMobilePhone('any'),
     body('email').optional().isEmail().normalizeEmail(),
