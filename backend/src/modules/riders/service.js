@@ -21,7 +21,8 @@ function auditLog(actor, action, entityId, before, after) {
 // ── REGISTER ─────────────────────────────────────────────────────────
 async function register(userId, data) {
   const { vehicleType, plateNumber, licenseNumber, nationalId, idDocumentUrl,
-          licenseDocumentUrl, vehiclePhotoUrl, emergencyContact, address, deliveryZone } = data;
+          licenseDocumentUrl, vehiclePhotoUrl, emergencyContact, address, deliveryZone,
+          mobileNumber, whatsappNumber } = data;
 
   const { rows: existing } = await query(
     'SELECT user_id FROM riders WHERE user_id = $1', [userId]);
@@ -32,11 +33,11 @@ async function register(userId, data) {
       `INSERT INTO riders
          (user_id, vehicle_type, plate_number, license_number, national_id,
           id_document_url, license_document_url, vehicle_photo_url,
-          emergency_contact, address, delivery_zone, kyc_status, is_online)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',FALSE) RETURNING *`,
+          emergency_contact, address, delivery_zone, mobile_number, whatsapp_number, kyc_status, is_online)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',FALSE) RETURNING *`,
       [userId, vehicleType || null, plateNumber || null, licenseNumber || null,
        nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null,
-       emergencyContact || null, address || null, deliveryZone || null]
+       emergencyContact || null, address || null, deliveryZone || null, mobileNumber || null, whatsappNumber || null]
     );
 
     // Grant rider role
@@ -144,7 +145,7 @@ async function updateProfile(userId, data) {
   const allowed = {
     vehicleType: 'vehicle_type', plateNumber: 'plate_number',
     licenseNumber: 'license_number', emergencyContact: 'emergency_contact',
-    address: 'address', deliveryZone: 'delivery_zone',
+    address: 'address', deliveryZone: 'delivery_zone', mobileNumber: 'mobile_number', whatsappNumber: 'whatsapp_number',
     profilePhotoUrl: 'profile_photo_url',
   };
   const sets = [], params = []; let pi = 1;
@@ -162,7 +163,9 @@ async function updateProfile(userId, data) {
 // ── AVAILABILITY TOGGLE ──────────────────────────────────────────────
 async function setAvailability(userId, isOnline) {
   const { rows: [r] } = await query(
-    `UPDATE riders SET is_online = $1, last_location_at = CASE WHEN $1 THEN now() ELSE last_location_at END
+    `UPDATE riders SET is_online = $1, last_location_at = CASE WHEN $1 THEN now() ELSE last_location_at END,
+       location_sharing_enabled = CASE WHEN $1 THEN location_sharing_enabled ELSE FALSE END,
+       location_sharing_delivery_id = CASE WHEN $1 THEN location_sharing_delivery_id ELSE NULL END
      WHERE user_id = $2 AND kyc_status = 'approved'
      RETURNING user_id, is_online, kyc_status`,
     [isOnline, userId]
@@ -189,9 +192,10 @@ async function updateLocation(userId, { lat, lng, deliveryId }) {
   }
 
   await query(
-    `UPDATE riders SET current_lat = $1, current_lng = $2, last_location_at = now()
+    `UPDATE riders SET current_lat = $1, current_lng = $2, last_location_at = now(),
+       location_sharing_enabled = TRUE, location_sharing_delivery_id = $4
      WHERE user_id = $3`,
-    [lat, lng, userId]
+    [lat, lng, userId, deliveryId]
   );
 
   await query(
