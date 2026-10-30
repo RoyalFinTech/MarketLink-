@@ -6047,7 +6047,7 @@ function renderRApp(){
   } else if(step===1){
     body='<label style="display:block;color:var(--mu);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Vehicle type</label>'+
       '<select id="ra-vehicle-type" style="width:100%;box-sizing:border-box;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;">'+
-      [['motorbike','Motorbike'],['bicycle','Bicycle'],['car','Car'],['van','Van']].map(function(v){return '<option value="'+v[0]+'"'+((f.vehicleType||'motorbike')===v[0]?' selected':'')+'>'+v[1]+'</option>';}).join('')+'</select>'+
+      [['motorbike','Motorbike'],['tricycle','Tricycle / Keke'],['bicycle','Bicycle'],['car','Car'],['van','Van'],['truck','Truck / pickup'],['other','Other vehicle']].map(function(v){return '<option value="'+v[0]+'"'+((f.vehicleType||'motorbike')===v[0]?' selected':'')+'>'+v[1]+'</option>';}).join('')+'</select>'+
       '<input class="inp" placeholder="Plate Number (e.g. BJL 1234 A)" id="ra-plate" value="'+sanitizeText(f.plate||'')+'">'+
       '<input class="inp" placeholder="Driver\'s Licence Number" id="ra-lic" value="'+sanitizeText(f.licence||'')+'">'+
       '<input class="inp" placeholder="Delivery zone / preferred area" id="ra-zone" value="'+sanitizeText(f.deliveryZone||'')+'">'+
