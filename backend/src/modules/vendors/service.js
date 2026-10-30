@@ -20,7 +20,7 @@ function actorLog(actor, action, entityId, before, after) {
 
 // ── REGISTER (called after user account already exists) ──────────────
 async function register(userId, data) {
-  const { businessName, businessCategory, businessAddress, phone, email,
+  const { businessName, businessCategory, businessCategoryGroup, businessAddress, phone, email, whatsappNumber,
           description, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
 
   if (!businessName?.trim()) throw new AppError('Business name is required.', 400, 'VALIDATION_ERROR');
@@ -33,13 +33,13 @@ async function register(userId, data) {
   return withTransaction(async (client) => {
     const { rows: [vendor] } = await client.query(
       `INSERT INTO vendors
-         (user_id, business_name, business_category, business_address, phone, email,
+         (user_id, business_name, business_category, business_category_group, business_address, phone, email, whatsapp_number,
           description, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, kyc_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending') RETURNING *`,
-      [userId, businessName.trim(), businessCategory || null, businessAddress || null,
-       phone || null, email || null, description || null,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending') RETURNING *`,
+      [userId, businessName.trim(), businessCategory || null, businessCategoryGroup || null, businessAddress || null,
+       phone || null, email || null, whatsappNumber || null, description || null,
        nationalId || null, idDocumentUrl || null, shopPhotoUrl || null, logoUrl || shopPhotoUrl || null,
-       latitude || null, longitude || null]
+       latitude ?? null, longitude ?? null]
     );
 
     // Grant vendor role to user
@@ -125,8 +125,8 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
 
   const [data, count] = await Promise.all([
     query(
-      `SELECT v.user_id, v.business_name, v.business_category, v.business_address,
-              v.logo_url, v.banner_url, v.description, v.rating_avg, v.rating_count,
+      `SELECT v.user_id, v.business_name, v.business_category, v.business_category_group, v.business_address,
+              v.latitude, v.longitude, v.whatsapp_number, v.logo_url, v.banner_url, v.description, v.rating_avg, v.rating_count,
               v.is_open, v.vacation_mode, v.kyc_status, v.commission_pct,
               v.total_sales, v.total_revenue, v.created_at,
               u.full_name AS owner_name
@@ -156,6 +156,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
 async function updateProfile(userId, data) {
   const allowed = {
     businessName: 'business_name', businessCategory: 'business_category',
+    businessCategoryGroup: 'business_category_group', whatsappNumber: 'whatsapp_number',
     businessAddress: 'business_address', phone: 'phone', email: 'email',
     description: 'description', logoUrl: 'logo_url', bannerUrl: 'banner_url',
     returnPolicy: 'return_policy', minOrderValue: 'min_order_value',
