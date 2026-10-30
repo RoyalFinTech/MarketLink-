@@ -5944,7 +5944,7 @@ function renderVApp(){
     body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
       '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:11px;cursor:pointer;"><input id="va-id-file" type="file" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'idDocFile\')">'+
       '<div style="font-size:25px;margin-top:8px;">📄</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">National ID or Passport</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.idDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input id="va-shop-file" type="file" accept="image/jpeg,image/png,image/webp" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'photoFile\')">'+
+      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input id="va-shop-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'photoFile\')">'+
       '<div style="font-size:25px;margin-top:8px;">📷</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">Shop photograph / logo (optional)</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.photoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;margin-bottom:14px;">'+
@@ -5988,8 +5988,8 @@ function vAppNext(){
     S.vForm.services=(G('va-services')&&G('va-services').value.trim())||'';
     S.vForm.hours=(G('va-hours')&&G('va-hours').value.trim())||'';
     S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
-    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat){
-      toast('Please complete the business name, shop name, address, category and WhatsApp number.','error');return;
+    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!S.vForm.whatsappNumber){
+      toast('Please complete the business name, shop name, address, category and a valid WhatsApp number.','error');return;
     }
   }
   S.vStep++; renderVApp();
@@ -6987,6 +6987,7 @@ window.addEventListener('unhandledrejection',function(e){
   async function vendorSubmit(){
     var form=S.vForm||{};
     if(!form.bname||!form.bname.trim()){toast('Enter your business or registered name.','error');return;}
+    if(!form.whatsappNumber||!/^\\+?\\d{10,15}$/.test(String(form.whatsappNumber).replace(/\\s/g,''))){toast('Enter a valid WhatsApp number so customers can contact your shop.','error');S.vStep=0;renderVApp();return;}
     if(!form.sname||!form.sname.trim()){toast('Enter the shop name customers will see.','error');return;}
     if(!form.saddr||!form.saddr.trim()){toast('Enter the shop address, including the area and town.','error');return;}
     if(!form.cat){toast('Choose your business category.','error');return;}
