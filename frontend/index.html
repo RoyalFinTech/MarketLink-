@@ -6987,7 +6987,7 @@ window.addEventListener('unhandledrejection',function(e){
   async function vendorSubmit(){
     var form=S.vForm||{};
     if(!form.bname||!form.bname.trim()){toast('Enter your business or registered name.','error');return;}
-    if(!form.whatsappNumber||!/^\\+?\\d{10,15}$/.test(String(form.whatsappNumber).replace(/\\s/g,''))){toast('Enter a valid WhatsApp number so customers can contact your shop.','error');S.vStep=0;renderVApp();return;}
+    if(!form.whatsappNumber||!/^\+?\d{10,15}$/.test(String(form.whatsappNumber).replace(/\s/g,''))){toast('Enter a valid WhatsApp number so customers can contact your shop.','error');S.vStep=0;renderVApp();return;}
     if(!form.sname||!form.sname.trim()){toast('Enter the shop name customers will see.','error');return;}
     if(!form.saddr||!form.saddr.trim()){toast('Enter the shop address, including the area and town.','error');return;}
     if(!form.cat){toast('Choose your business category.','error');return;}
