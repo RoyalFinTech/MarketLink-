@@ -1692,3 +1692,14 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 @media(max-width:480px){
  #tab-vendordash .ml-dashboard-avatar-compact,#tab-riderdash .ml-dashboard-avatar-compact{width:30px;height:30px;min-width:30px}
 }
+
+/* MarketLink vendor/rider form readability and responsive controls */
+#vapp-body input::placeholder,#vapp-body textarea::placeholder,#rapp-body input::placeholder,#rapp-body textarea::placeholder{color:#C4D3DE!important;-webkit-text-fill-color:#C4D3DE!important;opacity:1!important}
+#vapp-body input,#vapp-body textarea,#vapp-body select,#rapp-body input,#rapp-body textarea,#rapp-body select{opacity:1!important;max-width:100%;box-sizing:border-box}
+#vapp-body select,#rapp-body select{color:var(--tx)!important;background-color:var(--sfl)!important}
+#vapp-body select option,#rapp-body select option{color:#F8FAFC;background:#102331}
+#vapp-body label,#rapp-body label{color:var(--tx)}
+#vapp-body [style*="color:var(--mu)"],#rapp-body [style*="color:var(--mu)"]{color:#B8C8D3!important}
+#vapp-body .btn,#rapp-body .btn{min-height:44px;white-space:normal;line-height:1.35}
+#vapp-body textarea,#rapp-body textarea{font:inherit;line-height:1.5;resize:vertical}
+@media(max-width:480px){#vapp-body input,#vapp-body textarea,#vapp-body select,#rapp-body input,#rapp-body textarea,#rapp-body select{font-size:16px!important}#vapp-body .step-bar,#rapp-body .step-bar{gap:5px}}
