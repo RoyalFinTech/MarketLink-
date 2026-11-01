@@ -1703,3 +1703,29 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #vapp-body .btn,#rapp-body .btn{min-height:44px;white-space:normal;line-height:1.35}
 #vapp-body textarea,#rapp-body textarea{font:inherit;line-height:1.5;resize:vertical}
 @media(max-width:480px){#vapp-body input,#vapp-body textarea,#vapp-body select,#rapp-body input,#rapp-body textarea,#rapp-body select{font-size:16px!important}#vapp-body .step-bar,#rapp-body .step-bar{gap:5px}}
+
+
+/* Accessible, consistent vendor/rider application form refresh */
+#vapp-body,#rapp-body{color:#152b38!important;font-size:14px!important;line-height:1.5}
+#vapp-body .ml-role-field-label,#rapp-body .ml-role-field-label{display:block!important;color:#173746!important;font-size:13px!important;font-weight:750!important;line-height:1.4!important;margin:12px 0 6px!important}
+#vapp-body .ml-role-field-label span,#rapp-body .ml-role-field-label span{color:#b42318!important}
+#vapp-body .ml-role-field,#rapp-body .ml-role-field,#vapp-body input.inp,#rapp-body input.inp,#vapp-body textarea.inp,#rapp-body textarea.inp{width:100%;box-sizing:border-box;min-height:48px;background:#fff!important;background-color:#fff!important;color:#172b38!important;-webkit-text-fill-color:#172b38!important;border:1.5px solid #9fb5c2!important;border-radius:10px!important;padding:12px 14px!important;font-size:14px!important;font-weight:500!important;box-shadow:0 1px 2px rgba(16,42,58,.05)!important;opacity:1!important}
+#vapp-body input.inp:focus,#vapp-body textarea.inp:focus,#vapp-body select:focus,#rapp-body input.inp:focus,#rapp-body textarea.inp:focus,#rapp-body select:focus{outline:3px solid rgba(13,115,119,.18)!important;border-color:#0d7377!important}
+#vapp-body input::placeholder,#vapp-body textarea::placeholder,#rapp-body input::placeholder,#rapp-body textarea::placeholder{color:#657986!important;-webkit-text-fill-color:#657986!important;opacity:1!important}
+#vapp-body select,#rapp-body select{min-height:48px!important;background:#fff!important;background-color:#fff!important;color:#172b38!important;-webkit-text-fill-color:#172b38!important;border:1.5px solid #9fb5c2!important;border-radius:10px!important;font-size:14px!important;padding:12px 14px!important;opacity:1!important}
+#vapp-body select option,#rapp-body select option{background:#fff!important;color:#172b38!important}
+#vapp-body label,#rapp-body label{color:#173746}
+#vapp-body small,#rapp-body small,#vapp-body [style*="color:var(--mu)"],#rapp-body [style*="color:var(--mu)"]{color:#4e6573!important;opacity:1!important}
+#vapp-body .ml-linked-account-phone,#rapp-body .ml-linked-account-phone{display:flex;flex-direction:column;gap:3px;background:#edf5f7;border:1px solid #bfd2da;border-radius:10px;padding:11px 13px;margin:8px 0 14px;color:#244451!important}
+#vapp-body .ml-linked-account-phone span,#rapp-body .ml-linked-account-phone span{font-size:11px;font-weight:700;color:#4e6573!important}
+#vapp-body .ml-linked-account-phone strong,#rapp-body .ml-linked-account-phone strong{font-size:14px;color:#173746!important;overflow-wrap:anywhere}
+#vapp-body .ml-linked-account-phone small,#rapp-body .ml-linked-account-phone small{font-size:11px;line-height:1.45;color:#4e6573!important}
+#vapp-body .ml-role-field-help,#rapp-body .ml-role-field-help{font-size:12px;line-height:1.5;color:#4e6573!important;margin:0 0 8px}
+#vapp-body .ml-role-whatsapp-field,#rapp-body .ml-role-whatsapp-field{display:flex;align-items:stretch;gap:8px;flex-wrap:nowrap;margin:0 0 12px}
+#vapp-body .ml-role-whatsapp-field .ml-gm-flag,#rapp-body .ml-role-whatsapp-field .ml-gm-flag{flex:0 0 auto}
+#vapp-body .ml-role-country-code,#rapp-body .ml-role-country-code{display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:#e8f1f5;color:#173746!important;border:1px solid #b3c6d0;border-radius:9px;padding:0 12px;font-size:14px;font-weight:750}
+#vapp-body .step-bar,#rapp-body .step-bar{margin:0 0 14px}
+#vapp-body .btn,#rapp-body .btn{min-height:46px;font-size:14px!important;font-weight:700!important}
+#vapp-body input[type=file],#rapp-body input[type=file]{color:#344c5a!important;font-size:12px!important}
+#vapp-body input[type=file]::file-selector-button,#rapp-body input[type=file]::file-selector-button{background:#eaf3f5;color:#173746;border:1px solid #afc4ce;border-radius:7px;padding:7px 10px;margin-right:8px;font-weight:700}
+@media(max-width:560px){#vapp-body .ml-role-whatsapp-field,#rapp-body .ml-role-whatsapp-field{gap:6px}#vapp-body .ml-role-country-code,#rapp-body .ml-role-country-code{padding:0 9px}#vapp-body .ml-role-field,#rapp-body .ml-role-field,#rapp-body .ml-role-field{font-size:16px!important}}
