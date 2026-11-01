@@ -85,9 +85,31 @@ async function getById(userId, includePrivate = false) {
   if (!rows.length) throw new AppError('Vendor not found.', 404, 'VENDOR_NOT_FOUND');
   const v = rows[0];
   if (!includePrivate) {
-    // Strip sensitive KYC fields from public view
-    delete v.national_id; delete v.kyc_notes; delete v.suspension_reason;
-    delete v.owner_phone; delete v.owner_email;
+    // Never expose application documents, business account phone/email, internal
+    // financial totals, or moderation fields through the public store endpoint.
+    // Only approved stores have a customer-facing profile.
+    if (v.kyc_status !== 'approved') throw new AppError('Vendor not found.', 404, 'VENDOR_NOT_FOUND');
+    return {
+      user_id: v.user_id,
+      business_name: v.business_name,
+      business_category: v.business_category,
+      business_category_group: v.business_category_group,
+      business_address: v.business_address,
+      latitude: v.latitude,
+      longitude: v.longitude,
+      whatsapp_number: v.whatsapp_number,
+      logo_url: v.logo_url,
+      banner_url: v.banner_url,
+      description: v.description,
+      rating_avg: v.rating_avg,
+      rating_count: v.rating_count,
+      is_open: v.is_open,
+      vacation_mode: v.vacation_mode,
+      kyc_status: v.kyc_status,
+      owner_name: v.owner_name,
+      active_products: v.active_products,
+      created_at: v.created_at
+    };
   }
   return v;
 }
