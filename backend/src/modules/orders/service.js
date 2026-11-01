@@ -102,6 +102,7 @@ async function getById(id, userId, roles) {
       d.picked_up_at,
       d.delivered_at,
       (SELECT ru.full_name FROM users ru WHERE ru.id=d.rider_id) AS rider_name,
+      (SELECT rr.whatsapp_number FROM riders rr WHERE rr.user_id=d.rider_id) AS rider_whatsapp_number,
       COALESCE((
         SELECT json_agg(json_build_object(
           'status',h.status,'note',h.note,'changed_at',h.created_at
@@ -120,6 +121,8 @@ async function getById(id, userId, roles) {
   if (!rows.length) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
   const o=rows[0]; const adm=(roles||[]).some(r=>['admin','super_admin'].includes(r));
   if (!adm && o.customer_id!==userId && o.vendor_id!==userId && o.rider_id!==userId) throw new AppError('Forbidden.',403,'FORBIDDEN');
+  // Rider WhatsApp is private contact data: expose it only to the customer who owns this order.
+  if (String(o.customer_id)!==String(userId)) delete o.rider_whatsapp_number;
   return o;
 }
 async function listForCustomer(customerId, { page=1, limit=20, status }) {
