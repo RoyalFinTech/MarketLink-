@@ -1747,3 +1747,9 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #vapp-body .ml-time-grid input[type=time]{width:100%;min-height:48px;box-sizing:border-box;color:#172b38!important;background:#fff!important}
 #vapp-body .ml-role-field-label{margin-top:14px!important}
 @media(max-width:480px){#vapp-body .ml-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}#vapp-body .ml-time-grid{gap:8px}}
+
+/* Customer product-card seller contact actions */
+.ml-product-contact{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.ml-product-contact button,.ml-product-contact a{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:6px 10px;border-radius:8px;border:1px solid #0D7377;background:#E8F5F4;color:#07585B!important;font-size:11px;font-weight:800;text-decoration:none;cursor:pointer}
+.ml-product-contact a{background:#E7F8EC;border-color:#25A85A;color:#126B35!important}
+.ml-product-contact button:focus-visible,.ml-product-contact a:focus-visible{outline:3px solid rgba(13,115,119,.28);outline-offset:2px}
