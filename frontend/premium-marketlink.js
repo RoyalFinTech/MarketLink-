@@ -1523,7 +1523,6 @@
         if(shopPhotoUrl)uploaded.push(shopPhotoUrl);
       }
       if(btn)btn.textContent='Submitting application…';
-      var vendorPhone=(S.profilePhone||(S.user&&S.user.phone)||'').trim()||undefined;
       var vendorWhatsapp=String(f.whatsappNumber||'').replace(/[\s()-]/g,'');
       var businessDescription=[
         f.sname?'Shop/display name: '+String(f.sname).trim():'',
@@ -1536,7 +1535,6 @@
         businessName:String(f.bname).trim(),
         businessCategory:f.cat,
         businessAddress:String(f.saddr).trim(),
-        phone:vendorPhone,
         whatsappNumber:vendorWhatsapp,
         email:f.email||undefined,
         idDocumentUrl:idUpload&&idUpload.url,
@@ -1586,6 +1584,7 @@
         emergencyContact:emergencyPhone||undefined,
         address:String(f.addr).trim(),
         deliveryZone:f.deliveryZone||undefined,
+        whatsappNumber:f.whatsappNumber||undefined,
         idDocumentUrl:idUpload&&idUpload.url,
         licenseDocumentUrl:licenseUpload&&licenseUpload.url,
         vehiclePhotoUrl:vehiclePhotoUrl
