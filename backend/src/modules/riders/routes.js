@@ -3,7 +3,7 @@
 const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const { validate }            = require('../../middleware/validate');
-const { authenticate, authorize } = require('../../middleware/auth');
+const { authenticate, optionalAuthenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
 
 const ADMIN = ['admin', 'super_admin', 'moderator'];
@@ -125,6 +125,7 @@ router.post('/me/withdrawals',
 // GET /riders/:id — public rider profile lookup. Registered after every
 // literal self-service route above (see note near top of file).
 router.get('/:id',
+  optionalAuthenticate,
   [param('id').isUUID().withMessage('Invalid rider ID.')],
   validate, ctrl.getById
 );
