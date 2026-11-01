@@ -1534,7 +1534,10 @@
       await ML_API.vendors.register({
         businessName:String(f.bname).trim(),
         businessCategory:f.cat,
+        businessCategoryGroup:typeof marketlinkVendorCategoryGroup==='function'?marketlinkVendorCategoryGroup(f.cat):undefined,
         businessAddress:String(f.saddr).trim(),
+        latitude:f.latitude==null?undefined:f.latitude,
+        longitude:f.longitude==null?undefined:f.longitude,
         whatsappNumber:vendorWhatsapp,
         email:f.email||undefined,
         idDocumentUrl:idUpload&&idUpload.url,
@@ -1561,6 +1564,7 @@
       toast('Complete your name, phone, residential address, plate number and licence number first.','error');return;
     }
     if(!f.idDocFile||!f.licenseDocFile){toast('Upload your National ID and driver’s licence / permit before submitting.','error');return;}
+    if(!f.profilePhotoFile){toast('Upload a clear rider profile photo before submitting.','error');S.rStep=1;if(typeof renderRApp==='function')renderRApp();return;}
     var btn=document.querySelector('#rapp-body .btn-pu'),uploaded=[];
     if(btn){btn.disabled=true;btn.textContent='Uploading documents…';}
     try{
@@ -1568,6 +1572,8 @@
       if(idUpload&&idUpload.url)uploaded.push(idUpload.url);
       var licenseUpload=await ML_API.uploads.upload(f.licenseDocFile,'license-document');
       if(licenseUpload&&licenseUpload.url)uploaded.push(licenseUpload.url);
+      var riderPhoto=await ML_API.uploads.upload(f.profilePhotoFile,'profile-photo');
+      if(riderPhoto&&riderPhoto.url)uploaded.push(riderPhoto.url);
       var vehiclePhotoUrl=null;
       if(f.vehiclePhotoFile){
         var vehicleUpload=await ML_API.uploads.upload(f.vehiclePhotoFile,'rider-photo');
@@ -1585,6 +1591,9 @@
         address:String(f.addr).trim(),
         deliveryZone:f.deliveryZone||undefined,
         whatsappNumber:f.whatsappNumber||undefined,
+        latitude:f.latitude==null?undefined:f.latitude,
+        longitude:f.longitude==null?undefined:f.longitude,
+        profilePhotoUrl:riderPhoto&&riderPhoto.url,
         idDocumentUrl:idUpload&&idUpload.url,
         licenseDocumentUrl:licenseUpload&&licenseUpload.url,
         vehiclePhotoUrl:vehiclePhotoUrl
