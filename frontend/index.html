@@ -5912,7 +5912,7 @@ function renderVApp(){
 
   var body='';
   if(step===0){
-    body='<div style="padding:10px 12px;background:rgba(13,115,119,.10);border:1px solid rgba(13,115,119,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applying as:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+' · '+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'<br>Your MarketLink account details are linked automatically.</div>'+
+    body='<div style="padding:10px 12px;background:rgba(13,115,119,.10);border:1px solid rgba(13,115,119,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applying as:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+'<br>Your MarketLink account details are linked automatically.</div>'+
       '<input class="inp" placeholder="Business / registered name" id="va-bname" value="'+sanitizeText(f.bname||'')+'" autocomplete="organization">'+
       '<input class="inp" placeholder="Shop / display name" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
       '<input class="inp" placeholder="Shop address (area, town, landmark)" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
@@ -6025,7 +6025,7 @@ function renderRApp(){
 
   var body='';
   if(step===0){
-    body='<div style="padding:10px 12px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applicant:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+' · '+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'<br>Your existing account identity is linked automatically.</div>'+
+    body='<div style="padding:10px 12px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applicant:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+'<br>Your existing account identity is linked automatically.</div>'+
       '<input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name">'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">MarketLink account phone: <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
       '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Separate WhatsApp number (optional)</label>'+
