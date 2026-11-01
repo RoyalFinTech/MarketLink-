@@ -5917,18 +5917,17 @@ function renderVApp(){
       '<label class="ml-role-field-label" for="va-bname">Business / registered name <span>*</span></label><input class="inp ml-role-field" placeholder="e.g. Lamin General Trading" id="va-bname" value="'+sanitizeText(f.bname||'')+'" autocomplete="organization">'+
       '<label class="ml-role-field-label" for="va-sname">Shop / display name <span>*</span></label><input class="inp ml-role-field" placeholder="Name customers will see" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
       '<label class="ml-role-field-label" for="va-saddr">Shop address <span>*</span></label><input class="inp ml-role-field" placeholder="Area, town and nearby landmark" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
-      '<select id="va-cat" style="width:100%;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;appearance:none;">'+
-      marketlinkVendorCategoryOptions(cats,f.cat)+'</select>'+
+      '<label class="ml-role-field-label" for="va-cat">Business category <span>*</span></label><div class="ml-select-wrap"><select id="va-cat" class="ml-role-field ml-role-select" required>'+
+      marketlinkVendorCategoryOptions(cats,f.cat)+'</select><span aria-hidden="true">▾</span></div>'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">Account phone (sign-in): <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
-      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">WhatsApp number for customers (required)</label>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
-      '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
-      '<input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter 7 digits" id="va-phone" maxlength="7" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<label class="ml-role-field-label" for="va-phone">WhatsApp / contact phone <span>*</span></label>'+
+      '<div class="ml-country-phone"><span>🇬🇲 +220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="7-digit phone number" id="va-phone" maxlength="7" value="'+sanitizeText(String(f.whatsappNumber||'').replace(/^\\+?220/,''))+'" required></div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin:0 0 8px;" onclick="marketlinkCaptureGPS(\'vendor\')">📍 Save shop GPS location (optional)</button><div id="va-gps-status" style="color:var(--mu);font-size:11px;margin:0 0 10px;line-height:1.5;">GPS helps customers and riders navigate to your shop. You can enter your address without GPS.</div>' +
       '<input class="inp" type="email" id="va-email" placeholder="Business email (optional)" value="'+sanitizeText(f.email||'')+'" autocomplete="email">'+
       '<input class="inp" id="va-regno" placeholder="Business registration / permit number (optional)" value="'+sanitizeText(f.registrationNo||'')+'">'+
-      '<textarea class="inp" id="va-services" rows="3" placeholder="Products or services offered (what do you sell or do?)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;resize:vertical;line-height:1.45;">'+sanitizeText(f.services||'')+'</textarea>'+
-      '<input class="inp" id="va-hours" placeholder="Opening hours / working days (optional)" value="'+sanitizeText(f.hours||'')+'">'+
+      '<label class="ml-role-field-label" for="va-services">Main products or services offered</label><div class="ml-select-wrap"><select class="inp ml-role-field ml-role-select" id="va-services"><option value="">Choose what you mainly offer</option>'+['Products for sale','Food and drinks','Professional services','Repairs and maintenance','Delivery and transport','Beauty and personal care','Education and training','Other'].map(function(x){return '<option value="'+x+'"'+(f.services===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><span aria-hidden="true">▾</span></div>'+
+      '<label class="ml-role-field-label">Working days</label><div class="ml-day-grid">'+['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(function(day){return '<label><input type="checkbox" class="va-working-day" value="'+day+'" '+((f.workingDays||[]).indexOf(day)>=0?'checked':'')+'><span>'+day.slice(0,3)+'</span></label>';}).join('')+'</div>'+
+      '<label class="ml-role-field-label">Opening hours</label><div class="ml-time-grid"><label>Opens<input class="inp ml-role-field" type="time" id="va-open-time" value="'+sanitizeText(f.openTime||'09:00')+'"></label><label>Closes<input class="inp ml-role-field" type="time" id="va-close-time" value="'+sanitizeText(f.closeTime||'18:00')+'"></label></div>'+
       '<textarea class="inp" id="va-description" rows="3" placeholder="About your business, experience and service area (optional)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;max-height:120px;resize:vertical;line-height:1.45;">'+sanitizeText(f.description||'')+'</textarea>';
   } else if(step===1){
     body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
@@ -5972,11 +5971,14 @@ function vAppNext(){
     S.vForm.sname=(G('va-sname')&&G('va-sname').value.trim())||'';
     S.vForm.saddr=(G('va-saddr')&&G('va-saddr').value.trim())||'';
     S.vForm.cat=(G('va-cat')&&G('va-cat').value)||'';
-    S.vForm.whatsappNumber=(S.vForm.whatsappNumber||'').trim();
+    S.vForm.whatsappNumber='+220'+String((G('va-phone')&&G('va-phone').value)||'').replace(/\\D/g,'').slice(0,7);
     S.vForm.email=(G('va-email')&&G('va-email').value.trim())||'';
     S.vForm.registrationNo=(G('va-regno')&&G('va-regno').value.trim())||'';
     S.vForm.services=(G('va-services')&&G('va-services').value.trim())||'';
-    S.vForm.hours=(G('va-hours')&&G('va-hours').value.trim())||'';
+    S.vForm.workingDays=Array.prototype.map.call(document.querySelectorAll('.va-working-day:checked'),function(x){return x.value;});
+    S.vForm.openTime=(G('va-open-time')&&G('va-open-time').value)||'';
+    S.vForm.closeTime=(G('va-close-time')&&G('va-close-time').value)||'';
+    S.vForm.hours=[S.vForm.workingDays.join(', '),S.vForm.openTime&&S.vForm.closeTime?(S.vForm.openTime+' - '+S.vForm.closeTime):''].filter(Boolean).join(' | ');
     S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
     if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!S.vForm.whatsappNumber){
       toast('Please complete the business name, shop name, address, category and a valid WhatsApp number.','error');return;
@@ -6029,8 +6031,8 @@ function renderRApp(){
     body='<div style="padding:10px 12px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applicant:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+'<br>Your existing account identity is linked automatically.</div>'+
       '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Full name (from your MarketLink account)</label><input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name" readonly aria-readonly="true">'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">MarketLink account phone: <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
-      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">WhatsApp number for customers (required)</label>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+'<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter 7 digits" id="ra-phone" maxlength="7" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<label class="ml-role-field-label" for="ra-phone">WhatsApp / contact phone <span>*</span></label>'+
+      '<div class="ml-country-phone"><span>🇬🇲 +220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="7-digit phone number" id="ra-phone" maxlength="7" value="'+sanitizeText(String(f.whatsappNumber||'').replace(/^\\+?220/,''))+'" required></div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin:0 0 8px;" onclick="marketlinkCaptureGPS(\'rider\')">📍 Allow phone GPS</button><div id="ra-gps-status" style="color:var(--mu);font-size:11px;margin:0 0 10px;line-height:1.5;">We will ask before sharing live GPS during an assigned delivery.</div>' +
       '<input class="inp" placeholder="Residential address (area, town, landmark)" id="ra-addr" value="'+sanitizeText(f.addr||'')+'">'+
       '<input class="inp" placeholder="Emergency contact number" id="ra-emg" type="tel" inputmode="tel" value="'+sanitizeText(f.emergency||'')+'">';
@@ -6067,7 +6069,7 @@ function renderRApp(){
 function rAppNext(){
   if(S.rStep===0){
     S.rForm.fname=(G('ra-fname')&&G('ra-fname').value.trim())||'';
-    S.rForm.whatsappNumber=(S.rForm.whatsappNumber||'').trim();
+    S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\\D/g,'').slice(0,7);
     S.rForm.addr=(G('ra-addr')&&G('ra-addr').value.trim())||'';
     S.rForm.emergency=(G('ra-emg')&&G('ra-emg').value.trim())||'';
   } else if(S.rStep===1){
