@@ -955,8 +955,8 @@
 /* WhatsApp brand icon applied consistently to Help Centre and floating support shortcut. */
 #btn-sup.fab-sup{appearance:none;-webkit-appearance:none;border:0;padding:0;display:grid;place-items:center;background:#25D366!important;color:#fff!important;overflow:hidden;cursor:pointer;box-shadow:0 6px 20px rgba(37,211,102,.35)}
 #btn-sup.fab-sup img{display:block;width:39px;height:39px;object-fit:contain;filter:none}
-.ml-support-whatsapp-icon{width:52px;height:52px;border-radius:50%;background:#25D366;display:grid;place-items:center;flex:0 0 52px;box-shadow:0 4px 14px rgba(37,211,102,.28)}
-.ml-support-whatsapp-icon img{width:38px;height:38px;display:block;object-fit:contain}
+.ml-support-whatsapp-icon{width:52px;height:52px;border-radius:50%;background:#fff;display:grid;place-items:center;flex:0 0 52px;border:2px solid #25D366;box-shadow:0 4px 14px rgba(37,211,102,.18);overflow:hidden}
+.ml-support-whatsapp-icon img{width:38px;height:38px;display:block;object-fit:contain;filter:none}
 .ml-help-whatsapp-ico{background:#25D366!important;color:#fff!important}
 .ml-help-whatsapp-ico img{width:25px;height:25px;object-fit:contain;display:block}
 .ml-whatsapp-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#25D366!important;border-color:#25D366!important;color:#063b20!important;font-weight:850}
