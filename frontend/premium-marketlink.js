@@ -776,8 +776,8 @@
   }
   function productCard(p){
     var pid=liveProductId(p.id),stock=p.stock==null?null:Number(p.stock);
-    var vendorId=String(p.vendor_id||p.vendorId||''),wa=String(p.vendor_whatsapp||'').replace(/\\D/g,'');
-    var contact=vendorId?'<div class="ml-product-contact" onclick="event.stopPropagation()"><button type="button" onclick="window.ML_Premium.openVendorChat(\''+esc(vendorId)+'\',\''+esc(p.vendor_name||'MarketLink vendor')+'\')">Message seller</button>'+(wa?'<a href="https://wa.me/'+wa+'" target="_blank" rel="noopener noreferrer">WhatsApp seller</a>':'')+'</div>':'';
+    var vendorId=String(p.vendor_id||p.vendorId||''),wa=String(p.vendor_whatsapp||'').replace(/\\D/g,'');if(wa.length===7)wa='220'+wa;
+    var contact=vendorId?'<div class="ml-product-contact" onclick="event.stopPropagation()"><button type="button" onclick="window.ML_Premium.openVendorChat(\''+esc(vendorId)+'\',\''+esc(p.vendor_name||'MarketLink vendor')+'\')">Message seller</button>'+(wa.length>=10?'<a href="https://wa.me/'+wa+'" target="_blank" rel="noopener noreferrer">WhatsApp seller</a>':'')+'</div>':'';
     return '<article class="ml-product" onclick="window.ML_Premium.openProduct(\''+esc(pid)+'\')"><div class="ml-product-img">'+imageOrFallback(p)+'<div class="ml-product-emoji" style="'+(p.primary_image?'display:none':'')+'">🛍️</div></div><div class="ml-product-body"><div class="ml-product-vendor">'+esc(p.vendor_name||p.vendorName||'MarketLink vendor')+'</div><div class="ml-product-name">'+esc(p.name)+'</div><div class="ml-product-meta"><div><div class="ml-price">'+money(p.price)+'</div><div class="ml-stock">'+(stock==null?'Available':stock>0?stock+' in stock':'Out of stock')+'</div></div><button class="ml-add" '+(stock===0?'disabled':'')+' onclick="event.stopPropagation();window.ML_Premium.add(\''+esc(pid)+'\')">+</button></div>'+contact+'</div></article>';
   }
   var mlChatPollTimer=null,mlChatConversationId=null,mlChatVendorId=null;
