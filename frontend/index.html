@@ -3406,30 +3406,19 @@ function renderProfile(){
 function uploadPhoto(){var input=G('photo-inp');if(input){input.value='';input.click();}}
 async function handlePhoto(inp){
   if(!inp||!inp.files||!inp.files[0]) return;
+  // Keep the legacy file input wired to the canonical premium profile-photo
+  // flow. The old duplicate handler saved a URL and redrew the legacy SVG
+  // avatar, which could report success while the visible profile stayed stale.
   var file=inp.files[0];
-  if(!/^image\/(jpeg|png)$/.test(file.type)){toast('Please choose a JPG or PNG profile photo.','error');inp.value='';return;}
-  if(file.size>5*1024*1024){toast('Profile photo must be 5 MB or smaller.','error');inp.value='';return;}
-  if(!window.ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated||!ML_API.auth.isAuthenticated()){
-    toast('Please sign in again before uploading your profile photo.','error');inp.value='';return;
-  }
-  var camera=document.querySelector('.pfoto-cam');
-  var localPreview='';
   try{
-    localPreview=await new Promise(function(resolve){var reader=new FileReader();reader.onload=function(){resolve(String(reader.result||''));};reader.onerror=function(){resolve('');};reader.readAsDataURL(file);});
-    if(camera){camera.textContent='…';camera.setAttribute('aria-label','Uploading profile photo');}
-    toast('Uploading profile photo…','info');
-    var uploaded=await ML_API.uploads.upload(file,'profile-photo');
-    var photoUrl=uploaded&&uploaded.url;
-    if(!photoUrl||!/^https?:\/\//i.test(photoUrl))throw new Error('The server did not return a valid saved profile photo URL.');
-    var saved=await ML_API.customers.updateProfile({profilePhotoUrl:photoUrl});
-    if(!saved||saved.success===false)throw new Error('The photo was uploaded but the profile did not confirm saving it.');
-    S.profilePhoto=photoUrl;
-    if(S.user){S.user.profilePhotoUrl=photoUrl;S.user.avatarUrl=photoUrl;}
-    try{localStorage.setItem('ml_profile_photo_url',photoUrl);if(localPreview)localStorage.setItem('ml_profile_photo_preview',localPreview);localStorage.setItem('ml_profile_photo_preview_url',photoUrl);}catch(storageError){}
-    renderProfile();toast('Profile photo saved successfully.','success');
-  }catch(err){
-    toast((err&& (err.error||err.message))||'Could not upload your profile photo. Please try again.','error');
-  }finally{inp.value='';var current=document.querySelector('.pfoto-cam');if(current){current.textContent='📷';current.removeAttribute('aria-label');}}
+    if(window.ML_Premium&&typeof window.ML_Premium.saveProfilePhoto==='function'){
+      await window.ML_Premium.saveProfilePhoto(file);
+      return;
+    }
+    toast('Profile photo service is still loading. Please try again in a moment.','warning');
+  }finally{
+    inp.value='';
+  }
 }
 function editName(){
   var n=prompt('Edit your name:',S.profileName||S.user&&S.user.name||'');
