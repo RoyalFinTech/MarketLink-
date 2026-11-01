@@ -1729,3 +1729,21 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #vapp-body input[type=file],#rapp-body input[type=file]{color:#344c5a!important;font-size:12px!important}
 #vapp-body input[type=file]::file-selector-button,#rapp-body input[type=file]::file-selector-button{background:#eaf3f5;color:#173746;border:1px solid #afc4ce;border-radius:7px;padding:7px 10px;margin-right:8px;font-weight:700}
 @media(max-width:560px){#vapp-body .ml-role-whatsapp-field,#rapp-body .ml-role-whatsapp-field{gap:6px}#vapp-body .ml-role-country-code,#rapp-body .ml-role-country-code{padding:0 9px}#vapp-body .ml-role-field,#rapp-body .ml-role-field,#rapp-body .ml-role-field{font-size:16px!important}}
+
+/* Vendor category, plain Gambia contact, and business schedule controls */
+#vapp-body .ml-select-wrap{position:relative;width:100%;margin:0 0 12px}
+#vapp-body .ml-select-wrap>select{width:100%;min-height:50px;box-sizing:border-box;padding:12px 44px 12px 14px!important;background:#102b3a!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #24495b!important;border-radius:11px!important;font-size:14px!important;font-weight:700!important;appearance:none!important;cursor:pointer}
+#vapp-body .ml-select-wrap>select option,#vapp-body .ml-select-wrap>select optgroup{background:#fff!important;color:#172b38!important}
+#vapp-body .ml-select-wrap>span{position:absolute;right:15px;top:50%;transform:translateY(-50%);color:#fff;font-size:21px;font-weight:800;pointer-events:none}
+#vapp-body .ml-select-wrap:focus-within>select{outline:3px solid rgba(13,115,119,.2)!important;border-color:#0d7377!important}
+#vapp-body .ml-country-phone,#rapp-body .ml-country-phone{display:flex;align-items:stretch;gap:8px;margin:0 0 13px}
+#vapp-body .ml-country-phone>span,#rapp-body .ml-country-phone>span{display:flex;align-items:center;justify-content:center;min-width:104px;padding:0 12px;background:#e8f1f5;color:#173746;border:1.5px solid #9fb5c2;border-radius:10px;font-weight:750;font-size:14px;white-space:nowrap}
+#vapp-body .ml-country-phone input,#rapp-body .ml-country-phone input{flex:1;min-width:0}
+#vapp-body .ml-day-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 14px}
+#vapp-body .ml-day-grid label{display:flex;align-items:center;justify-content:center;min-height:40px;border:1px solid #a8bbc5;border-radius:9px;background:#f3f7f9;color:#173746!important;font-size:12px;font-weight:700;cursor:pointer}
+#vapp-body .ml-day-grid input{accent-color:#0d7377;width:15px;height:15px;margin:0 5px 0 0}
+#vapp-body .ml-time-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 14px}
+#vapp-body .ml-time-grid label{display:flex;flex-direction:column;gap:6px;color:#173746!important;font-size:12px;font-weight:700}
+#vapp-body .ml-time-grid input[type=time]{width:100%;min-height:48px;box-sizing:border-box;color:#172b38!important;background:#fff!important}
+#vapp-body .ml-role-field-label{margin-top:14px!important}
+@media(max-width:480px){#vapp-body .ml-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}#vapp-body .ml-time-grid{gap:8px}}
