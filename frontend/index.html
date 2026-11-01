@@ -5914,16 +5914,16 @@ function renderVApp(){
   var body='';
   if(step===0){
     body='<div style="padding:10px 12px;background:rgba(13,115,119,.10);border:1px solid rgba(13,115,119,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applying as:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+'<br>Your MarketLink account details are linked automatically.</div>'+
-      '<input class="inp" placeholder="Business / registered name" id="va-bname" value="'+sanitizeText(f.bname||'')+'" autocomplete="organization">'+
-      '<input class="inp" placeholder="Shop / display name" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
-      '<input class="inp" placeholder="Shop address (area, town, landmark)" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
+      '<label class="ml-role-field-label" for="va-bname">Business / registered name <span>*</span></label><input class="inp ml-role-field" placeholder="e.g. Lamin General Trading" id="va-bname" value="'+sanitizeText(f.bname||'')+'" autocomplete="organization">'+
+      '<label class="ml-role-field-label" for="va-sname">Shop / display name <span>*</span></label><input class="inp ml-role-field" placeholder="Name customers will see" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
+      '<label class="ml-role-field-label" for="va-saddr">Shop address <span>*</span></label><input class="inp ml-role-field" placeholder="Area, town and nearby landmark" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
       '<select id="va-cat" style="width:100%;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;appearance:none;">'+
       marketlinkVendorCategoryOptions(cats,f.cat)+'</select>'+
-      '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">MarketLink account phone: <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
-      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Separate WhatsApp number (for customer contact)</label>'+
+      '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">Account phone (sign-in): <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">WhatsApp number for customers (required)</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="7 digits after network prefix" id="va-phone" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter 7 digits" id="va-phone" maxlength="7" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin:0 0 8px;" onclick="marketlinkCaptureGPS(\'vendor\')">📍 Save shop GPS location (optional)</button><div id="va-gps-status" style="color:var(--mu);font-size:11px;margin:0 0 10px;line-height:1.5;">GPS helps customers and riders navigate to your shop. You can enter your address without GPS.</div>' +
       '<input class="inp" type="email" id="va-email" placeholder="Business email (optional)" value="'+sanitizeText(f.email||'')+'" autocomplete="email">'+
       '<input class="inp" id="va-regno" placeholder="Business registration / permit number (optional)" value="'+sanitizeText(f.registrationNo||'')+'">'+
@@ -6029,8 +6029,8 @@ function renderRApp(){
     body='<div style="padding:10px 12px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applicant:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+'<br>Your existing account identity is linked automatically.</div>'+
       '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Full name (from your MarketLink account)</label><input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name" readonly aria-readonly="true">'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">MarketLink account phone: <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
-      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Separate WhatsApp number (optional)</label>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+'<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span><input class="inp" type="tel" inputmode="tel" placeholder="7 digits after network prefix" id="ra-phone" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">WhatsApp number for customers (required)</label>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+'<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Enter 7 digits" id="ra-phone" maxlength="7" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin:0 0 8px;" onclick="marketlinkCaptureGPS(\'rider\')">📍 Allow phone GPS</button><div id="ra-gps-status" style="color:var(--mu);font-size:11px;margin:0 0 10px;line-height:1.5;">We will ask before sharing live GPS during an assigned delivery.</div>' +
       '<input class="inp" placeholder="Residential address (area, town, landmark)" id="ra-addr" value="'+sanitizeText(f.addr||'')+'">'+
       '<input class="inp" placeholder="Emergency contact number" id="ra-emg" type="tel" inputmode="tel" value="'+sanitizeText(f.emergency||'')+'">';
