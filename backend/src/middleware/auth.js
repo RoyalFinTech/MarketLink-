@@ -19,6 +19,12 @@ async function authenticate(req, res, next) {
     next();
   } catch (err) { next(err); }
 }
+function optionalAuthenticate(req, res, next) {
+  // Public profile endpoints may be browsed anonymously, while an owner or
+  // administrator with a valid bearer token can receive their private fields.
+  if (!req.headers.authorization) return next();
+  return authenticate(req, res, next);
+}
 function authorize(...roles) {
   return async (req, res, next) => {
     try {
@@ -45,4 +51,4 @@ function authorize(...roles) {
     } catch (err) { next(err); }
   };
 }
-module.exports = { authenticate, authorize };
+module.exports = { authenticate, optionalAuthenticate, authorize };
