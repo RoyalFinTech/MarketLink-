@@ -695,7 +695,7 @@
       }).join('');
       var ratio=Math.max(0,Math.min(100,progressIndex/(steps.length-1)*100));
       var deliveryDetails=o.rider_name?'<div class="ml-tracking-meta-row"><span>Delivery rider</span><b>'+esc(o.rider_name)+'</b></div>':'';
-      var riderWaDigits=String(o.rider_whatsapp_number||'').replace(/\\D/g,'');
+      var riderWaDigits=String(o.rider_whatsapp_number||'').replace(/\D/g,'');
       if(!terminal&&o.rider_name&&riderWaDigits.length>=9)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Contact rider</span><a class="ml-btn ml-btn-secondary" href="https://wa.me/'+riderWaDigits+'?text='+encodeURIComponent('Hello, I am contacting you about my MarketLink order '+String(o.order_number||'')+'.')+'" target="_blank" rel="noopener noreferrer" style="text-decoration:none">WhatsApp rider ↗</a></div>';
       if(o.estimated_minutes!==null&&o.estimated_minutes!==undefined)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Delivery estimate</span><b>'+Number(o.estimated_minutes)+' minutes (estimate)</b></div>';
       if(o.distance_km!==null&&o.distance_km!==undefined)deliveryDetails+='<div class="ml-tracking-meta-row"><span>Route distance</span><b>'+Number(o.distance_km).toFixed(1)+' km</b></div>';
@@ -1507,7 +1507,7 @@
     if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.whatsappNumber){
       toast('Complete the business name, shop name, address, category and customer WhatsApp number first.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
-    if(!/^\+220\d{7,9}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,'')){
+    if(!/^\+220\d{7,9}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,''))){
       toast('Enter a valid Gambian WhatsApp number using the network selector.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
