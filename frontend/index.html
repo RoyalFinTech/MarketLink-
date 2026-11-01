@@ -6026,7 +6026,7 @@ function renderRApp(){
   var body='';
   if(step===0){
     body='<div style="padding:10px 12px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.25);border-radius:11px;color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:12px;"><b style="color:var(--tx);">Applicant:</b> '+sanitizeText((S.user&&S.user.name)||S.profileName||'Customer')+'<br>Your existing account identity is linked automatically.</div>'+
-      '<input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name">'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Full name (from your MarketLink account)</label><input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name" readonly aria-readonly="true">'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">MarketLink account phone: <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
       '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Separate WhatsApp number (optional)</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;">'+gmfHTML()+'<span style="color:var(--mu);font-size:12px;flex-shrink:0;">+220</span><input class="inp" type="tel" inputmode="tel" placeholder="7 digits after network prefix" id="ra-phone" value="'+sanitizeText(f.whatsappNumber||'')+'" style="flex:1;margin-bottom:0;"></div>'+
@@ -6993,7 +6993,7 @@ window.addEventListener('unhandledrejection',function(e){
         longitude:form.longitude==null?undefined:form.longitude,
         description:[form.sname?'Shop name: '+form.sname.trim():'',form.registrationNo?'Registration / permit: '+String(form.registrationNo).trim():'',form.services?'Products / services: '+String(form.services).trim():'',form.hours?'Opening hours: '+String(form.hours).trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
       };
-      if(form.phone){p.phone=normalize(form.phone,S.vFormCountry||'GM').e164;}
+
       if(form.whatsappNumber){p.whatsappNumber=form.whatsappNumber;}
       if(form.email&&String(form.email).trim())p.email=String(form.email).trim();
       if(form.idDocFile){
@@ -7026,7 +7026,7 @@ window.addEventListener('unhandledrejection',function(e){
     var b=document.querySelector('#sh-rapp .btn-pu');if(b){b.textContent='Uploading and submitting…';b.disabled=true;}
     var uploaded=[];
     try{
-      var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined,mobileNumber:form.phone?(window.PhoneUtil?window.PhoneUtil.normalize(form.phone,'GM').e164:form.phone):(S.profilePhone||undefined),whatsappNumber:form.whatsappNumber||undefined,latitude:form.latitude==null?undefined:form.latitude,longitude:form.longitude==null?undefined:form.longitude};
+      var p={vehicleType:form.vehicleType||'motorbike',plateNumber:String(form.plate).trim(),licenseNumber:String(form.licence).trim(),emergencyContact:form.emergency||undefined,address:form.addr||undefined,deliveryZone:form.deliveryZone||undefined,whatsappNumber:form.whatsappNumber||undefined,latitude:form.latitude==null?undefined:form.latitude,longitude:form.longitude==null?undefined:form.longitude};
       if(form.idDocFile){var riderId=await ML_API.uploads.upload(form.idDocFile,'rider-document');p.idDocumentUrl=riderId.url;uploaded.push(riderId.url);}
       if(form.licenseDocFile){var licenseUpload=await ML_API.uploads.upload(form.licenseDocFile,'license-document');p.licenseDocumentUrl=licenseUpload.url;uploaded.push(licenseUpload.url);}
       if(form.profilePhotoFile){var profileUpload=await ML_API.uploads.upload(form.profilePhotoFile,'profile-photo');p.profilePhotoUrl=profileUpload.url;uploaded.push(profileUpload.url);}
