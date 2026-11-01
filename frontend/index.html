@@ -5980,8 +5980,8 @@ function vAppNext(){
     S.vForm.closeTime=(G('va-close-time')&&G('va-close-time').value)||'';
     S.vForm.hours=[S.vForm.workingDays.join(', '),S.vForm.openTime&&S.vForm.closeTime?(S.vForm.openTime+' - '+S.vForm.closeTime):''].filter(Boolean).join(' | ');
     S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
-    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!S.vForm.whatsappNumber){
-      toast('Please complete the business name, shop name, address, category and a valid WhatsApp number.','error');return;
+    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!/^\\+220\\d{7}$/.test(S.vForm.whatsappNumber)){
+      toast('Complete the required business details and enter a valid 7-digit Gambian contact number.','error');return;
     }
   }
   S.vStep++; renderVApp();
@@ -6072,6 +6072,7 @@ function rAppNext(){
     S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\D/g,'').slice(0,7);
     S.rForm.addr=(G('ra-addr')&&G('ra-addr').value.trim())||'';
     S.rForm.emergency=(G('ra-emg')&&G('ra-emg').value.trim())||'';
+    if(!/^\\+220\\d{7}$/.test(S.rForm.whatsappNumber)){toast('Enter a valid 7-digit Gambian WhatsApp/contact number.','error');return;}
   } else if(S.rStep===1){
     S.rForm.plate=(G('ra-plate')&&G('ra-plate').value.trim())||'';
     S.rForm.licence=(G('ra-lic')&&G('ra-lic').value.trim())||'';
