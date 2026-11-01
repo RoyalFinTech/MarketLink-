@@ -11,7 +11,7 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
   const orderMap = { newest:'p.created_at DESC', price_asc:'p.price ASC', price_desc:'p.price DESC', top_rated:'p.rating_avg DESC' };
   const ob = orderMap[sort]||'p.created_at DESC', wh = conds.length ? 'WHERE '+conds.join(' AND ') : '';
   const [d,c] = await Promise.all([
-    query(`SELECT p.id,p.name,p.slug,p.price,p.compare_at_price,p.rating_avg,p.rating_count,p.sold_count,c.name AS category_name,v.business_name AS vendor_name,(SELECT image_url FROM product_images WHERE product_id=p.id AND is_primary=TRUE LIMIT 1) AS primary_image,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL ${wh} ORDER BY ${ob} LIMIT $${pi++} OFFSET $${pi++}`, [...params, limit, off]),
+    query(`SELECT p.id,p.vendor_id,p.name,p.slug,p.price,p.compare_at_price,p.rating_avg,p.rating_count,p.sold_count,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,(SELECT image_url FROM product_images WHERE product_id=p.id AND is_primary=TRUE LIMIT 1) AS primary_image,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL ${wh} ORDER BY ${ob} LIMIT $${pi++} OFFSET $${pi++}`, [...params, limit, off]),
     query(`SELECT count(*) FROM products p ${wh}`, params),
   ]);
   return { items: d.rows, total: parseInt(c.rows[0].count), page, limit, totalPages: Math.ceil(parseInt(c.rows[0].count)/limit) };
