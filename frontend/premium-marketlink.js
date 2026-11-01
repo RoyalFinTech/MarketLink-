@@ -1505,7 +1505,7 @@
     if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.whatsappNumber){
       toast('Complete the business name, shop name, address, category and customer WhatsApp number first.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
-    if(!/^\\+220\\d{7,9}$/.test(String(f.whatsappNumber).replace(/[\\s()-]/g,''))){
+    if(!/^\+220\d{7,9}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,'')){
       toast('Enter a valid Gambian WhatsApp number using the network selector.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
@@ -1522,7 +1522,7 @@
       }
       if(btn)btn.textContent='Submitting application…';
       var vendorPhone=(S.profilePhone||(S.user&&S.user.phone)||'').trim()||undefined;
-      var vendorWhatsapp=String(f.whatsappNumber||'').replace(/[\\s()-]/g,'');
+      var vendorWhatsapp=String(f.whatsappNumber||'').replace(/[\s()-]/g,'');
       var businessDescription=[
         f.sname?'Shop/display name: '+String(f.sname).trim():'',
         f.registrationNo?'Business registration / permit: '+String(f.registrationNo).trim():'',
