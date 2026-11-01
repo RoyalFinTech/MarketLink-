@@ -80,8 +80,24 @@ async function getById(userId, includePrivate = false) {
   if (!rows.length) throw new AppError('Rider not found.', 404, 'RIDER_NOT_FOUND');
   const r = rows[0];
   if (!includePrivate) {
-    delete r.national_id; delete r.kyc_notes; delete r.suspension_reason;
-    delete r.license_number;
+    // Public rider lookups must not expose private KYC documents, personal
+    // contact details, emergency contacts, financial totals, or live GPS.
+    // Only approved riders have a public profile.
+    if (r.kyc_status !== 'approved') {
+      throw new AppError('Rider not found.', 404, 'RIDER_NOT_FOUND');
+    }
+    return {
+      user_id: r.user_id,
+      full_name: r.full_name,
+      vehicle_type: r.vehicle_type,
+      delivery_zone: r.delivery_zone,
+      profile_photo_url: r.profile_photo_url,
+      rating_avg: r.rating_avg,
+      rating_count: r.rating_count,
+      total_deliveries: r.total_deliveries,
+      completed_deliveries: r.completed_deliveries,
+      acceptance_rate: r.acceptance_rate,
+    };
   }
   return r;
 }
