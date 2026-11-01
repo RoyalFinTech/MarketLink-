@@ -29,9 +29,11 @@ router.post('/conversations',wrap(async(req,res)=>{
     const result=await query('INSERT INTO conversations (participant_a,participant_b,order_id) VALUES ($1,$2,$3) ON CONFLICT (participant_a,participant_b,order_id) DO UPDATE SET order_id=EXCLUDED.order_id RETURNING *',[a,b,orderId]);
     conversation=result.rows[0];
   }else{
-    const {rows}=await query('SELECT * FROM conversations WHERE participant_a=$1 AND participant_b=$2 AND order_id IS NULL ORDER BY created_at DESC LIMIT 1',[a,b]);
-    conversation=rows[0];
-    if(!conversation){const result=await query('INSERT INTO conversations (participant_a,participant_b) VALUES ($1,$2) RETURNING *',[a,b]);conversation=result.rows[0];}
+    const result=await query(
+      'INSERT INTO conversations (participant_a,participant_b) VALUES ($1,$2) ON CONFLICT (participant_a,participant_b) WHERE order_id IS NULL DO UPDATE SET participant_a=EXCLUDED.participant_a RETURNING *',
+      [a,b]
+    );
+    conversation=result.rows[0];
   }
   res.status(201).json({success:true,data:{...conversation,vendor:vendors[0]}});
 }));
@@ -60,6 +62,7 @@ router.get('/conversations/:id/messages',wrap(async(req,res)=>{
   const params=[c.id,limit];let where='conversation_id=$1';
   if(before){where+=' AND created_at < $3';params.push(before);}
   const {rows}=await query(`SELECT id,conversation_id,sender_id,body,attachment_url,status,created_at,read_at FROM messages WHERE ${where} ORDER BY created_at DESC LIMIT $2`,params);
+  await query("UPDATE messages SET status=CASE WHEN status='sent' THEN 'delivered' ELSE status END, delivered_at=COALESCE(delivered_at,now()) WHERE conversation_id=$1 AND sender_id<>$2 AND delivered_at IS NULL",[c.id,uid]);
   await query("UPDATE messages SET status='read',read_at=now() WHERE conversation_id=$1 AND sender_id<>$2 AND read_at IS NULL",[c.id,uid]);
   res.json({success:true,data:rows.reverse()});
 }));
