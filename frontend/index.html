@@ -6995,7 +6995,11 @@ window.addEventListener('unhandledrejection',function(e){
         businessAddress:form.saddr.trim(),
         latitude:form.latitude==null?undefined:form.latitude,
         longitude:form.longitude==null?undefined:form.longitude,
-        description:[form.sname?'Shop name: '+form.sname.trim():'',form.registrationNo?'Registration / permit: '+String(form.registrationNo).trim():'',form.services?'Products / services: '+String(form.services).trim():'',form.hours?'Opening hours: '+String(form.hours).trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
+        servicesOffered:form.services||undefined,
+        workingDays:Array.isArray(form.workingDays)?form.workingDays:[],
+        openingTime:form.openTime||undefined,
+        closingTime:form.closeTime||undefined,
+        description:[form.sname?'Shop name: '+form.sname.trim():'',form.registrationNo?'Registration / permit: '+String(form.registrationNo).trim():'',form.description||''].filter(Boolean).join('\n\n')||undefined
       };
 
       if(form.whatsappNumber){p.whatsappNumber=form.whatsappNumber;}
