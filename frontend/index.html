@@ -3411,8 +3411,9 @@ async function handlePhoto(inp){
   // avatar, which could report success while the visible profile stayed stale.
   var file=inp.files[0];
   try{
-    if(window.ML_Premium&&typeof window.ML_Premium.saveProfilePhoto==='function'){
-      await window.ML_Premium.saveProfilePhoto(file);
+    if(window.ML_Premium&&typeof window.ML_Premium.handleProfilePhoto==='function'){
+      // The premium handler expects the file-input element, not the File object.
+      await window.ML_Premium.handleProfilePhoto(inp);
       return;
     }
     toast('Profile photo service is still loading. Please try again in a moment.','warning');
