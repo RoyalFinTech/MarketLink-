@@ -21,7 +21,7 @@ function actorLog(actor, action, entityId, before, after) {
 // ── REGISTER (called after user account already exists) ──────────────
 async function register(userId, data) {
   const { businessName, businessCategory, businessCategoryGroup, businessAddress, phone, email, whatsappNumber,
-          description, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
+          description, servicesOffered, workingDays, openingTime, closingTime, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
 
   if (!businessName?.trim()) throw new AppError('Business name is required.', 400, 'VALIDATION_ERROR');
 
@@ -34,10 +34,11 @@ async function register(userId, data) {
     const { rows: [vendor] } = await client.query(
       `INSERT INTO vendors
          (user_id, business_name, business_category, business_category_group, business_address, phone, email, whatsapp_number,
-          description, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, kyc_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending') RETURNING *`,
+          description, services_offered, working_days, opening_time, closing_time, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, kyc_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending') RETURNING *`,
       [userId, businessName.trim(), businessCategory || null, businessCategoryGroup || null, businessAddress || null,
-       phone || null, email || null, whatsappNumber || null, description || null,
+       phone || null, email || null, whatsappNumber || null, description || null, servicesOffered || null,
+       Array.isArray(workingDays) ? workingDays : [], openingTime || null, closingTime || null,
        nationalId || null, idDocumentUrl || null, shopPhotoUrl || null, logoUrl || shopPhotoUrl || null,
        latitude ?? null, longitude ?? null]
     );
@@ -98,6 +99,10 @@ async function getById(userId, includePrivate = false) {
       latitude: v.latitude,
       longitude: v.longitude,
       whatsapp_number: v.whatsapp_number,
+      services_offered: v.services_offered,
+      working_days: v.working_days,
+      opening_time: v.opening_time,
+      closing_time: v.closing_time,
       logo_url: v.logo_url,
       banner_url: v.banner_url,
       description: v.description,
@@ -148,7 +153,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
   const [data, count] = await Promise.all([
     query(
       `SELECT v.user_id, v.business_name, v.business_category, v.business_category_group, v.business_address,
-              v.latitude, v.longitude, v.whatsapp_number, v.logo_url, v.banner_url, v.description, v.rating_avg, v.rating_count,
+              v.latitude, v.longitude, v.whatsapp_number, v.logo_url, v.banner_url, v.description, v.services_offered, v.working_days, v.opening_time, v.closing_time, v.rating_avg, v.rating_count,
               v.is_open, v.vacation_mode, v.kyc_status, v.created_at
               ${isAdmin ? ', v.commission_pct, v.total_sales, v.total_revenue' : ''},
               u.full_name AS owner_name
@@ -180,7 +185,7 @@ async function updateProfile(userId, data) {
     businessName: 'business_name', businessCategory: 'business_category',
     businessCategoryGroup: 'business_category_group', whatsappNumber: 'whatsapp_number',
     businessAddress: 'business_address', phone: 'phone', email: 'email',
-    description: 'description', logoUrl: 'logo_url', bannerUrl: 'banner_url',
+    description: 'description', servicesOffered: 'services_offered', workingDays: 'working_days', openingTime: 'opening_time', closingTime: 'closing_time', logoUrl: 'logo_url', bannerUrl: 'banner_url',
     returnPolicy: 'return_policy', minOrderValue: 'min_order_value',
     deliveryTimeMin: 'delivery_time_min', deliveryTimeMax: 'delivery_time_max',
     latitude: 'latitude', longitude: 'longitude',
