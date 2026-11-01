@@ -5971,7 +5971,7 @@ function vAppNext(){
     S.vForm.sname=(G('va-sname')&&G('va-sname').value.trim())||'';
     S.vForm.saddr=(G('va-saddr')&&G('va-saddr').value.trim())||'';
     S.vForm.cat=(G('va-cat')&&G('va-cat').value)||'';
-    S.vForm.whatsappNumber='+220'+String((G('va-phone')&&G('va-phone').value)||'').replace(/\\D/g,'').slice(0,7);
+    S.vForm.whatsappNumber='+220'+String((G('va-phone')&&G('va-phone').value)||'').replace(/\D/g,'').slice(0,7);
     S.vForm.email=(G('va-email')&&G('va-email').value.trim())||'';
     S.vForm.registrationNo=(G('va-regno')&&G('va-regno').value.trim())||'';
     S.vForm.services=(G('va-services')&&G('va-services').value.trim())||'';
@@ -6013,7 +6013,7 @@ function raDocsSelected(inp,target){
 }
 function openRiderApp(){
   S.rStep=0;
-  var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\\+220/,'').replace(/\\D/g,'');
+  var accountPhone=String(S.profilePhone||(S.user&&S.user.phone)||'').replace(/^\\+220/,'').replace(/\D/g,'');
   S.rForm={fname:(S.user&&S.user.name)||S.profileName||'',phone:accountPhone,whatsappNumber:'',addr:'',plate:'',licence:'',vehicleType:'motorbike',deliveryZone:'',emergency:'',latitude:null,longitude:null,docs:'',idDocFile:null,licenseDocFile:null,vehiclePhotoFile:null,profilePhotoFile:null};
   renderRApp(); openSheet('sh-rapp');
 }
@@ -6069,7 +6069,7 @@ function renderRApp(){
 function rAppNext(){
   if(S.rStep===0){
     S.rForm.fname=(G('ra-fname')&&G('ra-fname').value.trim())||'';
-    S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\\D/g,'').slice(0,7);
+    S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\D/g,'').slice(0,7);
     S.rForm.addr=(G('ra-addr')&&G('ra-addr').value.trim())||'';
     S.rForm.emergency=(G('ra-emg')&&G('ra-emg').value.trim())||'';
   } else if(S.rStep===1){
@@ -7310,7 +7310,7 @@ window.addEventListener('unhandledrejection',function(e){
   function decorateOnboardingPhone(id,target,fieldKey,replaceParent){
     var inp=document.getElementById(id);if(!inp||inp.dataset.mlPlainPhone==='1')return;
     inp.addEventListener('input',function(){
-      var digits=String(inp.value||'').replace(/\\D/g,'').slice(0,7);
+      var digits=String(inp.value||'').replace(/\D/g,'').slice(0,7);
       inp.value=digits;
       if(window.S){
         var obj=(target==='va'||target==='ra')?S[target==='va'?'vForm':'rForm']:S.rForm;
