@@ -1502,8 +1502,11 @@
   async function submitVendor(){
     if(!apiOk()){toast('Please sign in first.','error');return;}
     var f=S.vForm||{};
-    if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.phone){
-      toast('Complete the business name, shop name, address, category and WhatsApp number first.','error');return;
+    if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.whatsappNumber){
+      toast('Complete the business name, shop name, address, category and customer WhatsApp number first.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
+    }
+    if(!/^\\+220\\d{7,9}$/.test(String(f.whatsappNumber).replace(/[\\s()-]/g,''))){
+      toast('Enter a valid Gambian WhatsApp number using the network selector.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
     var btn=document.querySelector('#vapp-body .btn-p'),uploaded=[];
@@ -1518,7 +1521,8 @@
         if(shopPhotoUrl)uploaded.push(shopPhotoUrl);
       }
       if(btn)btn.textContent='Submitting application…';
-      var vendorPhone=window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:f.phone;
+      var vendorPhone=(S.profilePhone||(S.user&&S.user.phone)||'').trim()||undefined;
+      var vendorWhatsapp=String(f.whatsappNumber||'').replace(/[\\s()-]/g,'');
       var businessDescription=[
         f.sname?'Shop/display name: '+String(f.sname).trim():'',
         f.registrationNo?'Business registration / permit: '+String(f.registrationNo).trim():'',
@@ -1531,6 +1535,7 @@
         businessCategory:f.cat,
         businessAddress:String(f.saddr).trim(),
         phone:vendorPhone,
+        whatsappNumber:vendorWhatsapp,
         email:f.email||undefined,
         idDocumentUrl:idUpload&&idUpload.url,
         shopPhotoUrl:shopPhotoUrl,
