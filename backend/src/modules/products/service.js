@@ -17,7 +17,7 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
   return { items: d.rows, total: parseInt(c.rows[0].count), page, limit, totalPages: Math.ceil(parseInt(c.rows[0].count)/limit) };
 }
 async function getById(id) {
-  const { rows } = await query(`SELECT p.*,c.name AS category_name,v.business_name AS vendor_name,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL WHERE p.id=$1`, [id]);
+  const { rows } = await query(`SELECT p.*,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL WHERE p.id=$1`, [id]);
   if (!rows.length) throw new AppError('Product not found.',404,'PRODUCT_NOT_FOUND');
   return rows[0];
 }
