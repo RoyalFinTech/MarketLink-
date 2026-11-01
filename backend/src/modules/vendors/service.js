@@ -149,8 +149,8 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
     query(
       `SELECT v.user_id, v.business_name, v.business_category, v.business_category_group, v.business_address,
               v.latitude, v.longitude, v.whatsapp_number, v.logo_url, v.banner_url, v.description, v.rating_avg, v.rating_count,
-              v.is_open, v.vacation_mode, v.kyc_status, v.commission_pct,
-              v.total_sales, v.total_revenue, v.created_at,
+              v.is_open, v.vacation_mode, v.kyc_status, v.created_at
+              ${isAdmin ? ', v.commission_pct, v.total_sales, v.total_revenue' : ''},
               u.full_name AS owner_name
               ${isAdmin ? `, v.phone AS business_phone, v.email AS business_email,
                 v.id_document_url, v.shop_photo_url, u.phone AS owner_phone, u.email AS owner_email` : ''}
