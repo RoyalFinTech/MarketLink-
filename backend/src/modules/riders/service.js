@@ -131,13 +131,13 @@ async function list({ page = 1, limit = 20, search, kycStatus, isOnline, zone, i
 
   const [data, count] = await Promise.all([
     query(
-      `SELECT r.user_id, r.vehicle_type, r.plate_number, r.kyc_status,
+      `SELECT r.user_id, r.vehicle_type, r.kyc_status,
               r.is_online, r.delivery_zone, r.rating_avg, r.rating_count,
-              r.total_deliveries, r.total_earnings, r.acceptance_rate,
-              r.current_lat, r.current_lng, r.last_location_at,
-              u.full_name, u.phone
-              ${isAdmin ? `, r.address, r.emergency_contact, r.license_number,
-                r.national_id, r.id_document_url, r.license_document_url, r.vehicle_photo_url, r.profile_photo_url, r.mobile_number, r.whatsapp_number, u.email` : ''}
+              r.total_deliveries, r.acceptance_rate, r.profile_photo_url,
+              u.full_name
+              ${isAdmin ? `, r.plate_number, r.total_earnings, r.current_lat, r.current_lng, r.last_location_at,
+                u.phone, r.address, r.emergency_contact, r.license_number, r.national_id,
+                r.id_document_url, r.license_document_url, r.vehicle_photo_url, r.mobile_number, r.whatsapp_number, u.email` : ''}
        FROM riders r
        JOIN users u ON u.id = r.user_id
        ${where}
