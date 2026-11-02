@@ -475,7 +475,24 @@
     if(liveProfile){
       S.profileName=liveProfile.full_name||S.profileName||'';
       S.profilePhone=liveProfile.phone||S.profilePhone||'';
-      S.profilePhoto=liveProfile.profile_photo_url||S.profilePhoto||null;
+      S.profilePhoto=liveProfile.profile_photo_url||null;
+      // The server profile is the source of truth. Clear stale browser photos
+      // when the account no longer has a saved image instead of keeping an old URL.
+      try{
+        if(S.profilePhoto){
+          localStorage.setItem('ml_profile_photo_url',S.profilePhoto);
+          var previewUrl=localStorage.getItem('ml_profile_photo_preview_url');
+          if(previewUrl&&previewUrl!==S.profilePhoto){
+            localStorage.removeItem('ml_profile_photo_preview');
+            localStorage.removeItem('ml_profile_photo_preview_url');
+          }
+        }else{
+          localStorage.removeItem('ml_profile_photo_url');
+          localStorage.removeItem('ml_profile_photo_preview');
+          localStorage.removeItem('ml_profile_photo_preview_url');
+        }
+      }catch(photoStorageError){}
+      if(S.user){S.user.profilePhotoUrl=S.profilePhoto;S.user.avatarUrl=S.profilePhoto;}
       S.walletBalance=Number(liveProfile.wallet_balance||0);
       S.rewardPoints=Number(liveProfile.reward_points||0);
     }
@@ -743,8 +760,9 @@
     var orderCount=liveProfile?Number(liveProfile.total_orders||0):0;
     var spent=liveProfile?Number(liveProfile.total_spent||0):0;
     var wallet=liveWallet?Number(liveWallet.balance||0):Number(S.walletBalance||0);
-    var profilePhoto=S.profilePhoto||(liveProfile&&liveProfile.profile_photo_url)||(S.user&&(S.user.profilePhotoUrl||S.user.avatarUrl))||null;
-    try{profilePhoto=profilePhoto||localStorage.getItem('ml_profile_photo_url')||null;}catch(photoReadError){}
+    // Prefer the freshly loaded server profile over any stale session/local URL.
+    var profilePhoto=liveProfile ? (liveProfile.profile_photo_url||null) : ((S.user&&(S.user.profilePhotoUrl||S.user.avatarUrl))||S.profilePhoto||null);
+    if(!liveProfile){try{profilePhoto=profilePhoto||localStorage.getItem('ml_profile_photo_url')||null;}catch(photoReadError){}}
     var profileInitial=esc(String(firstName()||'U').trim().charAt(0).toUpperCase()||'U');
     var profileAvatar=profilePhoto
       ?'<img src="'+esc(String(profilePhoto)+(String(profilePhoto).indexOf('?')>=0?'&':'?')+'mlavatar='+Date.now())+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><span class="ml-dashboard-avatar-fallback" style="display:none;">'+profileInitial+'</span>'
@@ -947,7 +965,24 @@
     if(!apiOk())return;
     try{
       var r=await ML_API.customers.getProfile();liveProfile=r.data||liveProfile;
-      if(liveProfile){S.profileName=liveProfile.full_name||S.profileName||'';S.profilePhone=liveProfile.phone||S.profilePhone||'';S.profilePhoto=liveProfile.profile_photo_url||S.profilePhoto||null;}
+      if(liveProfile){S.profileName=liveProfile.full_name||S.profileName||'';S.profilePhone=liveProfile.phone||S.profilePhone||'';S.profilePhoto=liveProfile.profile_photo_url||null;
+      // The server profile is the source of truth. Clear stale browser photos
+      // when the account no longer has a saved image instead of keeping an old URL.
+      try{
+        if(S.profilePhoto){
+          localStorage.setItem('ml_profile_photo_url',S.profilePhoto);
+          var previewUrl=localStorage.getItem('ml_profile_photo_preview_url');
+          if(previewUrl&&previewUrl!==S.profilePhoto){
+            localStorage.removeItem('ml_profile_photo_preview');
+            localStorage.removeItem('ml_profile_photo_preview_url');
+          }
+        }else{
+          localStorage.removeItem('ml_profile_photo_url');
+          localStorage.removeItem('ml_profile_photo_preview');
+          localStorage.removeItem('ml_profile_photo_preview_url');
+        }
+      }catch(photoStorageError){}
+      if(S.user){S.user.profilePhotoUrl=S.profilePhoto;S.user.avatarUrl=S.profilePhoto;}}
     }catch(e){}
   }
   async function getProfileImageDimensions(file){
@@ -1438,7 +1473,8 @@
         }
       });
     }
-    var photo=S.profilePhoto||p.profile_photo_url||(function(){try{return localStorage.getItem('ml_profile_photo_url')||null;}catch(e){return null;}})()||null;
+    // Profile page must render the persisted server URL, not an older cached avatar.
+    var photo=p.profile_photo_url||null;
     var photoSrc=photo?String(photo)+(String(photo).indexOf('?')>=0?'&':'?')+'mlphoto='+encodeURIComponent(String(photo).length+'-'+(liveProfile&&liveProfile.updated_at||Date.now())):'';
     var avatar=defaultAvatarMarkup()+(photo?'<img class="ml-avatar-photo" src="'+esc(photoSrc)+'" alt="Profile photo" loading="eager" decoding="async" onerror="this.onerror=null;var preview=null;try{preview=localStorage.getItem(\'ml_profile_photo_preview\');}catch(e){}if(preview){this.src=preview;this.style.display=\'block\';}else{this.style.display=\'none\';var fallback=this.parentNode&&this.parentNode.querySelector(\'.ml-default-avatar\');if(fallback)fallback.style.display=\'block\';}">':'');
     var roles=(S.roles||[]).map(function(r){return '<span class="ml-role-pill">'+esc(r)+'</span>';}).join('');
