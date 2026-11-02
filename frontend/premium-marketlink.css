@@ -1782,3 +1782,10 @@ html[dir="rtl"] .ml-language-login-wrap{right:auto;left:14px}
 #vapp-body .ml-country-phone,#rapp-body .ml-country-phone{width:100%;box-sizing:border-box}
 #vapp-body .ml-country-phone>span,#rapp-body .ml-country-phone>span{min-height:48px;box-sizing:border-box}
 @media(max-width:480px){#vapp-body,#rapp-body{font-size:14px}#vapp-body .ml-country-phone>span,#rapp-body .ml-country-phone>span{min-width:88px;padding:0 8px;font-size:13px}#vapp-body .btn,#rapp-body .btn{font-size:13px!important}}
+
+
+/* File-upload cards need a light surface so document instructions remain legible */
+#vapp-body label:has(input[type="file"]),#rapp-body label:has(input[type="file"]){background:#f3f7f9!important;border:1.5px dashed #9fb5c2!important;color:#173746!important}
+#vapp-body label:has(input[type="file"]) div,#rapp-body label:has(input[type="file"]) div{color:#173746!important}
+#vapp-body label:has(input[type="file"]) div:last-child,#rapp-body label:has(input[type="file"]) div:last-child{color:#4e6573!important}
+#vapp-body label:has(input[type="file"]):focus-within,#rapp-body label:has(input[type="file"]):focus-within{outline:3px solid rgba(13,115,119,.2)!important;border-color:#0d7377!important}
