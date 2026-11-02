@@ -1147,6 +1147,8 @@
       var refreshed=await ML_API.customers.getProfile();
       liveProfile=refreshed&&refreshed.data||liveProfile;
       S.profilePhoto=null;
+      closeProfilePhotoViewer();
+      if(S.user){S.user.profilePhotoUrl=null;S.user.avatarUrl=null;}
       try{localStorage.removeItem('ml_profile_photo_preview');localStorage.removeItem('ml_profile_photo_preview_url');localStorage.removeItem('ml_profile_photo_url');}catch(storageError){}
       renderPremiumProfile();
       toast('Your profile photo has been removed.','success');
