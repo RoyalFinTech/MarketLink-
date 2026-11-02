@@ -1033,6 +1033,20 @@
       reader.readAsDataURL(file);
     });
   }
+  function verifyProfilePhotoImage(url){
+    return new Promise(function(resolve,reject){
+      var image=new Image(),settled=false;
+      var timeout=setTimeout(function(){finish(new Error('The uploaded photo could not be loaded from MarketLink storage. Please try again.'));},15000);
+      function finish(error){
+        if(settled)return;settled=true;clearTimeout(timeout);
+        image.onload=null;image.onerror=null;
+        if(error)reject(error);else resolve(true);
+      }
+      image.onload=function(){if(image.naturalWidth>0&&image.naturalHeight>0)finish();else finish(new Error('MarketLink returned an image that could not be displayed.'));};
+      image.onerror=function(){finish(new Error('The photo was uploaded but could not be displayed from MarketLink storage. Please try again.'));};
+      image.src=String(url)+(String(url).indexOf('?')>=0?'&':'?')+'mlphotocheck='+Date.now();
+    });
+  }
   async function saveProfilePhoto(file){
     if(!file)return false;
     if(!apiOk()){toast('Please sign in again before changing your profile photo.','error');return false;}
@@ -1047,34 +1061,46 @@
         return false;
       }
     }catch(imageReadError){toast(imageReadError.message||'Could not read this image. Please choose a valid JPG or PNG.','error');return false;}
-    var oldPhoto=liveProfile&&liveProfile.profile_photo_url||S.profilePhoto||null;
-    var uploadedUrl=null,previewUrl='';
+    var oldPhoto=liveProfile&&liveProfile.profile_photo_url||null;
+    var uploadedUrl=null,previewUrl='',profileUpdateAttempted=false;
     try{previewUrl=await makeProfilePhotoPreview(file);}catch(previewError){}
     try{
       toast('Uploading your profile photo…','info');
       var uploaded=await ML_API.uploads.upload(file,'profile-photo');
       uploadedUrl=uploaded&&uploaded.url;
       if(!uploadedUrl||!/^https?:\/\//i.test(uploadedUrl))throw {error:'MarketLink did not receive a valid saved image URL. Please retry or contact support.'};
-      var response=await ML_API.customers.updateProfile({profilePhotoUrl:uploadedUrl});
-      liveProfile=response&&response.data||liveProfile;
-      if(!liveProfile)liveProfile={};
-      liveProfile.profile_photo_url=uploadedUrl;
+      profileUpdateAttempted=true;
+      await ML_API.customers.updateProfile({profilePhotoUrl:uploadedUrl});
+      // Do not show a success message based only on the upload response: confirm
+      // that a fresh profile read returns the exact saved URL.
+      var verifiedResponse=await ML_API.customers.getProfile();
+      var verifiedProfile=verifiedResponse&&verifiedResponse.data;
+      if(!verifiedProfile||String(verifiedProfile.profile_photo_url||'')!==String(uploadedUrl)){
+        throw {error:'The photo uploaded, but MarketLink could not confirm it was saved to your profile. Please try again.'};
+      }
+      await verifyProfilePhotoImage(uploadedUrl);
+      liveProfile=verifiedProfile;
       S.profilePhoto=uploadedUrl;
       if(S.user){S.user.profilePhotoUrl=uploadedUrl;S.user.avatarUrl=uploadedUrl;}
       try{
+        localStorage.setItem('ml_profile_photo_url',uploadedUrl);
         if(previewUrl){
           localStorage.setItem('ml_profile_photo_preview',previewUrl);
           localStorage.setItem('ml_profile_photo_preview_url',uploadedUrl);
         }
-        localStorage.setItem('ml_profile_photo_url',uploadedUrl);
       }catch(storageError){}
       renderPremiumProfile();
-      toast('Your profile photo has been updated.','success');
+      toast('Your profile photo has been saved and verified.','success');
       if(oldPhoto&&oldPhoto!==uploadedUrl){
         try{await ML_API.uploads.deleteByUrl(oldPhoto);}catch(cleanupError){}
       }
       return true;
     }catch(e){
+      // If the server update succeeded but the URL cannot be verified/displayed,
+      // restore the previous profile reference before cleaning up the new upload.
+      if(profileUpdateAttempted){
+        try{await ML_API.customers.updateProfile({profilePhotoUrl:oldPhoto});}catch(rollbackError){}
+      }
       if(uploadedUrl&&uploadedUrl!==oldPhoto){
         try{await ML_API.uploads.deleteByUrl(uploadedUrl);}catch(cleanupError){}
       }
