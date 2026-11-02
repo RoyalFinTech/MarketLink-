@@ -5987,12 +5987,12 @@ function vAppNext(){
   S.vStep++; renderVApp();
 }
 function submitVApp(){
-  setTimeout(function(){
-    closeSheet('sh-vapp');
-    if(S.roles.indexOf('vendor')===-1) S.roles.push('vendor');
-    addRoleTabs(); renderProfile();
-    toast('Vendor application submitted! Review within 48hrs. 🎉');
-  },1200);
+  // Always use the authenticated API-backed application flow. Never show a
+  // success message or grant a local role without a persisted server response.
+  if(window.ML_Premium&&typeof window.ML_Premium.submitVendor==='function'){
+    return window.ML_Premium.submitVendor();
+  }
+  toast('MarketLink is still loading the application service. Please wait and try again.','error');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -6085,12 +6085,12 @@ function rAppNext(){
   S.rStep++; renderRApp();
 }
 function submitRApp(){
-  setTimeout(function(){
-    closeSheet('sh-rapp');
-    if(S.roles.indexOf('rider')===-1) S.roles.push('rider');
-    addRoleTabs(); renderProfile();
-    toast('Rider application submitted! Review within 48hrs. 🚀');
-  },1200);
+  // Always use the authenticated API-backed application flow. Never show a
+  // success message or grant a local role without a persisted server response.
+  if(window.ML_Premium&&typeof window.ML_Premium.submitRider==='function'){
+    return window.ML_Premium.submitRider();
+  }
+  toast('MarketLink is still loading the application service. Please wait and try again.','error');
 }
 
 // ═══════════════════════════════════════════════════════════
