@@ -1785,6 +1785,8 @@ async function syncServerProfile(){
     S.profileName=profile.full_name||S.profileName||'';
     S.profilePhone=profile.phone||S.profilePhone||'';
     S.profilePhoto=profile.profile_photo_url||null;
+    if(S.user){S.user.profilePhotoUrl=S.profilePhoto;S.user.avatarUrl=S.profilePhoto;}
+    try{if(S.profilePhoto)localStorage.setItem('ml_profile_photo_url',S.profilePhoto);else localStorage.removeItem('ml_profile_photo_url');}catch(photoStorageError){}
     S.rewardPoints=Number(profile.reward_points||0);
     S.walletBalance=Number(profile.wallet_balance||0);
     if(S.user){S.user.name=S.profileName||S.user.name;S.user.phone=S.profilePhone||S.user.phone;}
