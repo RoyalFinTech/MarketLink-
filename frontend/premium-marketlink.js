@@ -1510,7 +1510,7 @@
       toast('Complete the business name, shop name, address, category and customer WhatsApp number first.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!/^\+220\d{7,9}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,''))){
-      toast('Enter a valid Gambian WhatsApp number using the network selector.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
+      toast('Enter the 7-digit Gambian contact number after +220.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
     var btn=document.querySelector('#vapp-body .btn-p'),uploaded=[];
@@ -1542,6 +1542,10 @@
         longitude:f.longitude==null?undefined:f.longitude,
         whatsappNumber:vendorWhatsapp,
         email:f.email||undefined,
+        servicesOffered:f.services||undefined,
+        workingDays:Array.isArray(f.workingDays)?f.workingDays:[],
+        openingTime:f.openTime||undefined,
+        closingTime:f.closeTime||undefined,
         idDocumentUrl:idUpload&&idUpload.url,
         shopPhotoUrl:shopPhotoUrl,
         logoUrl:shopPhotoUrl,
