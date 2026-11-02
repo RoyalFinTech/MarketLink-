@@ -1082,6 +1082,7 @@
       liveProfile=verifiedProfile;
       S.profilePhoto=uploadedUrl;
       if(S.user){S.user.profilePhotoUrl=uploadedUrl;S.user.avatarUrl=uploadedUrl;}
+      if(typeof window.mlRefreshDashboardAvatar==='function')window.mlRefreshDashboardAvatar(uploadedUrl,S.profileName||S.user&&S.user.name||'');
       try{
         localStorage.setItem('ml_profile_photo_url',uploadedUrl);
         if(previewUrl){
@@ -1149,6 +1150,7 @@
       S.profilePhoto=null;
       closeProfilePhotoViewer();
       if(S.user){S.user.profilePhotoUrl=null;S.user.avatarUrl=null;}
+      if(typeof window.mlRefreshDashboardAvatar==='function')window.mlRefreshDashboardAvatar(null,S.profileName||S.user&&S.user.name||'');
       try{localStorage.removeItem('ml_profile_photo_preview');localStorage.removeItem('ml_profile_photo_preview_url');localStorage.removeItem('ml_profile_photo_url');}catch(storageError){}
       renderPremiumProfile();
       toast('Your profile photo has been removed.','success');
