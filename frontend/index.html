@@ -1787,6 +1787,15 @@ async function syncServerProfile(){
     S.profilePhoto=profile.profile_photo_url||null;
     if(S.user){S.user.profilePhotoUrl=S.profilePhoto;S.user.avatarUrl=S.profilePhoto;}
     try{if(S.profilePhoto)localStorage.setItem('ml_profile_photo_url',S.profilePhoto);else localStorage.removeItem('ml_profile_photo_url');}catch(photoStorageError){}
+    // The home/dashboard shell is rendered before this asynchronous profile read.
+    // Refresh any already-mounted dashboard avatar immediately after the URL arrives.
+    document.querySelectorAll('.ml-dashboard-avatar').forEach(function(node){
+      if(S.profilePhoto){
+        var safeUrl=sanitizeText(String(S.profilePhoto)+(String(S.profilePhoto).indexOf('?')>=0?'&':'?')+'mlavatar='+Date.now());
+        var initial=sanitizeText(String(S.profileName||S.user&&S.user.name||'U').trim().charAt(0).toUpperCase()||'U');
+        node.innerHTML='<img src="'+safeUrl+'" alt="Profile photo" onerror="this.style.display=\\'none\\';this.nextElementSibling.style.display=\\'flex\\';"><span class="ml-dashboard-avatar-fallback" style="display:none;">'+initial+'</span>';
+      }
+    });
     S.rewardPoints=Number(profile.reward_points||0);
     S.walletBalance=Number(profile.wallet_balance||0);
     if(S.user){S.user.name=S.profileName||S.user.name;S.user.phone=S.profilePhone||S.user.phone;}
