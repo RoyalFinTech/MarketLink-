@@ -143,21 +143,21 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
 
   const { rows: [updated] } = await query(
     "UPDATE wallet_deposits SET provider_ref=$2,status='pending',provider_status=$3,provider_response=$4,updated_at=now() WHERE id=$1 RETURNING id,amount,currency,payment_method,status,provider_status,created_at",
-    [depositId, providerRef, String(charge.providerStatus || 'pending').slice(0, 40), JSON.stringify({
+    [depositId, providerRef, String(charge.status || 'pending').slice(0, 40), JSON.stringify({
       nextStep: charge.nextStep || null,
       hasRedirect: Boolean(charge.authorizationUrl),
     })]
   );
 
   const nextStep = charge.nextStep || null;
-  const redirectUrl = charge.authorizationUrl || null;
+  const redirectUrl = charge.paymentLink || null;
   return {
     deposit: updated,
     provider: 'modempay',
     action: modemPay.isH2H() && !(nextStep?.openExternal && (nextStep.launch_url || redirectUrl)) ? 'continue' : 'redirect',
     redirectUrl,
     nextStep,
-    providerStatus: charge.providerStatus || 'pending',
+    providerStatus: charge.status || 'pending',
   };
 }
 

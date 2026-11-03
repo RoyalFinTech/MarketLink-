@@ -1346,9 +1346,10 @@
       var capabilities=results[4]&&results[4].data||{};
       var configured=Boolean(capabilities.configured);
       var direct=Boolean(capabilities.directMobileMoney);
+      S.paymentCapabilities=capabilities;
       var balance=Number(wallet.balance||0),available=Number(wallet.available_balance==null?balance:wallet.available_balance);
       var rails=(capabilities.methods||[]).filter(function(m){return ['wave','afrimoney','qmoney'].indexOf(String(m).toLowerCase())>=0;});
-      var railOptions='<option value="modempay">Choose payment method on Modem Pay</option>'+rails.map(function(m){var k=String(m).toLowerCase();return '<option value="'+esc(k)+'">'+(k==='wave'?'Wave':k==='afrimoney'?'AfriMoney':'QMoney')+'</option>';}).join('');
+      var railOptions=(direct?'':'<option value="modempay">Choose payment method on Modem Pay</option>')+rails.map(function(m){var k=String(m).toLowerCase();return '<option value="'+esc(k)+'">'+(k==='wave'?'Wave':k==='afrimoney'?'AfriMoney':'QMoney')+'</option>';}).join('');
       var pendingContext=dahaDepositContext&&dahaDepositContext.deposit?dahaDepositContext:null;
       var nextStep=pendingContext&&pendingContext.nextStep||{};
       var pinMode=String(nextStep.auth_mode||'').toLowerCase()==='pin'||String(nextStep.auth_mode||'').toLowerCase()==='otp';
