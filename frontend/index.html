@@ -1491,6 +1491,19 @@ var ML_API = (function(){
     setAvailability: function(isOnline){ return patch('/riders/availability', {isOnline:isOnline}); },
   };
 
+
+  // ── DAHA WALLET ───────────────────────────────────────────────
+  var wallet = {
+    getBalance: function(){ return get('/wallets/me'); },
+    transactions: function(qs){ return get('/wallets/me/transactions', qs); },
+    deposits: function(qs){ return get('/wallets/me/deposits', qs); },
+    createDeposit: function(d){ return post('/wallets/deposits', d); },
+    getDeposit: function(id){ return get('/wallets/deposits/'+encodeURIComponent(id)); },
+    continueDeposit: function(id,action,pin){ return post('/wallets/deposits/'+encodeURIComponent(id)+'/continue',{action:action,pin:pin||undefined}); },
+    withdrawals: function(qs){ return get('/wallets/me/withdrawals', qs); },
+    requestWithdrawal: function(d){ return post('/wallets/withdrawals', d); },
+  };
+
   // ── PAYMENTS ─────────────────────────────────────────────────
   var payments = {
     methods: function(){ return get('/payments/methods'); },
@@ -1634,7 +1647,7 @@ var ML_API = (function(){
   return {
     auth: auth, customers: customers, products: products,
     categories: categories, orders: orders, delivery: delivery,
-    payments: payments, notifications: notifications, affiliates: affiliates,
+    payments: payments, wallet: wallet, notifications: notifications, affiliates: affiliates,
     uploads: uploads, vendors: vendors, riders: riders, messaging: messaging, admin: admin,
     promotions: { create: function(d){ return post('/promotions',d); }, mine: function(){ return get('/promotions/mine'); }, adminList: function(qs){ return get('/promotions/admin/requests',qs); }, adminReview: function(id,d){ return patch('/promotions/admin/requests/'+encodeURIComponent(id),d); } },
     assistant: assistant,
