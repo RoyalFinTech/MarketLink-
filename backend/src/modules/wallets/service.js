@@ -254,7 +254,7 @@ async function processDepositWebhook(client, payload, eventId) {
     return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'deposit_not_pending' };
   }
 
-  const transactionRef = payload.transaction_reference || payload.transaction_id || payload.transactionId || payload.id;
+  const transactionRef = payload.transaction_reference || payload.transaction_id || payload.transactionId || payload.payment_intent_id || payload.paymentIntentId || payload.reference || payload.id;
   if (!transactionRef || !deposit.provider_ref || String(transactionRef) !== String(deposit.provider_ref)) {
     return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'provider_reference_mismatch' };
   }
