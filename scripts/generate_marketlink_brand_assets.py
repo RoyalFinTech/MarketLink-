@@ -39,9 +39,12 @@ def load_logo():
 LOGO = load_logo()
 
 def contained_logo(max_width, max_height):
-    result = LOGO.copy()
-    result.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
-    return result
+    # Unlike thumbnail(), calculate a contain-fit scale that also enlarges the
+    # 220x177 source for high-resolution canvases. This keeps the ratio exact.
+    scale = min(max_width / LOGO.width, max_height / LOGO.height)
+    width = max(1, round(LOGO.width * scale))
+    height = max(1, round(LOGO.height * scale))
+    return LOGO.resize((width, height), Image.Resampling.LANCZOS)
 
 def make_icon(size, maskable=False):
     canvas = gradient((size, size))
@@ -87,13 +90,13 @@ favicon.resize((32, 32), Image.Resampling.LANCZOS).save(
 W, H = 1200, 630
 social = gradient((W, H), top=(18, 51, 69), bottom=(5, 22, 34))
 draw = ImageDraw.Draw(social, "RGBA")
-draw.ellipse((40, -240, 680, 400), fill=(22, 114, 119, 42))
-draw.ellipse((750, 260, 1350, 860), fill=(211, 166, 76, 17))
-draw.rounded_rectangle((58, 58, 1142, 572), radius=34, outline=(214, 173, 91, 95), width=2)
+# Restrained accent glow stays behind the logo and does not obstruct text.
+draw.ellipse((-120, -190, 610, 540), fill=(22, 114, 119, 32))
+draw.rounded_rectangle((58, 58, 1142, 572), radius=34, outline=(214, 173, 91, 110), width=2)
 
-logo = contained_logo(440, 370)
-logo_x = 105 + (440 - logo.width) // 2
-logo_y = 315 - logo.height // 2
+logo = contained_logo(430, 360)
+logo_x = 95 + (430 - logo.width) // 2
+logo_y = (H - logo.height) // 2
 social.alpha_composite(logo, (logo_x, logo_y))
 draw = ImageDraw.Draw(social)
 draw.rounded_rectangle((590, 142, 596, 488), radius=3, fill=GOLD)
@@ -101,18 +104,19 @@ draw.rounded_rectangle((590, 142, 596, 488), radius=3, fill=GOLD)
 font_bold_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 font_regular_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 try:
-    title_font = ImageFont.truetype(font_bold_path, 65)
-    sub_font = ImageFont.truetype(font_regular_path, 30)
-    label_font = ImageFont.truetype(font_bold_path, 22)
+    title_font = ImageFont.truetype(font_bold_path, 46)
+    sub_font = ImageFont.truetype(font_regular_path, 27)
+    label_font = ImageFont.truetype(font_bold_path, 19)
 except OSError:
     title_font = ImageFont.load_default()
     sub_font = ImageFont.load_default()
     label_font = ImageFont.load_default()
 
-draw.text((650, 205), "MarketLink Gambia", font=title_font, fill=(250, 252, 253))
-draw.text((654, 300), "Your Local Marketplace", font=sub_font, fill=(221, 231, 235))
-draw.text((654, 354), "SHOP  •  SELL  •  DELIVER", font=label_font, fill=(232, 189, 98))
-draw.text((654, 423), "Connecting customers, vendors and riders", font=sub_font, fill=(185, 204, 212))
+text_x = 650
+draw.text((text_x, 205), "MarketLink Gambia", font=title_font, fill=(250, 252, 253))
+draw.text((text_x + 2, 285), "Your Local Marketplace in The Gambia", font=sub_font, fill=(221, 231, 235))
+draw.text((text_x + 2, 350), "SHOP  •  SELL  •  DELIVER", font=label_font, fill=(232, 189, 98))
+draw.text((text_x + 2, 411), "Local vendors  •  Secure ordering  •  Delivery", font=label_font, fill=(185, 204, 212))
 
 social.convert("RGB").save(
     ASSETS / "marketlink-og-preview.jpg",
