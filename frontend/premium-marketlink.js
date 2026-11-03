@@ -1281,6 +1281,7 @@
       '<section class="ml-affiliate-hero"><div class="ml-affiliate-hero-copy"><span class="ml-affiliate-label">YOUR REFERRAL REWARD</span><div class="ml-affiliate-big">'+pct+'<span>%</span></div><h4>Earn 2% of eligible merchandise.</h4><p>Share your unique MarketLink link. When someone places a qualifying order through your link, you can earn 2% of the eligible discounted merchandise subtotal after successful delivery.</p><small>Rewards are funded from MarketLink’s platform commission, not added to the customer’s price.</small></div><div class="ml-affiliate-hero-art ml-affiliate-hero-photo"><img class="ml-affiliate-hero-image" src="./assets/promo-shopping.webp" alt="Customers discovering products at a local supermarket" loading="lazy" decoding="async" onerror="this.onerror=null;this.style.display=&quot;none&quot;;this.parentElement.classList.add(&quot;ml-affiliate-hero-photo-failed&quot;)"><div class="ml-affiliate-art-label"><b>2%</b><span>ON ELIGIBLE ORDERS</span></div></div></section>'+
       '<div class="ml-stat-grid ml-affiliate-stats"><div class="ml-stat"><div class="ml-stat-label">Total rewards</div><div class="ml-stat-value">'+money(S.affiliateEarnings||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(S.affiliateClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referred orders</div><div class="ml-stat-value">'+Number(S.affiliateOrders||0)+'</div></div></div>'+
       '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your personal affiliate link</b><span>Share it on WhatsApp or with friends and family.</span></div><span>🔗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Affiliate referral link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><div class="ml-affiliate-footnote">The 2% reward applies to eligible discounted merchandise subtotal on qualifying purchases attributed to your link, after successful delivery. Delivery fees are excluded. Your live statistics above come from your MarketLink account.</div></div>'+
+      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Affiliate rewards are paid into DAHA Wallet</b><span>Eligible 2% rewards are credited after the referred order is delivered and payment is confirmed. View your DAHA ledger and request a Wave or AfriMoney withdrawal there.</span></div><span>💳</span></div><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Open DAHA Wallet ↗</button></div>'+
       '<section class="ml-affiliate-rules"><div class="ml-eyebrow">PROGRAM RULES</div><h4>How your 2% reward works</h4><ul>'+
       '<li><b>Reward rate:</b> Earn 2% of the eligible discounted merchandise subtotal for a qualifying order attributed to your unique affiliate link.</li>'+
       '<li><b>Funded by MarketLink:</b> The reward comes from MarketLink’s standard 5% platform commission; it is not added to the customer’s price. MarketLink retains 3% gross platform commission before payment-processing and operating costs.</li>'+
@@ -1328,12 +1329,13 @@
     if(typeof window.renderProfile==='function')window.renderProfile();
   }
   var dahaDepositContext=null;
-  var dahaVendorPayoutProfile=null;
+  var dahaPayoutProfile=null;
   async function renderPremiumWalletPage(root){
     if(!root)return;
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Loading DAHA Wallet…</div></div>';
     try{
       var isVendor=(S.roles||[]).indexOf('vendor')>=0;
+      var isRider=(S.roles||[]).indexOf('rider')>=0;
       var requests=[
         ML_API.wallet.getBalance(),
         ML_API.wallet.transactions({page:1,limit:30}),
@@ -1342,6 +1344,7 @@
         ML_API.payments.methods()
       ];
       if(isVendor)requests.push(ML_API.wallet.getVendorPayoutProfile());
+      else if(isRider)requests.push(ML_API.wallet.getRiderPayoutProfile());
       var results=await Promise.all(requests);
       var wallet=results[0]&&results[0].data||{};
       var txns=normalizeProducts(results[1]&&results[1].data);
@@ -1353,10 +1356,11 @@
       S.paymentCapabilities=capabilities;
       var balance=Number(wallet.balance||0),available=Number(wallet.available_balance==null?balance:wallet.available_balance);
       var rails=(capabilities.methods||[]).filter(function(m){return ['wave','afrimoney','qmoney'].indexOf(String(m).toLowerCase())>=0;});
-      var payoutProfile=isVendor?(results[5]&&results[5].data||{}):{};
-      dahaVendorPayoutProfile=payoutProfile;
+      var payoutProfile=(isVendor||isRider)?(results[5]&&results[5].data||{}):{};
+      dahaPayoutProfile=payoutProfile;
+      var payoutRoleLabel=isVendor?'vendor':'rider';
       var savedPayoutMethod=String(payoutProfile.payout_method||'wave').toLowerCase();
-      var payoutProfileMarkup=isVendor?'<section class="ml-profile-card ml-daha-panel" id="ml-daha-vendor-payout"><div class="ml-daha-panel-head"><div><span>VENDOR PAYOUT SETTINGS</span><h4>Saved payout destination</h4></div><b>Wave / AfriMoney</b></div><p class="ml-daha-copy">Save the mobile-money destination where your approved DAHA vendor withdrawals should be sent. You can change it whenever your payout details change.</p><label class="ml-field-label" for="ml-daha-vendor-payout-method">Preferred payout network</label><select id="ml-daha-vendor-payout-method" class="ml-daha-input"><option value="wave"'+(savedPayoutMethod==='wave'?' selected':'')+'>Wave</option><option value="afrimoney"'+(savedPayoutMethod==='afrimoney'?' selected':'')+'>AfriMoney</option></select><label class="ml-field-label" for="ml-daha-vendor-payout-number">Payout mobile number (7 digits)</label><input id="ml-daha-vendor-payout-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" value="'+esc(payoutProfile.account_number||'')+'" placeholder="Without +220"><label class="ml-field-label" for="ml-daha-vendor-payout-name">Account holder name</label><input id="ml-daha-vendor-payout-name" class="ml-daha-input" type="text" maxlength="150" value="'+esc(payoutProfile.beneficiary_name||'')+'" placeholder="Name registered to the wallet"><button type="button" class="ml-btn ml-btn-primary ml-daha-submit" onclick="window.ML_Premium.saveDahaVendorPayoutProfile()">Save payout destination</button><small class="ml-daha-copy">Payouts are still subject to authorized review and Modem Pay transfer confirmation.</small></section>':'';
+      var payoutProfileMarkup=(isVendor||isRider)?'<section class="ml-profile-card ml-daha-panel" id="ml-daha-saved-payout"><div class="ml-daha-panel-head"><div><span>'+payoutRoleLabel.toUpperCase()+' PAYOUT SETTINGS</span><h4>Saved payout destination</h4></div><b>Wave / AfriMoney</b></div><p class="ml-daha-copy">Save the mobile-money destination where your DAHA '+payoutRoleLabel+' withdrawals should be sent. You can change it whenever your payout details change.</p><label class="ml-field-label" for="ml-daha-payout-method">Preferred payout network</label><select id="ml-daha-payout-method" class="ml-daha-input"><option value="wave"'+(savedPayoutMethod==='wave'?' selected':'')+'>Wave</option><option value="afrimoney"'+(savedPayoutMethod==='afrimoney'?' selected':'')+'>AfriMoney</option></select><label class="ml-field-label" for="ml-daha-payout-number">Payout mobile number (7 digits)</label><input id="ml-daha-payout-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" value="'+esc(payoutProfile.account_number||'')+'" placeholder="Without +220"><label class="ml-field-label" for="ml-daha-payout-name">Account holder name</label><input id="ml-daha-payout-name" class="ml-daha-input" type="text" maxlength="150" value="'+esc(payoutProfile.beneficiary_name||'')+'" placeholder="Name registered to the wallet"><button type="button" class="ml-btn ml-btn-primary ml-daha-submit" onclick="window.ML_Premium.saveDahaPayoutProfile()">Save payout destination</button><small class="ml-daha-copy">Payouts are subject to authorized review and Modem Pay transfer confirmation.</small></section>':'';
       var railOptions=(direct?'':'<option value="modempay">Choose payment method on Modem Pay</option>')+rails.map(function(m){var k=String(m).toLowerCase();return '<option value="'+esc(k)+'">'+(k==='wave'?'Wave':k==='afrimoney'?'AfriMoney':'QMoney')+'</option>';}).join('');
       var pendingContext=dahaDepositContext&&dahaDepositContext.deposit?dahaDepositContext:null;
       var nextStep=pendingContext&&pendingContext.nextStep||{};
@@ -1427,18 +1431,25 @@
       await renderPremiumWalletPage(G('profile-body'));
     }catch(e){toast(e.error||'Could not submit the provider confirmation.','error');}
   }
-  async function saveDahaVendorPayoutProfile(){
-    var payoutMethod=String(G('ml-daha-vendor-payout-method')&&G('ml-daha-vendor-payout-method').value||'wave');
-    var accountNumber=String(G('ml-daha-vendor-payout-number')&&G('ml-daha-vendor-payout-number').value||'').replace(/\D/g,'');
-    var beneficiaryName=String(G('ml-daha-vendor-payout-name')&&G('ml-daha-vendor-payout-name').value||'').trim();
-    if(!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit vendor payout mobile number.','error');return;}
+  async function saveDahaPayoutProfile(){
+    var roles=S.roles||[];
+    var isVendor=roles.indexOf('vendor')>=0;
+    var isRider=roles.indexOf('rider')>=0;
+    if(!isVendor&&!isRider){toast('Only vendor and rider accounts can save a payout destination.','error');return;}
+    var payoutMethod=String(G('ml-daha-payout-method')&&G('ml-daha-payout-method').value||'wave');
+    var accountNumber=String(G('ml-daha-payout-number')&&G('ml-daha-payout-number').value||'').replace(/\D/g,'');
+    var beneficiaryName=String(G('ml-daha-payout-name')&&G('ml-daha-payout-name').value||'').trim();
+    if(!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit payout mobile number.','error');return;}
     if(!beneficiaryName){toast('Enter the payout account holder name.','error');return;}
     try{
-      var response=await ML_API.wallet.saveVendorPayoutProfile({payoutMethod:payoutMethod,accountNumber:accountNumber,beneficiaryName:beneficiaryName});
-      dahaVendorPayoutProfile=response&&response.data||response||null;
-      toast('Vendor payout destination saved securely.','success');
+      var payload={payoutMethod:payoutMethod,accountNumber:accountNumber,beneficiaryName:beneficiaryName};
+      var response=isVendor
+        ?await ML_API.wallet.saveVendorPayoutProfile(payload)
+        :await ML_API.wallet.saveRiderPayoutProfile(payload);
+      dahaPayoutProfile=response&&response.data||response||null;
+      toast('DAHA payout destination saved securely.','success');
       await renderPremiumWalletPage(G('profile-body'));
-    }catch(e){toast(e.error||'Could not save the vendor payout destination.','error');}
+    }catch(e){toast(e.error||'Could not save the payout destination.','error');}
   }
   async function submitDahaWithdrawal(){
     var amount=Number(G('ml-daha-withdraw-amount')&&G('ml-daha-withdraw-amount').value||0);
@@ -1446,15 +1457,18 @@
     var account=String(G('ml-daha-withdraw-number')&&G('ml-daha-withdraw-number').value||'').replace(/\D/g,'');
     var name=String(G('ml-daha-withdraw-name')&&G('ml-daha-withdraw-name').value||'').trim();
     if(!(amount>=50)){toast('The minimum withdrawal is D 50.00.','error');return;}
-    if((S.roles||[]).indexOf('vendor')>=0){
-      if(!dahaVendorPayoutProfile||!dahaVendorPayoutProfile.account_number){
+    var payoutRoles=S.roles||[];
+    var needsSavedProfile=payoutRoles.indexOf('vendor')>=0||payoutRoles.indexOf('rider')>=0;
+    if(needsSavedProfile){
+      if(!dahaPayoutProfile||!dahaPayoutProfile.account_number){
         toast('Save your Wave or AfriMoney payout destination first.','error');
-        var payoutSection=G('ml-daha-vendor-payout');if(payoutSection)payoutSection.scrollIntoView({behavior:'smooth',block:'center'});
+        var payoutSection=G('ml-daha-saved-payout');
+        if(payoutSection)payoutSection.scrollIntoView({behavior:'smooth',block:'center'});
         return;
       }
-      payoutMethod=String(dahaVendorPayoutProfile.payout_method||'').toLowerCase();
-      account=String(dahaVendorPayoutProfile.account_number||'').replace(/\D/g,'');
-      name=String(dahaVendorPayoutProfile.beneficiary_name||'').trim();
+      payoutMethod=String(dahaPayoutProfile.payout_method||'').toLowerCase();
+      account=String(dahaPayoutProfile.account_number||'').replace(/\D/g,'');
+      name=String(dahaPayoutProfile.beneficiary_name||'').trim();
     }
     if(!/^\d{7}$/.test(account)){toast('Enter the recipient 7-digit mobile-money number.','error');return;}
     if(!name){toast('Enter the account holder name.','error');return;}
@@ -2322,7 +2336,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,continueDahaDeposit:continueDahaDeposit,submitDahaWithdrawal:submitDahaWithdrawal,saveDahaVendorPayoutProfile:saveDahaVendorPayoutProfile,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
+    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,continueDahaDeposit:continueDahaDeposit,submitDahaWithdrawal:submitDahaWithdrawal,saveDahaPayoutProfile:saveDahaPayoutProfile,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
