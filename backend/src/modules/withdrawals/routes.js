@@ -3,6 +3,7 @@ const router = require('express').Router();
 const { body, query } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
+const withdrawalPinLimiter = require('./pinLimiter');
 const svc = require('./service');
 
 const WALLET_ROLES = ['vendor', 'rider'];
@@ -40,7 +41,9 @@ router.post('/me',
     body('amount').isFloat({ gt: 0 }).withMessage('Amount must be greater than zero.'),
     body('payoutMethod').trim().notEmpty().withMessage('Payout method is required.'),
     body('payoutDetails').optional().isObject(),
+    body('pin').matches(/^\d{4}$/).withMessage('Enter your 4-digit MarketLink PIN.'),
   ],
+  withdrawalPinLimiter,
   validate,
   async (req, res, next) => {
     try {

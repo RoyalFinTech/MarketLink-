@@ -4,6 +4,7 @@ const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
+const withdrawalPinLimiter = require('../withdrawals/pinLimiter');
 const ctrl = require('./controller');
 
 const WALLET_ROLES = ['customer', 'vendor', 'rider'];
@@ -32,13 +33,13 @@ router.post('/deposits/:id/continue', authenticate, authorize(...WALLET_ROLES), 
 router.get('/vendor/payout-profile', authenticate, authorize('vendor'), ctrl.getVendorPayoutProfile);
 router.put('/vendor/payout-profile', authenticate, authorize('vendor'), [
   body('payoutMethod').isIn(['wave','afrimoney']),
-  body('accountNumber').matches(/^\d{7}$/),
+  body('accountNumber').matches(/^(87|86|83)\d{7}$/),
   body('beneficiaryName').trim().notEmpty().isLength({ max: 150 }),
 ], validate, ctrl.saveVendorPayoutProfile);
 router.get('/rider/payout-profile', authenticate, authorize('rider'), ctrl.getRiderPayoutProfile);
 router.put('/rider/payout-profile', authenticate, authorize('rider'), [
   body('payoutMethod').isIn(['wave','afrimoney']),
-  body('accountNumber').matches(/^\d{7}$/),
+  body('accountNumber').matches(/^(87|86|83)\d{7}$/),
   body('beneficiaryName').trim().notEmpty().isLength({ max: 150 }),
 ], validate, ctrl.saveRiderPayoutProfile);
 router.get('/me/withdrawals', authenticate, authorize(...WALLET_ROLES), [
@@ -49,9 +50,10 @@ router.get('/me/withdrawals', authenticate, authorize(...WALLET_ROLES), [
 router.post('/withdrawals', authenticate, authorize(...WALLET_ROLES), [
   body('amount').isFloat({ gt: 0 }),
   body('payoutMethod').isIn(['wave', 'afrimoney']),
-  body('payoutDetails').isObject(),
-  body('payoutDetails.account_number').optional().matches(/^\d{7}$/),
+  body('payoutDetails').optional().isObject(),
+  body('payoutDetails.account_number').optional({ checkFalsy: true }).matches(/^(87|86|83)\d{7}$/),
   body('payoutDetails.beneficiary_name').optional().trim().notEmpty().isLength({ max: 150 }),
-], validate, ctrl.requestWithdrawal);
+  body('pin').matches(/^\d{4}$/).withMessage('Enter your 4-digit MarketLink PIN.'),
+], withdrawalPinLimiter, validate, ctrl.requestWithdrawal);
 
 module.exports = router;

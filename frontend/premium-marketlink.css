@@ -1848,3 +1848,14 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-daha-provider-step>p{font-size:11px;line-height:1.6;color:#b5c7d0}
 .ml-daha-provider-step .ml-btn{display:inline-flex;width:100%;justify-content:center;text-decoration:none}
 @media(max-width:520px){.ml-daha-topbar{align-items:flex-start}.ml-daha-brand img{width:54px;height:54px}.ml-daha-brand h3{font-size:16px}.ml-daha-panel{padding:14px}.ml-daha-actions .ml-btn{font-size:11px;padding:11px 9px}}
+
+/* DAHA secure withdrawal review and PIN step */
+.ml-daha-withdraw-review{margin:14px 0;padding:18px;border:1px solid rgba(245,184,61,.34);border-radius:17px;background:linear-gradient(145deg,rgba(245,184,61,.09),rgba(13,115,119,.10))}
+.ml-daha-review-head>span{display:block;color:#F5B83D;font-size:9px;letter-spacing:1.3px;font-weight:850}
+.ml-daha-review-head>b{display:block;color:#F6FAFC;font-size:15px;margin-top:5px}
+.ml-daha-review-head>p{color:#A9BAC4;font-size:11px;line-height:1.5;margin:5px 0 13px}
+.ml-daha-review-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+.ml-daha-review-row>span{color:#9DB0BC;font-size:11px}.ml-daha-review-row>strong{color:#F3F8FA;font-size:12px;text-align:right;overflow-wrap:anywhere}
+.ml-daha-pin-input{max-width:220px;letter-spacing:7px;font-size:19px;text-align:center}
+.ml-daha-review-actions{display:flex;gap:9px;margin-top:15px}.ml-daha-review-actions button{flex:1;min-width:0}
+@media(max-width:480px){.ml-daha-review-actions{flex-direction:column}.ml-daha-review-row{align-items:flex-start}.ml-daha-review-row>strong{max-width:58%}}

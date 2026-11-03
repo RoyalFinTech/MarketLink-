@@ -204,8 +204,8 @@ async function saveVendorPayoutProfile(userId, { payoutMethod, accountNumber, be
   if (!['wave','afrimoney'].includes(payoutMethod)) {
     throw new AppError('Choose Wave or AfriMoney for your vendor payout destination.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
   }
-  if (!/^\d{7}$/.test(accountNumber)) {
-    throw new AppError('Enter the 7-digit payout mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
+  if (!/^(87|86|83)\d{7}$/.test(accountNumber)) {
+    throw new AppError('Enter a valid 9-digit Gambian payout number beginning 87, 86 or 83 (without +220).', 400, 'INVALID_ACCOUNT_NUMBER');
   }
   if (!beneficiaryName || beneficiaryName.length > 150) {
     throw new AppError('Enter the account holder name (maximum 150 characters).', 400, 'BENEFICIARY_REQUIRED');
@@ -234,8 +234,8 @@ async function saveRiderPayoutProfile(userId, { payoutMethod, accountNumber, ben
   if (!['wave','afrimoney'].includes(payoutMethod)) {
     throw new AppError('Choose Wave or AfriMoney for your rider payout destination.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
   }
-  if (!/^\d{7}$/.test(accountNumber)) {
-    throw new AppError('Enter the 7-digit payout mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
+  if (!/^(87|86|83)\d{7}$/.test(accountNumber)) {
+    throw new AppError('Enter a valid 9-digit Gambian payout number beginning 87, 86 or 83 (without +220).', 400, 'INVALID_ACCOUNT_NUMBER');
   }
   if (!beneficiaryName || beneficiaryName.length > 150) {
     throw new AppError('Enter the account holder name (maximum 150 characters).', 400, 'BENEFICIARY_REQUIRED');
@@ -251,14 +251,14 @@ async function saveRiderPayoutProfile(userId, { payoutMethod, accountNumber, ben
   return profile;
 }
 
-async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {
+async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, pin } = {}) {
   if (Number(amount) < MIN_WITHDRAWAL) {
     throw new AppError('The minimum DAHA Wallet withdrawal is D 50.00.', 400, 'BELOW_MINIMUM');
   }
   await ensureWallet(userId);
   // Role-specific destinations are enforced centrally in withdrawals.service so
   // direct /vendors and /riders endpoints cannot bypass saved payout details.
-  return withdrawalsService.requestWithdrawal(userId, { amount, payoutMethod, payoutDetails });
+  return withdrawalsService.requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, pin });
 }
 
 async function processDepositWebhook(client, payload, eventId) {

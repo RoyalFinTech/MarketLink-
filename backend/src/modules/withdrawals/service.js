@@ -1,4 +1,5 @@
 'use strict';
+const bcrypt = require('bcryptjs');
 const modemPay = require('../../integrations/modempay');
 // Shared withdrawal logic for any wallet-holding user (vendors and riders today).
 // Reuses the existing generic `wallets` / `transactions` / `withdrawals` tables —
@@ -25,83 +26,68 @@ async function getBalance(userId) {
   });
 }
 
-async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {
+async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, pin } = {}) {
   const requested = Number(amount);
-  if (!Number.isFinite(requested) || requested <= 0) {
-    throw new AppError('Withdrawal amount must be greater than zero.', 400, 'INVALID_AMOUNT');
-  }
+  if (!Number.isFinite(requested) || requested <= 0) throw new AppError('Withdrawal amount must be greater than zero.', 400, 'INVALID_AMOUNT');
   amount = Math.round(requested * 100) / 100;
-  if (amount < MIN_WITHDRAWAL) {
-    throw new AppError('Minimum withdrawal is ' + MIN_WITHDRAWAL + ' GMD.', 400, 'BELOW_MINIMUM');
-  }
-
+  if (amount < MIN_WITHDRAWAL) throw new AppError('Minimum withdrawal is ' + MIN_WITHDRAWAL + ' GMD.', 400, 'BELOW_MINIMUM');
+  pin = String(pin || '');
+  if (!/^\d{4}$/.test(pin)) throw new AppError('Enter your 4-digit MarketLink PIN to authorize this withdrawal.', 400, 'WITHDRAWAL_PIN_REQUIRED');
   payoutMethod = String(payoutMethod || '').trim().toLowerCase();
-  let details = payoutDetails || {};
+  const suppliedDetails = payoutDetails && typeof payoutDetails === 'object' ? payoutDetails : {};
 
   return withTransaction(async (client) => {
-    // Vendor and rider destinations are always read from their private saved
-    // profile. This is central so older role-specific routes cannot bypass it.
-    const { rows: [vendor] } = await client.query(
-      'SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
-    const { rows: [rider] } = await client.query(
-      'SELECT user_id FROM riders WHERE user_id=$1', [userId]);
-
-    if (vendor) {
-      const { rows: [saved] } = await client.query(
-        'SELECT payout_method,account_number,beneficiary_name FROM vendor_payout_profiles WHERE user_id=$1',
-        [userId]);
-      if (!saved) {
-        throw new AppError('Save your DAHA vendor payout destination in Wave or AfriMoney before requesting a withdrawal.', 409, 'VENDOR_PAYOUT_PROFILE_REQUIRED');
-      }
-      payoutMethod = saved.payout_method;
-      details = { account_number: saved.account_number, beneficiary_name: saved.beneficiary_name };
-    } else if (rider) {
-      const { rows: [saved] } = await client.query(
-        'SELECT payout_method,account_number,beneficiary_name FROM rider_payout_profiles WHERE user_id=$1',
-        [userId]);
-      if (!saved) {
-        throw new AppError('Save your DAHA rider payout destination in Wave or AfriMoney before requesting a withdrawal.', 409, 'RIDER_PAYOUT_PROFILE_REQUIRED');
-      }
-      payoutMethod = saved.payout_method;
-      details = { account_number: saved.account_number, beneficiary_name: saved.beneficiary_name };
+    // Reuse the same PIN as MarketLink login. Never persist or log the clear PIN.
+    const { rows: [user] } = await client.query(
+      "SELECT pin_hash,status FROM users WHERE id=$1 FOR SHARE", [userId]);
+    if (!user || user.status !== 'active') throw new AppError('Your MarketLink account is not active.', 403, 'ACCOUNT_NOT_ACTIVE');
+    if (!user.pin_hash || !await bcrypt.compare(pin, user.pin_hash)) {
+      throw new AppError('Incorrect MarketLink PIN. No withdrawal was submitted.', 401, 'INVALID_WITHDRAWAL_PIN');
     }
 
+    // Saved payout profiles are defaults, not mandatory login-number matches.
+    // A number provided in this withdrawal request always takes priority.
+    const { rows: [vendor] } = await client.query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
+    const { rows: [rider] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1', [userId]);
+    let saved = null;
+    if (vendor) {
+      const { rows: [profile] } = await client.query(
+        'SELECT payout_method,account_number,beneficiary_name FROM vendor_payout_profiles WHERE user_id=$1', [userId]);
+      saved = profile || null;
+    } else if (rider) {
+      const { rows: [profile] } = await client.query(
+        'SELECT payout_method,account_number,beneficiary_name FROM rider_payout_profiles WHERE user_id=$1', [userId]);
+      saved = profile || null;
+    }
+
+    payoutMethod = payoutMethod || String(saved && saved.payout_method || '').toLowerCase();
     if (!['wave','afrimoney'].includes(payoutMethod)) {
       throw new AppError('Choose Wave or AfriMoney for your withdrawal payout.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
     }
-    const accountNumber = String(details.account_number || details.accountNumber || details.phone || '').replace(/\D/g, '');
-    const beneficiaryName = String(details.beneficiary_name || details.beneficiaryName || details.name || '').trim();
-    if (!/^\d{7}$/.test(accountNumber)) {
-      throw new AppError('Enter the recipient 7-digit mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
-    }
-    if (!beneficiaryName || beneficiaryName.length > 150) {
-      throw new AppError('Enter the account holder name for the payout.', 400, 'BENEFICIARY_REQUIRED');
-    }
+    const suppliedNumber = suppliedDetails.account_number || suppliedDetails.accountNumber || suppliedDetails.phone || '';
+    const accountNumber = String(suppliedNumber || (saved && saved.account_number) || '').replace(/\D/g, '');
+    const suppliedName = suppliedDetails.beneficiary_name || suppliedDetails.beneficiaryName || suppliedDetails.name || '';
+    const beneficiaryName = String(suppliedName || (saved && saved.beneficiary_name) || '').trim();
 
-    const { rows: [wallet] } = await client.query(
-      'SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE', [userId]);
+    if (!/^(87|86|83)\d{7}$/.test(accountNumber)) {
+      throw new AppError('Enter a valid 9-digit Gambian payout number beginning 87, 86 or 83. It may differ from your MarketLink login number.', 400, 'INVALID_ACCOUNT_NUMBER');
+    }
+    if (!beneficiaryName || beneficiaryName.length > 150) throw new AppError('Enter the account holder name for the payout.', 400, 'BENEFICIARY_REQUIRED');
+
+    const { rows: [wallet] } = await client.query('SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE', [userId]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
-
     const { rows: [pendingRow] } = await client.query(
-      "SELECT COALESCE(SUM(amount),0) AS pending FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
-      [userId]);
+      "SELECT COALESCE(SUM(amount),0) AS pending FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')", [userId]);
     const available = Number(wallet.balance) - Number(pendingRow.pending || 0);
     if (amount - available > 0.0001) {
-      throw new AppError(
-        'Insufficient available balance. Available: ' + Math.max(0,available).toFixed(2) + ', requested: ' + amount.toFixed(2) + '.',
-        400, 'INSUFFICIENT_BALANCE');
+      throw new AppError('Insufficient available balance. Available: ' + Math.max(0,available).toFixed(2) + ', requested: ' + amount.toFixed(2) + '.', 400, 'INSUFFICIENT_BALANCE');
     }
-
     const { rows: [wd] } = await client.query(
       "INSERT INTO withdrawals (user_id,wallet_id,amount,payout_method,payout_details,status) VALUES ($1,$2,$3,$4,$5,'processing') RETURNING *",
-      [userId, wallet.id, amount, payoutMethod, JSON.stringify({
-        account_number: accountNumber,
-        beneficiary_name: beneficiaryName,
-      })]);
+      [userId, wallet.id, amount, payoutMethod, JSON.stringify({ account_number: accountNumber, beneficiary_name: beneficiaryName })]);
     return wd;
   });
 }
-
 
 async function listMine(userId, { page = 1, limit = 20, status } = {}) {
   const off = (page - 1) * limit;
