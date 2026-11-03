@@ -218,37 +218,47 @@ async function saveVendorPayoutProfile(userId, { payoutMethod, accountNumber, be
   const { rows: [profile] } = await query(sql,[userId,payoutMethod,accountNumber,beneficiaryName]);
   return profile;
 }
-async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {
-  const { rows: [vendor] } = await query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
-  if (vendor) {
-    const savedDestination = await getVendorPayoutProfile(userId);
-    if (!savedDestination) {
-      throw new AppError('Save your DAHA vendor payout destination in Wave or AfriMoney before requesting a withdrawal.', 409, 'VENDOR_PAYOUT_PROFILE_REQUIRED');
-    }
-    payoutMethod = savedDestination.payout_method;
-    payoutDetails = {
-      account_number: savedDestination.account_number,
-      beneficiary_name: savedDestination.beneficiary_name,
-    };
-  }
+
+async function getRiderPayoutProfile(userId) {
+  const { rows: [profile] } = await query(
+    'SELECT payout_method,account_number,beneficiary_name,updated_at FROM rider_payout_profiles WHERE user_id=$1',
+    [userId]
+  );
+  return profile || null;
+}
+
+async function saveRiderPayoutProfile(userId, { payoutMethod, accountNumber, beneficiaryName } = {}) {
   payoutMethod = String(payoutMethod || '').trim().toLowerCase();
-  if (!PAYOUT_METHODS.includes(payoutMethod)) {
-    throw new AppError('Choose Wave or AfriMoney for your withdrawal payout.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
+  accountNumber = String(accountNumber || '').replace(/\D/g, '');
+  beneficiaryName = String(beneficiaryName || '').trim();
+  if (!['wave','afrimoney'].includes(payoutMethod)) {
+    throw new AppError('Choose Wave or AfriMoney for your rider payout destination.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
   }
-  const details = payoutDetails || {};
-  const accountNumber = String(details.account_number || details.accountNumber || details.phone || '').replace(/\D/g, '');
-  const beneficiaryName = String(details.beneficiary_name || details.beneficiaryName || details.name || '').trim();
-  if (!/^\d{7}$/.test(accountNumber)) throw new AppError('Enter the recipient 7-digit mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
-  if (!beneficiaryName) throw new AppError('Enter the account holder name for the payout.', 400, 'BENEFICIARY_REQUIRED');
+  if (!/^\d{7}$/.test(accountNumber)) {
+    throw new AppError('Enter the 7-digit payout mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
+  }
+  if (!beneficiaryName || beneficiaryName.length > 150) {
+    throw new AppError('Enter the account holder name (maximum 150 characters).', 400, 'BENEFICIARY_REQUIRED');
+  }
+  const { rows: [profile] } = await query(
+    'INSERT INTO rider_payout_profiles (user_id,payout_method,account_number,beneficiary_name) ' +
+    'VALUES ($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET ' +
+    'payout_method=EXCLUDED.payout_method, account_number=EXCLUDED.account_number, ' +
+    'beneficiary_name=EXCLUDED.beneficiary_name, updated_at=now() ' +
+    'RETURNING payout_method,account_number,beneficiary_name,updated_at',
+    [userId,payoutMethod,accountNumber,beneficiaryName]
+  );
+  return profile;
+}
+
+async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {
   if (Number(amount) < MIN_WITHDRAWAL) {
     throw new AppError('The minimum DAHA Wallet withdrawal is D 50.00.', 400, 'BELOW_MINIMUM');
   }
   await ensureWallet(userId);
-  return withdrawalsService.requestWithdrawal(userId, {
-    amount,
-    payoutMethod,
-    payoutDetails: { account_number: accountNumber, beneficiary_name: beneficiaryName },
-  });
+  // Role-specific destinations are enforced centrally in withdrawals.service so
+  // direct /vendors and /riders endpoints cannot bypass saved payout details.
+  return withdrawalsService.requestWithdrawal(userId, { amount, payoutMethod, payoutDetails });
 }
 
 async function processDepositWebhook(client, payload, eventId) {
@@ -342,5 +352,6 @@ module.exports = {
   ensureWallet, getWallet, listTransactions, listDeposits, getDeposit,
   initiateDeposit, continueDeposit, listWithdrawals, requestWithdrawal,
   getVendorPayoutProfile, saveVendorPayoutProfile,
+  getRiderPayoutProfile, saveRiderPayoutProfile,
   processDepositWebhook, failDepositWebhook,
 };

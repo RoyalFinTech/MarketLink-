@@ -35,6 +35,12 @@ router.put('/vendor/payout-profile', authenticate, authorize('vendor'), [
   body('accountNumber').matches(/^\d{7}$/),
   body('beneficiaryName').trim().notEmpty().isLength({ max: 150 }),
 ], validate, ctrl.saveVendorPayoutProfile);
+router.get('/rider/payout-profile', authenticate, authorize('rider'), ctrl.getRiderPayoutProfile);
+router.put('/rider/payout-profile', authenticate, authorize('rider'), [
+  body('payoutMethod').isIn(['wave','afrimoney']),
+  body('accountNumber').matches(/^\d{7}$/),
+  body('beneficiaryName').trim().notEmpty().isLength({ max: 150 }),
+], validate, ctrl.saveRiderPayoutProfile);
 router.get('/me/withdrawals', authenticate, authorize(...WALLET_ROLES), [
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),

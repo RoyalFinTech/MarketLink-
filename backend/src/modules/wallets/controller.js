@@ -21,6 +21,8 @@ exports.withdrawals = wrap(async (req, res) => res.json({
 }));
 exports.getVendorPayoutProfile = wrap(async (req, res) => res.json({ success: true, data: await service.getVendorPayoutProfile(req.user.id) }));
 exports.saveVendorPayoutProfile = wrap(async (req, res) => res.json({ success: true, data: await service.saveVendorPayoutProfile(req.user.id, req.body) }));
+exports.getRiderPayoutProfile = wrap(async (req, res) => res.json({ success: true, data: await service.getRiderPayoutProfile(req.user.id) }));
+exports.saveRiderPayoutProfile = wrap(async (req, res) => res.json({ success: true, data: await service.saveRiderPayoutProfile(req.user.id, req.body) }));
 exports.requestWithdrawal = wrap(async (req, res) => {
   const data = await service.requestWithdrawal(req.user.id, req.body);
   res.status(201).json({ success: true, message: 'DAHA Wallet withdrawal request submitted for review.', data });
