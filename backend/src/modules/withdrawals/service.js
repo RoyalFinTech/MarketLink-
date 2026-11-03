@@ -307,6 +307,13 @@ async function failProviderWithdrawal(withdrawalId, transfer = {}) {
     if (!wd.provider_ref || !references.includes(String(wd.provider_ref))) {
       return { ignored: true, reason: 'provider_reference_mismatch' };
     }
+    const transferAmount = Number(transfer.amount);
+    if (!Number.isFinite(transferAmount) || Math.abs(transferAmount - Number(wd.amount)) > 0.01) {
+      return { ignored: true, reason: 'amount_mismatch' };
+    }
+    if (String(transfer.currency || '').toUpperCase() !== 'GMD') {
+      return { ignored: true, reason: 'currency_mismatch' };
+    }
     const { rows: [updated] } = await client.query(
       "UPDATE withdrawals SET status='rejected',provider_status=$1,provider_response=$2,processed_at=now(),updated_at=now() WHERE id=$3 RETURNING *",
       [String(transfer.status || 'failed').slice(0,40), JSON.stringify(transfer), wd.id]);
@@ -328,10 +335,26 @@ async function processProviderWebhook(event) {
     return { processed:true, data:await completeProviderWithdrawal(withdrawalId,payload) };
   }
   if (event.event === 'transfer.flagged') {
-    const { rows: [updated] } = await query(
-      "UPDATE withdrawals SET provider_status='flagged',provider_response=$1,updated_at=now() WHERE id=$2 AND status='payout_pending' RETURNING id,status,provider_status",
-      [JSON.stringify(payload), withdrawalId]);
-    return { processed:true, data:updated || null, held_for_review:true };
+    return withTransaction(async (client) => {
+      const { rows: [wd] } = await client.query(
+        'SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [withdrawalId]);
+      if (!wd) return { ignored:true, reason:'withdrawal_not_found' };
+      const references = [payload.id,payload.transfer_reference,payload.transaction_reference,payload.reference].filter(Boolean).map(String);
+      if (wd.status !== 'payout_pending' || !wd.provider_ref || !references.includes(String(wd.provider_ref))) {
+        return { ignored:true, reason:'provider_reference_mismatch' };
+      }
+      const amount = Number(payload.amount);
+      if (!Number.isFinite(amount) || Math.abs(amount - Number(wd.amount)) > 0.01) {
+        return { ignored:true, reason:'amount_mismatch' };
+      }
+      if (String(payload.currency || '').toUpperCase() !== 'GMD') {
+        return { ignored:true, reason:'currency_mismatch' };
+      }
+      const { rows: [updated] } = await client.query(
+        "UPDATE withdrawals SET provider_status='flagged',provider_response=$1,updated_at=now() WHERE id=$2 RETURNING id,status,provider_status",
+        [JSON.stringify(payload), wd.id]);
+      return { processed:true, data:updated || null, held_for_review:true };
+    });
   }
   if (event.event === 'transfer.reversed') {
     return withTransaction(async (client) => {
@@ -341,6 +364,13 @@ async function processProviderWebhook(event) {
       const references = [payload.id,payload.transfer_reference,payload.transaction_reference,payload.reference].filter(Boolean).map(String);
       if (!wd.provider_ref || !references.includes(String(wd.provider_ref))) {
         return { ignored:true, reason:'provider_reference_mismatch' };
+      }
+      const reversedAmount = Number(payload.amount);
+      if (!Number.isFinite(reversedAmount) || Math.abs(reversedAmount - Number(wd.amount)) > 0.01) {
+        return { ignored:true, reason:'amount_mismatch' };
+      }
+      if (String(payload.currency || '').toUpperCase() !== 'GMD') {
+        return { ignored:true, reason:'currency_mismatch' };
       }
       if (wd.status === 'rejected' && wd.provider_status === 'reversed') {
         return { duplicate:true, withdrawalId:wd.id };
