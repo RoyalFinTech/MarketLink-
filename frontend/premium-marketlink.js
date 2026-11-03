@@ -25,12 +25,13 @@
   function liveProductId(id){return id==null?'':String(id);}
   function livePaymentOptions(){
     var caps=S.paymentCapabilities||{configured:false,directMobileMoney:false,hostedCheckout:false};
-    if(caps.directMobileMoney)return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];
-    if(caps.hostedCheckout)return [['Pay on Delivery','cod'],['Modem Pay secure checkout','modempay']];
-    return [['Pay on Delivery','cod'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];
+    if(caps.directMobileMoney)return [['Pay on Delivery','cod'],['DAHA Wallet','wallet'],['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']];
+    if(caps.hostedCheckout)return [['Pay on Delivery','cod'],['DAHA Wallet','wallet'],['Modem Pay secure checkout','modempay']];
+    return [['Pay on Delivery','cod'],['DAHA Wallet','wallet']];
   }
   function normalizePaymentChoice(label){
     if(label==='Pay on Delivery')return 'cod';
+    if(label==='DAHA Wallet')return 'wallet';
     if(label==='Modem Pay secure checkout')return 'modempay';
     return String(label||'').toLowerCase().replace(/\s+/g,'-');
   }
@@ -316,7 +317,7 @@
     var payLabel=S.selPay||'Pay on Delivery',payMethod=normalizePaymentChoice(payLabel);
     var accountNumber='';
     var activePaymentCaps=S.paymentCapabilities||{configured:false,directMobileMoney:false};
-    if(payMethod!=='cod'&&!activePaymentCaps.configured){
+    if(payMethod!=='cod'&&payMethod!=='wallet'&&!activePaymentCaps.configured){
       toast('Mobile-money payment setup is not complete yet. Choose Pay on Delivery or try again later.','warning');
       renderLiveCart();return;
     }
@@ -329,6 +330,7 @@
     var cartSnapshot=Object.assign({},S.cart||{}),cartItemsSnapshot=Object.assign({},CART_ITEMS||{});
     var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
     var placeBtn=document.querySelector('#cart-body button[data-ml-place-order]');
+    var walletPaymentCompleted=false;
     if(placeBtn){placeBtn.disabled=true;placeBtn.textContent='Creating secure order…';}
     try{
       var orderRes=await ML_API.orders.place(payload),order=orderRes&&orderRes.data&&orderRes.data.order?orderRes.data.order:orderRes.data;
@@ -336,7 +338,14 @@
       S.order=order;S.orderSI=0;
       var paymentRes=await ML_API.payments.initiate(order.id,payMethod,Number(order.total),accountNumber),paymentData=paymentRes&&paymentRes.data?paymentRes.data:paymentRes;
       S.order=Object.assign({},S.order,{payment:paymentData&&paymentData.payment||paymentData});
-      if(payMethod!=='cod'){
+      if(payMethod==='wallet'){
+        if(!paymentData||paymentData.action!=='wallet_paid'||!paymentData.payment||String(paymentData.payment.status).toLowerCase()!=='confirmed'){
+          throw {error:'DAHA Wallet did not confirm this payment. No order payment has been accepted.'};
+        }
+        walletPaymentCompleted=true;
+        toast('Order paid successfully with DAHA Wallet ✓','success');
+        finishLivePaidOrder();
+      }else if(payMethod!=='cod'){
         var payment=paymentData&&paymentData.payment;
         if(!payment||!payment.id)throw {error:'The payment provider did not return a valid payment record. Your cart has been kept; check order history before trying again.'};
         S.pendingPayment={order:order,payment:payment,method:payMethod,accountNumber:accountNumber,nextStep:paymentData.nextStep||null,redirectUrl:paymentData.redirectUrl||null,status:String(paymentData.status||payment.status||'pending').toLowerCase(),amount:Number(order.total),cartSnapshot:cartSnapshot,cartItemsSnapshot:cartItemsSnapshot};
@@ -350,8 +359,14 @@
         S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');startOrderTracking();
       }
     }catch(e){
+      if(payMethod==='wallet'&&order&&!walletPaymentCompleted){
+        try{await ML_API.orders.cancel(order.id,'DAHA Wallet checkout could not be completed.');}catch(cancelError){}
+      }
       if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
       toast(e.error||'Could not place your order.','error');
+      if(payMethod==='wallet'&&e&&e.code==='INSUFFICIENT_WALLET_BALANCE'){
+        setTimeout(function(){openProfilePage('wallet');},250);
+      }
     }
   }
 
@@ -779,7 +794,7 @@
       '<div class="ml-section-head"><h3>Latest from MarketLink</h3><button onclick="window.ML_Premium.refresh()">View latest</button></div>'+
       (prodHtml?'<div class="ml-product-grid">'+prodHtml+'</div>':'<div class="ml-empty"><div style="font-size:30px">🛍️</div><b>No live products yet</b><span>When an approved vendor publishes an active product, it will appear here automatically. No demo products are being shown.</span></div>')+
       roleCtaSectionMarkup()+
-      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div class="ml-footer-nav"><button type="button" onclick="switchTab(\'home\')">Home</button><button type="button" onclick="switchTab(\'catpage\')">Categories</button><button type="button" onclick="switchTab(\'orders\')">Orders</button><button type="button" onclick="switchTab(\'cart\')">Cart</button><button type="button" onclick="switchTab(\'profile\')">Profile</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Royal Wallet</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'deliveryPolicy\')">Delivery & Returns</button></div></footer>'+
+      '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div class="ml-footer-nav"><button type="button" onclick="switchTab(\'home\')">Home</button><button type="button" onclick="switchTab(\'catpage\')">Categories</button><button type="button" onclick="switchTab(\'orders\')">Orders</button><button type="button" onclick="switchTab(\'cart\')">Cart</button><button type="button" onclick="switchTab(\'profile\')">Profile</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'wallet\')">DAHA Wallet</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'deliveryPolicy\')">Delivery & Returns</button></div></footer>'+
       '</div>';
     setTimeout(initPromoCarousel,0);
     var homeRoot=G('tab-home');
@@ -1312,23 +1327,110 @@
     if(typeof switchTab==='function'&&S.curTab!=='profile'){switchTab('profile');return;}
     if(typeof window.renderProfile==='function')window.renderProfile();
   }
-  function renderPremiumWalletPage(root){
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div><div class="ml-loading">Loading your live wallet…</div></div>';
-    return Promise.all([ML_API.customers.getWallet(),ML_API.customers.getWalletTxns({page:1,limit:30})]).then(function(results){
-      var wallet=results[0]&&results[0].data||{},txns=normalizeProducts(results[1]&&results[1].data),balance=Number(wallet.balance||0);
-      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div>'+
-        '<section class="ml-wallet-hero"><span>Available balance</span><strong>'+money(balance)+'</strong><small>Live balance from your MarketLink account</small></section>'+
-        '<div class="ml-wallet-note">Wallet funding, transfers and bill payments are shown only when the corresponding production service is available. No sample transactions are added.</div>'+
-        '<div class="ml-section-head"><h3>Transaction history</h3><button type="button" onclick="window.ML_Premium.refreshWallet()">Refresh</button></div>'+
-        (txns.length?'<div class="ml-profile-card">'+txns.map(function(t){
-          var credit=String(t.type||'').toLowerCase()==='credit',amount=Math.abs(Number(t.amount||0)),desc=t.description||t.category||t.type||'Wallet transaction';
-          var date=t.created_at?new Date(t.created_at).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Date unavailable';
-          return '<div class="ml-wallet-transaction"><span class="ml-wallet-tx-icon '+(credit?'credit':'debit')+'">'+(credit?'↓':'↑')+'</span><div class="copy"><b>'+esc(desc)+'</b><span>'+esc(date)+' · '+esc(t.status||'recorded')+'</span></div><strong class="'+(credit?'credit':'debit')+'">'+(credit?'+':'−')+money(amount)+'</strong></div>';
-        }).join('')+'</div>':'<div class="ml-empty"><div style="font-size:28px">💳</div><b>No wallet transactions yet</b><span>Transactions will appear here when the live wallet service records them.</span></div>')+
-        '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
-    }).catch(function(e){
-      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Royal Wallet</h3></div><div class="ml-empty"><b>Wallet data unavailable</b><span>'+esc(e.error||'The live wallet service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.refreshWallet()">Retry</button></div></div>';
-    });
+  var dahaDepositContext=null;
+  async function renderPremiumWalletPage(root){
+    if(!root)return;
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Loading DAHA Wallet…</div></div>';
+    try{
+      var results=await Promise.all([
+        ML_API.wallet.getBalance(),
+        ML_API.wallet.transactions({page:1,limit:30}),
+        ML_API.wallet.deposits({page:1,limit:10}),
+        ML_API.wallet.withdrawals({page:1,limit:10}),
+        ML_API.payments.methods()
+      ]);
+      var wallet=results[0]&&results[0].data||{};
+      var txns=normalizeProducts(results[1]&&results[1].data);
+      var deposits=normalizeProducts(results[2]&&results[2].data);
+      var withdrawals=normalizeProducts(results[3]&&results[3].data);
+      var capabilities=results[4]&&results[4].data||{};
+      var configured=Boolean(capabilities.configured);
+      var direct=Boolean(capabilities.directMobileMoney);
+      var balance=Number(wallet.balance||0),available=Number(wallet.available_balance==null?balance:wallet.available_balance);
+      var rails=(capabilities.methods||[]).filter(function(m){return ['wave','afrimoney','qmoney'].indexOf(String(m).toLowerCase())>=0;});
+      var railOptions='<option value="modempay">Choose payment method on Modem Pay</option>'+rails.map(function(m){var k=String(m).toLowerCase();return '<option value="'+esc(k)+'">'+(k==='wave'?'Wave':k==='afrimoney'?'AfriMoney':'QMoney')+'</option>';}).join('');
+      var pendingContext=dahaDepositContext&&dahaDepositContext.deposit?dahaDepositContext:null;
+      var nextStep=pendingContext&&pendingContext.nextStep||{};
+      var pinMode=String(nextStep.auth_mode||'').toLowerCase()==='pin'||String(nextStep.auth_mode||'').toLowerCase()==='otp';
+      var confirmMode=Boolean(nextStep.confirmation_steps)||String(nextStep.auth_mode||'').toLowerCase()==='confirm';
+      var depositContextMarkup='';
+      if(pendingContext){
+        var depositRef=pendingContext.deposit.id||'';
+        depositContextMarkup='<div class="ml-daha-provider-step"><b>Modem Pay deposit initiated</b><p>Deposit '+money(pendingContext.deposit.amount)+' is pending. DAHA only adds funds after the signed provider webhook confirms the matching transaction.</p>'+
+          (pendingContext.redirectUrl?'<a class="ml-btn ml-btn-primary" target="_blank" rel="noopener noreferrer" href="'+esc(pendingContext.redirectUrl)+'">Continue to secure Modem Pay ↗</a>':'')+
+          (confirmMode?'<p>'+esc(nextStep.confirmation_steps||'Approve the payment request on your phone, then confirm below.')+'</p><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueDahaDeposit(\'confirm\')">I approved the payment</button>':'')+
+          (pinMode?'<label class="ml-field-label" for="ml-daha-provider-pin">Provider authorization code</label><input id="ml-daha-provider-pin" class="ml-daha-input" type="password" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="Enter provider code"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueDahaDeposit(\'pin\')">Submit provider code</button>':'')+
+          '<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshWallet()">Refresh deposit status</button></div>';
+      }
+      root.innerHTML='<div class="ml-profile-shell ml-daha-shell">'+
+        '<div class="ml-daha-topbar"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><div class="ml-daha-brand"><div><span>SECURE DIGITAL WALLET</span><h3>DAHA Wallet</h3></div><img src="./assets/daha-wallet-eagle.webp" alt="DAHA Wallet eagle logo" loading="eager"></div></div>'+
+        '<section class="ml-wallet-hero ml-daha-balance"><span>Available to spend</span><strong>'+money(available)+'</strong><small>Total balance '+money(balance)+(Number(wallet.reserved_balance||0)>0?' · Reserved for pending withdrawals '+money(wallet.reserved_balance):'')+'</small><span class="ml-daha-ledger-note">Your balance is read from the secure MarketLink wallet ledger.</span></section>'+
+        '<div class="ml-daha-actions"><button type="button" class="ml-btn ml-btn-primary" onclick="document.getElementById(\'ml-daha-deposit\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">＋ Deposit</button><button type="button" class="ml-btn ml-btn-secondary" onclick="document.getElementById(\'ml-daha-withdraw\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">↗ Withdraw</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshWallet()">↻ Refresh</button></div>'+
+        depositContextMarkup+
+        '<section class="ml-profile-card ml-daha-panel" id="ml-daha-deposit"><div class="ml-daha-panel-head"><div><span>ADD MONEY</span><h4>Deposit into DAHA</h4></div><b>Modem Pay</b></div>'+
+        '<p class="ml-daha-copy">Choose an amount and payment rail. Wave, AfriMoney and QMoney are offered only when enabled by the active Modem Pay merchant configuration.</p>'+
+        '<label class="ml-field-label" for="ml-daha-deposit-amount">Amount (GMD)</label><input id="ml-daha-deposit-amount" class="ml-daha-input" type="number" min="'+(direct?'1':'10')+'" step="0.01" inputmode="decimal" placeholder="e.g. 250.00">'+
+        '<label class="ml-field-label" for="ml-daha-deposit-method">Payment method</label><select id="ml-daha-deposit-method" class="ml-daha-input">'+railOptions+'</select>'+
+        (direct?'<label class="ml-field-label" for="ml-daha-deposit-number">7-digit mobile-money number</label><input id="ml-daha-deposit-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" placeholder="e.g. 87XXXXX">':'')+
+        '<button type="button" class="ml-btn ml-btn-primary ml-daha-submit" '+(!configured?'disabled':'')+' onclick="window.ML_Premium.submitDahaDeposit()">Continue to secure deposit →</button>'+
+        (!configured?'<div class="ml-wallet-note">Modem Pay is not currently configured on the backend. Deposits are disabled; your DAHA balance and wallet-funded checkout remain available.</div>':'<div class="ml-wallet-note">Funds are credited only after the backend verifies the signed Modem Pay webhook, provider reference, amount and GMD currency.</div>')+
+        '</section>'+
+        '<section class="ml-profile-card ml-daha-panel" id="ml-daha-withdraw"><div class="ml-daha-panel-head"><div><span>MOVE MONEY OUT</span><h4>Request a withdrawal</h4></div><b>Minimum D 50</b></div>'+
+        '<p class="ml-daha-copy">Choose the destination network. Withdrawal requests are reviewed and only debited when the payout is completed or manually confirmed by an authorized administrator.</p>'+
+        '<label class="ml-field-label" for="ml-daha-withdraw-amount">Amount (GMD)</label><input id="ml-daha-withdraw-amount" class="ml-daha-input" type="number" min="50" step="0.01" inputmode="decimal" placeholder="Minimum 50.00">'+
+        '<label class="ml-field-label" for="ml-daha-withdraw-method">Payout network</label><select id="ml-daha-withdraw-method" class="ml-daha-input"><option value="wave">Wave</option><option value="afrimoney">AfriMoney</option></select>'+
+        '<label class="ml-field-label" for="ml-daha-withdraw-number">Recipient mobile number (7 digits)</label><input id="ml-daha-withdraw-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" placeholder="Without +220">'+
+        '<label class="ml-field-label" for="ml-daha-withdraw-name">Account holder name</label><input id="ml-daha-withdraw-name" class="ml-daha-input" type="text" maxlength="150" placeholder="Name registered to the wallet">'+
+        '<button type="button" class="ml-btn ml-btn-primary ml-daha-submit" onclick="window.ML_Premium.submitDahaWithdrawal()">Submit withdrawal request →</button>'+
+        '</section>'+
+        '<div class="ml-section-head"><h3>Recent wallet activity</h3><button type="button" onclick="window.ML_Premium.refreshWallet()">Refresh</button></div>'+
+        (txns.length?'<div class="ml-profile-card">'+txns.map(function(t){var credit=String(t.type||'').toLowerCase()==='credit',amount=Math.abs(Number(t.amount||0)),desc=t.description||t.category||t.type||'Wallet transaction';var date=t.created_at?new Date(t.created_at).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Date unavailable';return '<div class="ml-wallet-transaction"><span class="ml-wallet-tx-icon '+(credit?'credit':'debit')+'">'+(credit?'↓':'↑')+'</span><div class="copy"><b>'+esc(desc)+'</b><span>'+esc(date)+'</span></div><strong class="'+(credit?'credit':'debit')+'">'+(credit?'+':'−')+money(amount)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No wallet transactions yet</b><span>Confirmed deposits, purchases and payouts will appear here.</span></div>')+
+        '<div class="ml-section-head"><h3>Deposit history</h3></div>'+
+        (deposits.length?'<div class="ml-profile-card">'+deposits.map(function(d){return '<div class="ml-wallet-transaction"><span class="ml-wallet-tx-icon credit">＋</span><div class="copy"><b>Wallet deposit · '+esc(String(d.status||'pending').replace(/_/g,' '))+'</b><span>'+esc(d.created_at?new Date(d.created_at).toLocaleString():'Date unavailable')+'</span></div><strong>'+money(d.amount)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><span>No deposits have been started.</span></div>')+
+        '<div class="ml-section-head"><h3>Withdrawal requests</h3></div>'+
+        (withdrawals.length?'<div class="ml-profile-card">'+withdrawals.map(function(w){return '<div class="ml-wallet-transaction"><span class="ml-wallet-tx-icon debit">↗</span><div class="copy"><b>'+esc(String(w.payout_method||'').toUpperCase())+' · '+esc(String(w.status||'processing').replace(/_/g,' '))+'</b><span>'+esc(w.created_at?new Date(w.created_at).toLocaleString():'Date unavailable')+'</span></div><strong>'+money(w.amount)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><span>No withdrawal requests yet.</span></div>')+
+        '<footer class="ml-app-footer"><span>DAHA Wallet · Powered by MarketLink Gambia</span></footer></div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>DAHA Wallet</h3></div><div class="ml-empty"><b>Wallet data unavailable</b><span>'+esc(e.error||'The live DAHA Wallet service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.refreshWallet()">Retry</button></div></div>';
+    }
+  }
+  async function submitDahaDeposit(){
+    var amount=Number(G('ml-daha-deposit-amount')&&G('ml-daha-deposit-amount').value||0);
+    var method=String(G('ml-daha-deposit-method')&&G('ml-daha-deposit-method').value||'modempay');
+    var accountNumber=String(G('ml-daha-deposit-number')&&G('ml-daha-deposit-number').value||'').replace(/\D/g,'');
+    if(!(amount>0)){toast('Enter a valid deposit amount.','error');return;}
+    if(S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit mobile-money number.','error');return;}
+    try{
+      var response=await ML_API.wallet.createDeposit({amount:amount,method:method,accountNumber:accountNumber||undefined});
+      var data=response&&response.data||response;
+      dahaDepositContext={deposit:data.deposit,redirectUrl:data.redirectUrl||null,nextStep:data.nextStep||null,action:data.action||'pending'};
+      toast('DAHA deposit initiated. Your balance will update after Modem Pay confirms it.','success');
+      await renderPremiumWalletPage(G('profile-body'));
+    }catch(e){toast(e.error||'Could not start the DAHA Wallet deposit.','error');}
+  }
+  async function continueDahaDeposit(action){
+    if(!dahaDepositContext||!dahaDepositContext.deposit){toast('There is no active DAHA deposit step.','error');return;}
+    var pin=String(G('ml-daha-provider-pin')&&G('ml-daha-provider-pin').value||'');
+    try{
+      await ML_API.wallet.continueDeposit(dahaDepositContext.deposit.id,action,pin);
+      toast('Provider step submitted. Waiting for Modem Pay webhook confirmation.','info');
+      await renderPremiumWalletPage(G('profile-body'));
+    }catch(e){toast(e.error||'Could not submit the provider confirmation.','error');}
+  }
+  async function submitDahaWithdrawal(){
+    var amount=Number(G('ml-daha-withdraw-amount')&&G('ml-daha-withdraw-amount').value||0);
+    var payoutMethod=String(G('ml-daha-withdraw-method')&&G('ml-daha-withdraw-method').value||'wave');
+    var account=String(G('ml-daha-withdraw-number')&&G('ml-daha-withdraw-number').value||'').replace(/\D/g,'');
+    var name=String(G('ml-daha-withdraw-name')&&G('ml-daha-withdraw-name').value||'').trim();
+    if(!(amount>=50)){toast('The minimum withdrawal is D 50.00.','error');return;}
+    if(!/^\d{7}$/.test(account)){toast('Enter the recipient 7-digit mobile-money number.','error');return;}
+    if(!name){toast('Enter the account holder name.','error');return;}
+    try{
+      await ML_API.wallet.requestWithdrawal({amount:amount,payoutMethod:payoutMethod,payoutDetails:{account_number:account,beneficiary_name:name}});
+      dahaDepositContext=null;
+      toast('Withdrawal request submitted. Your funds remain reserved until the payout is completed.','success');
+      await renderPremiumWalletPage(G('profile-body'));
+    }catch(e){toast(e.error||'Could not submit the withdrawal request.','error');}
   }
   async function renderPremiumPaymentsPage(root){
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div><div class="ml-loading">Checking available payment options…</div></div>';
@@ -1590,7 +1692,7 @@
       '<div class="ml-profile-hero"><div class="ml-profile-avatar-wrap"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.openPhotoViewer()" aria-label="View profile photo">'+avatar+'<span class="ml-avatar-camera" aria-hidden="true">📷</span></button><div class="ml-avatar-actions"><button type="button" class="ml-photo-action" onclick="window.ML_Premium.pickPhoto()">Change photo</button>'+(photo?'<button type="button" class="ml-photo-action ml-photo-remove" onclick="window.ML_Premium.removeProfilePhoto()">Remove</button>':'')+'</div><div class="ml-photo-guidance">JPG or PNG · at least 512 × 512 px · maximum 5 MB</div><input type="file" id="ml-profile-photo-input" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"></div><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
       '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">👤</div><div class="copy"><b>Full name</b><span>'+esc(fullName)+'</span></div></div><div class="ml-profile-row"><div class="ico">✨</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div><div class="ml-profile-row"><div class="ico">🎂</div><div class="copy"><b>Date of birth</b><span>'+esc(p.date_of_birth?String(p.date_of_birth).slice(0,10):'Not added yet')+'</span></div></div><div class="ml-profile-row"><div class="ico">🧾</div><div class="copy"><b>Gender</b><span>'+esc(p.gender?({'male':'Male','female':'Female','other':'Other','prefer_not_to_say':'Prefer not to say'}[p.gender]||String(p.gender)):'Not added yet')+'</span></div></div>'+(p.bio?'<div class="ml-profile-row ml-profile-about-row"><div class="ico">💬</div><div class="copy"><b>About you</b><span>'+esc(p.bio)+'</span></div></div>':'')+
       '<button type="button" class="ml-profile-row ml-profile-row-button ml-appearance-row" onclick="window.ML_Premium.toggleAppearance()"><div class="ico">'+(S.dark?'🌙':'☀️')+'</div><div class="copy"><b>Appearance · '+(S.dark?'Night mode':'Daylight mode')+'</b><span>'+(S.dark?'Night mode is active. Tap here to switch to Daylight.':'Daylight mode is active. Tap here to switch to Night.')+'</span></div><b class="ml-profile-arrow">›</b></button>'+applicationHtml+
-      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'wallet\')"><div class="ico">💰</div><div class="copy"><b>Royal Wallet</b><span>Available balance · '+money(p.wallet_balance||S.walletBalance||0)+'</span></div><b class="ml-profile-arrow">›</b></button>'+
+      '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'wallet\')"><div class="ico">💰</div><div class="copy"><b>DAHA Wallet</b><span>Available balance · '+money(p.wallet_balance||S.walletBalance||0)+'</span></div><b class="ml-profile-arrow">›</b></button>'+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openOrders()"><div class="ico">📦</div><div class="copy"><b>Order history</b><span>'+Number(p.total_orders||0)+' completed orders · '+money(p.total_spent||0)+' spent</span></div><b class="ml-profile-arrow">›</b></button>'+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.renderAddresses()"><div class="ico">📍</div><div class="copy"><b>Saved addresses</b><span>Manage delivery locations</span></div><b class="ml-profile-arrow">›</b></button>'+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="doLogout()"><div class="ico">↪</div><div class="copy"><b>Sign out</b><span>End this session securely</span></div><b class="ml-profile-arrow">›</b></button></div>'+
@@ -2187,7 +2289,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
+    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,continueDahaDeposit:continueDahaDeposit,submitDahaWithdrawal:submitDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;

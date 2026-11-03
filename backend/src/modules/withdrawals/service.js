@@ -32,7 +32,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails }
     // multiple withdrawal requests that together exceed their real balance.
     const { rows: [pendingRow] } = await client.query(
       `SELECT COALESCE(SUM(amount),0) AS pending FROM withdrawals
-       WHERE user_id=$1 AND status='processing'`, [userId]);
+       WHERE user_id=$1 AND status IN ('processing','payout_pending')`, [userId]);
     const available = parseFloat(wallet.balance) - parseFloat(pendingRow.pending);
     if (amount > available) {
       throw new AppError(
@@ -90,7 +90,7 @@ async function approve(withdrawalId, adminUserId) {
 
   const details = wd.payout_details || {};
   const modemNetwork = String(wd.payout_method || '').toLowerCase();
-  const useModem = Boolean(process.env.MODEM_PAY_API_KEY) &&
+  const useModem = modemPay.isConfigured() &&
     ['wave','afrimoney'].includes(modemNetwork);
 
   if (!useModem) {
