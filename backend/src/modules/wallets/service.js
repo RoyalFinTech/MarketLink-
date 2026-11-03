@@ -187,6 +187,35 @@ async function listWithdrawals(userId, options = {}) {
   return withdrawalsService.listMine(userId, options);
 }
 
+async function getVendorPayoutProfile(userId) {
+  const { rows: [profile] } = await query(
+    'SELECT payout_method,account_number,beneficiary_name,updated_at FROM vendor_payout_profiles WHERE user_id=$1',
+    [userId]
+  );
+  return profile || null;
+}
+
+async function saveVendorPayoutProfile(userId, { payoutMethod, accountNumber, beneficiaryName } = {}) {
+  payoutMethod = String(payoutMethod || '').trim().toLowerCase();
+  accountNumber = String(accountNumber || '').replace(/\D/g, '');
+  beneficiaryName = String(beneficiaryName || '').trim();
+  if (!['wave','afrimoney'].includes(payoutMethod)) {
+    throw new AppError('Choose Wave or AfriMoney for your vendor payout destination.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
+  }
+  if (!/^\d{7}$/.test(accountNumber)) {
+    throw new AppError('Enter the 7-digit payout mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
+  }
+  if (!beneficiaryName || beneficiaryName.length > 150) {
+    throw new AppError('Enter the account holder name (maximum 150 characters).', 400, 'BENEFICIARY_REQUIRED');
+  }
+  const sql = 'INSERT INTO vendor_payout_profiles (user_id,payout_method,account_number,beneficiary_name) ' +
+    'VALUES ($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET ' +
+    'payout_method=EXCLUDED.payout_method, account_number=EXCLUDED.account_number, ' +
+    'beneficiary_name=EXCLUDED.beneficiary_name, updated_at=now() ' +
+    'RETURNING payout_method,account_number,beneficiary_name,updated_at';
+  const { rows: [profile] } = await query(sql,[userId,payoutMethod,accountNumber,beneficiaryName]);
+  return profile;
+}
 async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {
   payoutMethod = String(payoutMethod || '').trim().toLowerCase();
   if (!PAYOUT_METHODS.includes(payoutMethod)) {
@@ -276,5 +305,6 @@ async function failDepositWebhook(client, payload, eventType) {
 module.exports = {
   ensureWallet, getWallet, listTransactions, listDeposits, getDeposit,
   initiateDeposit, continueDeposit, listWithdrawals, requestWithdrawal,
+  getVendorPayoutProfile, saveVendorPayoutProfile,
   processDepositWebhook, failDepositWebhook,
 };

@@ -29,6 +29,12 @@ router.post('/deposits/:id/continue', authenticate, authorize(...WALLET_ROLES), 
   body('action').isIn(['confirm', 'pin']),
   body('pin').optional({ checkFalsy: true }).matches(/^\d{4,8}$/),
 ], validate, ctrl.continueDeposit);
+router.get('/vendor/payout-profile', authenticate, authorize('vendor'), ctrl.getVendorPayoutProfile);
+router.put('/vendor/payout-profile', authenticate, authorize('vendor'), [
+  body('payoutMethod').isIn(['wave','afrimoney']),
+  body('accountNumber').matches(/^\d{7}$/),
+  body('beneficiaryName').trim().notEmpty().isLength({ max: 150 }),
+], validate, ctrl.saveVendorPayoutProfile);
 router.get('/me/withdrawals', authenticate, authorize(...WALLET_ROLES), [
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),

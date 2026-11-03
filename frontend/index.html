@@ -1502,6 +1502,8 @@ var ML_API = (function(){
     continueDeposit: function(id,action,pin){ return post('/wallets/deposits/'+encodeURIComponent(id)+'/continue',{action:action,pin:pin||undefined}); },
     withdrawals: function(qs){ return get('/wallets/me/withdrawals', qs); },
     requestWithdrawal: function(d){ return post('/wallets/withdrawals', d); },
+    getVendorPayoutProfile: function(){ return get('/wallets/vendor/payout-profile'); },
+    saveVendorPayoutProfile: function(d){ return put('/wallets/vendor/payout-profile', d); },
   };
 
   // ── PAYMENTS ─────────────────────────────────────────────────
