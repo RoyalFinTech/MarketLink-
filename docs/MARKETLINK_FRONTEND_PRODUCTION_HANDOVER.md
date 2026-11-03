@@ -705,3 +705,23 @@ Changes committed:
 - The browser GPS watch stops immediately after successful delivery.
 
 The live database currently has no rider or vendor accounts, so no real-account GPS test was possible. Physical device permission prompts and moving-device tracking remain pending.
+
+
+### 2026-11-03 — Rider/vendor dashboard withdrawal route aligned with DAHA Wallet
+
+The source audit found that the older rider and vendor dashboard withdrawal buttons still called role-specific endpoints using `payoutMethod: mobile_money`, the MarketLink login phone number and no PIN. The current DAHA backend requires a supported Wave/AfriMoney network, a nine-digit Gambian payout recipient and a four-digit MarketLink PIN, so the old dashboard shortcuts would fail even though the DAHA Wallet form already supported the correct process.
+
+Changes:
+- Rider Dashboard "Withdraw Funds" now opens the DAHA Wallet withdrawal section and pre-fills the requested amount.
+- Vendor Dashboard "Request payout" now opens the same DAHA Wallet withdrawal section and pre-fills the amount.
+- Both dashboards therefore use the existing final-review/PIN flow rather than the legacy endpoint calls.
+- The withdrawal form keeps an editable recipient account-number field. A saved payout profile is only a convenience default; users can enter a different Wave/AfriMoney number for each request.
+- The recipient is validated as a nine-digit Gambian number starting `87`, `86` or `83`; it is not forced to match the MarketLink login number.
+- The legacy LiveAPI vendor/rider adapters no longer send incorrectly shaped requests and instead direct callers to DAHA Wallet.
+
+Static checks:
+- All modified HTML inline scripts parse successfully.
+- No dashboard path submits the old `mobile_money` payout payload.
+- No live withdrawal or financial transaction was created by this change.
+
+Still requires a real authorized rider/vendor account test with a valid MarketLink PIN and Modem Pay transfer credentials.

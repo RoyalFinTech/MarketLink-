@@ -1158,12 +1158,7 @@ var LiveAPI = (function(){
   async function vendorAcceptOrder(orderId){try{return ok((await ML_API.orders.accept(orderId)).data);}catch(e){return fail(e.error||'Could not accept order.');}}
   async function vendorRejectOrder(orderId){try{return ok((await ML_API.orders.reject(orderId,'Rejected by vendor')).data);}catch(e){return fail(e.error||'Could not reject order.');}}
   async function vendorRequestPayout(amount){
-    if(!ML_API.auth.isAuthenticated()) return fail('Please log in before requesting a payout.');
-    try{
-      var phone=(S.profilePhone||(S.user&&S.user.phone)||'').trim();
-      var res=await ML_API.vendors.requestWithdrawal({amount:amount,payoutMethod:'mobile_money',payoutDetails:{phone:phone}});
-      return ok({payoutId:res.data.id,amount:Number(res.data.amount||amount),status:res.data.status||'processing',etaDays:2});
-    }catch(e){return fail(e.error||'Payout request failed.');}
+    return fail('Vendor payouts are submitted through DAHA Wallet. Review your Wave/AfriMoney recipient, enter your 4-digit MarketLink PIN, and confirm there.');
   }
   async function riderUpdateDeliveryStep(deliveryId,step){
     var map={picked_up:'picked_up',delivering:'in_transit',delivered:'delivered'};
@@ -1173,12 +1168,7 @@ var LiveAPI = (function(){
     return ok({deliveryId:deliveryId,step:step});
   }
   async function riderRequestWithdrawal(amount){
-    if(!ML_API.auth.isAuthenticated()) return fail('Please log in before requesting a withdrawal.');
-    try{
-      var phone=(S.profilePhone||(S.user&&S.user.phone)||'').trim();
-      var res=await ML_API.riders.requestWithdrawal({amount:amount,payoutMethod:'mobile_money',payoutDetails:{phone:phone}});
-      return ok({withdrawalId:res.data.id,amount:Number(res.data.amount||amount),status:res.data.status||'processing',etaDays:1});
-    }catch(e){return fail(e.error||'Withdrawal request failed.');}
+    return fail('Rider withdrawals are submitted through DAHA Wallet. Review your Wave/AfriMoney recipient, enter your 4-digit MarketLink PIN, and confirm there.');
   }
   return {
     submitOrder:submitOrder,
@@ -4194,15 +4184,15 @@ async function vToggleOnline(){
 }
 
 async function vRequestPayout(amount){
-  if(!amount||amount<=0){toast('No balance available to pay out','error');return;}
-  toast('Requesting payout…');
-  var res=await LiveAPI.vendorRequestPayout(amount);
-  if(res.success){
-    S.vPayoutsRequested=(S.vPayoutsRequested||0)+amount;
-    if(!S.vPayoutHistory) S.vPayoutHistory=[];
-    S.vPayoutHistory.unshift({id:res.data.payoutId,amount:amount,status:'Processing (ETA '+res.data.etaDays+'d)'});
-    renderVDash();
-    toast('Payout requested: D '+amount+' 💰');
+  if(!Number.isFinite(Number(amount))||Number(amount)<=0){toast('No available DAHA balance to withdraw.','error');return;}
+  if(!window.ML_Premium||typeof window.ML_Premium.beginDahaWithdrawal!=='function'){
+    toast('DAHA Wallet is not ready. Open Profile → DAHA Wallet and try again.','error');
+    return;
+  }
+  try{
+    await window.ML_Premium.beginDahaWithdrawal(Number(amount));
+  }catch(e){
+    toast(e&&e.error||'Could not open DAHA Wallet withdrawal.','error');
   }
 }
 function vAddPromo(){
@@ -5854,19 +5844,15 @@ async function rNextStep(){
   renderRDash();
 }
 async function rRequestWithdrawal(amount){
-  if(!amount||amount<=0){toast('No balance available','error');return;}
-  toast('Requesting withdrawal…');
-  var res=await LiveAPI.riderRequestWithdrawal(amount);
-  if(res&&res.success){
-    S.rWithdrawn=(S.rWithdrawn||0)+amount;
-    if(!S.rWithdrawHistory) S.rWithdrawHistory=[];
-    S.rWithdrawHistory.unshift({id:res.data.withdrawalId,amount:amount,status:'processing'});
-    await loadRiderLiveData();
-    toast('Withdrawal request submitted. It will only be paid after Modem Pay confirms the transfer.','success');
-  }else{
-    var message=res&&res.error||'Withdrawal request could not be submitted.';
-    toast(message,'error');
-    if(res&&res.code==='RIDER_PAYOUT_PROFILE_REQUIRED')openProfilePage('wallet');
+  if(!Number.isFinite(Number(amount))||Number(amount)<=0){toast('No available DAHA balance to withdraw.','error');return;}
+  if(!window.ML_Premium||typeof window.ML_Premium.beginDahaWithdrawal!=='function'){
+    toast('DAHA Wallet is not ready. Open Profile → DAHA Wallet and try again.','error');
+    return;
+  }
+  try{
+    await window.ML_Premium.beginDahaWithdrawal(Number(amount));
+  }catch(e){
+    toast(e&&e.error||'Could not open DAHA Wallet withdrawal.','error');
   }
 }
 
