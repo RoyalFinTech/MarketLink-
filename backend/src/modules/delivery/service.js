@@ -78,8 +78,13 @@ async function assignRider(deliveryId, riderId, actor) {
   if (!rider) throw new AppError('Rider not available or not approved.', 400, 'RIDER_UNAVAILABLE');
 
   return withTransaction(async (client) => {
+    const {rows:[lockedRider]}=await client.query("SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE FOR UPDATE",[riderId]);
+    if(!lockedRider)throw new AppError('Rider not available or not approved.',400,'RIDER_UNAVAILABLE');
+    const {rows:[busy]}=await client.query("SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",[riderId,deliveryId]);
+    if(busy)throw new AppError('This rider already has an active delivery. Choose another available rider.',409,'RIDER_HAS_ACTIVE_DELIVERY');
+    if(d.rider_id)await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[d.rider_id,deliveryId]);
     const { rows: [updated] } = await client.query(
-      `UPDATE deliveries SET rider_id = $1, status = 'assigned' WHERE id = $2 RETURNING *`,
+      "UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",
       [riderId, deliveryId]);
     await client.query(
       `UPDATE orders SET status = 'rider_assigned' WHERE id = $1`, [updated.order_id]);
@@ -108,8 +113,16 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
   if(!['unassigned','failed','assigned'].includes(delivery.status))throw new AppError('Riders can only be searched before pickup. Refresh the order status and try again.',409,'INVALID_STATUS');
   const hasPickup=delivery.pickup_lat!==null&&delivery.pickup_lng!==null;
   const {rows}=await query(
-    'SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,r.current_lat,r.current_lng,r.last_location_at,CASE WHEN r.current_lat IS NOT NULL AND r.current_lng IS NOT NULL AND $1::boolean THEN 6371*2*ASIN(SQRT(LEAST(1,POWER(SIN(RADIANS(r.current_lat-$2::numeric)/2),2)+COS(RADIANS($2::numeric))*COS(RADIANS(r.current_lat))*POWER(SIN(RADIANS(r.current_lng-$3::numeric)/2),2)))) ELSE NULL END AS distance_km FROM riders r JOIN users u ON u.id=r.user_id WHERE r.kyc_status=$4 AND r.is_online=TRUE ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30',
-    [hasPickup,delivery.pickup_lat,delivery.pickup_lng,'approved']
+    "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,"+
+    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 THEN r.current_lat ELSE NULL END AS current_lat,"+
+    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 THEN r.current_lng ELSE NULL END AS current_lng,"+
+    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 THEN r.last_location_at ELSE NULL END AS last_location_at,"+
+    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 AND r.current_lat IS NOT NULL AND r.current_lng IS NOT NULL AND $1::boolean "+
+    "THEN 6371*2*ASIN(SQRT(LEAST(1,POWER(SIN(RADIANS(r.current_lat-$2::numeric)/2),2)+COS(RADIANS($2::numeric))*COS(RADIANS(r.current_lat))*POWER(SIN(RADIANS(r.current_lng-$3::numeric)/2),2)))) ELSE NULL END AS distance_km "+
+    "FROM riders r JOIN users u ON u.id=r.user_id WHERE r.kyc_status=$5 AND r.is_online=TRUE "+
+    "AND NOT EXISTS (SELECT 1 FROM deliveries active WHERE active.rider_id=r.user_id AND active.id<>$4 AND active.status IN ('assigned','picked_up','in_transit')) "+
+    "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
+    [hasPickup,delivery.pickup_lat,delivery.pickup_lng,deliveryId,'approved']
   );
   return rows.map(r=>Object.assign({},r,{distance_km:r.distance_km===null?null:Number(Number(r.distance_km).toFixed(1)),location_fresh:!!(r.last_location_at&&Date.now()-new Date(r.last_location_at).getTime()<30*60*1000)}));
 }
@@ -118,16 +131,17 @@ async function acceptDelivery(deliveryId, riderId) {
   return withTransaction(async (client) => {
     const { rows:[d] } = await client.query('SELECT * FROM deliveries WHERE id=$1 FOR UPDATE',[deliveryId]);
     if(!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
-    const { rows:[rider] } = await client.query("SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved'",[riderId]);
+    const { rows:[rider] } = await client.query("SELECT user_id,is_online FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[riderId]);
     if(!rider) throw new AppError('Only an approved rider can accept a delivery.',403,'RIDER_UNAVAILABLE');
+    const {rows:[busy]}=await client.query("SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",[riderId,deliveryId]);
+    if(busy)throw new AppError('You already have an active delivery. Complete it before accepting another request.',409,'RIDER_HAS_ACTIVE_DELIVERY');
     if(d.status==='assigned' && String(d.rider_id)===String(riderId)) {
       await client.query("UPDATE rider_assignments SET status='accepted',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
       return d;
     }
     if(d.status!=='unassigned') throw new AppError('This delivery is no longer available.',409,'DELIVERY_NOT_AVAILABLE');
     if(d.rider_id && String(d.rider_id)!==String(riderId)) throw new AppError('This delivery is already assigned.',409,'DELIVERY_NOT_AVAILABLE');
-    const { rows:[online] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1 AND is_online=TRUE',[riderId]);
-    if(!online) throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
+    if(!rider.is_online) throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
     const { rows:[updated] } = await client.query("UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",[riderId,deliveryId]);
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
     await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'manual','accepted',now())",[deliveryId,riderId]);
@@ -143,6 +157,7 @@ async function declineDelivery(deliveryId, riderId) {
     if(d.status!=='assigned'||String(d.rider_id)!==String(riderId))
       throw new AppError('You can only decline a delivery assigned to you.',403,'FORBIDDEN');
     await client.query("UPDATE rider_assignments SET status='declined',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
+    await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[riderId,deliveryId]);
     const {rows:[updated]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 RETURNING *",[deliveryId]);
     await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[d.order_id]);
     const {rows:[order]}=await client.query('SELECT vendor_id FROM orders WHERE id=$1',[d.order_id]);
@@ -194,6 +209,9 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
          VALUES ($1,$2,$3,$4,'order',$5)`,
         [o.customer_id, 'delivery_update', 'Order Update', custMsgs[newStatus], d.order_id]);
     }
+    if(['delivered','failed','cancelled'].includes(newStatus)&&d.rider_id) {
+      await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[d.rider_id,deliveryId]);
+    }
     return updated;
   });
   if (newStatus === 'delivered') await ordersService.settleOrderFinancials(d.order_id);
@@ -204,7 +222,9 @@ async function getTracking(deliveryId, actorId, roles) {
   const { rows: [d] } = await query(
     `SELECT d.id, d.order_id, d.rider_id, d.status, d.estimated_minutes, d.picked_up_at,
             o.customer_id, o.vendor_id,
-            r.current_lat, r.current_lng, r.last_location_at,
+            CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.current_lat ELSE NULL END AS current_lat,
+            CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.current_lng ELSE NULL END AS current_lng,
+            CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.last_location_at ELSE NULL END AS last_location_at,
             u.full_name AS rider_name,
             (SELECT json_agg(p ORDER BY p.recorded_at DESC) FROM (
                SELECT lat, lng, recorded_at FROM rider_location_pings

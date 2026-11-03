@@ -2135,7 +2135,7 @@
     try{
       var r=await ML_API.delivery.updateStatus(S.activeDel.id,next);
       S.activeDel=Object.assign({},S.activeDel,r.data||{},{status:next});
-      if(next==='delivered'){S.activeDel=null;S._riderLiveLoaded=false;}
+      if(next==='delivered'){if(typeof stopRiderLocationWatch==='function')stopRiderLocationWatch();S.activeDel=null;S._riderLiveLoaded=false;}
       renderRDash();toast(next==='delivered'?'Delivery completed ✓':'Delivery status updated ✓');
     }catch(e){toast(e.error||'Could not update delivery status.','error');}
   }

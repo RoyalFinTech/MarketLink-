@@ -178,17 +178,29 @@ async function updateProfile(userId, data) {
 
 // ── AVAILABILITY TOGGLE ──────────────────────────────────────────────
 async function setAvailability(userId, isOnline) {
-  const { rows: [r] } = await query(
-    `UPDATE riders SET is_online = $1, last_location_at = CASE WHEN $1 THEN now() ELSE last_location_at END,
-       location_sharing_enabled = CASE WHEN $1 THEN location_sharing_enabled ELSE FALSE END,
-       location_sharing_delivery_id = CASE WHEN $1 THEN location_sharing_delivery_id ELSE NULL END
-     WHERE user_id = $2 AND kyc_status = 'approved'
-     RETURNING user_id, is_online, kyc_status`,
-    [isOnline, userId]
-  );
-  if (!r) throw new AppError('Only approved riders can toggle availability.', 403, 'NOT_APPROVED');
-  return r;
+  return withTransaction(async (client) => {
+    const {rows:[rider]}=await client.query(
+      "SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
+    if(!rider)throw new AppError('Only approved riders can toggle availability.',403,'NOT_APPROVED');
+    if(!isOnline) {
+      const {rows:[active]}=await client.query(
+        "SELECT id FROM deliveries WHERE rider_id=$1 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+        [userId]);
+      if(active)throw new AppError(
+        'Finish or decline your active delivery before going offline. Keep GPS sharing available so the customer can track this delivery.',
+        409,'ACTIVE_DELIVERY_IN_PROGRESS');
+    }
+    const {rows:[updated]}=await client.query(
+      "UPDATE riders SET is_online=$1,location_sharing_enabled=CASE WHEN $1 THEN location_sharing_enabled ELSE FALSE END,"+
+      "location_sharing_delivery_id=CASE WHEN $1 THEN location_sharing_delivery_id ELSE NULL END,"+
+      "current_lat=CASE WHEN $1 THEN current_lat ELSE NULL END,current_lng=CASE WHEN $1 THEN current_lng ELSE NULL END,"+
+      "last_location_at=CASE WHEN $1 THEN last_location_at ELSE NULL END "+
+      "WHERE user_id=$2 RETURNING user_id,is_online,kyc_status,location_sharing_enabled",
+      [Boolean(isOnline),userId]);
+    return updated;
+  });
 }
+
 
 // ── LOCATION UPDATE (GPS ping from rider app) ────────────────────────
 async function updateLocation(userId, { lat, lng, deliveryId }) {
@@ -207,12 +219,11 @@ async function updateLocation(userId, { lat, lng, deliveryId }) {
     }
   }
 
-  await query(
-    `UPDATE riders SET current_lat = $1, current_lng = $2, last_location_at = now(),
-       location_sharing_enabled = TRUE, location_sharing_delivery_id = $4
-     WHERE user_id = $3`,
-    [lat, lng, userId, deliveryId]
+  const {rows:[updatedRider]}=await query(
+    "UPDATE riders SET current_lat=$1,current_lng=$2,last_location_at=now(),location_sharing_enabled=TRUE,location_sharing_delivery_id=$4 WHERE user_id=$3 AND is_online=TRUE RETURNING user_id",
+    [lat,lng,userId,deliveryId]
   );
+  if(!updatedRider)throw new AppError('Go online before sharing GPS for this delivery.',409,'RIDER_OFFLINE');
 
   await query(
     `INSERT INTO rider_location_pings (rider_id, delivery_id, lat, lng)

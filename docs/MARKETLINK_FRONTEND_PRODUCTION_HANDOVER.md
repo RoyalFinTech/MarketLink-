@@ -688,3 +688,20 @@ The supplied WhatsApp screenshot showed Kaira Africa with a logo thumbnail, whil
 ### 2026-11-03 — Onboarding text contrast consistency
 
 The frontend CI check exposed a pre-existing cascade conflict in `premium-marketlink.css`: a white onboarding background rule existed, but later broad visibility overrides forced white text into the white copy panel. This matched earlier reports of faint onboarding text. A final scoped override now keeps the main onboarding copy panel white with dark readable text, while the image/visual panel retains white text over its dark photo overlay. The white first-run appearance is therefore preserved without flattening the visual card. CSS brace balance and the CI's exact white-background assertion were checked before commit.
+
+
+### 2026-11-03 — Rider GPS privacy and active-delivery safety
+
+The source audit found that the rider GPS update endpoint already required an assigned/in-progress delivery, but downstream APIs returned the rider's current coordinates even when sharing was disabled or when those coordinates belonged to another delivery. The completion flow also left the active sharing flag set.
+
+Changes committed:
+- Available-rider results only reveal coordinates when the rider has explicitly enabled sharing for that exact delivery. Other riders' saved/current coordinates are returned as null.
+- Customer/vendor tracking returns live coordinates only when the rider is sharing for the requested delivery and that delivery is assigned, picked up or in transit. The order-specific historical trail remains scoped to that delivery and authorized order parties.
+- Rider acceptance and vendor assignment reject overlapping active deliveries, since the live-sharing model tracks one active delivery at a time.
+- Declined, delivered, failed and cancelled deliveries clear the matching location-sharing flag, delivery reference and current coordinate fields.
+- Riders cannot toggle offline while an active delivery is underway; going offline after the job clears coordinates and timestamps.
+- Toggling online no longer falsely refreshes `last_location_at`.
+- GPS updates require the rider to remain online.
+- The browser GPS watch stops immediately after successful delivery.
+
+The live database currently has no rider or vendor accounts, so no real-account GPS test was possible. Physical device permission prompts and moving-device tracking remain pending.
