@@ -91,8 +91,11 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
       "INSERT INTO payments (id,order_id,method,provider_ref,amount,currency,status,paid_at) VALUES ($1,$2,'wallet',$3,$4,'GMD','confirmed',now()) RETURNING *",
       [paymentId, orderId, providerRef, requestedAmount]
     );
-    const nextBalance = Number(wallet.balance) - requestedAmount;
-    await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[nextBalance,wallet.id]);
+    const { rows: [debitedWallet] } = await client.query(
+      'UPDATE wallets SET balance=balance-$1,updated_at=now() WHERE id=$2 RETURNING balance',
+      [requestedAmount, wallet.id]
+    );
+    const nextBalance = Number(debitedWallet.balance);
     await client.query(
       "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','purchase',$2,$3,'order',$4,'DAHA Wallet payment for MarketLink order')",
       [wallet.id,requestedAmount,nextBalance,orderId]

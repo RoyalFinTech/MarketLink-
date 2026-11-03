@@ -141,11 +141,13 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
     throw new AppError('Modem Pay did not return a valid deposit reference. No wallet balance was changed.', 502, 'PROVIDER_INVALID_RESPONSE');
   }
 
+  const storedProviderRef = providerRef === idempotencyKey ? null : providerRef;
   const { rows: [updated] } = await query(
     "UPDATE wallet_deposits SET provider_ref=$2,status='pending',provider_status=$3,provider_response=$4,updated_at=now() WHERE id=$1 RETURNING id,amount,currency,payment_method,status,provider_status,created_at",
-    [depositId, providerRef, String(charge.status || 'pending').slice(0, 40), JSON.stringify({
+    [depositId, storedProviderRef, String(charge.status || 'pending').slice(0, 40), JSON.stringify({
+      paymentIntentId: charge.paymentIntentId || null,
       nextStep: charge.nextStep || null,
-      hasRedirect: Boolean(charge.authorizationUrl),
+      hasRedirect: Boolean(charge.paymentLink),
     })]
   );
 
@@ -278,11 +280,15 @@ async function processDepositWebhook(client, payload, eventId) {
     return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'deposit_not_pending' };
   }
 
-  const transactionRef = payload.transaction_reference || payload.transaction_id || payload.transactionId || payload.payment_intent_id || payload.paymentIntentId || payload.reference || payload.id;
-  if (deposit.provider_ref && (!transactionRef || String(transactionRef) !== String(deposit.provider_ref))) {
+  const providerRefs = [
+    payload.payment_intent_id, payload.paymentIntentId, payload.id,
+    payload.transaction_reference, payload.transaction_id, payload.transactionId,
+    payload.reference,
+  ].filter(Boolean).map(String);
+  if (deposit.provider_ref && !providerRefs.includes(String(deposit.provider_ref))) {
     return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'provider_reference_mismatch' };
   }
-  if (!deposit.provider_ref && externalReference && String(externalReference) !== String(deposit.idempotency_key)) {
+  if (externalReference && String(externalReference) !== String(deposit.idempotency_key)) {
     return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'idempotency_reference_mismatch' };
   }
   const providerAmount = Number(payload.amount);
