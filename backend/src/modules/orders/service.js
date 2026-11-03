@@ -165,29 +165,103 @@ const ALL_STATUSES=['pending','accepted','preparing','awaiting_rider','rider_ass
 async function _loadOrderForMutation(orderId){const {rows}=await query(`SELECT o.*,d.id AS delivery_id,d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1`,[orderId]);if(!rows.length)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');return rows[0];}
 function _assertTransitionAllowed(order,targetStatus,userId,roles){const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));if(isAdmin){if(!ALL_STATUSES.includes(targetStatus))throw new AppError('Invalid status.',400,'INVALID_STATUS');return;}const isVendor=(roles||[]).includes('vendor')&&order.vendor_id===userId;const isRider=(roles||[]).includes('rider')&&order.rider_id===userId;if(!isVendor&&!isRider)throw new AppError('You are not authorized to modify this order.',403,'FORBIDDEN');const step=TRANSITIONS[order.status];if(!step)throw new AppError(`Order in status "${order.status}" cannot be changed further.`,400,'INVALID_STATUS_TRANSITION');const allowed=[...(isVendor?(step.vendor||[]):[]),...(isRider?(step.rider||[]):[])];if(!allowed.includes(targetStatus))throw new AppError(`Cannot move order from "${order.status}" to "${targetStatus}".`,400,'INVALID_STATUS_TRANSITION');}
 
-async function settleOrderFinancials(orderId){return withTransaction(async(client)=>{
-  const {rows:[order]}=await client.query(`SELECT o.*,d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE`,[orderId]);
-  if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
-  if(order.status!=='delivered')return{settled:false,reason:'ORDER_NOT_DELIVERED'};
-  if(order.payment_status!=='confirmed')return{settled:false,reason:'PAYMENT_NOT_CONFIRMED'};
-  const {rows:[commission]}=await client.query('SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE',[orderId]);
-  if(!commission||commission.status==='paid')return{settled:true,alreadySettled:true};
+async function settleOrderFinancials(orderId) {
+  return withTransaction(async (client) => {
+    const { rows: [order] } = await client.query(
+      'SELECT o.*, d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE',
+      [orderId]);
+    if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
+    if (order.status !== 'delivered') return { settled:false, reason:'ORDER_NOT_DELIVERED' };
+    if (order.payment_status !== 'confirmed') return { settled:false, reason:'PAYMENT_NOT_CONFIRMED' };
 
-  const vendorAmount=Number(order.vendor_payout||0),riderAmount=Number(order.rider_payout||0),affiliateAmount=Number(order.affiliate_commission_amount||0),platformNet=Number(order.platform_net_fee||0);
-  let {rows:[vendorWallet]}=await client.query('SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE',[order.vendor_id]);
-  if(!vendorWallet){({rows:[vendorWallet]}=await client.query("INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING *",[order.vendor_id]));}
-  const vendorNext=Number(vendorWallet.balance)+vendorAmount;
-  await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[vendorNext,vendorWallet.id]);
-  await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','vendor_sale',$2,$3,'order_vendor_payout',$4,'MarketLink vendor payout')`,[vendorWallet.id,vendorAmount,vendorNext,orderId]);
+    const { rows: [commission] } = await client.query(
+      'SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE', [orderId]);
+    if (!commission || commission.status === 'paid') {
+      return { settled:true, alreadySettled:true };
+    }
 
-  if(order.rider_id&&riderAmount>0){let {rows:[riderWallet]}=await client.query('SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE',[order.rider_id]);if(!riderWallet){({rows:[riderWallet]}=await client.query("INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING *",[order.rider_id]));}const riderNext=Number(riderWallet.balance)+riderAmount;await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[riderNext,riderWallet.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','delivery_earning',$2,$3,'order_rider_payout',$4,'MarketLink delivery payout')`,[riderWallet.id,riderAmount,riderNext,orderId]);await client.query(`INSERT INTO rider_earnings (rider_id,delivery_id,order_id,amount,type,description,paid_at) VALUES($1,(SELECT id FROM deliveries WHERE order_id=$2),$2,$3,'delivery','MarketLink delivery payout',now())`,[order.rider_id,orderId,riderAmount]);await client.query('UPDATE riders SET total_earnings=COALESCE(total_earnings,0)+$1,total_deliveries=COALESCE(total_deliveries,0)+1 WHERE user_id=$2',[riderAmount,order.rider_id]);}
+    const vendorAmount = Number(order.vendor_payout || 0);
+    const riderAmount = Number(order.rider_payout || 0);
+    const affiliateAmount = Number(order.affiliate_commission_amount || 0);
+    const platformNet = Number(order.platform_net_fee || 0);
 
-  if(order.affiliate_user_id&&affiliateAmount>0){let {rows:[affiliateWallet]}=await client.query('SELECT * FROM wallets WHERE user_id=$1 FOR UPDATE',[order.affiliate_user_id]);if(!affiliateWallet){({rows:[affiliateWallet]}=await client.query("INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING *",[order.affiliate_user_id]));}const next=Number(affiliateWallet.balance)+affiliateAmount;await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[next,affiliateWallet.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','affiliate_commission',$2,$3,'order_affiliate_payout',$4,'MarketLink affiliate commission')`,[affiliateWallet.id,affiliateAmount,next,orderId]);await client.query('UPDATE affiliates SET total_earnings=COALESCE(total_earnings,0)+$1,total_orders=total_orders+1 WHERE user_id=$2',[affiliateAmount,order.affiliate_user_id]);}
+    if (vendorAmount > 0) {
+      let { rows: [vendorWallet] } = await client.query(
+        'SELECT id FROM wallets WHERE user_id=$1 FOR UPDATE', [order.vendor_id]);
+      if (!vendorWallet) {
+        ({ rows: [vendorWallet] } = await client.query(
+          "INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING id",
+          [order.vendor_id]));
+      }
+      const { rows: [credited] } = await client.query(
+        'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
+        [vendorAmount, vendorWallet.id]);
+      await client.query(
+        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','vendor_sale',$2,$3,'order_vendor_payout',$4,'MarketLink vendor payout credited to DAHA Wallet')",
+        [vendorWallet.id, vendorAmount, credited.balance, orderId]);
+    }
 
-  await client.query(`INSERT INTO platform_earnings (order_id,gross_merchandise,discount_amount,commission_pct,commission_amount,status,earned_at) VALUES($1,$2,$3,$4,$5,'earned',now()) ON CONFLICT (order_id) DO UPDATE SET commission_amount=EXCLUDED.commission_amount,status='earned'`,[orderId,Number(order.subtotal),Number(order.discount_amount||0),Number(order.platform_fee_pct||0),platformNet]);
-  await client.query("UPDATE commission_records SET status='paid' WHERE id=$1",[commission.id]);
-  return{settled:true,vendorPayout:vendorAmount,riderPayout:riderAmount,affiliatePayout:affiliateAmount,platformNet:platformNet};
-});}
+    if (order.rider_id && riderAmount > 0) {
+      let { rows: [riderWallet] } = await client.query(
+        'SELECT id FROM wallets WHERE user_id=$1 FOR UPDATE', [order.rider_id]);
+      if (!riderWallet) {
+        ({ rows: [riderWallet] } = await client.query(
+          "INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING id",
+          [order.rider_id]));
+      }
+      const { rows: [credited] } = await client.query(
+        'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
+        [riderAmount, riderWallet.id]);
+      await client.query(
+        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','delivery_earning',$2,$3,'order_rider_payout',$4,'MarketLink delivery earning credited to DAHA Wallet')",
+        [riderWallet.id, riderAmount, credited.balance, orderId]);
+      await client.query(
+        "INSERT INTO rider_earnings (rider_id,delivery_id,order_id,amount,type,description,paid_at) VALUES($1,(SELECT id FROM deliveries WHERE order_id=$2),$2,$3,'delivery','Delivery earning credited to DAHA Wallet',now())",
+        [order.rider_id, orderId, riderAmount]);
+      await client.query(
+        'UPDATE riders SET total_earnings=COALESCE(total_earnings,0)+$1,total_deliveries=total_deliveries+1 WHERE user_id=$2',
+        [riderAmount, order.rider_id]);
+      await client.query(
+        "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'wallet_funded','DAHA Wallet delivery earning',$2,'order',$3)",
+        [order.rider_id, 'Your delivery earning of D ' + riderAmount.toFixed(2) + ' was credited to DAHA Wallet.', orderId]);
+    }
+
+    if (order.affiliate_user_id && affiliateAmount > 0) {
+      let { rows: [affiliateWallet] } = await client.query(
+        'SELECT id FROM wallets WHERE user_id=$1 FOR UPDATE', [order.affiliate_user_id]);
+      if (!affiliateWallet) {
+        ({ rows: [affiliateWallet] } = await client.query(
+          "INSERT INTO wallets (user_id,balance,currency) VALUES($1,0,'GMD') RETURNING id",
+          [order.affiliate_user_id]));
+      }
+      const { rows: [credited] } = await client.query(
+        'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
+        [affiliateAmount, affiliateWallet.id]);
+      await client.query(
+        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','affiliate_commission',$2,$3,'order_affiliate_payout',$4,'2% MarketLink affiliate commission credited to DAHA Wallet')",
+        [affiliateWallet.id, affiliateAmount, credited.balance, orderId]);
+      await client.query(
+        'UPDATE affiliates SET total_earnings=COALESCE(total_earnings,0)+$1,total_orders=total_orders+1 WHERE user_id=$2',
+        [affiliateAmount, order.affiliate_user_id]);
+      await client.query(
+        "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'affiliate_reward','You earned a 2% affiliate reward',$2,'order',$3)",
+        [order.affiliate_user_id, 'D ' + affiliateAmount.toFixed(2) + ' was credited to your DAHA Wallet after successful delivery and payment.', orderId]);
+    }
+
+    await client.query(
+      "INSERT INTO platform_earnings (order_id,gross_merchandise,discount_amount,commission_pct,commission_amount,status,earned_at) VALUES($1,$2,$3,$4,$5,'earned',now()) ON CONFLICT (order_id) DO UPDATE SET commission_amount=EXCLUDED.commission_amount,status='earned'",
+      [orderId, Number(order.subtotal), Number(order.discount_amount || 0), Number(order.platform_fee_pct || 0), platformNet]);
+    await client.query("UPDATE commission_records SET status='paid' WHERE id=$1", [commission.id]);
+
+    return {
+      settled:true,
+      vendorPayout:vendorAmount,
+      riderPayout:riderAmount,
+      affiliatePayout:affiliateAmount,
+      platformNet:platformNet,
+    };
+  });
+}
 
 async function updateStatus(orderId,status,userId,roles,note){if(!ALL_STATUSES.includes(status))throw new AppError('Invalid status.',400,'INVALID_STATUS');const order=await _loadOrderForMutation(orderId);_assertTransitionAllowed(order,status,userId,roles);if(status==='cancelled'&&order.payment_status==='confirmed')throw new AppError('This order has a confirmed payment and cannot be cancelled until a supported refund is processed.',409,'PAYMENT_REFUND_REQUIRED');const result=await withTransaction(async(client)=>{const {rows:[o]}=await client.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *',[status,orderId]);await client.query('INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,$2,$3,$4)',[orderId,status,userId,note||null]);if(status==='delivered'){await client.query('UPDATE orders SET delivered_at=now() WHERE id=$1',[orderId]);await client.query("UPDATE deliveries SET status='delivered',delivered_at=now() WHERE order_id=$1",[orderId]);}if(status==='rider_assigned')await client.query("UPDATE deliveries SET status='assigned' WHERE order_id=$1",[orderId]);if(status==='picked_up')await client.query("UPDATE deliveries SET status='picked_up',picked_up_at=now() WHERE order_id=$1",[orderId]);if(status==='on_the_way')await client.query("UPDATE deliveries SET status='in_transit' WHERE order_id=$1",[orderId]);if(status==='cancelled'){const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const it of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND quantity IS NOT NULL',[it.quantity,it.product_id]);await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered')",[orderId]);}return o;});if(status==='delivered')await settleOrderFinancials(orderId);return result;}
 async function vendorAccept(orderId,vendorUserId,roles){return updateStatus(orderId,'accepted',vendorUserId,roles,'Accepted by vendor');}
