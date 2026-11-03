@@ -44,10 +44,10 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     // Transparent marketplace pricing: vendor sets retail price; MarketLink commission is not added to checkout.
     const fee = Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD || 25);
     const commPct = Number(process.env.MARKETLINK_PLATFORM_COMMISSION_PCT || 5);
-    const affiliateDefaultPct = Number(process.env.MARKETLINK_AFFILIATE_COMMISSION_PCT || 2);
+    const affiliateDefaultPct = 2;
     if (!Number.isFinite(fee) || fee < 0) throw new AppError('Invalid delivery fee configuration.',500,'FEE_CONFIG_ERROR');
     if (!Number.isFinite(commPct) || commPct < 0 || commPct > 20) throw new AppError('Invalid platform commission configuration.',500,'FEE_CONFIG_ERROR');
-    if (!Number.isFinite(affiliateDefaultPct) || affiliateDefaultPct < 0 || affiliateDefaultPct > commPct) throw new AppError('Invalid affiliate commission configuration.',500,'FEE_CONFIG_ERROR');
+    if (affiliateDefaultPct > commPct) throw new AppError('Platform commission must cover the 2% affiliate reward.',500,'FEE_CONFIG_ERROR');
 
     const discountedSubtotal = Math.max(0, sub-discount);
     const platFee = parseFloat((discountedSubtotal*commPct/100).toFixed(2));
@@ -56,10 +56,10 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     let affiliate=null;
     let affiliatePct=0;
     if (affiliateCode) {
-      const { rows:[a] } = await client.query('SELECT user_id,affiliate_code,commission_pct FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
+      const { rows:[a] } = await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
       if (a && a.user_id !== customerId) {
         affiliate=a;
-        affiliatePct=Math.min(Number(a.commission_pct || affiliateDefaultPct), commPct);
+        affiliatePct=affiliateDefaultPct;
       }
     }
     const affiliateAmount = affiliate ? parseFloat((discountedSubtotal*affiliatePct/100).toFixed(2)) : 0;
