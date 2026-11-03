@@ -1810,3 +1810,10 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-dashboard-avatar img{display:block;width:100%;height:100%;object-fit:cover}
 .ml-dashboard-avatar-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d7377,#102b3a);color:#fff;font-size:17px;font-weight:900}
 .ml-dashboard-avatar-compact{width:36px;height:36px;min-width:36px;border-radius:12px}
+
+/* Native in-page camera capture for profile photos */
+.ml-camera-panel{width:min(460px,calc(100vw - 28px));}
+.ml-camera-preview{width:100%;aspect-ratio:1/1;max-height:min(58vh,480px);overflow:hidden;border-radius:22px;background:#071521;border:1px solid rgba(245,198,107,.28);display:flex;align-items:center;justify-content:center;margin:12px 0;}
+.ml-camera-preview video{display:block;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+.ml-camera-panel [data-ml-camera-capture]:disabled{opacity:.55;cursor:wait;}
+.ml-profile-camera-modal{z-index:100000;}
