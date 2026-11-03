@@ -1503,6 +1503,10 @@
       dahaDepositContext=null;
       toast('Withdrawal request submitted. The funds are reserved until Modem Pay confirms the payout.','success');
       await renderPremiumWalletPage(G('profile-body'));
+      if((S.roles||[]).indexOf('rider')>=0 && typeof loadRiderLiveData==='function'){
+        S._riderLiveLoaded=false;
+        await loadRiderLiveData();
+      }
     }catch(e){
       var pinField=G('ml-daha-withdraw-pin');
       if(pinField){pinField.value='';pinField.focus();}
