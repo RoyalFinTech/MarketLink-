@@ -416,13 +416,22 @@ async function processProviderWebhook(event) {
 
 
 async function reject(withdrawalId, adminUserId) {
-  const { rows: [wd] } = await query('SELECT * FROM withdrawals WHERE id=$1', [withdrawalId]);
-  if (!wd) throw new AppError('Withdrawal not found.', 404, 'WITHDRAWAL_NOT_FOUND');
-  if (wd.status !== 'processing') throw new AppError(`Withdrawal already ${wd.status}.`, 400, 'ALREADY_PROCESSED');
-  const { rows: [updated] } = await query(
-    `UPDATE withdrawals SET status='rejected', processed_by=$1, processed_at=now() WHERE id=$2 RETURNING *`,
-    [adminUserId, withdrawalId]);
-  return updated;
+  return withTransaction(async (client) => {
+    const { rows: [wd] } = await client.query(
+      'SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [withdrawalId]);
+    if (!wd) throw new AppError('Withdrawal not found.', 404, 'WITHDRAWAL_NOT_FOUND');
+    if (wd.status !== 'processing') {
+      throw new AppError('Withdrawal is already ' + wd.status + '. A payout that has been sent to Modem Pay cannot be rejected here.', 409, 'ALREADY_PROCESSED');
+    }
+    const { rows: [updated] } = await client.query(
+      "UPDATE withdrawals SET status='rejected',provider_status='rejected_by_admin',processed_by=$1,processed_at=now(),updated_at=now() WHERE id=$2 AND status='processing' RETURNING *",
+      [adminUserId, withdrawalId]);
+    if (!updated) throw new AppError('Withdrawal state changed before rejection completed.', 409, 'WITHDRAWAL_STATE_CHANGED');
+    await client.query(
+      "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_rejected','DAHA withdrawal rejected','Your DAHA Wallet withdrawal request was rejected by MarketLink support. No money was sent.', 'withdrawal',$2)",
+      [wd.user_id, wd.id]);
+    return updated;
+  });
 }
 
 module.exports = { getBalance, requestWithdrawal, listMine, listPendingForAdmin, approve, reject, processProviderWebhook };
