@@ -8,13 +8,37 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#0E2636",
-  "theme_color": "#0E2636",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "categories": [
     "shopping",
     "business"
   ],
   "icons": [
+    {
+      "src": "./assets/marketlink-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/marketlink-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/marketlink-app-icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./assets/marketlink-app-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "./assets/marketlink-app-icon.svg",
       "sizes": "any",
@@ -26,12 +50,6 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
-    },
-    {
-      "src": "./assets/marketlink-logo.png",
-      "sizes": "220x177",
-      "type": "image/png",
-      "purpose": "any"
     }
   ]
 }

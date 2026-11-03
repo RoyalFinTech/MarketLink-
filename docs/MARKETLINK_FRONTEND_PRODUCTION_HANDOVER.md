@@ -670,3 +670,16 @@ The supplied WhatsApp screenshot showed Kaira Africa with a logo thumbnail, whil
 - Static metadata, manifest, SVG references and service-worker syntax were checked in source.
 - Actual WhatsApp preview refresh and Android/Edge/iOS icon appearance still require browser/device checks. WhatsApp may cache the old no-image preview; share a fresh URL variant after deployment if the old preview remains.
 - No physical-device verification is claimed from source changes alone.
+
+
+### 2026-11-03 — Final raster branding rollout
+
+- The reproducible GitHub Actions generator creates PWA, maskable, Apple and social assets from the unchanged 220×177 original MarketLink logo. It scales proportionally to fill each target canvas without stretching or redrawing the mark.
+- Final inspected assets: 192×192 and 512×512 standard PWA PNGs; 192×192 and 512×512 maskable PNGs with a central safe-zone inset; a 180×180 Apple Home Screen PNG; a 32×32 favicon; and a 1200×630 social preview JPEG.
+- Visual inspection confirmed the standard icon fills the square cleanly, the maskable icon has extra padding, the Apple icon is square, and the social card text is fully within the 1200×630 image.
+- HTML social metadata now points to the 1200×630 JPEG with explicit MIME type/dimensions. Twitter uses `summary_large_image`.
+- Manifest declares explicit 192px/512px any/maskable PNGs and keeps the SVG scalable fallbacks.
+- The earlier frontend CI failure was caused by changing the white PWA launch background to navy. The final change restores one `#FFFFFF` theme-color tag and `#FFFFFF` manifest background, while keeping the navy background inside the icon art only.
+- Service-worker cache is now v19 and precaches the manifest, PNG icons, SVG fallbacks and social card. API responses remain excluded.
+
+**External tests pending:** live WhatsApp crawler refresh, Android Chrome install, Windows Edge desktop install, and iOS Safari Add to Home Screen. WhatsApp may cache the previous preview; a fresh referral URL variant may be required after deployment.
