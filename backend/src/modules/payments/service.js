@@ -26,9 +26,11 @@ const modemAdapter = {
     return {
       reference: result.reference,
       paymentIntentId: result.paymentIntentId,
+      paymentLink: result.paymentLink,
       authorizationUrl: result.paymentLink,
       intentSecret: result.intentSecret,
       nextStep: result.nextStep || null,
+      status: result.status || null,
       providerStatus: result.status || null,
     };
   },
@@ -207,7 +209,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
   );
 
   const nextStep = chargeResult.nextStep || null;
-  const redirectUrl = chargeResult.paymentLink || null;
+  const redirectUrl = chargeResult.paymentLink || chargeResult.authorizationUrl || null;
   if (modemPay.isH2H()) {
     return {
       payment: updatedPayment,
@@ -215,7 +217,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
       action: nextStep && nextStep.openExternal && (nextStep.launch_url || redirectUrl) ? 'redirect' : 'continue',
       redirectUrl,
       nextStep,
-      providerStatus: chargeResult.status || 'pending',
+      providerStatus: chargeResult.status || chargeResult.providerStatus || 'pending',
     };
   }
   return {
@@ -223,7 +225,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
     action: 'redirect',
     redirectUrl,
     provider: provider.name,
-    providerStatus: chargeResult.status || 'pending',
+    providerStatus: chargeResult.status || chargeResult.providerStatus || 'pending',
   };
 }
 async function findOwnedPayment(paymentId, actorId, roles) {
