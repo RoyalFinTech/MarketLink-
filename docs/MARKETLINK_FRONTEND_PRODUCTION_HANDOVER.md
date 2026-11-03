@@ -640,3 +640,33 @@ This continuation was performed against the current `main` branch after reading 
 - `85887585bcdb94d6e933c01af66524aaa6b6bd0e`
 - `b39c887464529a07ab845ce0e8d331a3cd04b90e`
 - `1d87d426949b5e1415de9873edb082ada3f86fce`
+
+
+---
+
+## 2026-11-03 — MarketLink PWA identity and share-preview correction
+
+### User-reported issue
+The supplied WhatsApp screenshot showed Kaira Africa with a logo thumbnail, while MarketLink displayed only its title and hostname. The installed MarketLink logo also appeared poorly fitted on mobile and desktop.
+
+### Root causes confirmed in source
+- `frontend/index.html` had no Open Graph or Twitter card metadata, leaving social crawlers without an explicit image URL.
+- `frontend/manifest.webmanifest` reused one non-square source PNG for 192px and 512px entries and marked that image maskable without safe-zone padding.
+- The official logo file is `frontend/assets/marketlink-logo.png` (220×177); it remains unchanged. The new vector icon wrappers embed its exact bytes and centre it without stretching.
+
+### Implemented
+- Added scalable `frontend/assets/marketlink-app-icon.svg` for general install/favicons.
+- Added `frontend/assets/marketlink-app-icon-maskable.svg` with the logo contained in the central mask-safe region.
+- Added absolute canonical, Open Graph and Twitter metadata, including the public `og:image` URL, source-image dimensions and alt text.
+- Updated the web manifest icon declarations and app theme/background colours.
+- Bumped the service-worker shell cache to `marketlink-shell-v18` and added the manifest and new icon assets to the shell.
+
+### Voice-note / recording review
+- Searched accessible Conversation and Library file stores for audio MIME types, common audio extensions, voice-note titles and voice-recording titles.
+- No standalone audio file was surfaced. Related written MarketLink handovers and QA notes were located and used for continuation.
+- This is a limitation of the accessible file inventory; it does not prove that no recording exists in another voice-mode storage area. Unavailable audio content has not been inferred or represented as listened to.
+
+### Verification boundaries
+- Static metadata, manifest, SVG references and service-worker syntax were checked in source.
+- Actual WhatsApp preview refresh and Android/Edge/iOS icon appearance still require browser/device checks. WhatsApp may cache the old no-image preview; share a fresh URL variant after deployment if the old preview remains.
+- No physical-device verification is claimed from source changes alone.
