@@ -1504,6 +1504,8 @@ var ML_API = (function(){
     requestWithdrawal: function(d){ return post('/wallets/withdrawals', d); },
     getVendorPayoutProfile: function(){ return get('/wallets/vendor/payout-profile'); },
     saveVendorPayoutProfile: function(d){ return put('/wallets/vendor/payout-profile', d); },
+    getRiderPayoutProfile: function(){ return get('/wallets/rider/payout-profile'); },
+    saveRiderPayoutProfile: function(d){ return put('/wallets/rider/payout-profile', d); },
   };
 
   // ── PAYMENTS ─────────────────────────────────────────────────
