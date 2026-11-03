@@ -1328,6 +1328,7 @@
     if(typeof window.renderProfile==='function')window.renderProfile();
   }
   var dahaDepositContext=null;
+  var dahaVendorPayoutProfile=null;
   async function renderPremiumWalletPage(root){
     if(!root)return;
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Loading DAHA Wallet…</div></div>';
@@ -1353,6 +1354,7 @@
       var balance=Number(wallet.balance||0),available=Number(wallet.available_balance==null?balance:wallet.available_balance);
       var rails=(capabilities.methods||[]).filter(function(m){return ['wave','afrimoney','qmoney'].indexOf(String(m).toLowerCase())>=0;});
       var payoutProfile=isVendor?(results[5]&&results[5].data||{}):{};
+      dahaVendorPayoutProfile=payoutProfile;
       var savedPayoutMethod=String(payoutProfile.payout_method||'wave').toLowerCase();
       var payoutProfileMarkup=isVendor?'<section class="ml-profile-card ml-daha-panel" id="ml-daha-vendor-payout"><div class="ml-daha-panel-head"><div><span>VENDOR PAYOUT SETTINGS</span><h4>Saved payout destination</h4></div><b>Wave / AfriMoney</b></div><p class="ml-daha-copy">Save the mobile-money destination where your approved DAHA vendor withdrawals should be sent. You can change it whenever your payout details change.</p><label class="ml-field-label" for="ml-daha-vendor-payout-method">Preferred payout network</label><select id="ml-daha-vendor-payout-method" class="ml-daha-input"><option value="wave"'+(savedPayoutMethod==='wave'?' selected':'')+'>Wave</option><option value="afrimoney"'+(savedPayoutMethod==='afrimoney'?' selected':'')+'>AfriMoney</option></select><label class="ml-field-label" for="ml-daha-vendor-payout-number">Payout mobile number (7 digits)</label><input id="ml-daha-vendor-payout-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" value="'+esc(payoutProfile.account_number||'')+'" placeholder="Without +220"><label class="ml-field-label" for="ml-daha-vendor-payout-name">Account holder name</label><input id="ml-daha-vendor-payout-name" class="ml-daha-input" type="text" maxlength="150" value="'+esc(payoutProfile.beneficiary_name||'')+'" placeholder="Name registered to the wallet"><button type="button" class="ml-btn ml-btn-primary ml-daha-submit" onclick="window.ML_Premium.saveDahaVendorPayoutProfile()">Save payout destination</button><small class="ml-daha-copy">Payouts are still subject to authorized review and Modem Pay transfer confirmation.</small></section>':'';
       var railOptions=(direct?'':'<option value="modempay">Choose payment method on Modem Pay</option>')+rails.map(function(m){var k=String(m).toLowerCase();return '<option value="'+esc(k)+'">'+(k==='wave'?'Wave':k==='afrimoney'?'AfriMoney':'QMoney')+'</option>';}).join('');
@@ -1432,7 +1434,8 @@
     if(!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit vendor payout mobile number.','error');return;}
     if(!beneficiaryName){toast('Enter the payout account holder name.','error');return;}
     try{
-      await ML_API.wallet.saveVendorPayoutProfile({payoutMethod:payoutMethod,accountNumber:accountNumber,beneficiaryName:beneficiaryName});
+      var response=await ML_API.wallet.saveVendorPayoutProfile({payoutMethod:payoutMethod,accountNumber:accountNumber,beneficiaryName:beneficiaryName});
+      dahaVendorPayoutProfile=response&&response.data||response||null;
       toast('Vendor payout destination saved securely.','success');
       await renderPremiumWalletPage(G('profile-body'));
     }catch(e){toast(e.error||'Could not save the vendor payout destination.','error');}
@@ -1443,6 +1446,16 @@
     var account=String(G('ml-daha-withdraw-number')&&G('ml-daha-withdraw-number').value||'').replace(/\D/g,'');
     var name=String(G('ml-daha-withdraw-name')&&G('ml-daha-withdraw-name').value||'').trim();
     if(!(amount>=50)){toast('The minimum withdrawal is D 50.00.','error');return;}
+    if((S.roles||[]).indexOf('vendor')>=0){
+      if(!dahaVendorPayoutProfile||!dahaVendorPayoutProfile.account_number){
+        toast('Save your Wave or AfriMoney payout destination first.','error');
+        var payoutSection=G('ml-daha-vendor-payout');if(payoutSection)payoutSection.scrollIntoView({behavior:'smooth',block:'center'});
+        return;
+      }
+      payoutMethod=String(dahaVendorPayoutProfile.payout_method||'').toLowerCase();
+      account=String(dahaVendorPayoutProfile.account_number||'').replace(/\D/g,'');
+      name=String(dahaVendorPayoutProfile.beneficiary_name||'').trim();
+    }
     if(!/^\d{7}$/.test(account)){toast('Enter the recipient 7-digit mobile-money number.','error');return;}
     if(!name){toast('Enter the account holder name.','error');return;}
     try{

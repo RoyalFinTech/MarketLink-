@@ -217,6 +217,18 @@ async function saveVendorPayoutProfile(userId, { payoutMethod, accountNumber, be
   return profile;
 }
 async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {
+  const { rows: [vendor] } = await query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
+  if (vendor) {
+    const savedDestination = await getVendorPayoutProfile(userId);
+    if (!savedDestination) {
+      throw new AppError('Save your DAHA vendor payout destination in Wave or AfriMoney before requesting a withdrawal.', 409, 'VENDOR_PAYOUT_PROFILE_REQUIRED');
+    }
+    payoutMethod = savedDestination.payout_method;
+    payoutDetails = {
+      account_number: savedDestination.account_number,
+      beneficiary_name: savedDestination.beneficiary_name,
+    };
+  }
   payoutMethod = String(payoutMethod || '').trim().toLowerCase();
   if (!PAYOUT_METHODS.includes(payoutMethod)) {
     throw new AppError('Choose Wave or AfriMoney for your withdrawal payout.', 400, 'UNSUPPORTED_PAYOUT_METHOD');
@@ -240,12 +252,24 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails }
 async function processDepositWebhook(client, payload, eventId) {
   const metadata = payload?.metadata || {};
   const depositId = metadata.walletDepositId || metadata.wallet_deposit_id || metadata.depositId;
-  if (!depositId) return null;
+  const externalReference = payload.external_reference || payload.externalReference || metadata.idempotencyKey || metadata.idempotency_key;
+  if (!depositId && !externalReference) return null;
 
-  const { rows: [deposit] } = await client.query(
-    'SELECT * FROM wallet_deposits WHERE id=$1 FOR UPDATE',
-    [String(depositId)]
-  );
+  let deposit;
+  if (depositId) {
+    const { rows: [byId] } = await client.query(
+      'SELECT * FROM wallet_deposits WHERE id=$1 FOR UPDATE',
+      [String(depositId)]
+    );
+    deposit = byId;
+  }
+  if (!deposit && externalReference) {
+    const { rows: [byReference] } = await client.query(
+      'SELECT * FROM wallet_deposits WHERE idempotency_key=$1 FOR UPDATE',
+      [String(externalReference)]
+    );
+    deposit = byReference;
+  }
   if (!deposit) return null;
   if (deposit.status === 'completed') {
     return { duplicate: true, eventId, eventType: 'charge.succeeded', depositId: deposit.id };
@@ -255,8 +279,11 @@ async function processDepositWebhook(client, payload, eventId) {
   }
 
   const transactionRef = payload.transaction_reference || payload.transaction_id || payload.transactionId || payload.payment_intent_id || payload.paymentIntentId || payload.reference || payload.id;
-  if (!transactionRef || !deposit.provider_ref || String(transactionRef) !== String(deposit.provider_ref)) {
+  if (deposit.provider_ref && (!transactionRef || String(transactionRef) !== String(deposit.provider_ref))) {
     return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'provider_reference_mismatch' };
+  }
+  if (!deposit.provider_ref && externalReference && String(externalReference) !== String(deposit.idempotency_key)) {
+    return { processed: true, ignored: true, eventId, depositId: deposit.id, reason: 'idempotency_reference_mismatch' };
   }
   const providerAmount = Number(payload.amount);
   if (!Number.isFinite(providerAmount) || Math.abs(providerAmount - Number(deposit.amount)) > 0.01) {
@@ -274,8 +301,11 @@ async function processDepositWebhook(client, payload, eventId) {
     [deposit.wallet_id]
   );
   if (!wallet) throw new AppError('The DAHA Wallet record for this deposit no longer exists.', 409, 'WALLET_NOT_FOUND');
-  const nextBalance = Number(wallet.balance) + Number(deposit.amount);
-  await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2', [nextBalance, wallet.id]);
+  const { rows: [creditedWallet] } = await client.query(
+    'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
+    [deposit.amount, wallet.id]
+  );
+  const nextBalance = Number(creditedWallet.balance);
   await client.query(
     "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','deposit',$2,$3,'wallet_deposit',$4,'DAHA Wallet deposit confirmed by Modem Pay')",
     [wallet.id, deposit.amount, nextBalance, deposit.id]
