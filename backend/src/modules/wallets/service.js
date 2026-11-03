@@ -77,8 +77,8 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
   if (!DEPOSIT_METHODS.includes(method)) {
     throw new AppError('Choose Modem Pay, Wave, AfriMoney or QMoney.', 400, 'UNSUPPORTED_METHOD');
   }
-  if (!modemPay.isConfigured()) {
-    throw new AppError('Modem Pay is not configured yet. DAHA Wallet deposits are temporarily unavailable.', 503, 'PROVIDER_UNAVAILABLE');
+  if (!modemPay.isConfigured() || !modemPay.isWebhookConfigured()) {
+    throw new AppError('Modem Pay API credentials and webhook signing configuration are required before DAHA Wallet deposits can be enabled.', 503, 'PROVIDER_UNAVAILABLE');
   }
   if (modemPay.isH2H() && !modemPay.isH2HApproved()) {
     throw new AppError('Direct mobile-money deposits are awaiting Modem Pay H2H partner approval.', 503, 'PROVIDER_UNAVAILABLE');

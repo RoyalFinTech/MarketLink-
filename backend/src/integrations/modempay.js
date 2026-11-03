@@ -33,6 +33,10 @@ function isConfigured() {
   const key=String(process.env.MODEM_PAY_API_KEY||'').trim();
   return Boolean(key && !/(placeholder|replace[_ -]?me|change[_ -]?me|your[_ -]?(api[_ -]?)?key|example[_ -]?key)/i.test(key));
 }
+function isWebhookConfigured() {
+  return [process.env.MODEM_PAY_WEBHOOK_SECRET, process.env.MODEM_PAY_SECRET_HASH]
+    .some(value => String(value || '').trim().length > 0);
+}
 function getApiKey() {
   if (!isConfigured()) throw new AppError('Modem Pay is not configured on the server.', 503, 'PROVIDER_UNAVAILABLE');
   return String(process.env.MODEM_PAY_API_KEY).trim();
@@ -186,5 +190,5 @@ function verifyWebhookSignature(rawBody, signature) {
 
 module.exports = {
   createPaymentIntent, confirmCharge, finalizeCharge, getTransaction,
-  initiateTransfer, verifyWebhookSignature, isH2H, isConfigured, isH2HApproved,
+  initiateTransfer, verifyWebhookSignature, isH2H, isConfigured, isWebhookConfigured, isH2HApproved,
 };

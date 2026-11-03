@@ -90,8 +90,11 @@ async function approve(withdrawalId, adminUserId) {
 
   const details = wd.payout_details || {};
   const modemNetwork = String(wd.payout_method || '').toLowerCase();
-  const useModem = modemPay.isConfigured() &&
-    ['wave','afrimoney'].includes(modemNetwork);
+  const supportedModemNetwork = ['wave','afrimoney'].includes(modemNetwork);
+  if (modemPay.isConfigured() && supportedModemNetwork && !modemPay.isWebhookConfigured()) {
+    throw new AppError('Configure the Modem Pay webhook signing secret before sending automatic DAHA payouts.', 503, 'PROVIDER_UNAVAILABLE');
+  }
+  const useModem = modemPay.isConfigured() && modemPay.isWebhookConfigured() && supportedModemNetwork;
 
   if (!useModem) {
     return withTransaction(async (client) => {
