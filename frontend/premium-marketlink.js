@@ -1126,9 +1126,50 @@
     document.body.appendChild(modal);document.body.classList.add('ml-photo-viewer-open');
     var close=modal.querySelector('.ml-photo-viewer-close');if(close)close.focus();
   }
-  function takeProfilePhoto(){
-    var input=document.getElementById('ml-profile-camera-input');
-    if(input)input.click();else pickProfilePhoto();
+  function stopProfileCamera(){
+    var modal=document.getElementById('ml-profile-camera-modal');
+    if(modal){
+      var video=modal.querySelector('video');
+      if(video&&video.srcObject){video.srcObject.getTracks().forEach(function(track){track.stop();});video.srcObject=null;}
+      modal.remove();
+    }
+    document.body.classList.remove('ml-photo-viewer-open');
+  }
+  async function takeProfilePhoto(){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+      toast('Camera access is not available in this browser. Use Edit / Replace to choose a photo.','error');
+      return;
+    }
+    stopProfileCamera();
+    var modal=document.createElement('div');
+    modal.id='ml-profile-camera-modal';modal.className='ml-photo-viewer ml-profile-camera-modal';
+    modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-label','Take a profile photo');
+    modal.innerHTML='<div class="ml-photo-viewer-panel ml-camera-panel"><button type="button" class="ml-photo-viewer-close" aria-label="Close camera">×</button><div class="ml-photo-viewer-heading">Take your MarketLink photo</div><div class="ml-camera-preview"><video autoplay playsinline muted></video></div><p class="ml-photo-viewer-hint">Allow camera access, position your face, then take your photo.</p><div class="ml-photo-viewer-actions"><button type="button" class="ml-photo-viewer-action ml-photo-viewer-primary" data-ml-camera-capture>Take photo</button><button type="button" class="ml-photo-viewer-action ml-photo-viewer-secondary" data-ml-camera-cancel>Cancel</button></div></div>';
+    document.body.appendChild(modal);document.body.classList.add('ml-photo-viewer-open');
+    modal.addEventListener('click',function(e){if(e.target===modal)stopProfileCamera();});
+    modal.querySelector('.ml-photo-viewer-close').addEventListener('click',stopProfileCamera);
+    modal.querySelector('[data-ml-camera-cancel]').addEventListener('click',stopProfileCamera);
+    var capture=modal.querySelector('[data-ml-camera-capture]');capture.disabled=true;
+    try{
+      var stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'user'},width:{ideal:1280},height:{ideal:1280}}});
+      var video=modal.querySelector('video');video.srcObject=stream;
+      await video.play();
+      capture.disabled=false;
+      capture.addEventListener('click',async function(){
+        if(!video.videoWidth||!video.videoHeight){toast('The camera is still starting. Please wait a moment.','info');return;}
+        var side=Math.min(video.videoWidth,video.videoHeight),sx=(video.videoWidth-side)/2,sy=(video.videoHeight-side)/2;
+        var canvas=document.createElement('canvas');canvas.width=1024;canvas.height=1024;
+        canvas.getContext('2d').drawImage(video,sx,sy,side,side,0,0,1024,1024);
+        var file=await new Promise(function(resolve){canvas.toBlob(function(blob){resolve(blob?new File([blob],'marketlink-profile.jpg',{type:'image/jpeg',lastModified:Date.now()}):null);},'image/jpeg',0.9);});
+        if(!file){toast('Could not capture the photo. Please try again.','error');return;}
+        stopProfileCamera();
+        await saveProfilePhoto(file);
+      });
+    }catch(cameraError){
+      stopProfileCamera();
+      var message=cameraError&&cameraError.name==='NotAllowedError'?'Please allow camera access in your browser settings, then try again.':cameraError&&cameraError.name==='NotFoundError'?'No camera was found on this device. Use Edit / Replace to choose a photo.':'The camera could not be opened. Check camera permission and try again.';
+      toast(message,'error');
+    }
   }
   function pickProfilePhoto(){
     var el=document.getElementById('ml-profile-photo-input');
@@ -1458,28 +1499,15 @@
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
   function defaultAvatarMarkup(){
-    return '<svg class="ml-default-avatar" viewBox="0 0 160 160" role="img" aria-label="MarketLink default 3D avatar" xmlns="http://www.w3.org/2000/svg">'+
-      '<defs><linearGradient id="mlAvatarBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0F8F8A"/><stop offset=".52" stop-color="#276B75"/><stop offset="1" stop-color="#F5B83D"/></linearGradient>'+
-      '<radialGradient id="mlAvatarGlow" cx=".28" cy=".18" r=".9"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".45"/><stop offset="1" stop-color="#071521" stop-opacity=".12"/></radialGradient>'+
-      '<linearGradient id="mlAvatarSkin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#DDA47C"/><stop offset=".5" stop-color="#B97650"/><stop offset="1" stop-color="#8E4D34"/></linearGradient>'+
-      '<linearGradient id="mlAvatarShirt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#142F4A"/><stop offset=".55" stop-color="#0D7377"/><stop offset="1" stop-color="#073D4D"/></linearGradient>'+
-      '<linearGradient id="mlAvatarHair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#293342"/><stop offset="1" stop-color="#0A1220"/></linearGradient></defs>'+
-      '<rect width="160" height="160" rx="30" fill="url(#mlAvatarBg)"/><rect width="160" height="160" rx="30" fill="url(#mlAvatarGlow)"/>'+
-      '<circle cx="128" cy="34" r="21" fill="#FFD778" fill-opacity=".23"/><circle cx="26" cy="122" r="31" fill="#082B3E" fill-opacity=".13"/>'+
-      '<path d="M18 160c3-28 21-44 43-49 13-3 24-3 38 0 22 5 39 21 43 49Z" fill="url(#mlAvatarShirt)"/>'+
-      '<path d="M62 103h36l8 17-27 23-26-23Z" fill="url(#mlAvatarSkin)"/>'+
-      '<path d="M46 58c0-26 16-40 35-40 22 0 37 16 37 41v22c0 25-17 41-37 41-21 0-37-17-37-41Z" fill="url(#mlAvatarSkin)"/>'+
-      '<ellipse cx="44" cy="76" rx="7" ry="12" fill="#A96143"/><ellipse cx="119" cy="76" rx="7" ry="12" fill="#965037"/>'+
-      '<path d="M43 61c-3-25 11-43 36-45 23-2 39 12 43 35-9-6-14-15-18-22-6 12-22 19-39 21-7 1-14 5-22 11Z" fill="url(#mlAvatarHair)"/>'+
-      '<path d="M54 69c4-4 11-5 17-2" fill="none" stroke="#613522" stroke-width="3" stroke-linecap="round"/><path d="M90 67c6-3 12-2 17 2" fill="none" stroke="#613522" stroke-width="3" stroke-linecap="round"/>'+
-      '<ellipse cx="65" cy="77" rx="3.2" ry="4" fill="#172B36"/><ellipse cx="98" cy="77" rx="3.2" ry="4" fill="#172B36"/><circle cx="66" cy="75.5" r="1" fill="#FFFFFF"/><circle cx="99" cy="75.5" r="1" fill="#FFFFFF"/>'+
-      '<path d="M81 77l-4 13c2 3 5 4 8 2" fill="none" stroke="#8D4D35" stroke-width="2.4" stroke-linecap="round"/>'+
-      '<path d="M67 100c8 8 20 8 28 0" fill="none" stroke="#713B2D" stroke-width="3.4" stroke-linecap="round"/>'+
-      '<path d="M61 103c11 6 23 6 34 0" fill="none" stroke="#F4D0B6" stroke-width="2" stroke-linecap="round"/>'+
-      '<path d="M34 150c6-18 19-27 32-31l14 13 15-13c15 5 26 15 31 31" fill="url(#mlAvatarShirt)"/>'+
-      '<path d="M67 119l13 13 14-13" fill="none" stroke="#F5B83D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'+
-      '<path d="M29 29c10-10 20-15 32-18" stroke="#FFFFFF" stroke-opacity=".32" stroke-width="3" fill="none" stroke-linecap="round"/>'+
-      '</svg>';
+    return '<svg class="ml-default-avatar" viewBox="0 0 160 160" role="img" aria-label="MarketLink member avatar" xmlns="http://www.w3.org/2000/svg">'+
+      '<defs><linearGradient id="mlBrandAvatarBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#102B46"/><stop offset=".58" stop-color="#087E83"/><stop offset="1" stop-color="#DDAA45"/></linearGradient><linearGradient id="mlBrandAvatarSkin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3C9A5"/><stop offset="1" stop-color="#B97855"/></linearGradient><linearGradient id="mlBrandAvatarCoat" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#173C5B"/><stop offset="1" stop-color="#071B30"/></linearGradient><radialGradient id="mlBrandAvatarLight" cx=".25" cy=".12" r=".9"><stop offset="0" stop-color="#FFF" stop-opacity=".42"/><stop offset="1" stop-color="#FFF" stop-opacity="0"/></radialGradient></defs>'+
+      '<rect width="160" height="160" rx="38" fill="url(#mlBrandAvatarBg)"/><rect width="160" height="160" rx="38" fill="url(#mlBrandAvatarLight)"/>'+
+      '<circle cx="80" cy="80" r="66" fill="none" stroke="#F5C66B" stroke-opacity=".55" stroke-width="2"/><path d="M18 160c4-30 23-46 48-51l14 13 14-13c25 5 44 21 48 51Z" fill="url(#mlBrandAvatarCoat)"/>'+
+      '<path d="M63 104h34l8 17-25 20-25-20Z" fill="url(#mlBrandAvatarSkin)"/><ellipse cx="80" cy="70" rx="34" ry="39" fill="url(#mlBrandAvatarSkin)"/>'+
+      '<path d="M45 68c-2-30 14-48 37-48 24 0 38 17 35 47-7-5-13-13-17-23-11 11-30 16-55 16Z" fill="#182334"/>'+
+      '<path d="M59 71c5-4 11-4 16 0m10 0c5-4 11-4 16 0" fill="none" stroke="#553A30" stroke-width="3" stroke-linecap="round"/><path d="M72 91c5 5 12 5 17 0" fill="none" stroke="#7D4438" stroke-width="3" stroke-linecap="round"/>'+
+      '<path d="M59 127h42" stroke="#E5B85E" stroke-width="3" stroke-linecap="round"/><circle cx="80" cy="143" r="11" fill="#E5B85E"/><path d="M73 143h14M80 136v14" stroke="#12334B" stroke-width="2.5" stroke-linecap="round"/>'+
+      '<path d="M122 31h18M131 22v18" stroke="#FFE3A3" stroke-opacity=".85" stroke-width="2" stroke-linecap="round"/></svg>';
   }
   function togglePremiumAppearance(){
     S.dark=!S.dark;
@@ -1559,7 +1587,7 @@
       return '<button type="button" class="ml-profile-link" onclick="'+(item.page==='messages'?'window.ML_Premium.openMessages()':'window.ML_Premium.openProfilePage(\''+item.page+'\')')+'"><span class="ico">'+item.icon+'</span><span class="copy"><b>'+esc(item.title)+'</b><span>'+esc(item.desc)+'</span></span><span class="arrow" aria-hidden="true">›</span></button>';
     }).join('');
     root.innerHTML='<div class="ml-profile-shell">'+
-      '<div class="ml-profile-hero"><div class="ml-profile-avatar-wrap"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.openPhotoViewer()" aria-label="View profile photo">'+avatar+'<span class="ml-avatar-camera" aria-hidden="true">📷</span></button><div class="ml-avatar-actions"><button type="button" class="ml-photo-action" onclick="window.ML_Premium.pickPhoto()">Change photo</button>'+(photo?'<button type="button" class="ml-photo-action ml-photo-remove" onclick="window.ML_Premium.removeProfilePhoto()">Remove</button>':'')+'</div><div class="ml-photo-guidance">JPG or PNG · at least 512 × 512 px · maximum 5 MB</div><input type="file" id="ml-profile-photo-input" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"><input type="file" id="ml-profile-camera-input" accept="image/*" capture="user" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"></div><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
+      '<div class="ml-profile-hero"><div class="ml-profile-avatar-wrap"><button type="button" class="ml-avatar ml-avatar-button" onclick="window.ML_Premium.openPhotoViewer()" aria-label="View profile photo">'+avatar+'<span class="ml-avatar-camera" aria-hidden="true">📷</span></button><div class="ml-avatar-actions"><button type="button" class="ml-photo-action" onclick="window.ML_Premium.pickPhoto()">Change photo</button>'+(photo?'<button type="button" class="ml-photo-action ml-photo-remove" onclick="window.ML_Premium.removeProfilePhoto()">Remove</button>':'')+'</div><div class="ml-photo-guidance">JPG or PNG · at least 512 × 512 px · maximum 5 MB</div><input type="file" id="ml-profile-photo-input" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="window.ML_Premium.handleProfilePhoto(this)"></div><div class="ml-profile-identity"><div class="ml-eyebrow">Your MarketLink account</div><div class="ml-profile-name">'+esc(name)+'</div><div class="ml-profile-phone">'+gambiaFlagMarkup()+' '+esc(phone)+'</div><div class="ml-role-pills">'+roles+'<span class="ml-role-pill ml-role-active">Account active</span></div></div><button type="button" class="ml-edit" onclick="window.ML_Premium.editProfile()">Edit profile</button></div>'+
       '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">👤</div><div class="copy"><b>Full name</b><span>'+esc(fullName)+'</span></div></div><div class="ml-profile-row"><div class="ico">✨</div><div class="copy"><b>Display name</b><span>'+esc(name)+'</span></div></div><div class="ml-profile-row"><div class="ico">🎂</div><div class="copy"><b>Date of birth</b><span>'+esc(p.date_of_birth?String(p.date_of_birth).slice(0,10):'Not added yet')+'</span></div></div><div class="ml-profile-row"><div class="ico">🧾</div><div class="copy"><b>Gender</b><span>'+esc(p.gender?({'male':'Male','female':'Female','other':'Other','prefer_not_to_say':'Prefer not to say'}[p.gender]||String(p.gender)):'Not added yet')+'</span></div></div>'+(p.bio?'<div class="ml-profile-row ml-profile-about-row"><div class="ico">💬</div><div class="copy"><b>About you</b><span>'+esc(p.bio)+'</span></div></div>':'')+
       '<button type="button" class="ml-profile-row ml-profile-row-button ml-appearance-row" onclick="window.ML_Premium.toggleAppearance()"><div class="ico">'+(S.dark?'🌙':'☀️')+'</div><div class="copy"><b>Appearance · '+(S.dark?'Night mode':'Daylight mode')+'</b><span>'+(S.dark?'Night mode is active. Tap here to switch to Daylight.':'Daylight mode is active. Tap here to switch to Night.')+'</span></div><b class="ml-profile-arrow">›</b></button>'+applicationHtml+
       '<button type="button" class="ml-profile-row ml-profile-row-button" onclick="window.ML_Premium.openProfilePage(\'wallet\')"><div class="ico">💰</div><div class="copy"><b>Royal Wallet</b><span>Available balance · '+money(p.wallet_balance||S.walletBalance||0)+'</span></div><b class="ml-profile-arrow">›</b></button>'+
