@@ -12,7 +12,17 @@ const MIN_WITHDRAWAL = 50; // GMD — floor to avoid churn on tiny payout reques
 async function getBalance(userId) {
   const { rows: [w] } = await query('SELECT id,balance,currency FROM wallets WHERE user_id=$1', [userId]);
   if (!w) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
-  return w;
+  const { rows: [pending] } = await query(
+    "SELECT COALESCE(SUM(amount),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
+    [userId]
+  );
+  const reserved = Number(pending && pending.amount || 0);
+  const balance = Number(w.balance);
+  return Object.assign({}, w, {
+    balance: balance,
+    reserved_balance: reserved,
+    available_balance: Math.max(0, balance - reserved),
+  });
 }
 
 async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails } = {}) {

@@ -4296,11 +4296,14 @@ function renderRDash(){
   } else if(S.rSubTab==='wallet'){
     var total30=Number(S.rEarningsSummary&&S.rEarningsSummary.total_earnings||0);
     var pending30=Number(S.rEarningsSummary&&S.rEarningsSummary.pending_earnings||0);
-    var available=Number(S.rWallet&&S.rWallet.balance||0);
+    var available=Number(S.rWallet&&S.rWallet.available_balance!=null?S.rWallet.available_balance:(S.rWallet&&S.rWallet.balance||0));
     content='<div style="background:linear-gradient(135deg,#7C3AED,#4C1D95);border-radius:16px;padding:18px;margin-bottom:14px;text-align:center;">'+
       '<div style="color:rgba(255,255,255,0.7);font-size:11px;margin-bottom:4px;">Available Balance</div>'+
       '<div style="color:#fff;font-size:28px;font-weight:800;">D '+Math.max(0,available).toLocaleString()+'</div>'+
       '<button class="btn" style="background:#fff;color:#7C3AED;margin-top:12px;width:100%;font-weight:700;" onclick="rRequestWithdrawal('+Math.max(0,available)+')">Withdraw Funds</button>'+
+      '<button type="button" class="btn" style="background:rgba(255,255,255,0.12);color:#fff;margin-top:8px;width:100%;font-weight:700;" onclick="openProfilePage(\'wallet\')">Manage Wave / AfriMoney payout destination</button>'+
+      '<div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.5;margin-top:9px;">Rider delivery earnings are credited to DAHA Wallet after delivery and payment confirmation. Save your payout destination in DAHA before requesting a withdrawal.</div>'+
+      (Number(S.rWallet&&S.rWallet.reserved_balance||0)>0?'<div style="color:rgba(255,255,255,0.72);font-size:10px;margin-top:7px;">Reserved for pending withdrawals: D '+Number(S.rWallet.reserved_balance).toFixed(2)+'</div>':'')+
       '</div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
       [['30-Day Earnings','D '+total30.toLocaleString()],['Pending Earnings','D '+pending30.toLocaleString()],['Currency',String((S.rWallet&&S.rWallet.currency)||'GMD')]].map(function(r){
@@ -5832,12 +5835,16 @@ async function rRequestWithdrawal(amount){
   if(!amount||amount<=0){toast('No balance available','error');return;}
   toast('Requesting withdrawal…');
   var res=await LiveAPI.riderRequestWithdrawal(amount);
-  if(res.success){
+  if(res&&res.success){
     S.rWithdrawn=(S.rWithdrawn||0)+amount;
     if(!S.rWithdrawHistory) S.rWithdrawHistory=[];
-    S.rWithdrawHistory.unshift({id:res.data.withdrawalId,amount:amount,status:'Processing (ETA '+res.data.etaDays+'d)'});
-    renderRDash();
-    toast('Withdrawal requested: D '+amount+' 💰');
+    S.rWithdrawHistory.unshift({id:res.data.withdrawalId,amount:amount,status:'processing'});
+    await loadRiderLiveData();
+    toast('Withdrawal request submitted. It will only be paid after Modem Pay confirms the transfer.','success');
+  }else{
+    var message=res&&res.error||'Withdrawal request could not be submitted.';
+    toast(message,'error');
+    if(res&&res.code==='RIDER_PAYOUT_PROFILE_REQUIRED')openProfilePage('wallet');
   }
 }
 
