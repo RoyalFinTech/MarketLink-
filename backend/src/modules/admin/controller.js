@@ -20,5 +20,11 @@ exports.reports    = wrap(async (req,res) => res.json({ success:true, data: awai
 // ── Withdrawals (admin approval workflow) ───────────────────────────
 const withdrawalsSvc = require('../withdrawals/service');
 exports.pendingWithdrawals = wrap(async (req,res) => res.json({ success:true, data: await withdrawalsSvc.listPendingForAdmin(req.query) }));
-exports.approveWithdrawal  = wrap(async (req,res) => res.json({ success:true, message:'Withdrawal approved and paid out.', data: await withdrawalsSvc.approve(req.params.id, req.user.id) }));
+exports.approveWithdrawal = wrap(async (req,res) => {
+  const data = await withdrawalsSvc.approve(req.params.id, req.user.id);
+  const message = data.status === 'completed'
+    ? 'Withdrawal was paid and confirmed by Modem Pay.'
+    : 'Modem Pay payout started or is awaiting reconciliation. DAHA balance is debited only after provider confirmation.';
+  res.json({ success:true, message, data });
+});
 exports.rejectWithdrawal   = wrap(async (req,res) => res.json({ success:true, message:'Withdrawal rejected.', data: await withdrawalsSvc.reject(req.params.id, req.user.id) }));

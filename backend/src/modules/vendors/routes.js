@@ -64,7 +64,7 @@ router.get('/withdrawals',
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('status').optional().isIn(['processing', 'completed', 'rejected']),
+    query('status').optional().isIn(['processing', 'payout_pending', 'completed', 'rejected']),
   ],
   validate, ctrl.myWithdrawals
 );

@@ -1632,6 +1632,8 @@ var ML_API = (function(){
     users: function(qs){return get('/admin/users',qs);},
     reports: function(qs){return get('/admin/reports',qs);},
     withdrawals: function(qs){return get('/admin/withdrawals',qs);},
+    approveWithdrawal: function(id){return post('/admin/withdrawals/'+encodeURIComponent(id)+'/approve',{});},
+    rejectWithdrawal: function(id){return post('/admin/withdrawals/'+encodeURIComponent(id)+'/reject',{});},
     settings: function(){return get('/admin/settings');},
     setSetting: function(key,value){return put('/admin/settings/'+encodeURIComponent(key),{value:value});},
     auditLogs: function(qs){return get('/admin/audit-logs',qs);},
