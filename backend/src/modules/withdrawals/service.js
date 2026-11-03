@@ -147,8 +147,8 @@ async function approve(withdrawalId, adminUserId) {
     const details = wd.payout_details || {};
     const accountNumber = String(details.account_number || '').replace(/\D/g, '');
     const beneficiaryName = String(details.beneficiary_name || '').trim();
-    if (!/^\d{7}$/.test(accountNumber) || !beneficiaryName) {
-      throw new AppError('The saved payout destination is incomplete. Ask the user to update it before payout.', 409, 'INVALID_PAYOUT_DESTINATION');
+    if (!/^(87|86|83)\d{7}$/.test(accountNumber) || !beneficiaryName) {
+      throw new AppError('The saved 9-digit payout destination is incomplete or invalid. Ask the user to update it before payout.', 409, 'INVALID_PAYOUT_DESTINATION');
     }
 
     const { rows: [wallet] } = await client.query(
