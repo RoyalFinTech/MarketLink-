@@ -683,3 +683,8 @@ The supplied WhatsApp screenshot showed Kaira Africa with a logo thumbnail, whil
 - Service-worker cache is now v19 and precaches the manifest, PNG icons, SVG fallbacks and social card. API responses remain excluded.
 
 **External tests pending:** live WhatsApp crawler refresh, Android Chrome install, Windows Edge desktop install, and iOS Safari Add to Home Screen. WhatsApp may cache the previous preview; a fresh referral URL variant may be required after deployment.
+
+
+### 2026-11-03 — Onboarding text contrast consistency
+
+The frontend CI check exposed a pre-existing cascade conflict in `premium-marketlink.css`: a white onboarding background rule existed, but later broad visibility overrides forced white text into the white copy panel. This matched earlier reports of faint onboarding text. A final scoped override now keeps the main onboarding copy panel white with dark readable text, while the image/visual panel retains white text over its dark photo overlay. The white first-run appearance is therefore preserved without flattening the visual card. CSS brace balance and the CI's exact white-background assertion were checked before commit.

@@ -1859,3 +1859,41 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-daha-pin-input{max-width:220px;letter-spacing:7px;font-size:19px;text-align:center}
 .ml-daha-review-actions{display:flex;gap:9px;margin-top:15px}.ml-daha-review-actions button{flex:1;min-width:0}
 @media(max-width:480px){.ml-daha-review-actions{flex-direction:column}.ml-daha-review-row{align-items:flex-start}.ml-daha-review-row>strong{max-width:58%}}
+
+
+/* Final onboarding contrast fix: keep the copy panel white and readable.
+   The adjacent photo/visual panel retains its own dark overlay and white copy. */
+#scr-onboard.ml-onboard-screen{background:#fff!important}
+#scr-onboard.ml-onboard-screen{color:#172b36!important}
+#scr-onboard .ml-ob-topbar{background:#fff!important;color:#172b36!important}
+#scr-onboard .ml-ob-topbar-right>span{color:#526975!important}
+#scr-onboard .ml-ob-skip{background:#fff!important;color:#172b36!important;border:1px solid #dce5e9!important;text-shadow:none!important}
+#scr-onboard .ml-ob-slide,
+#scr-onboard .ml-ob-layout,
+#scr-onboard .ml-ob-copy,
+#scr-onboard .ml-ob-layout-runtime .ml-ob-copy{background:#fff!important;color:#172b36!important}
+#scr-onboard .ml-ob-copy,
+#scr-onboard .ml-ob-copy *{text-shadow:none!important}
+#scr-onboard .ml-ob-copy h1,
+#scr-onboard .ml-ob-copy h1 span,
+#scr-onboard .ml-ob-copy h1:not(em){color:#071521!important;-webkit-text-fill-color:#071521!important}
+#scr-onboard .ml-ob-copy h1 em{color:#0d7377!important;-webkit-text-fill-color:#0d7377!important}
+#scr-onboard .ml-ob-eyebrow,
+#scr-onboard .ml-ob-eyebrow *{color:#0d7377!important;-webkit-text-fill-color:#0d7377!important}
+#scr-onboard .ml-ob-description,
+#scr-onboard .ml-ob-copy p,
+#scr-onboard .ml-ob-inline-meta,
+#scr-onboard .ml-ob-inline-meta b,
+#scr-onboard .ml-ob-inline-meta small{color:#526975!important;-webkit-text-fill-color:#526975!important;opacity:1!important}
+#scr-onboard .ml-ob-chips span{background:#f4f8f9!important;color:#344d59!important;-webkit-text-fill-color:#344d59!important;border:1px solid #dfe8eb!important;text-shadow:none!important}
+#scr-onboard .ml-ob-footer{background:#fff!important;border-top:1px solid #edf1f3!important}
+#scr-onboard .ml-ob-next{background:#0d7377!important;color:#fff!important;-webkit-text-fill-color:#fff!important}
+#scr-onboard .ml-ob-visual-runtime,
+#scr-onboard .ml-ob-visual-runtime *{text-shadow:0 1px 4px rgba(0,0,0,.38)}
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-top,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-top *{color:#ffd36c!important;-webkit-text-fill-color:#ffd36c!important}
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-bottom h2,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-bottom p,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-pills span,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-reward span,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-reward small{color:#f8fbfd!important;-webkit-text-fill-color:#f8fbfd!important}
