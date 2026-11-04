@@ -192,7 +192,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
     if(err&&err.code==='MODEM_PAY_NETWORK_ERROR'){
       logger.warn('Modem Pay initiation outcome is unknown; keeping payment pending for reconciliation',{paymentId:payment.id,orderId,method});
       const {rows:[pendingAttempt]}=await query('SELECT * FROM payments WHERE id=$1',[payment.id]);
-      return {payment:pendingAttempt||payment,action:'continue',provider:provider.name,status:'pending',providerStatus:'unknown'};
+      return {payment:pendingAttempt||payment,action:'continue',status:'pending',providerStatus:'unknown'};
     }
     try { await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'", [payment.id]); }
     catch (updateErr) { logger.error('Could not mark failed payment attempt',{paymentId:payment.id,error:updateErr.message}); }
@@ -213,7 +213,6 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
   if (modemPay.isH2H()) {
     return {
       payment: updatedPayment,
-      provider: provider.name,
       action: nextStep && nextStep.openExternal && (nextStep.launch_url || redirectUrl) ? 'redirect' : 'continue',
       redirectUrl,
       nextStep,
@@ -224,7 +223,6 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
     payment: updatedPayment,
     action: 'redirect',
     redirectUrl,
-    provider: provider.name,
     providerStatus: chargeResult.status || chargeResult.providerStatus || 'pending',
   };
 }
