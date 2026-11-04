@@ -109,6 +109,9 @@ assert.ok(premiumJs.includes("method!=='cod'&&method!=='wallet'"), 'DAHA Wallet 
 assert.ok(premiumJs.includes('startRiderAvailabilityLocationSharing'), 'Rider online mode must support opt-in nearby availability location');
 assert.ok(premiumJs.includes('resumeRiderAvailabilityLocationSharing'), 'Rider availability location must resume safely after dashboard refresh');
 assert.ok(premiumJs.includes('Powered by Royal FinTech'), 'DAHA Wallet must show Royal FinTech branding');
+assert.ok(premiumJs.includes('confirmCodPayment'), 'Admin dashboard must expose COD reconciliation controls');
+assert.ok(premiumJs.includes('pendingCod'), 'Admin dashboard must load the protected COD reconciliation queue');
+assert.ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes("pendingCod: function(qs)"), 'Frontend payment API must expose the COD admin queue client');
 assert.doesNotMatch(premiumJs, /Modem Pay/i, 'Internal payment gateway name must not appear in customer-facing frontend');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /installPremiumPullToRefresh/, 'Pull-to-refresh handler is missing');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /ml-home-refresh/, 'Premium desktop refresh control is missing');
