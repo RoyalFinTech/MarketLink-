@@ -311,8 +311,101 @@ async function getPaymentStatus(paymentId, actorId, roles) {
   return { payment, status:providerStatus === 'processing' ? 'processing' : 'pending', providerStatus, nextStep, redirectUrl:nextStep && nextStep.launch_url || null };
 }
 
-async function confirmPayment(paymentId,actorId,roles){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));if(payment.method==='cod'){if(!isAdmin)throw new AppError('Only admins can confirm COD payments.',403,'FORBIDDEN');}else if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){await PROVIDERS[payment.method].verify(payment.provider_ref);}else if(payment.method!=='cod'){throw new AppError('This payment is confirmed by the provider webhook.',409,'WEBHOOK_CONFIRMATION_REQUIRED');}const confirmed=await markPaymentConfirmed(paymentId);try{await ordersService.settleOrderFinancials(payment.order_id);}catch(e){logger.warn('Settlement deferred after payment confirmation',{paymentId,orderId:payment.order_id,error:e.message});}return confirmed;}
-async function markPaymentConfirmed(paymentId){return withTransaction(async(client)=>{const {rows:[payment]}=await client.query('SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status==='confirmed')return payment;const {rows:[updated]}=await client.query(`UPDATE payments SET status='confirmed', paid_at=now() WHERE id=$1 RETURNING *`,[paymentId]);await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);const {rows:[o]}=await client.query('SELECT customer_id,total FROM orders WHERE id=$1',[payment.order_id]);if(o){await client.query(`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,[o.customer_id,'Your payment of D '+o.total+' has been confirmed.',paymentId]);}logger.info('Payment confirmed',{paymentId,orderId:payment.order_id});return updated;});}
+async function confirmPayment(paymentId,actorId,roles){
+  const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);
+  if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+  if(payment.status==='confirmed')return payment;
+  const roleList=Array.isArray(roles)?roles:[];
+  const isAdmin=roleList.some(r=>['admin','super_admin'].includes(r));
+  if(payment.method==='cod'){
+    if(!isAdmin)throw new AppError('Only admins can confirm collected cash for Pay on Delivery orders.',403,'FORBIDDEN');
+  }else if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){
+    await PROVIDERS[payment.method].verify(payment.provider_ref);
+  }else if(payment.method!=='cod'){
+    throw new AppError('This payment is confirmed by the payment service notification.',409,'WEBHOOK_CONFIRMATION_REQUIRED');
+  }
+  const actor=payment.method==='cod'?{
+    userId:actorId,
+    role:roleList.includes('super_admin')?'super_admin':'admin'
+  }:null;
+  const confirmed=await markPaymentConfirmed(paymentId,actor);
+  try{
+    await ordersService.settleOrderFinancials(payment.order_id);
+  }catch(e){
+    logger.warn('Settlement deferred after payment confirmation',{paymentId,orderId:payment.order_id,error:e.message});
+  }
+  return confirmed;
+}
+
+async function listPendingCodPayments({page=1,limit=30}={}){
+  const page_=Math.max(parseInt(page)||1,1);
+  const limit_=Math.min(Math.max(parseInt(limit)||30,1),100);
+  const offset=(page_-1)*limit_;
+  const {rows}=await query(
+    `SELECT p.id AS payment_id,p.amount,p.currency,p.created_at,
+            o.id AS order_id,o.order_number,o.total,o.status AS order_status,
+            o.payment_status,o.placed_at,
+            customer.full_name AS customer_name,
+            v.business_name AS vendor_name,
+            d.status AS delivery_status,
+            rider.full_name AS rider_name
+     FROM payments p
+     JOIN orders o ON o.id=p.order_id
+     JOIN users customer ON customer.id=o.customer_id
+     LEFT JOIN vendors v ON v.user_id=o.vendor_id
+     LEFT JOIN deliveries d ON d.order_id=o.id
+     LEFT JOIN users rider ON rider.id=d.rider_id
+     WHERE p.method='cod'
+       AND p.status='pending'
+       AND o.status='delivered'
+       AND o.payment_status<>'confirmed'
+     ORDER BY p.created_at ASC
+     LIMIT $1 OFFSET $2`,
+    [limit_,offset]
+  );
+  return rows;
+}
+async function markPaymentConfirmed(paymentId,actor=null){
+  return withTransaction(async(client)=>{
+    const {rows:[payment]}=await client.query('SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);
+    if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+    if(payment.status==='confirmed')return payment;
+    const {rows:[updated]}=await client.query(
+      `UPDATE payments SET status='confirmed',paid_at=now() WHERE id=$1 RETURNING *`,
+      [paymentId]
+    );
+    await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);
+    const {rows:[order]}=await client.query(
+      'SELECT customer_id,total,status,order_number FROM orders WHERE id=$1',
+      [payment.order_id]
+    );
+    if(order){
+      await client.query(
+        `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+         VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)`,
+        [order.customer_id,'Your payment of D '+order.total+' has been confirmed.',paymentId]
+      );
+    }
+    // Cash collection is an offline event, so retain an actor and order snapshot
+    // in the same transaction as the payment confirmation.
+    if(payment.method==='cod'&&actor&&actor.userId){
+      await client.query(
+        `INSERT INTO admin_action_logs
+           (actor_id,actor_role,action,entity_type,entity_id,after_data)
+         VALUES ($1,$2,'payment.cod_cash_confirmed','payment',$3,$4)`,
+        [actor.userId,actor.role,paymentId,JSON.stringify({
+          order_id:payment.order_id,
+          order_number:order&&order.order_number||null,
+          amount:Number(payment.amount),
+          currency:payment.currency||'GMD',
+          order_status:order&&order.status||null
+        })]
+      );
+    }
+    logger.info('Payment confirmed',{paymentId,orderId:payment.order_id,method:payment.method});
+    return updated;
+  });
+}
 async function processWebhook({ event, rawBody }) {
   if (String(event?.event || '').startsWith('transfer.')) {
     const withdrawalsSvc = require('../withdrawals/service');
@@ -484,4 +577,4 @@ async function processWebhook({ event, rawBody }) {
 
 async function refund(paymentId,{amount,reason},actor){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id=$1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status!=='confirmed')throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');if(payment.refund_status==='processed')throw new AppError('Payment already refunded.',400,'ALREADY_REFUNDED');const refundAmount=amount||payment.amount;if(refundAmount>payment.amount)throw new AppError('Refund amount exceeds payment amount.',400,'INVALID_AMOUNT');const provider=PROVIDERS[payment.method];if(payment.method!=='cod'&&provider)await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});return withTransaction(async(client)=>{const {rows:[updated]}=await client.query(`UPDATE payments SET refund_status='processed', refund_amount=$1,status=CASE WHEN $1=amount THEN 'refunded' ELSE status END WHERE id=$2 RETURNING *`,[refundAmount,paymentId]);const {rows:[o]}=await client.query('SELECT customer_id FROM orders WHERE id=$1',[payment.order_id]);if(o){const {rows:[w]}=await client.query('SELECT id,balance FROM wallets WHERE user_id=$1',[o.customer_id]);if(w){await client.query('UPDATE wallets SET balance=balance+$1 WHERE id=$2',[refundAmount,w.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,[w.id,refundAmount,Number(w.balance)+Number(refundAmount),paymentId,reason||'Order refund']);}}await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,[actor.id,actor.role,paymentId,JSON.stringify({refundAmount,reason})]);return updated;});}
 async function getHistory(customerId,{page=1,limit=20}){const limit_=Math.min(parseInt(limit)||20,100);const offset=(Math.max(parseInt(page)||1,1)-1)*limit_;const {rows}=await query(`SELECT p.*,o.order_number FROM payments p JOIN orders o ON o.id=p.order_id WHERE o.customer_id=$1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,[customerId,limit_,offset]);return rows;}
-module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,refund,getHistory,processWebhook,markPaymentConfirmed};
+module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,refund,getHistory,processWebhook,markPaymentConfirmed};
