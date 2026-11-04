@@ -176,7 +176,16 @@ async function settleOrderFinancials(orderId) {
 
     const { rows: [commission] } = await client.query(
       'SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE', [orderId]);
-    if (!commission || commission.status === 'paid') {
+    if (!commission) {
+      // Never report success when the authoritative settlement row is missing.
+      // An operator must reconcile the order before any wallet credit is attempted.
+      throw new AppError(
+        'The order settlement record is missing. No wallet balances were changed. An Admin must reconcile this order before settlement.',
+        409,
+        'SETTLEMENT_RECORD_MISSING'
+      );
+    }
+    if (commission.status === 'paid') {
       return { settled:true, alreadySettled:true };
     }
 
