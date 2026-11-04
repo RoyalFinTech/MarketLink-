@@ -2259,7 +2259,23 @@
     return beginDahaWithdrawal(amount);
   }
   async function liveRiderDecline(id){
-    toast('Delivery decline is not exposed as a separate backend action; the request remains available until accepted.','info');
+    if(!apiOk()){toast('Rider sign-in required.','error');return;}
+    if(!id){toast('The delivery reference is missing. Refresh your rider dashboard.','error');return;}
+    try{
+      await ML_API.delivery.decline(String(id));
+      S.rDeliveries=(S.rDeliveries||[]).filter(function(delivery){return String(delivery.id)!==String(id);});
+      if(S.activeDel&&String(S.activeDel.id)===String(id)){
+        S.activeDel=null;
+        S.delStepIdx=0;
+        stopRiderLocationWatch();
+      }
+      S._riderLiveLoaded=false;
+      renderRDash();
+      toast('Delivery declined. The vendor can now assign another rider.','success');
+      refreshNotifBadges();
+    }catch(e){
+      toast(e.error||'Could not decline this delivery. Refresh your rider requests and try again.','error');
+    }
   }
   function sanitizeRiderMap(){
     var map=G('rider-amap');
@@ -2275,9 +2291,6 @@
     if(S.activeDel&&S.activeDel.id)startRiderLocationWatch(S.activeDel.id);
     else stopRiderLocationWatch();
     sanitizeRiderMap();
-    document.querySelectorAll('#rdash-body button').forEach(function(btn){
-      if((btn.textContent||'').indexOf('Decline')>=0) btn.remove();
-    });
   };
   async function reorderLive(orderId,itemsDesc,total,rawItems){
     if(!apiOk()){toast('Please sign in first.','error');return;}
