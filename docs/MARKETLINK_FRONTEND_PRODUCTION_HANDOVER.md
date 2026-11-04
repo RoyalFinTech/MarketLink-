@@ -820,3 +820,9 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - Replaced the test file with correctly escaped JavaScript regular expressions and parsed the corrected script body before committing.
 - The PWA release source remains at shell cache `v20` and premium JS revision `r19`; a fresh CI run is required to establish the test result.
 - The GitHub Pages deployment job separately returned HTTP 502 while creating a Pages deployment for commit `7159447feec1f456832495ed16c5029cbfb0e55e`. Its Jekyll build passed; this is separate from the Render static-site deployment and will be distinguished from Render status.
+
+
+## 2026-11-04 — Twilio OTP adapter unit tests
+- Added Jest coverage for Twilio Account SID/Auth Token and API Key/Secret, Messaging Service and From-number addressing, missing sender configuration, unsupported providers, and existing Africa's Talking compatibility.
+- Added authentication tests proving `OTP_DEV_MODE=true` still returns `devOtp` to the existing dashboard reveal flow without sending SMS. With development mode off, auth calls the selected provider and deletes the pending OTP if delivery is rejected.
+- Added a backend GitHub Actions workflow to run `npm ci` and `npm test` for backend changes. Tests use mocked credentials and do not send real SMS.

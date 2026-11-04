@@ -6,13 +6,37 @@ const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const { normalizePhone } = require('../../utils/phone');
+const notificationsService = require('../notifications/service');
 function signAccess(id, roles) { return jwt.sign({ sub: id, roles }, process.env.JWT_ACCESS_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }); }
 function signRefresh(id) { return jwt.sign({ sub: id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }); }
 function genOtp() { return String(crypto.randomInt(100000, 999999)); }
 function canonicalPhone(raw) { try { return normalizePhone(raw, 'GM').e164; } catch (e) { throw new AppError(e.message || 'Please enter a valid phone number.',400,'INVALID_PHONE'); } }
-async function storeOtp(destination,channel,purpose,otp,userId=null){const hash=await bcrypt.hash(otp,8);const exp=new Date(Date.now()+(parseInt(process.env.OTP_EXPIRY_MINUTES)||5)*60000);await query('DELETE FROM otp_verifications WHERE destination=$1 AND purpose=$2 AND verified_at IS NULL',[destination,purpose]);await query('INSERT INTO otp_verifications (user_id,destination,channel,code_hash,purpose,expires_at) VALUES($1,$2,$3,$4,$5,$6)',[userId,destination,channel,hash,purpose,exp]);}
+async function storeOtp(destination,channel,purpose,otp,userId=null){
+ const hash=await bcrypt.hash(otp,8),exp=new Date(Date.now()+(parseInt(process.env.OTP_EXPIRY_MINUTES)||5)*60000);
+ await query('DELETE FROM otp_verifications WHERE destination=$1 AND purpose=$2 AND verified_at IS NULL',[destination,purpose]);
+ const {rows:[record]}=await query('INSERT INTO otp_verifications (user_id,destination,channel,code_hash,purpose,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[userId,destination,channel,hash,purpose,exp]);
+ return record.id;
+}
+async function issueOtp(destination,purpose,otp,userId=null){
+ const otpId=await storeOtp(destination,'sms',purpose,otp,userId);
+ if(String(process.env.OTP_DEV_MODE||'').trim().toLowerCase()==='true')return{devOtp:otp,deliveryMode:'development'};
+ const minutes=parseInt(process.env.OTP_EXPIRY_MINUTES,10)||5,label=purpose==='pin_reset'?'PIN reset':'verification';
+ const delivery=await notificationsService.sendSms({to:destination,message:'MarketLink '+label+' code: '+otp+'. Expires in '+minutes+' minutes. Do not share this code.'});
+ if(!delivery||!delivery.sent){
+  await query('DELETE FROM otp_verifications WHERE id=$1 AND verified_at IS NULL',[otpId]).catch(()=>{});
+  logger.error('OTP delivery failed',{purpose,provider:delivery&&delivery.provider||process.env.SMS_PROVIDER||'africastalking',reason:delivery&&delivery.reason||'UNKNOWN'});
+  throw new AppError('MarketLink could not deliver your code by SMS. Please try again later.',503,'OTP_DELIVERY_FAILED');
+ }
+ return{deliveryMode:'sms',smsProvider:delivery.provider||process.env.SMS_PROVIDER||'africastalking'};
+}
 async function verifyOtp(destination,purpose,otp){const {rows}=await query('SELECT * FROM otp_verifications WHERE destination=$1 AND purpose=$2 AND verified_at IS NULL ORDER BY created_at DESC LIMIT 1',[destination,purpose]);if(!rows.length)throw new AppError('No OTP was requested for this number.',400,'OTP_NOT_FOUND');const rec=rows[0];if(new Date()>new Date(rec.expires_at))throw new AppError('OTP has expired. Please request a new one.',400,'OTP_EXPIRED');await query('UPDATE otp_verifications SET attempts=attempts+1 WHERE id=$1',[rec.id]);if(rec.attempts>=5)throw new AppError('Too many attempts. Please request a new OTP.',429,'OTP_MAX_ATTEMPTS');if(!await bcrypt.compare(otp,rec.code_hash))throw new AppError('Incorrect OTP. Please try again.',400,'INVALID_OTP');await query('UPDATE otp_verifications SET verified_at=now() WHERE id=$1',[rec.id]);return rec;}
-async function registerInitiate({fullName,phone,userType='customer'}){const e164=canonicalPhone(phone);const {rows}=await query('SELECT id FROM users WHERE phone=$1',[e164]);if(rows.length)throw new AppError('An account already exists with this phone number.',409,'PHONE_ALREADY_REGISTERED');const otp=genOtp();await storeOtp(e164,'sms','registration',otp);logger.info('Registration OTP',{phone:e164,dev:process.env.OTP_DEV_MODE==='true'});return{message:'OTP sent.',phone:e164,...(process.env.OTP_DEV_MODE==='true'?{devOtp:otp}:{})};}
+async function registerInitiate({fullName,phone,userType='customer'}){
+ const e164=canonicalPhone(phone),{rows}=await query('SELECT id FROM users WHERE phone=$1',[e164]);
+ if(rows.length)throw new AppError('An account already exists with this phone number.',409,'PHONE_ALREADY_REGISTERED');
+ const otp=genOtp(),delivery=await issueOtp(e164,'registration',otp);
+ logger.info('Registration OTP issued',{deliveryMode:delivery.deliveryMode,provider:delivery.smsProvider||null});
+ return{message:delivery.deliveryMode==='development'?'Development OTP ready.':'OTP sent by SMS.',phone:e164,...(delivery.devOtp?{devOtp:delivery.devOtp}:{})};
+}
 function generateAffiliateCode(){return 'ML'+crypto.randomBytes(4).toString('hex').toUpperCase();}
 async function createAffiliateForCustomer(client,userId){for(let i=0;i<5;i++){const code=generateAffiliateCode();try{await client.query('INSERT INTO affiliates (user_id,affiliate_code,commission_pct) VALUES($1,$2,2.00)',[userId,code]);return code;}catch(e){if(e.code==='23505')continue;throw e;}}throw new AppError('Could not create affiliate profile.',500,'AFFILIATE_SETUP_FAILED');}
 async function registerComplete({fullName,phone,otp,pin,userType='customer'}){const e164=canonicalPhone(phone);await verifyOtp(e164,'registration',otp);const {rows}=await query('SELECT id FROM users WHERE phone=$1',[e164]);if(rows.length)throw new AppError('An account already exists with this phone number.',409,'PHONE_ALREADY_REGISTERED');const hash=await bcrypt.hash(pin,12);return withTransaction(async(client)=>{const {rows:[user]}=await client.query('INSERT INTO users (full_name,phone,password_hash,pin_hash,phone_verified,status) VALUES($1,$2,$3,$4,TRUE,\'active\') RETURNING id,full_name,phone,status',[fullName,e164,hash,hash]);const types=Array.isArray(userType)?userType:[userType];for(const t of types)await client.query('INSERT INTO user_roles (user_id,role_id) SELECT $1,id FROM roles WHERE name=$2',[user.id,t]);let affiliateCode=null;if(types.includes('customer')){const ref='ML'+Math.random().toString(36).toUpperCase().slice(2,8);await client.query('INSERT INTO customers (user_id,referral_code) VALUES($1,$2)',[user.id,ref]);await client.query('INSERT INTO wallets (user_id) VALUES($1)',[user.id]);affiliateCode=await createAffiliateForCustomer(client,user.id);}const accessToken=signAccess(user.id,types);const rt=signRefresh(user.id);const rth=await bcrypt.hash(rt,8);await client.query('INSERT INTO refresh_tokens (user_id,token_hash,expires_at) VALUES($1,$2,$3)',[user.id,rth,new Date(Date.now()+30*24*60*60*1000)]);return{user,accessToken,refreshToken:rt,roles:types,affiliateCode};});}
@@ -21,10 +45,9 @@ async function requestPinReset(rawPhone){
   const phone=canonicalPhone(rawPhone);
   const {rows}=await query('SELECT id FROM users WHERE phone=$1 AND status <> $2 LIMIT 1',[phone,'deleted']);
   if(!rows.length)throw new AppError('No active MarketLink account was found for this phone number.',404,'USER_NOT_FOUND');
-  const otp=genOtp();
-  await storeOtp(phone,'sms','pin_reset',otp,rows[0].id);
-  logger.info('PIN reset OTP requested',{userId:rows[0].id,dev:process.env.OTP_DEV_MODE==='true'});
-  return {message:'Reset code generated.',phone,...(process.env.OTP_DEV_MODE==='true'?{devOtp:otp}:{})};
+  const otp=genOtp(),delivery=await issueOtp(phone,'pin_reset',otp,rows[0].id);
+  logger.info('PIN reset OTP issued',{userId:rows[0].id,deliveryMode:delivery.deliveryMode,provider:delivery.smsProvider||null});
+  return{message:delivery.deliveryMode==='development'?'Development reset code ready.':'PIN reset code sent by SMS.',phone,...(delivery.devOtp?{devOtp:delivery.devOtp}:{})};
 }
 async function confirmPinReset({phone:rawPhone,otp,newPin}){
   const phone=canonicalPhone(rawPhone);

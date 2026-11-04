@@ -163,41 +163,39 @@ async function sendEmail({ to, subject, text, html }) {
   }
 }
 
-async function sendSms({ to, message }) {
-  if (!process.env.AFRICASTALKING_API_KEY || !process.env.AFRICASTALKING_USERNAME) {
-    return { sent: false, reason: 'AFRICASTALKING_API_KEY_AND_USERNAME_REQUIRED' };
-  }
-  if (!to || !message) return { sent: false, reason: 'RECIPIENT_AND_MESSAGE_REQUIRED' };
-  try {
-    const form = new URLSearchParams({
-      username: process.env.AFRICASTALKING_USERNAME,
-      to: String(to),
-      message: String(message)
-    });
-    if (process.env.AFRICASTALKING_SENDER_ID) form.set('from', process.env.AFRICASTALKING_SENDER_ID);
-    const response = await requestWithTimeout('https://api.africastalking.com/version1/messaging', {
-      method: 'POST',
-      headers: {
-        apiKey: process.env.AFRICASTALKING_API_KEY,
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: form.toString()
-    });
-    const raw = await response.text();
-    let data = {};
-    try { data = JSON.parse(raw); } catch (_) {}
-    const recipients = data.SMSMessageData && data.SMSMessageData.Recipients;
-    if (!response.ok || !Array.isArray(recipients) || !recipients.length) {
-      logger.warn("Africa's Talking SMS request was not accepted", { status: response.status });
-      return { sent: false, provider: 'africastalking', status: response.status, reason: 'PROVIDER_REJECTED' };
-    }
-    const accepted = recipients.filter(item => ['100', '101', '102'].includes(String(item.statusCode)));
-    return { sent: accepted.length > 0, provider: 'africastalking', accepted: accepted.length, failed: recipients.length - accepted.length };
-  } catch (error) {
-    logger.error('SMS provider request failed', { error: error.message });
-    return { sent: false, reason: 'PROVIDER_REQUEST_FAILED' };
-  }
+async function sendTwilioSms({to,message}){
+ const sid=String(process.env.TWILIO_ACCOUNT_SID||'').trim(),key=String(process.env.TWILIO_API_KEY||'').trim(),secret=String(process.env.TWILIO_API_SECRET||'').trim(),token=String(process.env.TWILIO_AUTH_TOKEN||'').trim();
+ const useKey=Boolean(key&&secret),username=useKey?key:sid,password=useKey?secret:token,from=String(process.env.TWILIO_FROM_NUMBER||'').trim(),serviceSid=String(process.env.TWILIO_MESSAGING_SERVICE_SID||'').trim();
+ if(!sid||!username||!password)return{sent:false,provider:'twilio',reason:'TWILIO_ACCOUNT_AND_API_CREDENTIALS_REQUIRED'};
+ if(!from&&!serviceSid)return{sent:false,provider:'twilio',reason:'TWILIO_FROM_NUMBER_OR_MESSAGING_SERVICE_REQUIRED'};
+ try{
+  const form=new URLSearchParams({To:String(to),Body:String(message)});
+  if(serviceSid)form.set('MessagingServiceSid',serviceSid);else form.set('From',from);
+  const response=await requestWithTimeout('https://api.twilio.com/2010-04-01/Accounts/'+encodeURIComponent(sid)+'/Messages.json',{method:'POST',headers:{Authorization:'Basic '+Buffer.from(username+':'+password).toString('base64'),Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
+  const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(_){}
+  if(!response.ok||!data.sid){logger.warn('Twilio SMS request was not accepted',{status:response.status,providerCode:data.code||null});return{sent:false,provider:'twilio',status:response.status,reason:'PROVIDER_REJECTED'};}
+  return{sent:true,provider:'twilio',messageSid:data.sid,status:data.status||'accepted'};
+ }catch(error){logger.error('Twilio SMS request failed',{error:error.message});return{sent:false,provider:'twilio',reason:'PROVIDER_REQUEST_FAILED'};}
+}
+async function sendAfricaTalkingSms({to,message}){
+ if(!process.env.AFRICASTALKING_API_KEY||!process.env.AFRICASTALKING_USERNAME)return{sent:false,provider:'africastalking',reason:'AFRICASTALKING_API_KEY_AND_USERNAME_REQUIRED'};
+ try{
+  const form=new URLSearchParams({username:process.env.AFRICASTALKING_USERNAME,to:String(to),message:String(message)});
+  if(process.env.AFRICASTALKING_SENDER_ID)form.set('from',process.env.AFRICASTALKING_SENDER_ID);
+  const response=await requestWithTimeout('https://api.africastalking.com/version1/messaging',{method:'POST',headers:{apiKey:process.env.AFRICASTALKING_API_KEY,Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
+  const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(_){}
+  const recipients=data.SMSMessageData&&data.SMSMessageData.Recipients;
+  if(!response.ok||!Array.isArray(recipients)||!recipients.length){logger.warn("Africa's Talking SMS request was not accepted",{status:response.status});return{sent:false,provider:'africastalking',status:response.status,reason:'PROVIDER_REJECTED'};}
+  const accepted=recipients.filter(x=>['100','101','102'].includes(String(x.statusCode)));
+  return{sent:accepted.length>0,provider:'africastalking',accepted:accepted.length,failed:recipients.length-accepted.length};
+ }catch(error){logger.error("Africa's Talking SMS request failed",{error:error.message});return{sent:false,provider:'africastalking',reason:'PROVIDER_REQUEST_FAILED'};}
+}
+async function sendSms({to,message}){
+ if(!to||!message)return{sent:false,reason:'RECIPIENT_AND_MESSAGE_REQUIRED'};
+ const provider=String(process.env.SMS_PROVIDER||'africastalking').trim().toLowerCase();
+ if(provider==='twilio')return sendTwilioSms({to,message});
+ if(provider==='africastalking'||provider==='africa_talking')return sendAfricaTalkingSms({to,message});
+ return{sent:false,provider,reason:'UNSUPPORTED_SMS_PROVIDER'};
 }
 
 async function sendPush({ token, title, body, data = {} }) {

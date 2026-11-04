@@ -80,6 +80,10 @@ assert.deepEqual(ogDimensions, { width: 1200, height: 630 }, 'Open Graph preview
 assert.match(html, /property=["']og:image["']/, 'Open Graph image metadata is missing');
 assert.match(html, /property=["']og:image:width["']\s+content=["']1200["']/, 'Open Graph image width metadata is missing');
 assert.match(html, /property=["']og:image:height["']\s+content=["']630["']/, 'Open Graph image height metadata is missing');
+const expectedOgUrl = 'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-og-preview.jpg?v=20261104-r3';
+assert.ok(html.includes('property="og:image" content="' + expectedOgUrl + '"'), 'Open Graph image URL must be current');
+assert.ok(html.includes('property="og:image:secure_url" content="' + expectedOgUrl + '"'), 'Secure Open Graph image URL must match');
+assert.ok(html.includes('name="twitter:image" content="' + expectedOgUrl + '"'), 'Twitter image URL must match');
 assert.ok(fs.existsSync(path.join(root, 'assets', 'marketlink-logo.png')), 'Official MarketLink logo is missing');
 assert.ok(fs.existsSync(path.join(root, 'assets', 'daha-wallet-eagle.webp')), 'Official DAHA eagle asset is missing');
 assert.ok(fs.existsSync(path.join(root, 'assets', 'apple-touch-icon-180.png')), 'Apple touch icon is missing');
