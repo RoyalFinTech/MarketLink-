@@ -10,13 +10,12 @@ exports.methods = wrap(async (req,res) => {
   const h2h = Boolean(modemPay.isH2H());
   const h2hApproved = Boolean(modemPay.isH2HApproved());
   const configured = keyConfigured && webhookConfigured && (!h2h || h2hApproved);
+  // Return only the public checkout capabilities. Gateway mode, webhook
+  // configuration and provider identity stay inside the backend integration.
   res.json({success:true,data:{
     configured,
-    mode:h2h?'h2h':'merchant',
     directMobileMoney:configured&&h2h,
     hostedCheckout:configured&&!h2h,
-    webhookConfigured,
-    setupReason:!keyConfigured?'Secure mobile-money checkout is being prepared.':(!webhookConfigured?'Payment confirmation is being configured.':(h2h&&!h2hApproved?'Direct mobile-money checkout is awaiting activation.':null)),
     methods:configured?['wave','afrimoney','qmoney']:[],
     currency:'GMD'
   }});
