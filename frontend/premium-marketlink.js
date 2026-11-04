@@ -2143,10 +2143,48 @@
       renderRDash();toast(next==='delivered'?'Delivery completed ✓':'Delivery status updated ✓');
     }catch(e){toast(e.error||'Could not update delivery status.','error');}
   }
+  var mlRiderAvailabilityWatchId=null;
+  function stopRiderAvailabilityLocationSharing(){
+    try{if(mlRiderAvailabilityWatchId!==null&&navigator.geolocation)navigator.geolocation.clearWatch(mlRiderAvailabilityWatchId);}catch(e){}
+    mlRiderAvailabilityWatchId=null;
+  }
+  function startRiderAvailabilityLocationSharing(allowPermissionPrompt){
+    if(!navigator.geolocation){
+      if(allowPermissionPrompt)toast('Location is not available in this browser. You can stay online, but shops will not see your approximate distance.','warning');
+      return;
+    }
+    if(mlRiderAvailabilityWatchId!==null)return;
+    var begin=function(){
+      if(!S.rOnline||mlRiderAvailabilityWatchId!==null)return;
+      try{
+        mlRiderAvailabilityWatchId=navigator.geolocation.watchPosition(function(position){
+          if(!S.rOnline||!position||!position.coords)return;
+          var active=(S.rDeliveries||[]).find(function(d){return ['assigned','picked_up','in_transit'].indexOf(String(d.status||''))>=0;});
+          var deliveryId=active&&active.id?active.id:undefined;
+          ML_API.delivery.updateLocation(Number(position.coords.latitude),Number(position.coords.longitude),deliveryId).catch(function(){});
+        },function(error){
+          if(error&&error.code===1&&allowPermissionPrompt)toast('Location permission is off. You can stay online, but shops will not see your approximate distance until location is enabled.','warning');
+          else if(error&&error.code===2&&allowPermissionPrompt)toast('Your device could not get a GPS location. Check location services and try again.','warning');
+          stopRiderAvailabilityLocationSharing();
+        },{enableHighAccuracy:true,maximumAge:45000,timeout:15000});
+      }catch(e){mlRiderAvailabilityWatchId=null;if(allowPermissionPrompt)toast('Could not start location sharing. You can still stay online.','warning');}
+    };
+    if(!allowPermissionPrompt&&navigator.permissions&&typeof navigator.permissions.query==='function'){
+      navigator.permissions.query({name:'geolocation'}).then(function(permission){if(permission&&permission.state==='granted')begin();}).catch(function(){});
+      return;
+    }
+    begin();
+  }
   async function toggleRiderOnline(){
     if(!apiOk()){toast('Sign in required.','error');return;}
-    try{var next=!S.rOnline;await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You are online and eligible for deliveries.':'You are offline.');}
-    catch(e){toast(e.error||'Could not change rider availability.','error');}
+    try{
+      var next=!S.rOnline;
+      await ML_API.delivery.setAvailability(next);
+      S.rOnline=next;
+      if(next)startRiderAvailabilityLocationSharing(true);else stopRiderAvailabilityLocationSharing();
+      renderRDash();
+      toast(next?'You are online. Nearby shops can see your approximate distance when location is allowed.':'You are offline.');
+    }catch(e){toast(e.error||'Could not change rider availability.','error');}
   }
   async function liveVendorRequestPayout(amount){
     amount=Number(amount||0);
@@ -2564,6 +2602,7 @@
   window.doSearch=liveSearch;
   window.submitVApp=submitVendor;
   window.submitRApp=submitRider;
+  window.ML_Premium.resumeRiderAvailabilityLocationSharing=function(){if(S.rOnline)startRiderAvailabilityLocationSharing(false);else stopRiderAvailabilityLocationSharing();};
   window.rToggleOnline=toggleRiderOnline;
   window.editName=editProfileModal;
   window.reorderPastOrder=reorderLive;
