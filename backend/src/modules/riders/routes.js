@@ -79,7 +79,7 @@ router.post('/location',
   [
     body('lat').isFloat({ min: -90,  max: 90  }).withMessage('Invalid latitude.'),
     body('lng').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude.'),
-    body('deliveryId').isUUID().withMessage('An active assigned delivery is required for location sharing.'),
+    body('deliveryId').optional({ nullable:true, checkFalsy:true }).isUUID().withMessage('Invalid delivery reference.'),
   ],
   validate, ctrl.updateLocation
 );
