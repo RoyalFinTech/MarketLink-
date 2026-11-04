@@ -1,0 +1,44 @@
+name: MarketLink backend checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/marketlink-backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/marketlink-backend-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked backend dependencies
+        run: npm ci
+      - name: Run backend Jest tests
+        run: npm test -- --ci
+      - name: Parse changed financial and rider modules
+        run: |
+          node --check src/modules/payments/service.js
+          node --check src/modules/payments/controller.js
+          node --check src/modules/payments/routes.js
+          node --check src/modules/orders/service.js
+          node --check src/modules/wallets/service.js
+          node --check src/modules/withdrawals/service.js
+          node --check src/modules/delivery/service.js
+          node --check src/modules/riders/service.js
+          node --check src/modules/riders/routes.js
