@@ -842,3 +842,48 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - Render deployment and GitHub Pages build completed successfully for the prior premium-entry commit.
 - The new frontend CI job failed because its regular expression expected a literal backslash before the dot in `royalfintech.github.io`. Replaced the hostname and redirect checks with literal source assertions, avoiding regex escape ambiguity.
 - Updated the frontend check runner to Node 22 to align with current backend CI and the Supabase package engine requirement.
+
+
+## 2026-11-04 — Financial cycle, nearby riders and premium app continuation
+
+### Checkout and DAHA Wallet
+- Customer checkout has two always-available routes when mobile-money configuration is not ready: **Pay on Delivery** (cod) and **DAHA Wallet** (wallet). The frontend maps the visible DAHA label to the exact backend method key; wallet checkout is not disabled by unavailable external mobile-money credentials.
+- Customer-facing payment capability responses now expose only availability, supported user-facing rails and currency. Internal gateway mode, webhook configuration, provider identity and adapter details remain in the backend.
+- DAHA Wallet branding in the premium wallet header reads **Powered by Royal FinTech**. Wallet balance and activity remain sourced from the server ledger; the app does not fabricate funds.
+- The existing withdrawal flow continues to allow a request-specific Wave/AfriMoney destination that may differ from the MarketLink login number. Saved payout details are defaults only; request recipient details and the 4-digit MarketLink PIN remain part of the withdrawal flow.
+
+### Pay on Delivery cash reconciliation
+- Added protected GET /payments/cod/pending for Admin users only. It lists delivered COD orders whose payment is pending, or whose payment is confirmed but the authoritative settlement record is not yet paid.
+- Admin confirmation is only accepted after the order is delivered. Cash confirmation writes the Admin actor and payment/order snapshot to admin_action_logs in the same transaction as payment confirmation.
+- A settlement error does not silently clear the cash-reconciliation queue. Confirmed-but-unsettled COD rows remain visible as **Retry wallet settlement**; the underlying settlement routine and uniqueness controls prevent duplicate vendor, rider or affiliate credits.
+- The premium Admin tab is routed to the live-data Admin renderer that contains this queue. Do not use the legacy Admin renderer as a substitute for the live reconciliation screen.
+
+### Settlement integrity and database changes
+- settleOrderFinancials() no longer reports success when the authoritative commission_records row is missing. It raises SETTLEMENT_RECORD_MISSING before changing wallet balances so an Admin can reconcile the order.
+- Applied Supabase migration 028_financial_settlement_idempotency_indexes to project nsglfunkdnpchoqqzmcc. Read-back confirmed:
+  - uq_commission_records_order
+  - uq_rider_earnings_delivery_order
+  - uq_transactions_order_settlement_credit
+- Duplicate checks returned zero rows before the unique indexes were applied. The migration is tracked in backend/src/db/migrations/028_financial_settlement_idempotency_indexes.sql.
+- Production still has no real customer/vendor/rider orders or payments to exercise a complete Dalasi movement. No synthetic user, payment or payout was inserted to create a false end-to-end result.
+
+### Nearby rider search and delivery ownership
+- Vendor order cards call the existing available-rider endpoint and present approved online riders with approximate distance when a fresh, opted-in location is available. Exact rider coordinates are not returned in vendor discovery results.
+- Rider assignment locks the delivery and the selected rider row, checks that the actor owns the vendor order or is an Admin, and rejects offline/unapproved/busy riders. This serializes concurrent assignment attempts for the same rider.
+- Rider availability location is an explicit browser geolocation permission. Idle availability pings are throttled to 45 seconds. The availability watcher stops when a delivery becomes active so the active-delivery tracker remains the single owner of GPS updates.
+- The premium rider dashboard now calls the backend decline endpoint and no longer hides the Decline control. A declined assignment is released for vendor reassignment.
+
+### Premium UI, PWA and sharing
+- Current homepage asset versions: premium JS marketlink-premium-canonical-r25, premium CSS marketlink-premium-canonical-r23; service-worker shell: marketlink-shell-v26.
+- The PWA manifest uses the MarketLink name/short name and declares 192/512 PNG icons, maskable variants, SVG artwork and standalone display. The homepage declares a favicon, Apple touch icon, Open Graph and Twitter metadata, and a 1200 × 630 MarketLink social preview image.
+- Desktop refresh and mobile pull-to-refresh handlers are present for marketplace, cart, orders, profile, vendor, rider and Admin views.
+- The old GitHub Pages MarketLink path is redirected to the canonical Render premium app. The old shortcut HTML remains a redirect, not a second product implementation. This does not delete the repository, other GitHub Pages projects or Kaira Africa services.
+
+### CI and Render verification for this pass
+- Backend GitHub Actions run 25 (62c7fd33b0d59fbd8e5222bbdd2287e73fddad50) passed: **3 test suites, 13 tests**, plus node --check on payment, order, wallet, withdrawal, delivery and rider modules.
+- Frontend GitHub Actions run 189 (ff7a85e8540845c3cb42c6dfc174a491b82d5350) passed the frontend/PWA source checks after the JS/cache references were aligned. GitHub Pages build/deployment run 752 also completed successfully; Render remains the canonical production frontend.
+- Render frontend deploy for commit 075b8bb88a5b65a8546c5759294421e4235c581f was Live. Render backend deploy for commit 30fb29608bd737ac889bd3ecad517b0c6b507efa was Live, and logs confirmed the production API started and mounted 23 modules. The subsequent rider-decline change is frontend-only and uses the already-deployed backend decline endpoint.
+- Direct external browser fetches of the production homepage/API could not be completed from this execution environment because public DNS/network resolution was unavailable. Render control-plane deploy state and startup logs are verified, but a real authenticated HTTP checkout run was not possible here.
+- Physical Android, iOS and desktop install/icon tests, and WhatsApp/social crawler preview retrieval, remain pending real-device/external-network verification. The manifest and metadata source checks pass; source presence is not a substitute for those device tests.
+- OTP behaviour was not changed in this pass. Development OTP remains on the current development-mode configuration; the existing Twilio/Africa's Talking adapter tests remain in the backend test suite.
+
