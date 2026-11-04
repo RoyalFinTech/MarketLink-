@@ -314,21 +314,32 @@ async function getPaymentStatus(paymentId, actorId, roles) {
 async function confirmPayment(paymentId,actorId,roles){
   const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);
   if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
-  if(payment.status==='confirmed')return payment;
   const roleList=Array.isArray(roles)?roles:[];
   const isAdmin=roleList.some(r=>['admin','super_admin'].includes(r));
   if(payment.method==='cod'){
     if(!isAdmin)throw new AppError('Only admins can confirm collected cash for Pay on Delivery orders.',403,'FORBIDDEN');
-  }else if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){
+    const {rows:[order]}=await query('SELECT status FROM orders WHERE id=$1',[payment.order_id]);
+    if(!order||order.status!=='delivered'){
+      throw new AppError('COD cash can only be reconciled after the order is marked delivered.',409,'COD_NOT_DELIVERED');
+    }
+    const actor={
+      userId:actorId,
+      role:roleList.includes('super_admin')?'super_admin':'admin'
+    };
+    const confirmed=payment.status==='confirmed'?payment:await markPaymentConfirmed(paymentId,actor);
+    // COD confirmations run after delivery. Do not hide a confirmed payment if
+    // settlement fails: the Admin queue includes confirmed-but-unsettled items
+    // so this path can safely retry without creating another wallet credit.
+    const settlement=await ordersService.settleOrderFinancials(payment.order_id);
+    return {payment:confirmed,settlement};
+  }
+  if(payment.status==='confirmed')return payment;
+  if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){
     await PROVIDERS[payment.method].verify(payment.provider_ref);
-  }else if(payment.method!=='cod'){
+  }else{
     throw new AppError('This payment is confirmed by the payment service notification.',409,'WEBHOOK_CONFIRMATION_REQUIRED');
   }
-  const actor=payment.method==='cod'?{
-    userId:actorId,
-    role:roleList.includes('super_admin')?'super_admin':'admin'
-  }:null;
-  const confirmed=await markPaymentConfirmed(paymentId,actor);
+  const confirmed=await markPaymentConfirmed(paymentId);
   try{
     await ordersService.settleOrderFinancials(payment.order_id);
   }catch(e){
@@ -355,10 +366,13 @@ async function listPendingCodPayments({page=1,limit=30}={}){
      LEFT JOIN vendors v ON v.user_id=o.vendor_id
      LEFT JOIN deliveries d ON d.order_id=o.id
      LEFT JOIN users rider ON rider.id=d.rider_id
+     LEFT JOIN commission_records cr ON cr.order_id=o.id
      WHERE p.method='cod'
-       AND p.status='pending'
        AND o.status='delivered'
-       AND o.payment_status<>'confirmed'
+       AND (
+         p.status='pending'
+         OR (p.status='confirmed' AND COALESCE(cr.status,'')<>'paid')
+       )
      ORDER BY p.created_at ASC
      LIMIT $1 OFFSET $2`,
     [limit_,offset]
