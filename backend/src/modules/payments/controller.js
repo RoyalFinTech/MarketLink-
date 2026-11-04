@@ -25,6 +25,7 @@ exports.initiate = wrap(async (req,res) => { const result=await svc.initiatePaym
 exports.continue = wrap(async (req,res) => res.json({success:true,data:await svc.continuePayment(req.params.id,req.body,req.user.id,req.user.roles)}));
 exports.status = wrap(async (req,res) => res.json({success:true,data:await svc.getPaymentStatus(req.params.id,req.user.id,req.user.roles)}));
 exports.confirm = wrap(async (req,res) => res.json({success:true,data:await svc.confirmPayment(req.params.id,req.user.id,req.user.roles)}));
+exports.pendingCod = wrap(async (req,res) => res.json({success:true,data:await svc.listPendingCodPayments(req.query)}));
 exports.refund = wrap(async (req,res) => { const actor={id:req.user.id,role:(req.user.roles||[])[0]}; res.json({success:true,data:await svc.refund(req.params.id,req.body,actor)}); });
 exports.history = wrap(async (req,res) => res.json({success:true,data:await svc.getHistory(req.user.id,req.query)}));
 exports.webhook = async (req,res,next) => {
