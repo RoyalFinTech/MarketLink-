@@ -414,24 +414,39 @@
       '<div class="ml-wallet-note" style="margin:8px 0 12px;padding:12px;border-radius:12px">Only confirm cash after an Admin has verified that the rider/vendor handed over the collected amount. This queue includes delivered orders only; wallet settlement remains blocked until payment is confirmed.</div>'+
       (codPayments.length?'<div class="ml-profile-card">'+codPayments.map(function(c){
         var paymentId=esc(c.payment_id||'');
+        var paymentState=String(c.payment_record_status||'pending').toLowerCase();
+        var alreadyConfirmed=paymentState==='confirmed';
         var riderLabel=c.rider_name||'Rider not assigned';
-        return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>Delivered · Cash confirmation pending</small></div><button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;)">Confirm cash received</button></div>';
+        var actionLabel=alreadyConfirmed?'Retry wallet settlement':'Confirm cash received';
+        var stateLabel=alreadyConfirmed?'Cash confirmed · settlement needs retry':'Delivered · cash confirmation pending';
+        return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>'+stateLabel+'</small></div><button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;,&quot;'+paymentState+'&quot;)">'+actionLabel+'</button></div>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No delivered COD payments awaiting confirmation</b><span>New cash-on-delivery orders will appear here after delivery is marked complete.</span></div>')+
       '<div class="ml-section-head"><h3>Top vendors</h3></div>'+
       (vendors.length?'<div class="ml-profile-card">'+vendors.map(function(v){return '<div class="ml-profile-row"><div class="ico">🏪</div><div class="copy"><b>'+esc(v.business_name||'Vendor')+'</b><span>'+Number(v.total_sales||0)+' sales · '+money(v.total_revenue||0)+'</span></div><span style="color:#FFD778">★ '+Number(v.rating_avg||0).toFixed(1)+'</span></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No approved vendors yet</b><span>Vendor performance will appear here after real vendors are approved.</span></div>')+
       '<div style="display:flex;gap:8px;margin-top:14px"><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="window.ML_Premium.adminUsers()">Users</button><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="adminLogout()">Sign out</button></div></div>';
     }catch(e){toast(e.error||'Could not load the admin dashboard.','error');}
   }
-  async function confirmCodPayment(paymentId){
+  async function confirmCodPayment(paymentId,paymentState){
     if(!apiOk()){toast('Admin session required.','error');return;}
     if(!paymentId){toast('The COD payment reference is missing.','error');return;}
-    if(!window.confirm('Confirm that the collected cash for this delivered order has been received and reconciled? This will mark the COD payment as paid and may release the vendor/rider/affiliate settlement.'))return;
+    var retry=String(paymentState||'pending').toLowerCase()==='confirmed';
+    var question=retry
+      ?'This COD payment is already marked as cash received. Retry the outstanding wallet settlement for this delivered order?'
+      :'Confirm that the collected cash for this delivered order has been received and reconciled? This will mark the COD payment as paid and may release the vendor/rider/affiliate settlement.';
+    if(!window.confirm(question))return;
     try{
-      await ML_API.payments.confirm(paymentId);
-      toast('COD cash confirmation recorded. Eligible wallet settlement has been processed.','success');
+      var response=await ML_API.payments.confirm(paymentId);
+      var data=response&&response.data||response||{};
+      var settlement=data.settlement||null;
+      if(settlement&&settlement.settled===false){
+        toast('Cash confirmation is saved, but wallet settlement is still pending: '+String(settlement.reason||'Review required')+'.','warning');
+      }else{
+        toast(retry?'COD wallet settlement retry completed.':'COD cash recorded and eligible wallet settlement completed.','success');
+      }
       await loadAdminDashboard();
     }catch(e){
-      toast(e.error||'Could not confirm this COD cash payment.','error');
+      toast(e.error||'Could not confirm or settle this COD payment. Review the settlement record before retrying.','error');
+      await loadAdminDashboard();
     }
   }
 
