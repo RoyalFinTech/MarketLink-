@@ -91,6 +91,12 @@ assert.ok(fs.existsSync(path.join(root, 'assets', 'apple-touch-icon-180.png')), 
 assert.match(html, /rel=["']manifest["'][^>]*manifest\.webmanifest/i, 'HTML must link the PWA manifest');
 assert.match(html, /id=["']scr-returning["']/, 'Returning-user PIN screen is missing');
 assert.match(html, /navigator\.serviceWorker\.register/, 'Service worker registration is missing');
+assert.match(html, /host==='royalfintech\\.github\\.io' && path\.indexOf\('\/MarketLink-\/'\)===0/, 'Legacy Pages entry must be redirected');
+assert.match(html, /location\.replace\('https:\/\/marketlink-gambia-frontend\.onrender\.com\//, 'Legacy Pages must redirect to canonical premium app');
+assert.match(html, /marketlink-premium-canonical-r20/, 'Premium JS URL must be revised');
+assert.match(serviceWorker, /marketlink-shell-v21/, 'PWA cache must be bumped');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /installPremiumPullToRefresh/, 'Pull-to-refresh handler is missing');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /ml-home-refresh/, 'Premium desktop refresh control is missing');
 assert.match(html, /ml_onboarding_seen_v1/, 'Onboarding completion must persist');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /#scr-onboard\.ml-onboard-screen\{background:#fff!important\}/, 'Onboarding white theme override is missing');
 console.log('MarketLink frontend checks passed: external JS, ' + inlineCount + ' inline scripts, synchronized PWA cache, manifest/icons, 1200 × 630 social image, returning PIN route and white first-run theme.');

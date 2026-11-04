@@ -784,7 +784,7 @@
       :'<span class="ml-dashboard-avatar-fallback">'+profileInitial+'</span>';
     root.innerHTML=
       '<div class="ml-premium-home">'+
-      '<div class="ml-home-top"><div class="ml-home-welcome">'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-home-top-actions"><div class="ml-live-dot">Live marketplace</div><button type="button" class="ml-dashboard-avatar" onclick="switchTab(\'profile\')" aria-label="Open your profile" title="Open your profile">'+profileAvatar+'</button></div></div>'+
+      '<div class="ml-home-top"><div class="ml-home-welcome">'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-home-top-actions"><div class="ml-live-dot">Live marketplace</div><button type="button" class="ml-home-refresh" onclick="window.ML_Premium.refresh()" aria-label="Refresh MarketLink" title="Refresh marketplace">↻</button><button type="button" class="ml-dashboard-avatar" onclick="switchTab(\'profile\')" aria-label="Open your profile" title="Open your profile">'+profileAvatar+'</button></div></div>'+
       '<div class="ml-home-discovery"><button type="button" class="ml-btn ml-btn-primary" onclick="var s=document.getElementById(\'hsearch\');if(s)s.focus()">🔎 Search marketplace</button><button type="button" class="ml-btn ml-btn-secondary" onclick="switchTab(\'orders\')">📦 Track my orders</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.renderCategories()">🛍️ Browse categories</button></div>'+
       '<div class="ml-home-search"><span aria-hidden="true">🔎</span><input id="hsearch" type="search" autocomplete="off" placeholder="Search products, vendors or categories…" aria-label="Search products, vendors or categories" oninput="window.doSearch(this.value)"><button type="button" onclick="var q=document.getElementById(\'hsearch\');if(q)window.doSearch(q.value)">Search</button></div>'+
       promoCarouselMarkup()+
@@ -2582,4 +2582,52 @@
     if(window.ML_Premium.renderPremiumAdminLogin)window.ML_Premium.renderPremiumAdminLogin();
     setTimeout(function(){if(apiOk())window.ML_Premium.removeDemoBanner();},1200);
   });
+
+  function installPremiumPullToRefresh(){
+    if(window.__marketLinkPullRefreshInstalled)return;
+    window.__marketLinkPullRefreshInstalled=true;
+    var startY=0,scrollNode=null,eligible=false;
+    function isControl(node){
+      return !!(node&&node.closest&&node.closest('input,textarea,select,button,[contenteditable="true"],.sheet-ov.open,[role="dialog"]'));
+    }
+    function findScrollNode(node){
+      var current=node;
+      while(current&&current!==document.body&&current!==document.documentElement){
+        if(current.scrollHeight>current.clientHeight+2){
+          var style=window.getComputedStyle?getComputedStyle(current):null;
+          var overflow=style?(style.overflowY||style.overflow):'auto';
+          if(/auto|scroll|overlay/.test(overflow))return current;
+        }
+        current=current.parentElement;
+      }
+      return document.scrollingElement||document.documentElement;
+    }
+    document.addEventListener('touchstart',function(event){
+      if(!event.touches||event.touches.length!==1||isControl(event.target)){eligible=false;return;}
+      var app=document.getElementById('scr-app');
+      if(app&&!app.classList.contains('active')){eligible=false;return;}
+      scrollNode=findScrollNode(event.target);
+      eligible=!!scrollNode&&scrollNode.scrollTop<=1;
+      startY=event.touches[0].clientY;
+    },{passive:true});
+    document.addEventListener('touchend',function(event){
+      if(!eligible||!event.changedTouches||!event.changedTouches.length){eligible=false;return;}
+      var delta=event.changedTouches[0].clientY-startY;
+      var atTop=!scrollNode||scrollNode.scrollTop<=1;
+      eligible=false;scrollNode=null;
+      if(delta<105||!atTop)return;
+      var tab=String(S.curTab||'home');
+      if(tab==='home')refresh();
+      else if(tab==='cart')renderLiveCart();
+      else if(tab==='orders')renderLiveOrders();
+      else if(tab==='profile')renderPremiumProfile();
+      else if(tab==='vendordash')renderVDash();
+      else if(tab==='riderdash')renderRDash();
+      else if(tab==='admindash')loadAdminDashboard();
+    },{passive:true});
+    document.addEventListener('touchcancel',function(){eligible=false;scrollNode=null;},{passive:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPremiumPullToRefresh,{once:true});
+  else installPremiumPullToRefresh();
+
 })();

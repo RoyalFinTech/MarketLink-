@@ -826,3 +826,13 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - Added Jest coverage for Twilio Account SID/Auth Token and API Key/Secret, Messaging Service and From-number addressing, missing sender configuration, unsupported providers, and existing Africa's Talking compatibility.
 - Added authentication tests proving `OTP_DEV_MODE=true` still returns `devOtp` to the existing dashboard reveal flow without sending SMS. With development mode off, auth calls the selected provider and deletes the pending OTP if delivery is rejected.
 - Added a backend GitHub Actions workflow to run `npm ci` and `npm test` for backend changes. Tests use mocked credentials and do not send real SMS.
+
+
+## 2026-11-04 — Retire old GitHub Pages entry and refresh premium app
+
+- The user's screenshot showed the old dashboard at `https://royalfintech.github.io/MarketLink-/frontend/index.html`; Render was serving the premium app, while this old repository Pages URL remained a separate entry.
+- Added an early host guard to `frontend/index.html`: only URLs on `royalfintech.github.io` beneath `/MarketLink-/` redirect to the canonical premium Render app. Other GitHub Pages projects and all Render routes are unaffected.
+- Updated the old `MarketLink (7).html` shortcut to point directly at the canonical Render app.
+- Bumped premium JavaScript URL to `r20` and PWA cache to `v21` so installed app clients fetch the new UI behaviour.
+- Added a visible refresh control to premium home and pull-down refresh for the current app tab (home, cart, orders, profile, vendor, rider or admin) when pulled at the top.
+- This retires the old MarketLink Pages entry by redirect; it does not delete unrelated GitHub Pages content or separate Kaira Africa services.

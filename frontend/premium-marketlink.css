@@ -1897,3 +1897,8 @@ body.ml-photo-viewer-open{overflow:hidden}
 #scr-onboard .ml-ob-visual-runtime .ml-ob-visual-pills span,
 #scr-onboard .ml-ob-visual-runtime .ml-ob-reward span,
 #scr-onboard .ml-ob-visual-runtime .ml-ob-reward small{color:#f8fbfd!important;-webkit-text-fill-color:#f8fbfd!important}
+
+.ml-home-refresh{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1px solid rgba(245,184,61,.48);border-radius:11px;background:rgba(245,184,61,.09);color:#FFD778;font-size:22px;font-weight:800;line-height:1;cursor:pointer;transition:transform .18s ease,background .18s ease}
+.ml-home-refresh:hover{background:rgba(245,184,61,.18);transform:rotate(35deg)}
+.ml-home-refresh:focus-visible{outline:3px solid rgba(245,184,61,.5);outline-offset:2px}
+@media(max-width:560px){.ml-home-refresh{width:32px;height:32px;font-size:20px}}
