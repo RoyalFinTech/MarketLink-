@@ -14,7 +14,7 @@ describe('OTP delivery mode',()=>{
   process.env.OTP_DEV_MODE='false';notifications.sendSms.mockResolvedValue({sent:true,provider:'twilio'});const r=await registerInitiate({fullName:'Test',phone:'871234567'});expect(r).not.toHaveProperty('devOtp');expect(notifications.sendSms).toHaveBeenCalledWith(expect.objectContaining({to:'+220871234567',message:expect.stringMatching(/\d{6}/)}));
  });
  test('deletes OTP after provider rejection',async()=>{
-  process.env.OTP_DEV_MODE='false';notifications.sendSms.mockResolvedValue({sent:false,provider:'twilio'});await expect(registerInitiate({fullName:'Test',phone:'871234567'})).rejects.toMatchObject({code:'OTP_DELIVERY_FAILED',status:503});expect(query).toHaveBeenCalledWith('DELETE FROM otp_verifications WHERE id=$1 AND verified_at IS NULL',['otp-id']);
+  process.env.OTP_DEV_MODE='false';notifications.sendSms.mockResolvedValue({sent:false,provider:'twilio'});await expect(registerInitiate({fullName:'Test',phone:'871234567'})).rejects.toMatchObject({code:'OTP_DELIVERY_FAILED',statusCode:503});expect(query).toHaveBeenCalledWith('DELETE FROM otp_verifications WHERE id=$1 AND verified_at IS NULL',['otp-id']);
  });
  test('PIN reset keeps development OTP response',async()=>{
   process.env.OTP_DEV_MODE='true';query.mockImplementation(async sql=>{if(sql.startsWith('SELECT id FROM users WHERE phone=$1 AND status'))return{rows:[{id:'user-id'}]};if(sql.startsWith('INSERT INTO otp_verifications'))return{rows:[{id:'otp-id'}]};return{rows:[]};});const r=await requestPinReset('871234567');expect(r.devOtp).toMatch(/^\d{6}$/);expect(notifications.sendSms).not.toHaveBeenCalled();
