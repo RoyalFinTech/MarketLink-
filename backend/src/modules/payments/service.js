@@ -123,10 +123,10 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
   if (method === 'wallet') {
     return payOrderFromDahaWallet({ orderId, requestedAmount, customerId });
   }
-  if(method!=='cod'&&(!modemPay.isConfigured()||!modemPay.isWebhookConfigured())) throw new AppError('Modem Pay API credentials and webhook signing configuration are required before mobile-money checkout can be enabled. Choose Pay on Delivery or DAHA Wallet.',503,'PROVIDER_UNAVAILABLE');
-  if(method!=='cod'&&modemPay.isH2H()&&!modemPay.isH2HApproved()) throw new AppError('Direct mobile-money checkout is waiting for Modem Pay H2H partner approval.',503,'PROVIDER_UNAVAILABLE');
+  if(method!=='cod'&&(!modemPay.isConfigured()||!modemPay.isWebhookConfigured())) throw new AppError('Secure mobile-money checkout is not available yet. Choose Pay on Delivery or DAHA Wallet.',503,'PROVIDER_UNAVAILABLE');
+  if(method!=='cod'&&modemPay.isH2H()&&!modemPay.isH2HApproved()) throw new AppError('Direct mobile-money checkout is not available yet. Choose Pay on Delivery or DAHA Wallet.',503,'PROVIDER_UNAVAILABLE');
   if(modemPay.isH2H()&&!['cod','wave','afrimoney','qmoney'].includes(method)) throw new AppError('Choose Wave, AfriMoney or QMoney for direct mobile-money checkout.',400,'UNSUPPORTED_METHOD');
-  if (method!=='cod'&&!modemPay.isH2H()&&requestedAmount<10) throw new AppError('Modem Pay checkout requires a minimum payment of D 10.00.',400,'BELOW_PROVIDER_MINIMUM');
+  if (method!=='cod'&&!modemPay.isH2H()&&requestedAmount<10) throw new AppError('Mobile-money checkout requires a minimum payment of D 10.00.',400,'BELOW_PROVIDER_MINIMUM');
 
   // Reserve a pending payment while holding the order lock, so two requests cannot
   // both start a provider charge for the same order and method.
@@ -243,7 +243,7 @@ async function continuePayment(paymentId, { action, pin }, actorId, roles) {
   const payment = await findOwnedPayment(paymentId, actorId, roles);
   if (payment.status === 'confirmed') return { payment, status:'completed', confirmed:true };
   if (payment.status !== 'pending') throw new AppError('This payment attempt is no longer active. Start a new payment from checkout.',409,'PAYMENT_NOT_ACTIVE');
-  if (!modemPay.isH2H()) throw new AppError('This payment requires the configured hosted Modem Pay checkout.',409,'PAYMENT_FLOW_MISMATCH');
+  if (!modemPay.isH2H()) throw new AppError('This payment requires the secure hosted checkout selected for this transaction.',409,'PAYMENT_FLOW_MISMATCH');
 
   let providerResponse;
   if (action === 'confirm') providerResponse = await modemPay.confirmCharge(payment.provider_ref);
@@ -303,7 +303,7 @@ async function getPaymentStatus(paymentId, actorId, roles) {
 
   if (['failed','cancelled','abandoned','expired'].includes(providerStatus)) {
     await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'",[paymentId]);
-    try { await releaseOrderInventoryAfterPaymentFailure(payment.order_id,'Modem Pay reported '+providerStatus+'.'); }
+    try { await releaseOrderInventoryAfterPaymentFailure(payment.order_id,'The payment provider reported '+providerStatus+'.'); }
     catch (e) { logger.error('Could not release inventory after provider failure',{paymentId,orderId:payment.order_id,error:e.message}); }
     payment = await findOwnedPayment(paymentId, actorId, roles);
     return { payment, status:'failed', providerStatus };
@@ -318,7 +318,7 @@ async function processWebhook({ event, rawBody }) {
     const withdrawalsSvc = require('../withdrawals/service');
     return withdrawalsSvc.processProviderWebhook(event);
   }
-  if (!event || !event.event) throw new AppError('Invalid Modem Pay event.', 400, 'INVALID_WEBHOOK');
+  if (!event || !event.event) throw new AppError('Invalid payment event.', 400, 'INVALID_WEBHOOK');
 
   const eventType = String(event.event);
   const payload = event.payload || {};
