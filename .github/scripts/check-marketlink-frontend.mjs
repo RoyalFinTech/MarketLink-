@@ -69,8 +69,12 @@ for (const icon of manifest.icons) {
 
 const htmlJs = html.match(/<script\b[^>]*\bsrc=["']([^"']*premium-marketlink\.js[^"']*)["'][^>]*>/i);
 const shellJs = serviceWorker.match(/["'](\.\/premium-marketlink\.js\?[^"']+)["']/i);
+const htmlCss = html.match(/<link\b[^>]*href=["']([^"']*premium-marketlink\.css[^"']*)["'][^>]*>/i);
+const shellCss = serviceWorker.match(/["'](\.\/premium-marketlink\.css\?[^"']+)["']/i);
 assert.ok(htmlJs && shellJs, 'Homepage and service worker must both reference premium-marketlink.js');
 assert.equal(htmlJs[1], shellJs[1], 'Service worker must cache the exact premium JS URL used by the homepage');
+assert.ok(htmlCss && shellCss, 'Homepage and service worker must both reference premium-marketlink.css');
+assert.equal(htmlCss[1], shellCss[1], 'Service worker must cache the exact premium CSS URL used by the homepage');
 assert.match(serviceWorker, /CACHE_NAME\s*=\s*['"]marketlink-shell-v\d+['"]/, 'Service worker shell cache must be versioned');
 
 const ogPreviewPath = path.join(root, 'assets', 'marketlink-og-preview.jpg');
@@ -93,8 +97,17 @@ assert.match(html, /id=["']scr-returning["']/, 'Returning-user PIN screen is mis
 assert.match(html, /navigator\.serviceWorker\.register/, 'Service worker registration is missing');
 assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("path.indexOf('/MarketLink-/')===0"), 'Legacy Pages entry must be redirected');
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
-assert.match(html, /marketlink-premium-canonical-r20/, 'Premium JS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v21/, 'PWA cache must be bumped');
+assert.match(html, /marketlink-premium-canonical-r21/, 'Premium JS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r23/, 'Premium CSS URL must be revised');
+assert.match(serviceWorker, /marketlink-shell-v22/, 'PWA cache must be bumped');
+
+const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
+assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
+assert.ok(premiumJs.includes("method!=='cod'&&method!=='wallet'"), 'DAHA Wallet must remain selectable when mobile-money checkout is not configured');
+assert.ok(premiumJs.includes('startRiderAvailabilityLocationSharing'), 'Rider online mode must support opt-in nearby availability location');
+assert.ok(premiumJs.includes('resumeRiderAvailabilityLocationSharing'), 'Rider availability location must resume safely after dashboard refresh');
+assert.ok(premiumJs.includes('Powered by Royal FinTech'), 'DAHA Wallet must show Royal FinTech branding');
+assert.doesNotMatch(premiumJs, /Modem Pay/i, 'Internal payment gateway name must not appear in customer-facing frontend');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /installPremiumPullToRefresh/, 'Pull-to-refresh handler is missing');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /ml-home-refresh/, 'Premium desktop refresh control is missing');
 assert.match(html, /ml_onboarding_seen_v1/, 'Onboarding completion must persist');
