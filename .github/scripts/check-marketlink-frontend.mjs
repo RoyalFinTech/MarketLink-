@@ -98,10 +98,10 @@ assert.match(html, /navigator\.serviceWorker\.register/, 'Service worker registr
 assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("path.indexOf('/MarketLink-/')===0"), 'Legacy Pages entry must be redirected');
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
-assert.match(html, /premium-canonical-r12/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r23/, 'Premium JS URL must be revised');
+assert.match(html, /premium-canonical-r13/, 'Production shell version marker must be current');
+assert.match(html, /marketlink-premium-canonical-r24/, 'Premium JS URL must be revised');
 assert.match(html, /marketlink-premium-canonical-r23/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v24/, 'PWA cache must be bumped');
+assert.match(serviceWorker, /marketlink-shell-v25/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
