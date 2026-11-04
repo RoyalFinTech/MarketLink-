@@ -794,3 +794,21 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - Recipient details are not added to customer, vendor or rider-facing screens by this change.
 - JavaScript syntax parsing passed before commit. The existing MarketLink frontend GitHub Actions check will run because the modified file is under `frontend/`. Final verification requires the check result and the new Render deployment.
 
+
+
+## 2026-11-04 — PWA cache release and asset validation
+
+### Finding
+- The production homepage and service worker both referenced premium JavaScript revision `marketlink-premium-canonical-r18`, and the shell cache was `marketlink-shell-v19`, even after the frontend JavaScript had received new commits.
+- Because the service worker uses cache-first delivery for app-shell assets, existing installed clients could retain the older premium JavaScript until a service-worker revision changed.
+
+### Change
+- Bumped the app-shell cache from `marketlink-shell-v19` to `marketlink-shell-v20`.
+- Bumped the premium JavaScript URL in both `frontend/index.html` and the service worker from `r18` to `r19`.
+- Extended `.github/scripts/check-marketlink-frontend.mjs` to assert that the homepage and service worker use exactly the same JS URL, all declared PNG icon dimensions match the manifest, the Open Graph preview is exactly 1200 × 630, social metadata exists, and the official MarketLink/DAHA/Apple assets are present.
+
+### Verification
+- Repository assets were decoded and visually inspected: official MarketLink logo, separate DAHA eagle, and 1200 × 630 preview render correctly.
+- Static CI is configured to run the strengthened checks on this frontend commit.
+- Actual installed-device icon and service-worker update behaviour remain PENDING DEVICE TEST.
+- Public asset URL and WhatsApp crawler fetch remain UNVERIFIED because production URL DNS resolution failed in the audit environment.
