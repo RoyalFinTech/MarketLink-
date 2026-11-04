@@ -836,3 +836,9 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - Bumped premium JavaScript URL to `r20` and PWA cache to `v21` so installed app clients fetch the new UI behaviour.
 - Added a visible refresh control to premium home and pull-down refresh for the current app tab (home, cart, orders, profile, vendor, rider or admin) when pulled at the top.
 - This retires the old MarketLink Pages entry by redirect; it does not delete unrelated GitHub Pages content or separate Kaira Africa services.
+
+
+## 2026-11-04 — Frontend CI redirect assertion correction
+- Render deployment and GitHub Pages build completed successfully for the prior premium-entry commit.
+- The new frontend CI job failed because its regular expression expected a literal backslash before the dot in `royalfintech.github.io`. Replaced the hostname and redirect checks with literal source assertions, avoiding regex escape ambiguity.
+- Updated the frontend check runner to Node 22 to align with current backend CI and the Supabase package engine requirement.

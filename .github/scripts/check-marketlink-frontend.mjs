@@ -91,8 +91,8 @@ assert.ok(fs.existsSync(path.join(root, 'assets', 'apple-touch-icon-180.png')), 
 assert.match(html, /rel=["']manifest["'][^>]*manifest\.webmanifest/i, 'HTML must link the PWA manifest');
 assert.match(html, /id=["']scr-returning["']/, 'Returning-user PIN screen is missing');
 assert.match(html, /navigator\.serviceWorker\.register/, 'Service worker registration is missing');
-assert.match(html, /host==='royalfintech\\.github\\.io' && path\.indexOf\('\/MarketLink-\/'\)===0/, 'Legacy Pages entry must be redirected');
-assert.match(html, /location\.replace\('https:\/\/marketlink-gambia-frontend\.onrender\.com\//, 'Legacy Pages must redirect to canonical premium app');
+assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("path.indexOf('/MarketLink-/')===0"), 'Legacy Pages entry must be redirected');
+assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.match(html, /marketlink-premium-canonical-r20/, 'Premium JS URL must be revised');
 assert.match(serviceWorker, /marketlink-shell-v21/, 'PWA cache must be bumped');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /installPremiumPullToRefresh/, 'Pull-to-refresh handler is missing');
