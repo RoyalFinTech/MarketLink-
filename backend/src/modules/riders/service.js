@@ -204,23 +204,37 @@ async function setAvailability(userId, isOnline) {
 
 // ── LOCATION UPDATE (GPS ping from rider app) ────────────────────────
 async function updateLocation(userId, { lat, lng, deliveryId }) {
-  if (!deliveryId) throw new AppError('An active assigned delivery is required for location sharing.',400,'DELIVERY_REQUIRED');
-  {
-    const { rows: [delivery] } = await query(
-      'SELECT id, rider_id, status FROM deliveries WHERE id=$1',
-      [deliveryId]
+  // With no delivery ID this is an opt-in availability ping. It is only
+  // accepted for an approved online rider who has no active delivery.
+  if (!deliveryId) {
+    const {rows:[updatedRider]}=await query(
+      "UPDATE riders SET current_lat=$1,current_lng=$2,last_location_at=now(),location_sharing_enabled=TRUE,location_sharing_delivery_id=NULL "+
+      "WHERE user_id=$3 AND is_online=TRUE AND kyc_status='approved' "+
+      "AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.rider_id=$3 AND d.status IN ('assigned','picked_up','in_transit')) "+
+      "RETURNING user_id",
+      [lat,lng,userId]
     );
-    if (!delivery) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
-    if (String(delivery.rider_id)!==String(userId)) {
-      throw new AppError('You can only share your location for a delivery assigned to you.',403,'FORBIDDEN');
-    }
-    if (!['assigned','picked_up','in_transit'].includes(String(delivery.status))) {
-      throw new AppError('Location updates are only accepted for an active delivery.',409,'DELIVERY_NOT_ACTIVE');
-    }
+    if(!updatedRider)throw new AppError(
+      'Go online and finish any active delivery before sharing your availability location.',
+      409,'RIDER_NOT_AVAILABLE'
+    );
+    return { sharedForAvailability:true, updatedAt:new Date() };
+  }
+
+  const { rows: [delivery] } = await query(
+    'SELECT id, rider_id, status FROM deliveries WHERE id=$1',
+    [deliveryId]
+  );
+  if (!delivery) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+  if (String(delivery.rider_id)!==String(userId)) {
+    throw new AppError('You can only share your location for a delivery assigned to you.',403,'FORBIDDEN');
+  }
+  if (!['assigned','picked_up','in_transit'].includes(String(delivery.status))) {
+    throw new AppError('Location updates are only accepted for an active delivery.',409,'DELIVERY_NOT_ACTIVE');
   }
 
   const {rows:[updatedRider]}=await query(
-    "UPDATE riders SET current_lat=$1,current_lng=$2,last_location_at=now(),location_sharing_enabled=TRUE,location_sharing_delivery_id=$4 WHERE user_id=$3 AND is_online=TRUE RETURNING user_id",
+    "UPDATE riders SET current_lat=$1,current_lng=$2,last_location_at=now(),location_sharing_enabled=TRUE,location_sharing_delivery_id=$4 WHERE user_id=$3 AND is_online=TRUE AND kyc_status='approved' RETURNING user_id",
     [lat,lng,userId,deliveryId]
   );
   if(!updatedRider)throw new AppError('Go online before sharing GPS for this delivery.',409,'RIDER_OFFLINE');
@@ -228,10 +242,9 @@ async function updateLocation(userId, { lat, lng, deliveryId }) {
   await query(
     `INSERT INTO rider_location_pings (rider_id, delivery_id, lat, lng)
      VALUES ($1,$2,$3,$4)`,
-    [userId, deliveryId || null, lat, lng]
+    [userId,deliveryId,lat,lng]
   );
-
-  return { lat, lng, updatedAt: new Date() };
+  return { sharedForDelivery:true, updatedAt:new Date() };
 }
 
 // ── DELIVERY HISTORY ─────────────────────────────────────────────────
