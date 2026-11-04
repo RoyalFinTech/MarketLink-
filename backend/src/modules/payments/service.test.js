@@ -19,6 +19,7 @@ const deliveredOrder={
 };
 
 describe('Pay on Delivery reconciliation',()=>{
+ let transactionQuery;
  beforeEach(()=>{
   jest.clearAllMocks();
   query.mockImplementation(async(sql)=>{
@@ -26,13 +27,13 @@ describe('Pay on Delivery reconciliation',()=>{
    if(sql.startsWith('SELECT status FROM orders'))return{rows:[{status:'delivered'}]};
    return{rows:[]};
   });
-  const clientQuery=jest.fn(async(sql)=>{
+  transactionQuery=jest.fn(async(sql)=>{
    if(sql.startsWith('SELECT * FROM payments WHERE id=$1 FOR UPDATE'))return{rows:[payment]};
    if(sql.startsWith("UPDATE payments SET status='confirmed'"))return{rows:[{...payment,status:'confirmed'}]};
    if(sql.startsWith('SELECT customer_id,total,status,order_number FROM orders'))return{rows:[deliveredOrder]};
    return{rows:[]};
   });
-  withTransaction.mockImplementation(async(work)=>work({query:clientQuery}));
+  withTransaction.mockImplementation(async(work)=>work({query:transactionQuery}));
   ordersService.settleOrderFinancials.mockResolvedValue({settled:true,vendorPayout:100,riderPayout:20,affiliatePayout:2,platformNet:23});
  });
  test('only an Admin can confirm collected COD cash',async()=>{
@@ -56,10 +57,11 @@ describe('Pay on Delivery reconciliation',()=>{
   const result=await confirmPayment(payment.id,'admin-id',['admin']);
   expect(result.payment).toMatchObject({id:payment.id,status:'confirmed'});
   expect(result.settlement).toMatchObject({settled:true});
-  const clientQuery=withTransaction.mock.calls[0][0];
+  expect(ordersService.settleOrderFinancials).toHaveBeenCalledTimes(1);
   expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith(payment.order_id);
-  const calls=withTransaction.mock.results[0].value;
-  expect(calls).toBeDefined();
+  const auditCall=transactionQuery.mock.calls.find(([sql])=>sql.includes("INSERT INTO admin_action_logs"));
+  expect(auditCall).toBeDefined();
+  expect(auditCall[1]).toEqual(expect.arrayContaining(['admin-id','admin',payment.id]));
  });
  test('lists delivered pending or confirmed-but-unsettled COD payments for Admin retry',async()=>{
   const row={payment_id:payment.id,payment_record_status:'confirmed'};
