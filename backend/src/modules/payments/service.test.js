@@ -38,7 +38,7 @@ describe('Pay on Delivery reconciliation',()=>{
  });
  test('only an Admin can confirm collected COD cash',async()=>{
   await expect(confirmPayment(payment.id,'vendor-id',['vendor']))
-   .rejects.toMatchObject({status:403,code:'FORBIDDEN'});
+   .rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
   expect(withTransaction).not.toHaveBeenCalled();
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
@@ -49,7 +49,7 @@ describe('Pay on Delivery reconciliation',()=>{
    return{rows:[]};
   });
   await expect(confirmPayment(payment.id,'admin-id',['admin']))
-   .rejects.toMatchObject({status:409,code:'COD_NOT_DELIVERED'});
+   .rejects.toMatchObject({statusCode:409,code:'COD_NOT_DELIVERED'});
   expect(withTransaction).not.toHaveBeenCalled();
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
