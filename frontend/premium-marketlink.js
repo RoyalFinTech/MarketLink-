@@ -2143,7 +2143,7 @@
       renderRDash();toast(next==='delivered'?'Delivery completed ✓':'Delivery status updated ✓');
     }catch(e){toast(e.error||'Could not update delivery status.','error');}
   }
-  var mlRiderAvailabilityWatchId=null;
+  var mlRiderAvailabilityWatchId=null,mlRiderAvailabilityLastSentAt=0;
   function stopRiderAvailabilityLocationSharing(){
     try{if(mlRiderAvailabilityWatchId!==null&&navigator.geolocation)navigator.geolocation.clearWatch(mlRiderAvailabilityWatchId);}catch(e){}
     mlRiderAvailabilityWatchId=null;
@@ -2159,9 +2159,14 @@
       try{
         mlRiderAvailabilityWatchId=navigator.geolocation.watchPosition(function(position){
           if(!S.rOnline||!position||!position.coords)return;
+          // Limit idle-availability pings to one per 45 seconds. Active tracking
+          // uses the same cadence to avoid flooding the API on fast GPS updates.
+          var now=Date.now();
+          if(now-mlRiderAvailabilityLastSentAt<45000)return;
+          mlRiderAvailabilityLastSentAt=now;
           var active=(S.rDeliveries||[]).find(function(d){return ['assigned','picked_up','in_transit'].indexOf(String(d.status||''))>=0;});
           var deliveryId=active&&active.id?active.id:undefined;
-          ML_API.delivery.updateLocation(Number(position.coords.latitude),Number(position.coords.longitude),deliveryId).catch(function(){});
+          ML_API.delivery.updateLocation(Number(position.coords.latitude),Number(position.coords.longitude),deliveryId).catch(function(){mlRiderAvailabilityLastSentAt=0;});
         },function(error){
           if(error&&error.code===1&&allowPermissionPrompt)toast('Location permission is off. You can stay online, but shops will not see your approximate distance until location is enabled.','warning');
           else if(error&&error.code===2&&allowPermissionPrompt)toast('Your device could not get a GPS location. Check location services and try again.','warning');
