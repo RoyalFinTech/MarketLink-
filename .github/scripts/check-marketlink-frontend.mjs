@@ -97,6 +97,8 @@ assert.match(html, /id=["']scr-returning["']/, 'Returning-user PIN screen is mis
 assert.match(html, /navigator\.serviceWorker\.register/, 'Service worker registration is missing');
 assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("path.indexOf('/MarketLink-/')===0"), 'Legacy Pages entry must be redirected');
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
+assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
+assert.match(html, /premium-canonical-r10/, 'Production shell version marker must be current');
 assert.match(html, /marketlink-premium-canonical-r21/, 'Premium JS URL must be revised');
 assert.match(html, /marketlink-premium-canonical-r23/, 'Premium CSS URL must be revised');
 assert.match(serviceWorker, /marketlink-shell-v22/, 'PWA cache must be bumped');
