@@ -353,7 +353,7 @@ async function listPendingCodPayments({page=1,limit=30}={}){
   const limit_=Math.min(Math.max(parseInt(limit)||30,1),100);
   const offset=(page_-1)*limit_;
   const {rows}=await query(
-    `SELECT p.id AS payment_id,p.amount,p.currency,p.created_at,
+    `SELECT p.id AS payment_id,p.amount,p.currency,p.status AS payment_record_status,p.created_at,
             o.id AS order_id,o.order_number,o.total,o.status AS order_status,
             o.payment_status,o.placed_at,
             customer.full_name AS customer_name,
