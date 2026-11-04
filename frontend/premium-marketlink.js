@@ -196,7 +196,7 @@
     var pinMode=String(step.auth_mode||'').toLowerCase()==='pin';
     var confirmMode=String(step.auth_mode||'').toLowerCase()==='confirm'&&!step.openExternal;
     var headline=isComplete?'Payment confirmed':isFailed?'Payment not completed':'Complete your payment';
-    var message=isComplete?'payment provider has confirmed your payment. Your MarketLink order status is now updated.':isFailed?'payment provider did not complete this payment. You can return to your cart and try again with a new payment attempt.':'Follow the provider’s next step below. MarketLink will only mark your order as paid after a verified confirmation.';
+    var message=isComplete?'Your payment is confirmed. Your MarketLink order status is now updated.':isFailed?'The payment was not completed. You can return to your cart and try again with a new payment attempt.':'Follow the instructions shown below. MarketLink will only mark your order as paid after a verified confirmation.';
     root.innerHTML='<div class="ml-profile-shell ml-payment-flow">'+
       '<div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK CHECKOUT</div><h3>Secure payment</h3></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.restoreCartAndRetry()">← Back to cart</button></div>'+
       '<div class="ml-payment-result '+(isComplete?'is-success':isFailed?'is-failed':'is-pending')+'">'+paymentBrandMarkup()+'<div class="ml-payment-result-title">'+(isComplete?'✓ ':isFailed?'! ':'')+esc(headline)+'</div><p>'+esc(message)+'</p>'+
@@ -205,8 +205,8 @@
        isFailed?'<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.restoreCartAndRetry()">Return to cart and try again</button>':
        (link?'<a class="ml-btn ml-btn-primary ml-payment-open-provider" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">Continue to '+esc(methodLabel)+' ↗</a>':'')+
        (confirmMode?'<div class="ml-payment-next-step"><b>Approve the request on your phone</b><p>'+esc(step.confirmation_steps||'Approve the payment request on your mobile-money phone. Then select the button below.')+'</p><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'confirm\')">I have approved the request</button></div>':'')+
-       (pinMode?'<div class="ml-payment-next-step"><label for="ml-modem-payment-pin">Provider authorization code</label><p>Enter the code requested by your payment provider. MarketLink will send it for this payment attempt only and will not save it.</p><input id="ml-modem-payment-pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="'+Math.min(8,Math.max(4,Number(step.auth_length)||6))+'" placeholder="Enter authorization code"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'pin\')">Submit code securely</button></div>':'')+
-       '<div class="ml-payment-status-line" id="ml-payment-status-message">Waiting for the payment provider to confirm. This can take a little time.</div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.checkPaymentStatus()">Check payment status</button>')+
+       (pinMode?'<div class="ml-payment-next-step"><label for="ml-modem-payment-pin">Provider authorization code</label><p>Enter the temporary code requested for this payment. MarketLink will send it for this payment attempt only and will not save it.</p><input id="ml-modem-payment-pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="'+Math.min(8,Math.max(4,Number(step.auth_length)||6))+'" placeholder="Enter authorization code"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'pin\')">Submit code securely</button></div>':'')+
+       '<div class="ml-payment-status-line" id="ml-payment-status-message">Waiting for payment confirmation. This can take a little time.</div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.checkPaymentStatus()">Check payment status</button>')+
       '</div><p class="ml-payment-footnote">Do not pay twice while a transaction is pending. If the provider has already requested approval on your phone, finish that request first.</p></div>';
     if(!isComplete&&!isFailed&&!mlPaymentStatusTimer){
       mlPaymentStatusStarted=Date.now();
@@ -220,7 +220,7 @@
     var pending=S.pendingPayment;
     if(!pending||!pending.payment||!pending.payment.id)return;
     var line=G('ml-payment-status-message');
-    if(line&&!silent)line.textContent='Checking the payment provider…';
+    if(line&&!silent)line.textContent='Checking payment status…';
     try{
       var response=await ML_API.payments.status(pending.payment.id),data=response&&response.data?response.data:response;
       pending.status=String(data.status||data.payment&&data.payment.status||'pending').toLowerCase();
@@ -231,7 +231,7 @@
       if(['completed','confirmed','failed','cancelled','abandoned','expired'].indexOf(pending.status)>-1){
         stopPaymentStatusPolling();
         renderLivePaymentStep();
-        if(pending.status==='completed'||pending.status==='confirmed')toast('Payment confirmed by payment provider. Your order is updated.','success');
+        if(pending.status==='completed'||pending.status==='confirmed')toast('Payment confirmed. Your order is updated.','success');
         else toast('Payment was not completed. Review the status and try again if needed.','error');
       }else if(line){
         line.textContent='Payment status: '+(pending.status==='processing'?'The provider is processing it.':'Still waiting for provider confirmation.')+' Do not submit another payment.';
@@ -347,7 +347,7 @@
         finishLivePaidOrder();
       }else if(payMethod!=='cod'){
         var payment=paymentData&&paymentData.payment;
-        if(!payment||!payment.id)throw {error:'The payment provider did not return a valid payment record. Your cart has been kept; check order history before trying again.'};
+        if(!payment||!payment.id)throw {error:'The payment service did not return a valid payment record. Your cart has been kept; check order history before trying again.'};
         S.pendingPayment={order:order,payment:payment,method:payMethod,accountNumber:accountNumber,nextStep:paymentData.nextStep||null,redirectUrl:paymentData.redirectUrl||null,status:String(paymentData.status||payment.status||'pending').toLowerCase(),amount:Number(order.total),cartSnapshot:cartSnapshot,cartItemsSnapshot:cartItemsSnapshot};
         persistPendingPayment(S.pendingPayment);
         // Keep the cart saved while the provider is processing. The payment screen
@@ -1296,15 +1296,15 @@
       terms:{title:'Terms of Service',sections:[
         ['Your account and PIN','Please use accurate registration details and keep your 4-digit PIN private. If you think someone else has accessed your account, contact MarketLink support so we can help you secure it.'],
         ['Marketplace listings','Vendors should keep product details, prices and availability accurate and offer goods they are allowed to sell. Stock and prices can change, so please review your basket before confirming an order.'],
-        ['Orders and payments','Please check the order total and delivery fees before confirming. Use a payment option shown in checkout. If payment provider is enabled, follow the payment instructions shown on screen; MarketLink will mark an order as paid only after the provider confirms it. If a payment is pending, check its status before trying again.'],
+        ['Orders and payments','Please check the order total and delivery fees before confirming. Use a payment option shown in checkout. When secure mobile-money payments are enabled, follow the instructions shown on screen. MarketLink marks an order as paid only after verification. If a payment is pending, check its status before trying again.'],
         ['Delivery responsibilities','Provide a complete address and reachable contact number. Riders must follow applicable road-safety rules and handle orders responsibly. Delivery estimates can vary with availability, traffic and other conditions.'],
         ['Getting help and using MarketLink fairly','Please use MarketLink respectfully and lawfully. If an order goes wrong, contact support with your order number so we can review the details and explain the available next steps. We may limit access when there is a clear safety or misuse concern.'],
         ['Applicable law','These terms are intended to operate in accordance with applicable laws of The Gambia. MarketLink may update in-app terms as the service develops.']
       ]},
       privPolicy:{title:'Privacy Policy',sections:[
-        ['Information used by the service','Depending on the features you use, MarketLink may process your name, phone number, account details, saved addresses, orders, wallet and transaction records, support messages and application information. If you choose mobile-money payment, the mobile number you enter and transaction details may be sent to payment provider or the selected provider to process and verify that payment.'],
+        ['Information used by the service','Depending on the features you use, MarketLink may process your name, phone number, account details, saved addresses, orders, wallet and transaction records, support messages and application information. If you choose mobile-money payment, the mobile number you enter and transaction details may be shared with the selected payment partner to process and verify the transaction.'],
         ['Why we use it','Information supports sign-in, account management, order processing, delivery coordination, service security and help requests. Access to account-specific information requires an authenticated session.'],
-        ['Payments and providers','Payment providers, including payment provider when enabled, process the information needed to complete and verify payments. Some networks may request a temporary PIN/OTP on the payment screen; this is sent to the provider for that transaction and is not saved in your MarketLink account. Please do not share payment codes in support chats or with vendors and riders. Providers have their own privacy notices and terms.'],
+        ['Payments and providers','Our payment partners process the information needed to complete and verify payments. Some networks may request a temporary PIN/OTP on the payment screen; this is sent to the provider for that transaction and is not saved in your MarketLink account. Please do not share payment codes in support chats or with vendors and riders. Providers have their own privacy notices and terms.'],
         ['Protecting your account','Keep your PIN private, sign out of shared devices and contact support if you suspect that another person has accessed your account.'],
         ['Questions and requests','For privacy questions or help with account information, email marketlinkgambia@gmail.com or call +220 87 407 1510.']
       ]},
@@ -1361,7 +1361,7 @@
       dahaPayoutProfile=payoutProfile;
       var payoutRoleLabel=isVendor?'vendor':'rider';
       var savedPayoutMethod=String(payoutProfile.payout_method||'wave').toLowerCase();
-      var payoutProfileMarkup=(isVendor||isRider)?'<section class="ml-profile-card ml-daha-panel" id="ml-daha-saved-payout"><div class="ml-daha-panel-head"><div><span>'+payoutRoleLabel.toUpperCase()+' PAYOUT SETTINGS</span><h4>Saved payout destination</h4></div><b>Wave / AfriMoney</b></div><p class="ml-daha-copy">Save the mobile-money destination where your DAHA '+payoutRoleLabel+' withdrawals should be sent. You can change it whenever your payout details change.</p><label class="ml-field-label" for="ml-daha-payout-method">Preferred payout network</label><select id="ml-daha-payout-method" class="ml-daha-input"><option value="wave"'+(savedPayoutMethod==='wave'?' selected':'')+'>Wave</option><option value="afrimoney"'+(savedPayoutMethod==='afrimoney'?' selected':'')+'>AfriMoney</option></select><label class="ml-field-label" for="ml-daha-payout-number">Payout account number (9 digits)</label><input id="ml-daha-payout-number" class="ml-daha-input" type="tel" inputmode="numeric" autocomplete="off" maxlength="9" value="'+esc(payoutProfile.account_number||'')+'" placeholder="87••••••• / 86••••••• / 83•••••••"><small class="ml-daha-copy">Enter the Wave/AfriMoney number. Supported Gambian mobile prefixes: 87, 86 and 83. This may differ from your MarketLink login number.</small><label class="ml-field-label" for="ml-daha-payout-name">Account holder name</label><input id="ml-daha-payout-name" class="ml-daha-input" type="text" maxlength="150" value="'+esc(payoutProfile.beneficiary_name||'')+'" placeholder="Name registered to the wallet"><button type="button" class="ml-btn ml-btn-primary ml-daha-submit" onclick="window.ML_Premium.saveDahaPayoutProfile()">Save payout destination</button><small class="ml-daha-copy">Payouts are subject to authorized review and payment provider transfer confirmation.</small></section>':'';
+      var payoutProfileMarkup=(isVendor||isRider)?'<section class="ml-profile-card ml-daha-panel" id="ml-daha-saved-payout"><div class="ml-daha-panel-head"><div><span>'+payoutRoleLabel.toUpperCase()+' PAYOUT SETTINGS</span><h4>Saved payout destination</h4></div><b>Wave / AfriMoney</b></div><p class="ml-daha-copy">Save the mobile-money destination where your DAHA '+payoutRoleLabel+' withdrawals should be sent. You can change it whenever your payout details change.</p><label class="ml-field-label" for="ml-daha-payout-method">Preferred payout network</label><select id="ml-daha-payout-method" class="ml-daha-input"><option value="wave"'+(savedPayoutMethod==='wave'?' selected':'')+'>Wave</option><option value="afrimoney"'+(savedPayoutMethod==='afrimoney'?' selected':'')+'>AfriMoney</option></select><label class="ml-field-label" for="ml-daha-payout-number">Payout account number (9 digits)</label><input id="ml-daha-payout-number" class="ml-daha-input" type="tel" inputmode="numeric" autocomplete="off" maxlength="9" value="'+esc(payoutProfile.account_number||'')+'" placeholder="87••••••• / 86••••••• / 83•••••••"><small class="ml-daha-copy">Enter the Wave/AfriMoney number. Supported Gambian mobile prefixes: 87, 86 and 83. This may differ from your MarketLink login number.</small><label class="ml-field-label" for="ml-daha-payout-name">Account holder name</label><input id="ml-daha-payout-name" class="ml-daha-input" type="text" maxlength="150" value="'+esc(payoutProfile.beneficiary_name||'')+'" placeholder="Name registered to the wallet"><button type="button" class="ml-btn ml-btn-primary ml-daha-submit" onclick="window.ML_Premium.saveDahaPayoutProfile()">Save payout destination</button><small class="ml-daha-copy">Payouts are subject to authorized review and verified transfer confirmation.</small></section>':'';
       var railOptions=(direct?'':'<option value="modempay">Choose a payment method on secure checkout</option>')+rails.map(function(m){var k=String(m).toLowerCase();return '<option value="'+esc(k)+'">'+(k==='wave'?'Wave':k==='afrimoney'?'AfriMoney':'QMoney')+'</option>';}).join('');
       var pendingContext=dahaDepositContext&&dahaDepositContext.deposit?dahaDepositContext:null;
       var nextStep=pendingContext&&pendingContext.nextStep||{};
@@ -1381,13 +1381,13 @@
         '<section class="ml-wallet-hero ml-daha-balance"><span>Available to spend</span><strong>'+money(available)+'</strong><small>Total balance '+money(balance)+(Number(wallet.reserved_balance||0)>0?' · Reserved for pending withdrawals '+money(wallet.reserved_balance):'')+'</small><span class="ml-daha-ledger-note">Your balance is read from the secure MarketLink wallet ledger.</span></section>'+
         '<div class="ml-daha-actions"><button type="button" class="ml-btn ml-btn-primary" onclick="document.getElementById(\'ml-daha-deposit\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">＋ Deposit</button><button type="button" class="ml-btn ml-btn-secondary" onclick="document.getElementById(\'ml-daha-withdraw\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">↗ Withdraw</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshWallet()">↻ Refresh</button></div>'+
         depositContextMarkup+
-        '<section class="ml-profile-card ml-daha-panel" id="ml-daha-deposit"><div class="ml-daha-panel-head"><div><span>ADD MONEY</span><h4>Deposit into DAHA</h4></div><b>payment provider</b></div>'+
-        '<p class="ml-daha-copy">Choose an amount and payment rail. Wave, AfriMoney and QMoney are offered only when enabled by the active payment provider merchant configuration.</p>'+
+        '<section class="ml-profile-card ml-daha-panel" id="ml-daha-deposit"><div class="ml-daha-panel-head"><div><span>ADD MONEY</span><h4>Deposit into DAHA</h4></div><b>Secure payment</b></div>'+
+        '<p class="ml-daha-copy">Choose an amount and payment rail. Wave, AfriMoney and QMoney are offered only when enabled by the active merchant payment configuration.</p>'+
         '<label class="ml-field-label" for="ml-daha-deposit-amount">Amount (GMD)</label><input id="ml-daha-deposit-amount" class="ml-daha-input" type="number" min="'+(direct?'1':'10')+'" step="0.01" inputmode="decimal" placeholder="e.g. 250.00">'+
         '<label class="ml-field-label" for="ml-daha-deposit-method">Payment method</label><select id="ml-daha-deposit-method" class="ml-daha-input">'+railOptions+'</select>'+
         (direct?'<label class="ml-field-label" for="ml-daha-deposit-number">7-digit mobile-money number</label><input id="ml-daha-deposit-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" placeholder="e.g. 87XXXXX">':'')+
         '<button type="button" class="ml-btn ml-btn-primary ml-daha-submit" '+(!configured?'disabled':'')+' onclick="window.ML_Premium.submitDahaDeposit()">Continue to secure deposit →</button>'+
-        (!configured?'<div class="ml-wallet-note">payment provider is not currently configured on the backend. Deposits are disabled; your DAHA balance and wallet-funded checkout remain available.</div>':'<div class="ml-wallet-note">Funds are credited only after the backend verifies the signed payment provider webhook, provider reference, amount and GMD currency.</div>')+
+        (!configured?'<div class="ml-wallet-note">Mobile-money deposits are not available yet. Deposits are disabled; your DAHA balance and wallet-funded checkout remain available.</div>':'<div class="ml-wallet-note">Funds are credited only after the backend verifies the signed payment confirmation, transaction reference, amount and GMD currency.</div>')+
         '</section>'+
         payoutProfileMarkup+
         '<section class="ml-profile-card ml-daha-panel" id="ml-daha-withdraw"><div class="ml-daha-panel-head"><div><span>MOVE MONEY OUT</span><h4>Request a withdrawal</h4></div><b>Minimum D 50</b></div>'+
@@ -1421,7 +1421,7 @@
       var response=await ML_API.wallet.createDeposit({amount:amount,method:method,accountNumber:accountNumber||undefined});
       var data=response&&response.data||response;
       dahaDepositContext={deposit:data.deposit,redirectUrl:data.redirectUrl||null,nextStep:data.nextStep||null,action:data.action||'pending'};
-      toast('DAHA deposit initiated. Your balance will update after payment provider confirms it.','success');
+      toast('DAHA deposit initiated. Your balance will update after the payment is confirmed.','success');
       await renderPremiumWalletPage(G('profile-body'));
     }catch(e){toast(e.error||'Could not start the DAHA Wallet deposit.','error');}
   }
@@ -1430,7 +1430,7 @@
     var pin=String(G('ml-daha-provider-pin')&&G('ml-daha-provider-pin').value||'');
     try{
       await ML_API.wallet.continueDeposit(dahaDepositContext.deposit.id,action,pin);
-      toast('Provider step submitted. Waiting for payment provider webhook confirmation.','info');
+      toast('Provider step submitted. Waiting for secure payment confirmation.','info');
       await renderPremiumWalletPage(G('profile-body'));
     }catch(e){toast(e.error||'Could not submit the provider confirmation.','error');}
   }
@@ -1501,7 +1501,7 @@
       });
       dahaWithdrawalDraft=null;
       dahaDepositContext=null;
-      toast('Withdrawal request submitted. The funds are reserved until payment provider confirms the payout.','success');
+      toast('Withdrawal request submitted. The funds are reserved until the transfer is confirmed.','success');
       await renderPremiumWalletPage(G('profile-body'));
       if((S.roles||[]).indexOf('rider')>=0 && typeof loadRiderLiveData==='function'){
         S._riderLiveLoaded=false;
@@ -1534,10 +1534,10 @@
       caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout),setupReason:String(data&&data.setupReason||'')};
       S.paymentCapabilities=caps;
     }catch(e){}
-    var providerStatus=!caps.configured?(caps.setupReason||'Mobile-money payments are still being set up. They will become selectable in checkout after payment provider configuration and any required H2H partner approval.'):caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'payment provider hosted checkout is configured. Continue to the secure payment provider payment page and choose from the methods activated for your merchant account.';
+    var providerStatus=!caps.configured?(caps.setupReason||'Mobile-money payments are still being set up. They will become selectable in checkout after mobile-money activation.'):caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'secure hosted checkout is available. Continue to the secure payment page to choose an activated method.';
     var methodCards=caps.directMobileMoney
-      ? '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Enter your local Wave number in checkout and follow the next step from payment provider.</span></div></div><div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Enter your local number, approve the phone prompt, then confirm you have approved it in MarketLink.</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Enter your local number and provide the temporary code only if payment provider requests it for this payment.</span></div></div>'
-      : '<div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>payment provider secure checkout</b><span>'+(caps.configured?'Choose one of the payment options activated for the MarketLink merchant account on payment provider’s payment page.':'Available after provider setup is complete.')+'</span></div></div>';
+      ? '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Enter your local Wave number in checkout and follow the next step from the payment service.</span></div></div><div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Enter your local number, approve the phone prompt, then confirm you have approved it in MarketLink.</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Enter your local number and provide the temporary code only if requested for this payment.</span></div></div>'
+      : '<div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>Secure mobile-money checkout</b><span>'+(caps.configured?'Choose one of the payment options activated for the MarketLink merchant account on the secure payment page.':'Available after provider setup is complete.')+'</span></div></div>';
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div>'+
       '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Pay when your order arrives, where this option is available for the order and delivery area.</span></div></div>'+methodCards+'</div>'+
       '<div class="ml-wallet-note ml-payment-availability-note">'+paymentBrandMarkup()+'<b>'+ (caps.configured?'Mobile-money checkout: available':'Mobile-money checkout: setup pending')+'</b><p>'+esc(providerStatus)+'</p></div>'+
