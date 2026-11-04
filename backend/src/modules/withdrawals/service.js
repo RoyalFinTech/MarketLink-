@@ -119,13 +119,13 @@ async function listPendingForAdmin({ page = 1, limit = 20 } = {}) {
 // The wallet is debited only after a successful transfer response/webhook.
 async function approve(withdrawalId, adminUserId) {
   if (!modemPay.isConfigured()) {
-    throw new AppError('Modem Pay API credentials are not configured. No payout was sent.', 503, 'PROVIDER_UNAVAILABLE');
+    throw new AppError('Secure payout processing is not available yet. No payout was sent.', 503, 'PROVIDER_UNAVAILABLE');
   }
   if (!modemPay.isWebhookConfigured()) {
-    throw new AppError('Configure the Modem Pay webhook signing secret before approving payouts.', 503, 'PROVIDER_UNAVAILABLE');
+    throw new AppError('Payment confirmation is not configured yet. No payout was sent.', 503, 'PROVIDER_UNAVAILABLE');
   }
   if (modemPay.isH2H() && !modemPay.isH2HApproved()) {
-    throw new AppError('Modem Pay H2H payout access is not approved for this merchant.', 503, 'PROVIDER_UNAVAILABLE');
+    throw new AppError('Direct mobile-money payouts are not available yet. No payout was sent.', 503, 'PROVIDER_UNAVAILABLE');
   }
 
   const reservation = await withTransaction(async (client) => {
@@ -271,14 +271,14 @@ async function completeProviderWithdrawal(withdrawalId, transfer = {}) {
     if (!wallet) throw new AppError('Wallet balance is insufficient after provider confirmation.', 409, 'INSUFFICIENT_BALANCE');
 
     await client.query(
-      "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','withdrawal',$2,$3,'withdrawal',$4,'Modem Pay confirmed DAHA withdrawal')",
+      "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','withdrawal',$2,$3,'withdrawal',$4,'DAHA withdrawal confirmed by payment partner')",
       [wallet.id, wd.amount, wallet.balance, wd.id]);
     const { rows: [updated] } = await client.query(
       "UPDATE withdrawals SET status='completed',provider_status='completed',provider_response=$1,processed_at=now(),updated_at=now() WHERE id=$2 RETURNING *",
       [JSON.stringify(transfer), wd.id]);
     await client.query(
       "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_completed','DAHA withdrawal completed',$2,'withdrawal',$3)",
-      [wd.user_id, 'Your DAHA Wallet withdrawal of D ' + Number(wd.amount).toFixed(2) + ' has been confirmed by Modem Pay.', wd.id]);
+      [wd.user_id, 'Your DAHA Wallet withdrawal of D ' + Number(wd.amount).toFixed(2) + ' has been confirmed by our payment partner.', wd.id]);
     return updated;
   });
 }
@@ -383,13 +383,13 @@ async function processProviderWebhook(event) {
         [wd.amount,wd.wallet_id]);
       if (!wallet) throw new AppError('Wallet not found while reversing a payout.',404,'WALLET_NOT_FOUND');
       await client.query(
-        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','withdrawal_reversal',$2,$3,'withdrawal',$4,'Modem Pay reversed DAHA withdrawal')",
+        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','withdrawal_reversal',$2,$3,'withdrawal',$4,'DAHA withdrawal reversed by payment partner')",
         [wallet.id,wd.amount,wallet.balance,wd.id]);
       const { rows: [updated] } = await client.query(
         "UPDATE withdrawals SET status='rejected',provider_status='reversed',provider_response=$1,processed_at=now(),updated_at=now() WHERE id=$2 RETURNING *",
         [JSON.stringify(payload),wd.id]);
       await client.query(
-        "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_reversed','DAHA withdrawal reversed','Modem Pay reversed the payout. The amount has been returned to your DAHA Wallet.','withdrawal',$2)",
+        "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_reversed','DAHA withdrawal reversed','The payment partner reversed the payout. The amount has been returned to your DAHA Wallet.','withdrawal',$2)",
         [wd.user_id,wd.id]);
       return { processed:true,data:updated,fundsReturned:true };
     });
@@ -407,7 +407,7 @@ async function reject(withdrawalId, adminUserId) {
       'SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [withdrawalId]);
     if (!wd) throw new AppError('Withdrawal not found.', 404, 'WITHDRAWAL_NOT_FOUND');
     if (wd.status !== 'processing') {
-      throw new AppError('Withdrawal is already ' + wd.status + '. A payout that has been sent to Modem Pay cannot be rejected here.', 409, 'ALREADY_PROCESSED');
+      throw new AppError('Withdrawal is already ' + wd.status + '. A payout that has already been sent for processing cannot be rejected here.', 409, 'ALREADY_PROCESSED');
     }
     const { rows: [updated] } = await client.query(
       "UPDATE withdrawals SET status='rejected',provider_status='rejected_by_admin',processed_by=$1,processed_at=now(),updated_at=now() WHERE id=$2 AND status='processing' RETURNING *",
