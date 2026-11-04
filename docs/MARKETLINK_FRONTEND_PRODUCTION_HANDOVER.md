@@ -784,3 +784,13 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - VERIFIED: corrected trigger function definition was read back from the live database after migration.
 - VERIFIED: no orders and no platform-earnings rows existed at correction time; no historical records were changed.
 - PENDING: behaviour with a real, eligible affiliate order after successful payment and delivery settlement. No fixture or real-money transaction was fabricated.
+
+
+## 2026-11-04 — Admin payout recipient visibility
+
+- The existing `GET /admin/withdrawals` route is guarded by authentication and the `admin` / `super_admin` roles. The service returns `payout_details` with each pending withdrawal.
+- The admin UI previously displayed the user, role, payout method, amount and status but omitted the destination account-holder name and mobile-money number.
+- Updated the protected admin payout queue to display the beneficiary name and recipient account number, with safe HTML escaping. If details are missing or malformed, the queue shows a warning rather than silently hiding the gap.
+- Recipient details are not added to customer, vendor or rider-facing screens by this change.
+- JavaScript syntax parsing passed before commit. The existing MarketLink frontend GitHub Actions check will run because the modified file is under `frontend/`. Final verification requires the check result and the new Render deployment.
+

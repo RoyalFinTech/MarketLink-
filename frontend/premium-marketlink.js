@@ -2283,10 +2283,17 @@
       (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
         var status=String(x.status||'processing').toLowerCase();
         var providerStatus=String(x.provider_status||'').replace(/_/g,' ');
+        var payoutDetails=x.payout_details||{};
+        if(typeof payoutDetails==='string'){try{payoutDetails=JSON.parse(payoutDetails);}catch(e){payoutDetails={};}}
+        var recipientName=String(payoutDetails.beneficiary_name||payoutDetails.beneficiaryName||'').trim();
+        var recipientNumber=String(payoutDetails.account_number||payoutDetails.accountNumber||'').trim();
+        var recipientHtml=(recipientName||recipientNumber)
+          ?'<small style="display:block;margin-top:5px;color:#b8c7d3">Recipient: '+esc(recipientName||'Name not provided')+' · Account: '+esc(recipientNumber||'Number not provided')+'</small>'
+          :'<small style="display:block;margin-top:5px;color:#FFCF86">Recipient details are missing. Verify the saved payout profile before approval.</small>';
         var actions=status==='processing'
           ?'<div style="display:flex;gap:8px;margin-top:9px"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approveDahaWithdrawal(\''+esc(x.id)+'\')">Approve payout</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectDahaWithdrawal(\''+esc(x.id)+'\')">Reject</button></div>'
           :'<small style="display:block;margin-top:6px;color:#8fa5b1">Provider status: '+esc(providerStatus||'awaiting confirmation')+'. Funds remain reserved until confirmation.</small>';
-        return '<div class="ml-profile-row" style="align-items:flex-start"><div class="ico">💸</div><div class="copy"><b>'+esc(x.full_name||'Account')+'</b><span>'+esc(x.user_type||'account')+' · '+esc(x.payout_method||'Payout')+' · '+esc(status.replace(/_/g,' '))+'</span>'+actions+'</div><strong>'+money(x.amount||0)+'</strong></div>';
+        return '<div class="ml-profile-row" style="align-items:flex-start"><div class="ico">💸</div><div class="copy"><b>'+esc(x.full_name||'Account')+'</b><span>'+esc(x.user_type||'account')+' · '+esc(x.payout_method||'Payout')+' · '+esc(status.replace(/_/g,' '))+'</span>'+recipientHtml+actions+'</div><strong>'+money(x.amount||0)+'</strong></div>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No pending payouts</b><span>The production database has no withdrawal requests awaiting admin action.</span></div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Live payouts unavailable</b><span>'+esc(e.error||'The backend did not return withdrawal data.')+'</span></div>';}
   }
