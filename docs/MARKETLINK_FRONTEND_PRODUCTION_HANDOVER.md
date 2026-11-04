@@ -812,3 +812,11 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - Static CI is configured to run the strengthened checks on this frontend commit.
 - Actual installed-device icon and service-worker update behaviour remain PENDING DEVICE TEST.
 - Public asset URL and WhatsApp crawler fetch remain UNVERIFIED because production URL DNS resolution failed in the audit environment.
+
+
+## 2026-11-04 — PWA CI correction
+
+- The first run of the strengthened frontend checker failed before testing application assets because the checker file contained over-escaped regular expressions. Node reported `SyntaxError: Invalid regular expression flags` at the script-tag expression.
+- Replaced the test file with correctly escaped JavaScript regular expressions and parsed the corrected script body before committing.
+- The PWA release source remains at shell cache `v20` and premium JS revision `r19`; a fresh CI run is required to establish the test result.
+- The GitHub Pages deployment job separately returned HTTP 502 while creating a Pages deployment for commit `7159447feec1f456832495ed16c5029cbfb0e55e`. Its Jekyll build passed; this is separate from the Render static-site deployment and will be distinguished from Render status.
