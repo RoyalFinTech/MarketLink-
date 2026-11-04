@@ -155,7 +155,6 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
   const redirectUrl = charge.paymentLink || null;
   return {
     deposit: updated,
-    provider: 'modempay',
     action: modemPay.isH2H() && !(nextStep?.openExternal && (nextStep.launch_url || redirectUrl)) ? 'continue' : 'redirect',
     redirectUrl,
     nextStep,
