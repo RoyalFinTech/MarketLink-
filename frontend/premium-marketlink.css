@@ -1902,3 +1902,29 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-home-refresh:hover{background:rgba(245,184,61,.18);transform:rotate(35deg)}
 .ml-home-refresh:focus-visible{outline:3px solid rgba(245,184,61,.5);outline-offset:2px}
 @media(max-width:560px){.ml-home-refresh{width:32px;height:32px;font-size:20px}}
+
+
+/* Accessible contrast for wallet, payment and onboarding secondary text. */
+.ml-wallet-note{color:#D2DEE4!important}
+.ml-wallet-transaction .copy span{color:#C6D3DA!important}
+.ml-daha-copy{color:#CFDCE2!important}
+.ml-daha-input::placeholder{color:#C7D3D9!important;opacity:1}
+.ml-daha-provider-step>p,.ml-daha-review-head>p{color:#C6D4DB!important}
+.ml-daha-review-row>span{color:#C5D2D9!important}
+.ml-daha-ledger-note{color:#D1DEE3!important}
+.ml-daha-brand small{display:block;margin-top:4px;color:#D2DFE5;font-size:10px;line-height:1.4}
+#scr-onboard .ml-ob-description,
+#scr-onboard .ml-ob-copy p,
+#scr-onboard .ml-ob-inline-meta,
+#scr-onboard .ml-ob-inline-meta b,
+#scr-onboard .ml-ob-inline-meta small{opacity:1!important}
+#scr-onboard .ml-ob-copy input::placeholder,
+#scr-onboard .ml-ob-copy textarea::placeholder{color:#526975!important;opacity:1!important}
+.lm .ml-wallet-note{color:#334d59!important}
+.lm .ml-wallet-transaction .copy span{color:#425d69!important}
+.lm .ml-daha-copy,.lm .ml-daha-provider-step>p,.lm .ml-daha-review-head>p{color:#405b67!important}
+.lm .ml-daha-input{background:#fff!important;color:#172b36!important;border-color:#aabcc4!important}
+.lm .ml-daha-input::placeholder{color:#526975!important}
+.lm .ml-daha-review-row>span{color:#405b67!important}
+.lm .ml-daha-ledger-note{color:#405b67!important}
+.lm .ml-daha-brand small{color:#405b67!important}
