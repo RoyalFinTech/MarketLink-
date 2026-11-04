@@ -725,3 +725,37 @@ Static checks:
 - No live withdrawal or financial transaction was created by this change.
 
 Still requires a real authorized rider/vendor account test with a valid MarketLink PIN and Modem Pay transfer credentials.
+
+
+## 2026-11-04 — Production continuation audit
+
+### Repository and deployment reconciliation
+- Verified `main` at `28b3261857a4df897427db378b5d96f7883242c0`; the rider/vendor DAHA routing commits `d247d46dc169a3535fb36cacd90795d547a70a35` and `28b3261857a4df897427db378b5d96f7883242c0` are in the branch history.
+- Frontend Render deployment `dep-dbl3o86q1p3s739ngmug` is Live on `28b3261857a4df897427db378b5d96f7883242c0`.
+- Backend Render deployment `dep-dbkugb17lnhs738c0150` is Live on `3c5b09d50a479c85224b2f9e78c8700f6079e27f`; the two later commits are frontend-only.
+- Supabase project `nsglfunkdnpchoqqzmcc` is ACTIVE_HEALTHY. Migrations through `027_daha_payout_recipient_numbers_nine_digits` are recorded as applied.
+
+### Financial code review
+- DAHA wallet balance and reserved funds are read from the backend ledger; pending withdrawals are deducted from available balance.
+- Rider/vendor withdrawal requests use the shared DAHA withdrawal service, require the four-digit MarketLink PIN, and prioritize the per-request recipient over any saved profile. The destination is not matched to the login phone.
+- Admin approval locks the withdrawal, reserves it in `payout_pending`, and uses a stable Modem Pay idempotency key for retry. Wallet debit occurs only after a matching provider-confirmed transfer; failure restores availability; completed transfer reversals are credited back.
+- Affiliate reward calculation is 2% of discounted merchandise subtotal, excludes delivery, and is funded from MarketLink commission. Self-referral is excluded in order creation; the database check enforces exactly 2%.
+- Order settlement requires both delivered status and confirmed payment and runs under row locks in a database transaction. Live database inspection found no duplicate `commission_records` rows.
+- Retired the unused legacy `riders.addEarning()` function, which independently updated rider earnings, wallet balance and transactions outside a single transaction. Repository search found no in-repository caller. Delivery earnings are documented as credited only through `ordersService.settleOrderFinancials()`.
+
+### Outstanding verification and blockers
+- Public frontend/API/OG image fetches could not be completed from this environment because DNS resolution failed. Source contains canonical, Open Graph and Twitter metadata and references a 1200 × 630 preview, but the deployed image response and real WhatsApp preview remain unverified.
+- PWA manifest declares raster 192/512 and maskable icons, Apple touch icon and standalone mode; physical Android, Windows and iOS install tests remain PENDING DEVICE TEST.
+- H2H DAHA deposit code currently accepts a seven-digit account number. The Gambia's numbering transition took effect on 4 September 2026, while Modem Pay's public Afrimoney account-lookup documentation still specifies seven digits. Do not rewrite the provider payload until Modem Pay confirms the correct post-transition H2H format. This is a provider-compatibility blocker.
+- Modem Pay API/webhook configuration and H2H approval could not be inspected through the available Render tools. No credential values were read or changed. Live deposit and payout tests were not performed.
+- No standalone voice recording was available in the current conversation or recursively searched Library inventory.
+- Profile-photo code validates type, size and dimensions, updates the profile URL, rereads the profile and verifies image loading before reporting success. Full browser/storage end-to-end behaviour remains unverified.
+- Backend build logs still report 33 dependency vulnerabilities (4 low, 22 moderate, 6 high, 1 critical). Package-level vulnerability triage and compatible upgrades remain outstanding; no force upgrade was run.
+- A historical 30 October PIN-reset runtime error was found. Current deployed source exports both PIN-reset methods, and no backend error logs were returned for 3–4 November.
+
+### Current status labels
+- VERIFIED: GitHub/Render SHA reconciliation; Supabase migration/schema presence; no duplicate commission records in current database; source-level affiliate formula and DAHA payout logic review.
+- IMPLEMENTED: Removal of the unused non-transactional rider wallet-credit helper (this commit).
+- PENDING DEVICE TEST: PWA installation and camera capture.
+- BLOCKED: Confirming Modem Pay H2H mobile-number format and reading provider environment configuration.
+- UNVERIFIED: Public OG image/WhatsApp scrape, production upload rendering, actual Modem Pay financial transactions, and broad marketplace regression tests.

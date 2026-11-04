@@ -370,35 +370,9 @@ async function reinstate(riderId, actor) {
   return updated;
 }
 
-// ── ADD EARNING (called by delivery service on completion) ────────────
-async function addEarning(riderId, { deliveryId, orderId, amount, type = 'delivery', description }) {
-  const { rows: [earning] } = await query(
-    `INSERT INTO rider_earnings (rider_id, delivery_id, order_id, amount, type, description)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [riderId, deliveryId || null, orderId || null, amount, type, description || null]
-  );
-  // Update running total on rider record
-  await query(
-    `UPDATE riders SET total_earnings = total_earnings + $1 WHERE user_id = $2`,
-    [amount, riderId]
-  );
-  // Credit wallet
-  const { rows: [wallet] } = await query(
-    `UPDATE wallets SET balance = balance + $1 WHERE user_id = $2
-     RETURNING id, balance`,
-    [amount, riderId]
-  );
-  if (wallet) {
-    await query(
-      `INSERT INTO transactions (wallet_id, type, category, amount, balance_after, reference_type, reference_id, description)
-       VALUES ($1,'credit','delivery_earning',$2,$3,'delivery',$4,$5)`,
-      [wallet.id, amount, wallet.balance, deliveryId, description || 'Delivery earning']
-    );
-  }
-  return earning;
-}
-
+// Rider delivery earnings and DAHA wallet credits are settled only by
+// ordersService.settleOrderFinancials after payment confirmation and delivery.
 module.exports = {
   register, getById, list, updateProfile, setAvailability, updateLocation,
-  getDeliveryHistory, getEarnings, approve, reject, suspend, reinstate, addEarning,
+  getDeliveryHistory, getEarnings, approve, reject, suspend, reinstate,
 };
