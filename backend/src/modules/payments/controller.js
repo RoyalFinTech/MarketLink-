@@ -11,13 +11,12 @@ exports.methods = wrap(async (req,res) => {
   const h2hApproved = Boolean(modemPay.isH2HApproved());
   const configured = keyConfigured && webhookConfigured && (!h2h || h2hApproved);
   res.json({success:true,data:{
-    provider:'modempay',
     configured,
     mode:h2h?'h2h':'merchant',
     directMobileMoney:configured&&h2h,
     hostedCheckout:configured&&!h2h,
     webhookConfigured,
-    setupReason:!keyConfigured?'Waiting for Modem Pay server credentials.':(!webhookConfigured?'Waiting for the Modem Pay webhook signing secret.':(h2h&&!h2hApproved?'Waiting for Modem Pay H2H partner approval.':null)),
+    setupReason:!keyConfigured?'Secure mobile-money checkout is being prepared.':(!webhookConfigured?'Payment confirmation is being configured.':(h2h&&!h2hApproved?'Direct mobile-money checkout is awaiting activation.':null)),
     methods:configured?['wave','afrimoney','qmoney']:[],
     currency:'GMD'
   }});
