@@ -63,40 +63,59 @@ async function list({ page=1, limit=20, status, riderId, vendorId, isAdmin=false
 }
 
 async function assignRider(deliveryId, riderId, actor) {
-  const { rows: [d] } = await query('SELECT d.*,o.vendor_id FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id = $1', [deliveryId]);
-  if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
-  const actorRoles=actor&&Array.isArray(actor.roles)?actor.roles:[];
-  const actorIsAdmin=actorRoles.some(r=>['admin','super_admin','moderator'].includes(r));
-  const actorIsVendor=actorRoles.includes('vendor')&&String(d.vendor_id)===String(actor.id);
-  if(!actorIsAdmin&&!actorIsVendor)throw new AppError('Only the order’s vendor or an Admin can assign its rider.',403,'FORBIDDEN');
-  if (!['unassigned','failed'].includes(d.status))
-    throw new AppError(`Cannot assign rider to delivery with status: ${d.status}`, 400, 'INVALID_STATUS');
-
-  const { rows: [rider] } = await query(
-    `SELECT user_id FROM riders WHERE user_id = $1 AND kyc_status = 'approved' AND is_online = TRUE`,
-    [riderId]);
-  if (!rider) throw new AppError('Rider not available or not approved.', 400, 'RIDER_UNAVAILABLE');
-
   return withTransaction(async (client) => {
-    const {rows:[lockedRider]}=await client.query("SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE FOR UPDATE",[riderId]);
+    // Lock the delivery first so two shop users cannot replace one another's
+    // rider assignment concurrently.
+    const { rows: [d] } = await client.query(
+      'SELECT d.*,o.vendor_id FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id=$1 FOR UPDATE OF d',
+      [deliveryId]
+    );
+    if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
+
+    const actorRoles=actor&&Array.isArray(actor.roles)?actor.roles:[];
+    const actorIsAdmin=actorRoles.some(r=>['admin','super_admin','moderator'].includes(r));
+    const actorIsVendor=actorRoles.includes('vendor')&&String(d.vendor_id)===String(actor.id);
+    if(!actorIsAdmin&&!actorIsVendor)throw new AppError('Only the order’s vendor or an Admin can assign its rider.',403,'FORBIDDEN');
+    if (!['unassigned','failed'].includes(d.status)) {
+      throw new AppError(`Cannot assign rider to delivery with status: ${d.status}`, 409, 'INVALID_STATUS');
+    }
+
+    // The rider row lock serializes competing assignments and online/offline
+    // location updates for this rider.
+    const { rows: [lockedRider] } = await client.query(
+      "SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE FOR UPDATE",
+      [riderId]
+    );
     if(!lockedRider)throw new AppError('Rider not available or not approved.',400,'RIDER_UNAVAILABLE');
-    const {rows:[busy]}=await client.query("SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",[riderId,deliveryId]);
+
+    const {rows:[busy]}=await client.query(
+      "SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+      [riderId,deliveryId]
+    );
     if(busy)throw new AppError('This rider already has an active delivery. Choose another available rider.',409,'RIDER_HAS_ACTIVE_DELIVERY');
-    if(d.rider_id)await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[d.rider_id,deliveryId]);
+
+    if(d.rider_id)await client.query(
+      "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",
+      [d.rider_id,deliveryId]
+    );
     const { rows: [updated] } = await client.query(
-      "UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",
-      [riderId, deliveryId]);
-    await client.query(
-      `UPDATE orders SET status = 'rider_assigned' WHERE id = $1`, [updated.order_id]);
+      "UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 AND status IN ('unassigned','failed') RETURNING *",
+      [riderId, deliveryId]
+    );
+    if(!updated)throw new AppError('This delivery has already been assigned. Refresh the order and choose again.',409,'DELIVERY_ALREADY_ASSIGNED');
+
+    await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
     await client.query(
       `INSERT INTO rider_assignments (delivery_id, rider_id, assigned_by, assignment_type, status)
        VALUES ($1,$2,$3,$4,'pending')`,
-      [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual']);
+      [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual']
+    );
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
        VALUES ($1,'delivery_assigned','New Delivery Request 🛵',
                'You have a new delivery. Tap to view details.','delivery',$2)`,
-      [riderId, deliveryId]);
+      [riderId, deliveryId]
+    );
     logger.info('Rider assigned', { deliveryId, riderId, actor: actor?.id });
     return updated;
   });
