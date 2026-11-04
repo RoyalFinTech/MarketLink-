@@ -2191,7 +2191,20 @@
     try{if(mlRiderAvailabilityWatchId!==null&&navigator.geolocation)navigator.geolocation.clearWatch(mlRiderAvailabilityWatchId);}catch(e){}
     mlRiderAvailabilityWatchId=null;
   }
+  function hasActiveRiderDelivery(){
+    var activeStates=['assigned','picked_up','in_transit'];
+    if(S.activeDel&&activeStates.indexOf(String(S.activeDel.status||'').toLowerCase())>=0)return true;
+    return (S.rDeliveries||[]).some(function(delivery){
+      return activeStates.indexOf(String(delivery.status||'').toLowerCase())>=0;
+    });
+  }
   function startRiderAvailabilityLocationSharing(allowPermissionPrompt){
+    // The active-delivery GPS watcher owns location updates during a delivery.
+    // Do not start a second availability watcher or write duplicate location pings.
+    if(hasActiveRiderDelivery()){
+      stopRiderAvailabilityLocationSharing();
+      return;
+    }
     if(!navigator.geolocation){
       if(allowPermissionPrompt)toast('Location is not available in this browser. You can stay online, but shops will not see your approximate distance.','warning');
       return;
@@ -2202,14 +2215,15 @@
       try{
         mlRiderAvailabilityWatchId=navigator.geolocation.watchPosition(function(position){
           if(!S.rOnline||!position||!position.coords)return;
-          // Limit idle-availability pings to one per 45 seconds. Active tracking
-          // uses the same cadence to avoid flooding the API on fast GPS updates.
+          if(hasActiveRiderDelivery()){
+            stopRiderAvailabilityLocationSharing();
+            return;
+          }
+          // Idle availability pings are limited to one per 45 seconds.
           var now=Date.now();
           if(now-mlRiderAvailabilityLastSentAt<45000)return;
           mlRiderAvailabilityLastSentAt=now;
-          var active=(S.rDeliveries||[]).find(function(d){return ['assigned','picked_up','in_transit'].indexOf(String(d.status||''))>=0;});
-          var deliveryId=active&&active.id?active.id:undefined;
-          ML_API.delivery.updateLocation(Number(position.coords.latitude),Number(position.coords.longitude),deliveryId).catch(function(){mlRiderAvailabilityLastSentAt=0;});
+          ML_API.delivery.updateLocation(Number(position.coords.latitude),Number(position.coords.longitude)).catch(function(){mlRiderAvailabilityLastSentAt=0;});
         },function(error){
           if(error&&error.code===1&&allowPermissionPrompt)toast('Location permission is off. You can stay online, but shops will not see your approximate distance until location is enabled.','warning');
           else if(error&&error.code===2&&allowPermissionPrompt)toast('Your device could not get a GPS location. Check location services and try again.','warning');
