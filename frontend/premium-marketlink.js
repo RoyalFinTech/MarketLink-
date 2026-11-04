@@ -2507,7 +2507,7 @@
     else if(tab==='profile'){if(typeof window.renderProfile==='function')window.renderProfile();else renderPremiumProfile();}
     else if(tab==='vendordash')renderVDash();
     else if(tab==='riderdash')renderRDash();
-    else if(tab==='admindash')renderAdminDash();
+    else if(tab==='admindash')loadAdminDashboard();
     else if(tab==='catpage')renderLiveCategoriesPage();
     else if(tab==='store'&&typeof renderStoreProdCtrl==='function')renderStoreProdCtrl();
     document.querySelectorAll('.ntab').forEach(function(n){n.classList.toggle('act',n.dataset.tab===tab);n.classList.toggle('sel',n.dataset.tab===tab);n.setAttribute('aria-current',n.dataset.tab===tab?'page':'false');});
