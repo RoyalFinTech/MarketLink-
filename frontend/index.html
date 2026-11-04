@@ -4246,6 +4246,7 @@ async function loadRiderLiveData(){
       pay:Number(d.earning||0),eta:d.estimated_minutes!=null?(d.estimated_minutes+' min'):'—',
       status:d.status,order_number:d.order_number,total:d.order_total
     };});
+    if(S.rOnline&&window.ML_Premium&&typeof window.ML_Premium.resumeRiderAvailabilityLocationSharing==='function')window.ML_Premium.resumeRiderAvailabilityLocationSharing();
   }catch(e){S.rDeliveries=[];toast(e.error||'Could not load live rider deliveries.','error');}
   finally{S._riderLoading=false;renderRDash();}
 }
