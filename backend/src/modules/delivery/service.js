@@ -129,21 +129,35 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
   if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
   const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
   if(!isAdmin&&String(delivery.vendor_id)!==String(actorId))throw new AppError('You can only find riders for your own orders.',403,'FORBIDDEN');
-  if(!['unassigned','failed','assigned'].includes(delivery.status))throw new AppError('Riders can only be searched before pickup. Refresh the order status and try again.',409,'INVALID_STATUS');
+  if(!['unassigned','failed'].includes(delivery.status))throw new AppError('Riders can only be searched before pickup and before assignment. Refresh the order status and try again.',409,'INVALID_STATUS');
   const hasPickup=delivery.pickup_lat!==null&&delivery.pickup_lng!==null;
   const {rows}=await query(
     "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,"+
-    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 THEN r.current_lat ELSE NULL END AS current_lat,"+
-    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 THEN r.current_lng ELSE NULL END AS current_lng,"+
-    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 THEN r.last_location_at ELSE NULL END AS last_location_at,"+
-    "CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=$4 AND r.current_lat IS NOT NULL AND r.current_lng IS NOT NULL AND $1::boolean "+
-    "THEN 6371*2*ASIN(SQRT(LEAST(1,POWER(SIN(RADIANS(r.current_lat-$2::numeric)/2),2)+COS(RADIANS($2::numeric))*COS(RADIANS(r.current_lat))*POWER(SIN(RADIANS(r.current_lng-$3::numeric)/2),2)))) ELSE NULL END AS distance_km "+
-    "FROM riders r JOIN users u ON u.id=r.user_id WHERE r.kyc_status=$5 AND r.is_online=TRUE "+
-    "AND NOT EXISTS (SELECT 1 FROM deliveries active WHERE active.rider_id=r.user_id AND active.id<>$4 AND active.status IN ('assigned','picked_up','in_transit')) "+
+    "CASE WHEN r.location_sharing_enabled=TRUE "+
+      "AND (r.location_sharing_delivery_id=$4 OR r.location_sharing_delivery_id IS NULL) "+
+      "AND r.last_location_at >= now()-interval '5 minutes' "+
+      "THEN r.last_location_at ELSE NULL END AS last_location_at,"+
+    "CASE WHEN $1::boolean AND r.location_sharing_enabled=TRUE "+
+      "AND (r.location_sharing_delivery_id=$4 OR r.location_sharing_delivery_id IS NULL) "+
+      "AND r.last_location_at >= now()-interval '5 minutes' "+
+      "AND r.current_lat IS NOT NULL AND r.current_lng IS NOT NULL "+
+      "THEN 6371*2*ASIN(SQRT(LEAST(1,"+
+        "POWER(SIN(RADIANS(r.current_lat-$2::numeric)/2),2)+"+
+        "COS(RADIANS($2::numeric))*COS(RADIANS(r.current_lat))*"+
+        "POWER(SIN(RADIANS(r.current_lng-$3::numeric)/2),2)))) "+
+      "ELSE NULL END AS distance_km "+
+    "FROM riders r JOIN users u ON u.id=r.user_id "+
+    "WHERE r.kyc_status=$5 AND r.is_online=TRUE "+
+    "AND NOT EXISTS (SELECT 1 FROM deliveries active WHERE active.rider_id=r.user_id AND active.status IN ('assigned','picked_up','in_transit')) "+
     "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
     [hasPickup,delivery.pickup_lat,delivery.pickup_lng,deliveryId,'approved']
   );
-  return rows.map(r=>Object.assign({},r,{distance_km:r.distance_km===null?null:Number(Number(r.distance_km).toFixed(1)),location_fresh:!!(r.last_location_at&&Date.now()-new Date(r.last_location_at).getTime()<30*60*1000)}));
+  // Return an approximate distance only. Exact coordinates remain server-side
+  // and are never exposed to shop accounts through this discovery endpoint.
+  return rows.map(r=>Object.assign({},r,{
+    distance_km:r.distance_km===null?null:Number(Number(r.distance_km).toFixed(1)),
+    location_fresh:!!(r.last_location_at&&Date.now()-new Date(r.last_location_at).getTime()<5*60*1000)
+  }));
 }
 
 async function acceptDelivery(deliveryId, riderId) {
