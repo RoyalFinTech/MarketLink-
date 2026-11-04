@@ -75,16 +75,16 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
     throw new AppError('Enter a deposit amount greater than zero.', 400, 'INVALID_AMOUNT');
   }
   if (!DEPOSIT_METHODS.includes(method)) {
-    throw new AppError('Choose Modem Pay, Wave, AfriMoney or QMoney.', 400, 'UNSUPPORTED_METHOD');
+    throw new AppError('Choose a supported mobile-money payment method: Wave, AfriMoney or QMoney.', 400, 'UNSUPPORTED_METHOD');
   }
   if (!modemPay.isConfigured() || !modemPay.isWebhookConfigured()) {
-    throw new AppError('Modem Pay API credentials and webhook signing configuration are required before DAHA Wallet deposits can be enabled.', 503, 'PROVIDER_UNAVAILABLE');
+    throw new AppError('Secure mobile-money deposits are not available yet. Your existing DAHA balance and wallet-funded checkout remain available.', 503, 'PROVIDER_UNAVAILABLE');
   }
   if (modemPay.isH2H() && !modemPay.isH2HApproved()) {
-    throw new AppError('Direct mobile-money deposits are awaiting Modem Pay H2H partner approval.', 503, 'PROVIDER_UNAVAILABLE');
+    throw new AppError('Direct mobile-money deposits are not available yet.', 503, 'PROVIDER_UNAVAILABLE');
   }
   if (!modemPay.isH2H() && value < 10) {
-    throw new AppError('Modem Pay hosted checkout requires a minimum deposit of D 10.00.', 400, 'BELOW_PROVIDER_MINIMUM');
+    throw new AppError('Secure mobile-money checkout requires a minimum deposit of D 10.00.', 400, 'BELOW_PROVIDER_MINIMUM');
   }
   if (modemPay.isH2H() && !['wave', 'afrimoney', 'qmoney'].includes(method)) {
     throw new AppError('Choose Wave, AfriMoney or QMoney for direct mobile-money deposits.', 400, 'UNSUPPORTED_METHOD');
@@ -138,7 +138,7 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
       "UPDATE wallet_deposits SET status='failed',provider_status='invalid_provider_response',updated_at=now() WHERE id=$1",
       [depositId]
     );
-    throw new AppError('Modem Pay did not return a valid deposit reference. No wallet balance was changed.', 502, 'PROVIDER_INVALID_RESPONSE');
+    throw new AppError('The payment service did not return a valid deposit reference. No wallet balance was changed.', 502, 'PROVIDER_INVALID_RESPONSE');
   }
 
   const storedProviderRef = providerRef === idempotencyKey ? null : providerRef;
@@ -173,7 +173,7 @@ async function continueDeposit(userId, depositId, { action, pin } = {}) {
   if (deposit.status !== 'pending' || !deposit.provider_ref) {
     throw new AppError('This deposit is not ready for another provider step.', 409, 'DEPOSIT_NOT_ACTIVE');
   }
-  if (!modemPay.isH2H()) throw new AppError('This deposit uses the secure hosted Modem Pay checkout.', 409, 'PAYMENT_FLOW_MISMATCH');
+  if (!modemPay.isH2H()) throw new AppError('This deposit uses the secure hosted mobile-money checkout.', 409, 'PAYMENT_FLOW_MISMATCH');
 
   if (action === 'confirm') await modemPay.confirmCharge(deposit.provider_ref);
   else if (action === 'pin') {
@@ -323,7 +323,7 @@ async function processDepositWebhook(client, payload, eventId) {
   );
   const nextBalance = Number(creditedWallet.balance);
   await client.query(
-    "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','deposit',$2,$3,'wallet_deposit',$4,'DAHA Wallet deposit confirmed by Modem Pay')",
+    "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','deposit',$2,$3,'wallet_deposit',$4,'DAHA Wallet deposit confirmed by payment partner')",
     [wallet.id, deposit.amount, nextBalance, deposit.id]
   );
   await client.query(
