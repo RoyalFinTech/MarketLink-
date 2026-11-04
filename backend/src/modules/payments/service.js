@@ -34,8 +34,8 @@ const modemAdapter = {
       providerStatus: result.status || null,
     };
   },
-  refund: async () => { throw new AppError('Modem Pay refunds are not enabled in MarketLink yet.', 503, 'PROVIDER_UNAVAILABLE'); },
-  verify: async () => { throw new AppError('Modem Pay payments are confirmed by signed webhooks or status checks.', 409, 'WEBHOOK_CONFIRMATION_REQUIRED'); },
+  refund: async () => { throw new AppError('Refund processing is not enabled in MarketLink yet.', 503, 'PROVIDER_UNAVAILABLE'); },
+  verify: async () => { throw new AppError('Payments are confirmed only through verified payment notifications or status checks.', 409, 'WEBHOOK_CONFIRMATION_REQUIRED'); },
 };
 const stripeAdapter = { name:'stripe', charge:async()=>{throw new AppError('Stripe integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, refund:async()=>{throw new AppError('Stripe integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, verify:async()=>{throw new AppError('Stripe integration is not configured.',503,'PROVIDER_UNAVAILABLE');} };
 const paystackAdapter = { name:'paystack', charge:async()=>{throw new AppError('Paystack integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, refund:async()=>{throw new AppError('Paystack integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, verify:async()=>{throw new AppError('Paystack integration is not configured.',503,'PROVIDER_UNAVAILABLE');} };
