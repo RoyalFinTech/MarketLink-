@@ -98,16 +98,18 @@ assert.match(html, /navigator\.serviceWorker\.register/, 'Service worker registr
 assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("path.indexOf('/MarketLink-/')===0"), 'Legacy Pages entry must be redirected');
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
-assert.match(html, /premium-canonical-r13/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r24/, 'Premium JS URL must be revised');
+assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
+assert.match(html, /marketlink-premium-canonical-r25/, 'Premium JS URL must be revised');
 assert.match(html, /marketlink-premium-canonical-r23/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v25/, 'PWA cache must be bumped');
+assert.match(serviceWorker, /marketlink-shell-v26/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
 assert.ok(premiumJs.includes("method!=='cod'&&method!=='wallet'"), 'DAHA Wallet must remain selectable when mobile-money checkout is not configured');
 assert.ok(premiumJs.includes('startRiderAvailabilityLocationSharing'), 'Rider online mode must support opt-in nearby availability location');
 assert.ok(premiumJs.includes('resumeRiderAvailabilityLocationSharing'), 'Rider availability location must resume safely after dashboard refresh');
+assert.ok(premiumJs.includes('await ML_API.delivery.decline(String(id))'), 'Rider decline must call the backend and free the delivery assignment');
+assert.doesNotMatch(premiumJs, /Delivery decline is not exposed as a separate backend action/, 'Premium rider dashboard must not show a disabled decline placeholder');
 assert.ok(premiumJs.includes('Powered by Royal FinTech'), 'DAHA Wallet must show Royal FinTech branding');
 assert.ok(premiumJs.includes('confirmCodPayment'), 'Admin dashboard must expose COD reconciliation controls');
 assert.ok(premiumJs.includes('pendingCod'), 'Admin dashboard must load the protected COD reconciliation queue');
