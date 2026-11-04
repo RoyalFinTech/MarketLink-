@@ -759,3 +759,28 @@ Still requires a real authorized rider/vendor account test with a valid MarketLi
 - PENDING DEVICE TEST: PWA installation and camera capture.
 - BLOCKED: Confirming Modem Pay H2H mobile-number format and reading provider environment configuration.
 - UNVERIFIED: Public OG image/WhatsApp scrape, production upload rendering, actual Modem Pay financial transactions, and broad marketplace regression tests.
+
+
+## 2026-11-04 — Platform net commission trigger correction
+
+### Finding
+- The live `record_marketlink_platform_earning()` trigger was reading `orders.platform_fee` (gross platform commission) when `commission_records.status` changed to `paid`.
+- The application settlement path records `orders.platform_net_fee` (platform commission after the affiliate reward). The trigger's `ON CONFLICT` update could therefore overwrite the correct retained amount with the gross amount.
+- Affiliate commissions are paid from MarketLink's commission, so the platform earnings ledger must record the net amount retained after the 2% affiliate reward.
+
+### Production correction
+- Applied Supabase migration `marketlink_platform_earnings_net_affiliate_commission` to project `nsglfunkdnpchoqqzmcc`.
+- Re-read `public.record_marketlink_platform_earning()` from PostgreSQL after applying the change. The stored function now prefers `platform_net_fee`, with a guarded fallback to gross platform fee minus affiliate commission, never below zero.
+- The correction only replaces the trigger function; it does not rewrite existing wallet, order, affiliate, or platform-earnings rows.
+- At the time of correction, the live database contained zero orders and zero `platform_earnings` rows, so no historical earning records were affected.
+- Matching versioned SQL is tracked at `backend/src/db/migrations/028_platform_earnings_net_affiliate_commission.sql`.
+
+### Database governance / remaining migration work
+- Supabase's timestamped `supabase_migrations.schema_migrations` history includes migration names that are not represented one-to-one by the current numbered `backend/src/db/migrations/` directory, including the original platform-earnings trigger/ledger migrations.
+- The backend's custom `backend/src/db/migrate.js` tracks a separate `public.schema_migrations` table; that table was absent in the live database during this audit. Do not run `npm run migrate` against production until the custom runner and Supabase migration history have been reconciled. A blanket run could attempt to replay existing schema changes.
+- Supabase advisors returned 61 informational `rls_enabled_no_policy` findings and 48 informational `unindexed_foreign_keys` findings. The first group requires checking the intended access model (RLS with no policies is closed to client roles); the second requires workload-aware index review. No blanket policies or indexes were added.
+
+### Verification status
+- VERIFIED: corrected trigger function definition was read back from the live database after migration.
+- VERIFIED: no orders and no platform-earnings rows existed at correction time; no historical records were changed.
+- PENDING: behaviour with a real, eligible affiliate order after successful payment and delivery settlement. No fixture or real-money transaction was fabricated.
