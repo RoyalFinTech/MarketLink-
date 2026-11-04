@@ -16,8 +16,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm test -- --runInBand
+      - name: Parse financial and rider modules
+        run: |
+          node --check src/modules/payments/service.js
+          node --check src/modules/payments/controller.js
+          node --check src/modules/payments/routes.js
+          node --check src/modules/orders/service.js
+          node --check src/modules/wallets/service.js
+          node --check src/modules/withdrawals/service.js
+          node --check src/modules/delivery/service.js
+          node --check src/modules/riders/service.js
+          node --check src/modules/riders/routes.js
