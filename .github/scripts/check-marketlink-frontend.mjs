@@ -98,7 +98,7 @@ assert.match(html, /window\.ML_Premium&&typeof window\.ML_Premium\.load==='funct
 assert.match(html, /Opening your premium marketplace/, 'goApp must show the premium loading state immediately');
 assert.match(html, /previous homepage has been disabled/, 'Do not fall back to the legacy homepage when premium loading fails');
 assert.doesNotMatch(html, /else\{renderHome\(\);\}/, 'Legacy homepage fallback must be removed');
-assert.match(premiumJs, /reconcilePremiumHomeAfterBundleLoad/, 'Deferred premium bundle must reconcile sessions restored before it loaded');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /reconcilePremiumHomeAfterBundleLoad/, 'Deferred premium bundle must reconcile sessions restored before it loaded');
 assert.match(html, /navigator\.serviceWorker\.register\([^;]*updateViaCache:'none'/, 'PWA registration must bypass stale HTTP-cached service-worker scripts');
 assert.match(html, /reg\.update\(\)/, 'PWA must check for the latest service-worker shell on app launch');
 assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("path.indexOf('/MarketLink-/')===0"), 'Legacy Pages entry must be redirected');
