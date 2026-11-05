@@ -469,7 +469,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r24"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r27" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r24"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r28" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -3937,6 +3937,7 @@ function marketlinkDashboardAvatarButton(compact){
 }
 function renderVDash(){
   var el=G('vdash-body'); if(!el) return;
+  el.classList.add('ml-role-dashboard-premium','ml-vendor-dashboard');
   if(ML_API.auth.isAuthenticated() && (S.roles||[]).indexOf('vendor')>=0 && !S._vendorLiveLoaded){
     S._vendorLiveLoaded=true; loadVendorLiveData();
   }
@@ -4255,6 +4256,7 @@ async function loadRiderLiveData(){
 }
 function renderRDash(){
   var el=G('rdash-body'); if(!el) return;
+  el.classList.add('ml-role-dashboard-premium','ml-rider-dashboard');
   if(ML_API.auth.isAuthenticated() && (S.roles||[]).indexOf('rider')>=0 && !S._riderLiveLoaded){
     S._riderLiveLoaded=true; loadRiderLiveData();
   }
