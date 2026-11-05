@@ -99,9 +99,9 @@ assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("pat
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
 assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r26/, 'Premium JS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r27/, 'Premium JS URL must be revised');
 assert.match(html, /marketlink-premium-canonical-r24/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v27/, 'PWA cache must be bumped');
+assert.match(serviceWorker, /marketlink-shell-v29/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
@@ -118,6 +118,8 @@ assert.doesNotMatch(premiumJs, /Modem Pay/i, 'Internal payment gateway name must
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /installPremiumPullToRefresh/, 'Pull-to-refresh handler is missing');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /ml-home-refresh/, 'Premium desktop refresh control is missing');
 assert.ok(premiumJs.includes('refreshCurrentView'), 'A shared refresh dispatcher must refresh the active app view');
+assert.ok(html.includes("var roleLanding=(preferredRole&&marketLinkRoles.indexOf(preferredRole)>-1)?preferredRole:null;"), 'Sign-in must default to premium home unless a role dashboard was explicitly selected');
+assert.doesNotMatch(html, /marketLinkRoles\.indexOf\('vendor'\)>-1\?'vendor':marketLinkRoles\.indexOf\('rider'\)>-1\?'rider'/, 'Role claims must not silently redirect users into legacy role dashboards');
 assert.match(fs.readFileSync(path.join(root, 'MarketLink (7).html'), 'utf8'), /ml_release=20261105-premium-r28/, 'Legacy HTML shortcut must force the current canonical app release');
 assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v28/, 'PWA shell cache must be invalidated for the current release');
 assert.match(premiumJs, /id='ml-global-refresh'/, 'Desktop app-wide refresh control is missing');
