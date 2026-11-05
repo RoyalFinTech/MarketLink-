@@ -827,7 +827,7 @@
       :'<span class="ml-dashboard-avatar-fallback">'+profileInitial+'</span>';
     root.innerHTML=
       '<div class="ml-premium-home">'+
-      '<div class="ml-home-top"><div class="ml-home-welcome">'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-home-top-actions"><div class="ml-live-dot">Live marketplace</div><button type="button" class="ml-home-refresh" onclick="window.ML_Premium.refresh()" aria-label="Refresh MarketLink" title="Refresh marketplace">↻</button><button type="button" class="ml-dashboard-avatar" onclick="switchTab(\'profile\')" aria-label="Open your profile" title="Open your profile">'+profileAvatar+'</button></div></div>'+
+      '<div class="ml-home-top"><div class="ml-home-welcome">'+mlOfficialBrandMarkup()+'<div class="ml-hero-title">Welcome back, '+esc(firstName())+'.</div><div class="ml-hero-sub">Discover products from local vendors, order securely and track each step.</div></div><div class="ml-home-top-actions"><div class="ml-live-dot">Live marketplace</div><button type="button" class="ml-home-refresh" onclick="window.ML_Premium.refreshCurrentView()" aria-label="Refresh MarketLink" title="Refresh current MarketLink view">↻</button><button type="button" class="ml-dashboard-avatar" onclick="switchTab(\'profile\')" aria-label="Open your profile" title="Open your profile">'+profileAvatar+'</button></div></div>'+
       '<div class="ml-home-discovery"><button type="button" class="ml-btn ml-btn-primary" onclick="var s=document.getElementById(\'hsearch\');if(s)s.focus()">🔎 Search marketplace</button><button type="button" class="ml-btn ml-btn-secondary" onclick="switchTab(\'orders\')">📦 Track my orders</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.renderCategories()">🛍️ Browse categories</button></div>'+
       '<div class="ml-home-search"><span aria-hidden="true">🔎</span><input id="hsearch" type="search" autocomplete="off" placeholder="Search products, vendors or categories…" aria-label="Search products, vendors or categories" oninput="window.doSearch(this.value)"><button type="button" onclick="var q=document.getElementById(\'hsearch\');if(q)window.doSearch(q.value)">Search</button></div>'+
       promoCarouselMarkup()+
@@ -943,6 +943,23 @@
     },280);
   }
   async function refresh(){await loadLiveHome();}
+  async function refreshCurrentView(){
+    var tab=String(S.curTab||'home');
+    if(tab==='home')return refresh();
+    if(tab==='cart')return renderLiveCart();
+    if(tab==='orders')return renderLiveOrders();
+    if(tab==='profile')return renderPremiumProfile();
+    if(tab==='vendordash'){
+      if(typeof loadVendorLiveData==='function')return loadVendorLiveData();
+      if(typeof window.renderVDash==='function')return window.renderVDash();
+    }
+    if(tab==='riderdash'){
+      if(typeof loadRiderLiveData==='function')return loadRiderLiveData();
+      if(typeof window.renderRDash==='function')return window.renderRDash();
+    }
+    if(tab==='admindash')return loadAdminDashboard();
+    return refresh();
+  }
   async function loadLiveAddresses(){
     var r=await ML_API.customers.getAddresses(),rows=normalizeProducts(r.data);
     var selected=rows.find(function(a){return String(a.id)===String(S.delivAddressId||S.deliveryAddressId);})||rows.find(function(a){return a.is_default;});
@@ -2285,9 +2302,25 @@
     map.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;box-sizing:border-box;background:linear-gradient(160deg,#07151F,#102A35);">'+
       '<div><div style="font-size:28px;margin-bottom:8px">📍</div><b style="color:#EAF2F5;font-size:13px">'+(hasGps?'Live location connected':'Live location unavailable')+'</b><div style="color:#91A4B4;font-size:11px;line-height:1.5;margin-top:5px">'+(hasGps?'Showing the latest backend-provided rider location.':'No current GPS point is available from the backend for this delivery.')+'</div></div></div>';
   }
+  var baseRenderVDash=window.renderVDash;
+  window.renderVDash=function(){
+    // Route the old role-dashboard wallet shortcut to the shared DAHA ledger.
+    if(apiOk()&&S.vSubTab==='wallet'){
+      S.vSubTab='orders';
+      openProfilePage('wallet');
+      return;
+    }
+    if(typeof baseRenderVDash==='function')return baseRenderVDash.apply(this,arguments);
+  };
   var baseRenderRDash=window.renderRDash;
   window.renderRDash=function(){
-    if(typeof baseRenderRDash==='function')baseRenderRDash();
+    // Keep rider earnings and withdrawals on the single DAHA wallet flow.
+    if(apiOk()&&S.rSubTab==='wallet'){
+      S.rSubTab='requests';
+      openProfilePage('wallet');
+      return;
+    }
+    if(typeof baseRenderRDash==='function')baseRenderRDash.apply(this,arguments);
     if(S.activeDel&&S.activeDel.id)startRiderLocationWatch(S.activeDel.id);
     else stopRiderLocationWatch();
     sanitizeRiderMap();
@@ -2730,18 +2763,58 @@
       var atTop=!scrollNode||scrollNode.scrollTop<=1;
       eligible=false;scrollNode=null;
       if(delta<105||!atTop)return;
-      var tab=String(S.curTab||'home');
-      if(tab==='home')refresh();
-      else if(tab==='cart')renderLiveCart();
-      else if(tab==='orders')renderLiveOrders();
-      else if(tab==='profile')renderPremiumProfile();
-      else if(tab==='vendordash')renderVDash();
-      else if(tab==='riderdash')renderRDash();
-      else if(tab==='admindash')loadAdminDashboard();
+      refreshCurrentView();
     },{passive:true});
     document.addEventListener('touchcancel',function(){eligible=false;scrollNode=null;},{passive:true});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPremiumPullToRefresh,{once:true});
   else installPremiumPullToRefresh();
+
+  window.ML_Premium.refreshCurrentView=refreshCurrentView;
+  function installDesktopRefresh(){
+    if(window.__marketLinkDesktopRefreshInstalled||!document.body)return;
+    window.__marketLinkDesktopRefreshInstalled=true;
+    var app=G('scr-app');
+    var button=G('ml-global-refresh');
+    if(!button){
+      button=document.createElement('button');
+      button.type='button';
+      button.id='ml-global-refresh';
+      button.className='ml-global-refresh';
+      button.setAttribute('aria-label','Refresh current MarketLink view');
+      button.title='Refresh current MarketLink view';
+      button.innerHTML='<span aria-hidden="true">↻</span><span class="ml-global-refresh-label">Refresh</span>';
+      document.body.appendChild(button);
+    }
+    button.addEventListener('click',async function(){
+      if(button.disabled)return;
+      var label=button.querySelector('.ml-global-refresh-label');
+      button.disabled=true;
+      button.classList.add('is-refreshing');
+      if(label)label.textContent='Refreshing…';
+      try{await refreshCurrentView();}
+      catch(error){toast(error&&error.error||'Could not refresh this MarketLink view.','error');}
+      finally{
+        button.disabled=false;
+        button.classList.remove('is-refreshing');
+        if(label)label.textContent='Refresh';
+      }
+    });
+    function syncVisibility(){
+      var active=!!app&&app.classList.contains('active');
+      var tab=String(S.curTab||'home');
+      var homeHasOwnRefresh=tab==='home'&&!!document.querySelector('.ml-home-refresh');
+      button.hidden=!(active&&window.innerWidth>820&&!homeHasOwnRefresh);
+    }
+    if(app&&typeof MutationObserver==='function'){
+      var observer=new MutationObserver(syncVisibility);
+      observer.observe(app,{attributes:true,attributeFilter:['class'],subtree:true});
+      window.__marketLinkDesktopRefreshObserver=observer;
+    }
+    window.addEventListener('resize',syncVisibility,{passive:true});
+    syncVisibility();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installDesktopRefresh,{once:true});
+  else installDesktopRefresh();
 
 })();
