@@ -1987,8 +1987,8 @@ body.ml-photo-viewer-open{overflow:hidden}
   border-radius:11px!important;padding:12px 10px!important;color:#b9c7d2!important;
   font-size:12px!important;font-weight:700!important;white-space:normal;cursor:pointer;
 }
-#vdash-body.ml-role-dashboard-premium .stab[style*="border-bottom-color: rgb(13, 115, 119)"],
-#vdash-body.ml-role-dashboard-premium .stab[style*="border-bottom-color: rgb(124, 58, 237)"]{
+#vdash-body.ml-role-dashboard-premium .stab[style*="#0D7377"],
+#rdash-body.ml-role-dashboard-premium .stab[style*="#7C3AED"]{
   color:#ffe0a0!important;background:rgba(218,169,79,.12)!important;border-color:rgba(218,169,79,.34)!important;
 }
 #vdash-body.ml-role-dashboard-premium>div:last-child,
