@@ -1947,3 +1947,92 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-daha-input:disabled{opacity:.68;cursor:not-allowed}
 .ml-daha-input option{background:#102637;color:#F5F8FA}
 .lm .ml-daha-input option{background:#FFFFFF;color:#172B36}
+
+/* MarketLink premium role dashboards — shared navy/gold shell, desktop and mobile. */
+#vdash-body.ml-role-dashboard-premium,#rdash-body.ml-role-dashboard-premium{
+  width:min(100%,1440px);margin:0 auto;padding:clamp(10px,2.2vw,28px);
+  box-sizing:border-box;color:#edf4f7;isolation:isolate;
+}
+#vdash-body.ml-role-dashboard-premium>div:first-child,
+#rdash-body.ml-role-dashboard-premium>div:first-child{
+  border:1px solid rgba(244,198,104,.22)!important;border-radius:24px!important;
+  padding:clamp(22px,3vw,38px) clamp(16px,2.8vw,34px) 22px!important;
+  margin:0 0 18px!important;overflow:hidden;
+  background:radial-gradient(ellipse at 85% 0%,rgba(218,169,79,.17),transparent 42%),
+    linear-gradient(135deg,#101d2b 0%,#0a1420 68%,#172538 100%)!important;
+  box-shadow:0 18px 48px rgba(0,0,0,.18);
+}
+#vdash-body.ml-role-dashboard-premium>div:first-child .fb,
+#rdash-body.ml-role-dashboard-premium>div:first-child .fb{opacity:.24;pointer-events:none}
+#vdash-body.ml-role-dashboard-premium>div:first-child [style*="font-size:15px"],
+#rdash-body.ml-role-dashboard-premium>div:first-child [style*="font-size:15px"]{
+  color:#fff!important;font-size:clamp(19px,2vw,25px)!important;letter-spacing:-.025em;
+}
+#vdash-body.ml-role-dashboard-premium>div:first-child [style*="font-size:10px"],
+#rdash-body.ml-role-dashboard-premium>div:first-child [style*="font-size:10px"]{color:#c5d0d9!important}
+#vdash-body.ml-role-dashboard-premium>div:first-child [style*="grid-template-columns:repeat(3,1fr)"]>div,
+#rdash-body.ml-role-dashboard-premium>div:first-child [style*="grid-template-columns:repeat(3,1fr)"]>div{
+  min-width:0;background:rgba(255,255,255,.055)!important;border:1px solid rgba(236,195,112,.2)!important;
+  border-radius:15px!important;padding:clamp(11px,1.5vw,17px)!important;
+}
+#vdash-body.ml-role-dashboard-premium .snav,
+#rdash-body.ml-role-dashboard-premium .snav{
+  display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;padding:8px!important;margin:0 0 16px!important;
+  background:#101d2b!important;border:1px solid rgba(244,198,104,.18)!important;border-radius:17px!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.12);
+}
+#vdash-body.ml-role-dashboard-premium .stab,
+#rdash-body.ml-role-dashboard-premium .stab{
+  flex:1 1 120px;min-width:0;text-align:center!important;border:1px solid transparent!important;
+  border-radius:11px!important;padding:12px 10px!important;color:#b9c7d2!important;
+  font-size:12px!important;font-weight:700!important;white-space:normal;cursor:pointer;
+}
+#vdash-body.ml-role-dashboard-premium .stab[style*="border-bottom-color: rgb(13, 115, 119)"],
+#vdash-body.ml-role-dashboard-premium .stab[style*="border-bottom-color: rgb(124, 58, 237)"]{
+  color:#ffe0a0!important;background:rgba(218,169,79,.12)!important;border-color:rgba(218,169,79,.34)!important;
+}
+#vdash-body.ml-role-dashboard-premium>div:last-child,
+#rdash-body.ml-role-dashboard-premium>div:last-child{padding:clamp(0px,1vw,12px)!important}
+#vdash-body.ml-role-dashboard-premium>div:last-child>div,
+#rdash-body.ml-role-dashboard-premium>div:last-child>div{
+  border-color:rgba(185,202,216,.16)!important;border-radius:17px!important;
+  box-shadow:0 9px 25px rgba(0,0,0,.12);
+}
+#vdash-body.ml-role-dashboard-premium input,
+#vdash-body.ml-role-dashboard-premium textarea,
+#vdash-body.ml-role-dashboard-premium select,
+#rdash-body.ml-role-dashboard-premium input,
+#rdash-body.ml-role-dashboard-premium textarea,
+#rdash-body.ml-role-dashboard-premium select{
+  min-height:44px;max-width:100%;box-sizing:border-box;color:#f2f6f8!important;
+  background:#101d2b!important;border:1px solid #506477!important;border-radius:11px!important;
+}
+#vdash-body.ml-role-dashboard-premium input::placeholder,
+#vdash-body.ml-role-dashboard-premium textarea::placeholder,
+#rdash-body.ml-role-dashboard-premium input::placeholder,
+#rdash-body.ml-role-dashboard-premium textarea::placeholder{color:#aebdca!important;opacity:1!important}
+#vdash-body.ml-role-dashboard-premium label,
+#rdash-body.ml-role-dashboard-premium label{color:#e5edf2!important}
+#vdash-body.ml-role-dashboard-premium button,
+#rdash-body.ml-role-dashboard-premium button{min-height:38px;border-radius:10px}
+#vdash-body.ml-role-dashboard-premium .ml-empty,
+#rdash-body.ml-role-dashboard-premium .ml-empty{border-radius:16px}
+@media(min-width:900px){
+  #vdash-body.ml-role-dashboard-premium>div:last-child,
+  #rdash-body.ml-role-dashboard-premium>div:last-child{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  #vdash-body.ml-role-dashboard-premium>div:last-child>div:only-child,
+  #rdash-body.ml-role-dashboard-premium>div:last-child>div:has(>input#vp-name){grid-column:1/-1}
+  #vdash-body.ml-role-dashboard-premium>div:last-child>div{min-width:0}
+}
+@media(max-width:680px){
+  #vdash-body.ml-role-dashboard-premium,#rdash-body.ml-role-dashboard-premium{padding:8px 9px 92px}
+  #vdash-body.ml-role-dashboard-premium>div:first-child,#rdash-body.ml-role-dashboard-premium>div:first-child{border-radius:18px!important;padding:23px 13px 15px!important}
+  #vdash-body.ml-role-dashboard-premium .snav,#rdash-body.ml-role-dashboard-premium .snav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  #vdash-body.ml-role-dashboard-premium .stab,#rdash-body.ml-role-dashboard-premium .stab{flex:auto;padding:11px 6px!important;font-size:11px!important}
+  #vdash-body.ml-role-dashboard-premium>div:last-child,#rdash-body.ml-role-dashboard-premium>div:last-child{display:block}
+}
+@media(max-width:380px){
+  #vdash-body.ml-role-dashboard-premium>div:first-child [style*="display:flex;align-items:center;justify-content:space-between"],
+  #rdash-body.ml-role-dashboard-premium>div:first-child [style*="display:flex;align-items:center;justify-content:space-between"]{gap:6px}
+  #vdash-body.ml-role-dashboard-premium button,#rdash-body.ml-role-dashboard-premium button{font-size:11px!important;padding-left:8px!important;padding-right:8px!important}
+}
