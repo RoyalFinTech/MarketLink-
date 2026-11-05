@@ -2036,3 +2036,12 @@ body.ml-photo-viewer-open{overflow:hidden}
   #rdash-body.ml-role-dashboard-premium>div:first-child [style*="display:flex;align-items:center;justify-content:space-between"]{gap:6px}
   #vdash-body.ml-role-dashboard-premium button,#rdash-body.ml-role-dashboard-premium button{font-size:11px!important;padding-left:8px!important;padding-right:8px!important}
 }
+
+
+/* Let the premium app and its role dashboards use the full desktop viewport. The legacy 430px app frame is mobile-only. */
+@media(min-width:821px){
+  #app{width:100%!important;max-width:none!important;margin:0!important;height:100vh!important;}
+  #bnav{width:100%!important;max-width:none!important;}
+  #scr-app{width:100%!important;max-width:none!important;}
+  #vdash-body.ml-role-dashboard-premium,#rdash-body.ml-role-dashboard-premium{width:min(100%,1440px)!important;margin-left:auto!important;margin-right:auto!important;}
+}
