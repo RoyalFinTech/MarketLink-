@@ -469,7 +469,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r27"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r30" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r28"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r31" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -2131,11 +2131,16 @@ function goApp(){
   restoreDelivLocation();
   restoreWishlistFromStorage();
   restoreRecentFromStorage();
+  var homeRoot=G('tab-home');
+  if(homeRoot)homeRoot.innerHTML='<div class="ml-premium-home ml-home-loading"><div class="ml-dashboard-brand">MarketLink Gambia</div><div class="ml-skeleton-line" style="width:54%"></div><div class="ml-skeleton-line" style="width:36%"></div><div class="ml-skeleton-card"></div><p style="color:#64748b;font-size:13px;margin-top:14px">Opening your premium marketplace…</p></div>';
   if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
-    // Always enter through the premium marketplace renderer. The legacy inline
-    // renderHome() remains only as a fallback if the premium bundle failed to load.
-    Promise.resolve(window.ML_Premium.load()).catch(function(homeError){console.error('[MarketLink] Premium home failed to load:',homeError);});
-  }else{renderHome();}
+    Promise.resolve(window.ML_Premium.load()).catch(function(homeError){
+      console.error('[MarketLink] Premium home failed to load:',homeError);
+      if(homeRoot)homeRoot.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink could not load the premium home</b><span>Please check your connection and retry. The previous homepage has been disabled to prevent showing an outdated screen.</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium&&window.ML_Premium.load&&window.ML_Premium.load()">Retry premium home</button></div></div>';
+    });
+  }else if(homeRoot){
+    homeRoot.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink update is still loading</b><span>The premium dashboard module has not finished loading. Please wait a moment and reopen the app.</span></div></div>';
+  }
   renderCart();renderOrders();renderProfile();
   updateCartBadge();
   var marketLinkRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
