@@ -2547,7 +2547,7 @@
     ['home','catpage','store','cart','orders','profile','vendordash','riderdash','admindash'].forEach(function(x){var el=G('tab-'+x);if(el)el.style.display='none';});
     var target=G('tab-'+tab);if(target)target.style.display='block';
     var nav=G('bnav');if(nav)nav.style.display=tab==='admindash'?'none':'flex';
-    if(tab==='home')renderHome();
+    if(tab==='home'){if(window.ML_Premium&&typeof window.ML_Premium.load==='function')window.ML_Premium.load().catch(function(e){console.error('[MarketLink] Premium home refresh failed:',e);});else renderHome();}
     else if(tab==='cart')renderCart();
     else if(tab==='orders'){renderLiveOrders();if(typeof startOrderTracking==='function'&&S.order)startOrderTracking();}
     else if(tab==='profile'){if(typeof window.renderProfile==='function')window.renderProfile();else renderPremiumProfile();}
