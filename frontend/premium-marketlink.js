@@ -2823,7 +2823,7 @@
   function reconcilePremiumHomeAfterBundleLoad(){
     var appRoot=G('scr-app'),homeRoot=G('tab-home');
     if(!appRoot||!appRoot.classList.contains('active')||!homeRoot)return;
-    if(!ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated())return;
+    // Session is already restored by goApp(); avoid an API-global load-order dependency.
     if(S.curTab&&S.curTab!=='home')return;
     window.renderHome();
   }
