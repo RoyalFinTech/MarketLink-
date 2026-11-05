@@ -2817,4 +2817,16 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installDesktopRefresh,{once:true});
   else installDesktopRefresh();
 
+}
+  // Session restoration may call goApp() before this deferred premium bundle runs.
+  // Reconcile that boot order so returning users cannot remain on legacy markup.
+  function reconcilePremiumHomeAfterBundleLoad(){
+    var appRoot=G('scr-app'),homeRoot=G('tab-home');
+    if(!appRoot||!appRoot.classList.contains('active')||!homeRoot)return;
+    if(!ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated())return;
+    if(S.curTab&&S.curTab!=='home')return;
+    window.renderHome();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',reconcilePremiumHomeAfterBundleLoad,{once:true});
+  else reconcilePremiumHomeAfterBundleLoad();
 })();
