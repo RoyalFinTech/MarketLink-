@@ -1837,7 +1837,7 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-daha-panel-head>b{font-size:10px;color:#f3d58e;border:1px solid rgba(213,172,82,.38);border-radius:20px;padding:6px 9px}
 .ml-daha-copy{font-size:11px;line-height:1.65;color:var(--ml-muted,#9db0ba);margin-bottom:14px}
 .ml-field-label{display:block;font-size:11px;font-weight:800;color:var(--ml-text,#edf4f7);margin:12px 0 6px}
-.ml-daha-input{display:block;width:100%;min-height:46px;border:1px solid rgba(132,165,181,.38);border-radius:12px;padding:11px 13px;background:rgba(3,18,29,.72);color:#f5f8fa;font:600 13px inherit;outline:none}
+.ml-daha-input{display:block;width:100%;min-height:46px;border:1px solid rgba(132,165,181,.48);border-radius:12px;padding:11px 13px;background:rgba(3,18,29,.82);color:#f5f8fa;color-scheme:dark;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;outline:none}
 .ml-daha-input:focus{border-color:#d6ad58;box-shadow:0 0 0 3px rgba(214,173,88,.14)}
 .ml-daha-input::placeholder{color:#9aabb5}
 .ml-daha-input option{background:#102637;color:#f5f8fa}
@@ -1923,8 +1923,27 @@ body.ml-photo-viewer-open{overflow:hidden}
 .lm .ml-wallet-note{color:#334d59!important}
 .lm .ml-wallet-transaction .copy span{color:#425d69!important}
 .lm .ml-daha-copy,.lm .ml-daha-provider-step>p,.lm .ml-daha-review-head>p{color:#405b67!important}
-.lm .ml-daha-input{background:#fff!important;color:#172b36!important;border-color:#aabcc4!important}
+.lm .ml-daha-input{background:#fff!important;color:#172b36!important;color-scheme:light;border-color:#8ea5af!important}
 .lm .ml-daha-input::placeholder{color:#526975!important}
 .lm .ml-daha-review-row>span{color:#405b67!important}
 .lm .ml-daha-ledger-note{color:#405b67!important}
 .lm .ml-daha-brand small{color:#405b67!important}
+
+
+/* One desktop refresh control for every signed-in app tab (mobile keeps pull-to-refresh). */
+.ml-global-refresh{display:none;position:fixed;top:max(42px,env(safe-area-inset-top));right:clamp(16px,2.5vw,34px);z-index:9800;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 13px;border:1px solid rgba(245,184,61,.52);border-radius:12px;background:rgba(7,21,33,.96);color:#FFE1A5;font-family:inherit;font-size:12px;font-weight:800;line-height:1;box-shadow:0 10px 26px rgba(0,0,0,.24);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);cursor:pointer;transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.ml-global-refresh[hidden]{display:none!important}
+.ml-global-refresh:enabled:hover{background:#102C3D;border-color:#FFD778;transform:translateY(-1px)}
+.ml-global-refresh:focus-visible{outline:3px solid rgba(245,184,61,.5);outline-offset:3px}
+.ml-global-refresh:disabled{opacity:.72;cursor:wait}
+.ml-global-refresh.is-refreshing>span:first-child{display:inline-block;animation:mlGlobalRefreshSpin .8s linear infinite}
+@keyframes mlGlobalRefreshSpin{to{transform:rotate(360deg)}}
+@media(min-width:821px){.ml-global-refresh:not([hidden]){display:inline-flex}}
+@media(max-width:820px){.ml-global-refresh{display:none!important}}
+
+/* Use explicit inherited font metrics for wallet controls and native dropdown theme. */
+.ml-daha-input{font-family:inherit;font-size:13px;font-weight:600;line-height:1.4}
+.ml-daha-input:focus-visible{outline:3px solid rgba(214,173,88,.2);outline-offset:1px}
+.ml-daha-input:disabled{opacity:.68;cursor:not-allowed}
+.ml-daha-input option{background:#102637;color:#F5F8FA}
+.lm .ml-daha-input option{background:#FFFFFF;color:#172B36}
