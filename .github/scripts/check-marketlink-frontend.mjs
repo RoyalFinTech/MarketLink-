@@ -117,6 +117,14 @@ assert.ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes("pendi
 assert.doesNotMatch(premiumJs, /Modem Pay/i, 'Internal payment gateway name must not appear in customer-facing frontend');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /installPremiumPullToRefresh/, 'Pull-to-refresh handler is missing');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /ml-home-refresh/, 'Premium desktop refresh control is missing');
+assert.ok(premiumJs.includes('refreshCurrentView'), 'A shared refresh dispatcher must refresh the active app view');
+assert.match(premiumJs, /id='ml-global-refresh'/, 'Desktop app-wide refresh control is missing');
+assert.ok(premiumJs.includes("if(tab==='vendordash')") && premiumJs.includes('return loadVendorLiveData()'), 'Vendor refresh must reload backend data');
+assert.ok(premiumJs.includes("if(tab==='riderdash')") && premiumJs.includes('return loadRiderLiveData()'), 'Rider refresh must reload backend data');
+assert.ok(premiumJs.includes("apiOk()&&S.vSubTab==='wallet'") && premiumJs.includes("apiOk()&&S.rSubTab==='wallet'"), 'Vendor and rider wallet tabs must route to the shared DAHA ledger');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /\.ml-global-refresh/, 'Desktop global refresh styling is missing');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /font-family:inherit;font-size:13px;font-weight:600;line-height:1\.4/, 'DAHA wallet inputs must use explicit readable typography');
+assert.doesNotMatch(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /font:600 13px inherit/, 'Invalid DAHA wallet font shorthand must be removed');
 assert.match(html, /ml_onboarding_seen_v1/, 'Onboarding completion must persist');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /#scr-onboard\.ml-onboard-screen\{background:#fff!important\}/, 'Onboarding white theme override is missing');
 console.log('MarketLink frontend checks passed: external JS, ' + inlineCount + ' inline scripts, synchronized PWA cache, manifest/icons, 1200 × 630 social image, returning PIN route and white first-run theme.');
