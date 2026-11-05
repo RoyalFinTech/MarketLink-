@@ -121,7 +121,7 @@ assert.ok(premiumJs.includes('refreshCurrentView'), 'A shared refresh dispatcher
 assert.ok(html.includes("var roleLanding=(preferredRole&&marketLinkRoles.indexOf(preferredRole)>-1)?preferredRole:null;"), 'Sign-in must default to premium home unless a role dashboard was explicitly selected');
 assert.doesNotMatch(html, /marketLinkRoles\.indexOf\('vendor'\)>-1\?'vendor':marketLinkRoles\.indexOf\('rider'\)>-1\?'rider'/, 'Role claims must not silently redirect users into legacy role dashboards');
 assert.match(fs.readFileSync(path.join(root, 'MarketLink (7).html'), 'utf8'), /ml_release=20261105-premium-r28/, 'Legacy HTML shortcut must force the current canonical app release');
-assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v28/, 'PWA shell cache must be invalidated for the current release');
+assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v29/, 'PWA shell cache must be invalidated for the current release');
 assert.match(premiumJs, /id='ml-global-refresh'/, 'Desktop app-wide refresh control is missing');
 assert.ok(premiumJs.includes("if(tab==='vendordash')") && premiumJs.includes('return loadVendorLiveData()'), 'Vendor refresh must reload backend data');
 assert.ok(premiumJs.includes("if(tab==='riderdash')") && premiumJs.includes('return loadRiderLiveData()'), 'Rider refresh must reload backend data');
