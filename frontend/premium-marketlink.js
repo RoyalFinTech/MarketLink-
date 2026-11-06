@@ -2829,4 +2829,6 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',reconcilePremiumHomeAfterBundleLoad,{once:true});
   else reconcilePremiumHomeAfterBundleLoad();
+  // Signal only after the entire premium bundle has initialized its renderers.
+  document.dispatchEvent(new Event('marketlink:premium-ready'));
 })();
