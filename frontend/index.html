@@ -3988,7 +3988,7 @@ async function vSubmitPromotion(){
   if(!title||title.length>120){toast('Enter a promotion title of up to 120 characters.','error');return;}
   if(!Number.isInteger(durationHours)||durationHours<1||durationHours>720){toast('Choose a duration from 1 to 720 hours.','error');return;}
   if(!Number.isFinite(budget)||budget<0){toast('Enter a valid suggested budget in Dalasi.','error');return;}
-  var button=G('vpromo-submit'),bannerUrl=null;
+  var button=G('vpromo-submit'),bannerUrl=null,requestCreated=false;
   if(button){button.disabled=true;button.textContent='Submitting request…';}
   try{
     var file=fileEl&&fileEl.files&&fileEl.files[0];
@@ -3998,10 +3998,14 @@ async function vSubmitPromotion(){
       if(!bannerUrl)throw new Error('The banner image was not saved.');
     }
     await ML_API.promotions.create({title:title,description:description||undefined,bannerUrl:bannerUrl||undefined,placement:placement,durationHours:durationHours,requestedBudgetGmd:budget});
+    requestCreated=true;
     S._vendorPromotionsLoaded=false;S._vendorPromotionsError=null;
     toast('Promotion request sent for Admin review. No payment has been taken.','success');
     await loadVendorPromotions();
-  }catch(e){toast(e.error||e.message||'Could not submit the promotion request.','error');}
+  }catch(e){
+    if(bannerUrl&&!requestCreated){try{await ML_API.uploads.deleteByUrl(bannerUrl);}catch(cleanupError){}}
+    toast(e.error||e.message||'Could not submit the promotion request.','error');
+  }
   finally{if(button&&button.isConnected){button.disabled=false;button.textContent='Submit promotion request';}}
 }
 function marketlinkDashboardAvatarButton(compact){
