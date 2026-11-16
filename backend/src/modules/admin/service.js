@@ -269,7 +269,7 @@ async function getFinancialReconciliation({ page=1, limit=50 } = {}) {
       WHERE abs(COALESCE(pe.commission_amount,0)-COALESCE(cr.platform_net_amount,0)) > 0.01
 
       UNION ALL
-      SELECT 'duplicate_provider_reference','warning',p.provider_ref::text,p.id::text,
+      SELECT 'duplicate_provider_reference','warning',p.provider_ref::text,p.provider_ref::text,
              max(p.amount)::numeric,max(p.created_at),
              'More than one payment row uses the same provider reference'
       FROM payments p
