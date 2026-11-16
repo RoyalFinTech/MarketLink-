@@ -381,11 +381,29 @@ async function listPendingCodPayments({page=1,limit=30}={}){
   return rows;
 }
 
+
+function getCodRemittanceInstructions(){
+  const waveNumber=String(process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER||'').replace(/\\D/g,'');
+  const waveName=String(process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME||'').trim();
+  const afriNumber=String(process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER||'').replace(/\\D/g,'');
+  const afriName=String(process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NAME||'').trim();
+  const validNumber=value=>/^(87|86|83)\\d{7}$/.test(value);
+  return {
+    currency:'GMD',
+    methods:{
+      wave:{configured:validNumber(waveNumber)&&!!waveName,accountNumber:validNumber(waveNumber)?waveNumber:null,accountName:waveName||null},
+      afrimoney:{configured:validNumber(afriNumber)&&!!afriName,accountNumber:validNumber(afriNumber)?afriNumber:null,accountName:afriName||null}
+    }
+  };
+}
+
 async function submitCodCashRemittance({paymentId,riderId,providerReference,depositMethod='wave',proofUrl}){
   const reference=String(providerReference||'').trim();
   if(reference.length<4||reference.length>120)throw new AppError('Enter the Wave deposit reference from your receipt.',400,'COD_REMITTANCE_REFERENCE_REQUIRED');
   const method=String(depositMethod||'wave').toLowerCase();
   if(!['wave','afrimoney'].includes(method))throw new AppError('Choose Wave or AfriMoney for the cash remittance.',400,'COD_REMITTANCE_METHOD_INVALID');
+  const destination=getCodRemittanceInstructions().methods[method];
+  if(!destination||!destination.configured)throw new AppError('MarketLink has not published a verified collection account for this deposit method yet. Contact Admin before sending cash.',503,'COD_REMITTANCE_DESTINATION_NOT_CONFIGURED');
   if(proofUrl&&(!/^https:\/\//i.test(String(proofUrl))||String(proofUrl).length>1000))throw new AppError('The deposit proof link must be a valid HTTPS link.',400,'COD_REMITTANCE_PROOF_INVALID');
   return withTransaction(async(client)=>{
     const {rows:[payment]}=await client.query(
@@ -691,4 +709,4 @@ async function processWebhook({ event, rawBody }) {
 
 async function refund(paymentId,{amount,reason},actor){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id=$1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status!=='confirmed')throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');if(payment.refund_status==='processed')throw new AppError('Payment already refunded.',400,'ALREADY_REFUNDED');const refundAmount=amount||payment.amount;if(refundAmount>payment.amount)throw new AppError('Refund amount exceeds payment amount.',400,'INVALID_AMOUNT');const provider=PROVIDERS[payment.method];if(payment.method!=='cod'&&provider)await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});return withTransaction(async(client)=>{const {rows:[updated]}=await client.query(`UPDATE payments SET refund_status='processed', refund_amount=$1,status=CASE WHEN $1=amount THEN 'refunded' ELSE status END WHERE id=$2 RETURNING *`,[refundAmount,paymentId]);const {rows:[o]}=await client.query('SELECT customer_id FROM orders WHERE id=$1',[payment.order_id]);if(o){const {rows:[w]}=await client.query('SELECT id,balance FROM wallets WHERE user_id=$1',[o.customer_id]);if(w){await client.query('UPDATE wallets SET balance=balance+$1 WHERE id=$2',[refundAmount,w.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,[w.id,refundAmount,Number(w.balance)+Number(refundAmount),paymentId,reason||'Order refund']);}}await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,[actor.id,actor.role,paymentId,JSON.stringify({refundAmount,reason})]);return updated;});}
 async function getHistory(customerId,{page=1,limit=20}){const limit_=Math.min(parseInt(limit)||20,100);const offset=(Math.max(parseInt(page)||1,1)-1)*limit_;const {rows}=await query(`SELECT p.*,o.order_number FROM payments p JOIN orders o ON o.id=p.order_id WHERE o.customer_id=$1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,[customerId,limit_,offset]);return rows;}
-module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,submitCodCashRemittance,listMyCodCashRemittances,listCodCashRemittances,verifyCodCashRemittance,refund,getHistory,processWebhook,markPaymentConfirmed};
+module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,getCodRemittanceInstructions,submitCodCashRemittance,listMyCodCashRemittances,listCodCashRemittances,verifyCodCashRemittance,refund,getHistory,processWebhook,markPaymentConfirmed};
