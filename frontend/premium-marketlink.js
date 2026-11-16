@@ -515,46 +515,57 @@
     }catch(e){toast(e.error||'Could not load users.','error');}
   }
   async function loadLiveHome(){
-    if(!apiOk()){liveProducts=[];liveCategories=[];renderPremiumHome();return;}
-    var results=await Promise.all([
+    // Paint the real premium marketplace immediately. Never make the entire
+    // customer homepage wait for six independent API requests to finish.
+    if(!apiOk()){
+      liveProducts=[];liveCategories=[];liveProfile=null;liveWallet=null;
+      renderPremiumHome();
+      return;
+    }
+    renderPremiumHome();
+    var dataRequest=Promise.all([
       ML_API.products.list({page:1,limit:16,sort:'newest'}),
       ML_API.categories.getTree(),
       ML_API.customers.getProfile(),
       ML_API.customers.getOrderHistory?ML_API.customers.getOrderHistory({page:1,limit:5}):ML_API.customers.getOrders({page:1,limit:5}),
       ML_API.customers.getWallet().catch(function(){return {data:null};}),
       ML_API.customers.getNotifications({page:1,limit:6,unreadOnly:false}).catch(function(){return {data:[]};})
-    ].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
-    liveProducts=normalizeProducts(results[0].data);
-    liveCategories=Array.isArray(results[1].data)?results[1].data:[];
-    liveProfile=results[2].data||null;
-    liveOrders=results[3].data||null;
-    liveWallet=results[4].data||null;
-    liveNotifications=normalizeProducts(results[5].data);
-    if(liveProfile){
-      S.profileName=liveProfile.full_name||S.profileName||'';
-      S.profilePhone=liveProfile.phone||S.profilePhone||'';
-      S.profilePhoto=liveProfile.profile_photo_url||null;
-      // The server profile is the source of truth. Clear stale browser photos
-      // when the account no longer has a saved image instead of keeping an old URL.
-      try{
-        if(S.profilePhoto){
-          localStorage.setItem('ml_profile_photo_url',S.profilePhoto);
-          var previewUrl=localStorage.getItem('ml_profile_photo_preview_url');
-          if(previewUrl&&previewUrl!==S.profilePhoto){
+    ].map(function(p){return Promise.resolve(p).catch(function(error){console.warn('[MarketLink] A homepage data request failed:',error);return {data:null};});})).then(function(results){
+      liveProducts=normalizeProducts(results[0].data);
+      liveCategories=Array.isArray(results[1].data)?results[1].data:[];
+      liveProfile=results[2].data||null;
+      liveOrders=results[3].data||null;
+      liveWallet=results[4].data||null;
+      liveNotifications=normalizeProducts(results[5].data);
+      if(liveProfile){
+        S.profileName=liveProfile.full_name||S.profileName||'';
+        S.profilePhone=liveProfile.phone||S.profilePhone||'';
+        S.profilePhoto=liveProfile.profile_photo_url||null;
+        try{
+          if(S.profilePhoto){
+            localStorage.setItem('ml_profile_photo_url',S.profilePhoto);
+            var previewUrl=localStorage.getItem('ml_profile_photo_preview_url');
+            if(previewUrl&&previewUrl!==S.profilePhoto){
+              localStorage.removeItem('ml_profile_photo_preview');
+              localStorage.removeItem('ml_profile_photo_preview_url');
+            }
+          }else{
+            localStorage.removeItem('ml_profile_photo_url');
             localStorage.removeItem('ml_profile_photo_preview');
             localStorage.removeItem('ml_profile_photo_preview_url');
           }
-        }else{
-          localStorage.removeItem('ml_profile_photo_url');
-          localStorage.removeItem('ml_profile_photo_preview');
-          localStorage.removeItem('ml_profile_photo_preview_url');
-        }
-      }catch(photoStorageError){}
-      if(S.user){S.user.profilePhotoUrl=S.profilePhoto;S.user.avatarUrl=S.profilePhoto;}
-      S.walletBalance=Number(liveProfile.wallet_balance||0);
-      S.rewardPoints=Number(liveProfile.reward_points||0);
-    }
-    renderPremiumHome();
+        }catch(photoStorageError){}
+        if(S.user){S.user.profilePhotoUrl=S.profilePhoto;S.user.avatarUrl=S.profilePhoto;}
+        S.walletBalance=Number(liveProfile.wallet_balance||0);
+        S.rewardPoints=Number(liveProfile.reward_points||0);
+      }
+      renderPremiumHome();
+    }).catch(function(error){
+      console.error('[MarketLink] Premium homepage data refresh failed:',error);
+    });
+    // Bound startup wait even if the API or network never settles. The first
+    // premium paint remains usable; late responses update it when available.
+    await Promise.race([dataRequest,new Promise(function(resolve){setTimeout(resolve,7000);})]);
   }
   function isMarketLinkRole(role){return (S.roles||[]).some(function(r){return String(r).toLowerCase()===String(role).toLowerCase();});}
   function roleCtaSectionMarkup(){
