@@ -25,6 +25,7 @@ exports.continue = wrap(async (req,res) => res.json({success:true,data:await svc
 exports.status = wrap(async (req,res) => res.json({success:true,data:await svc.getPaymentStatus(req.params.id,req.user.id,req.user.roles)}));
 exports.confirm = wrap(async (req,res) => res.json({success:true,data:await svc.confirmPayment(req.params.id,req.user.id,req.user.roles)}));
 exports.pendingCod = wrap(async (req,res) => res.json({success:true,data:await svc.listPendingCodPayments(req.query)}));
+exports.codRemittanceInstructions = wrap(async(req,res) => res.json({success:true,data:svc.getCodRemittanceInstructions()}));
 exports.submitCodRemittance = wrap(async(req,res) => res.status(201).json({success:true,data:await svc.submitCodCashRemittance({...req.body,paymentId:req.params.id,riderId:req.user.id})}));
 exports.myCodRemittances = wrap(async(req,res) => res.json({success:true,data:await svc.listMyCodCashRemittances(req.user.id,req.query)}));
 exports.codRemittances = wrap(async(req,res) => res.json({success:true,data:await svc.listCodCashRemittances(req.query)}));
