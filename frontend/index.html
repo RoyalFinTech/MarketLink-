@@ -469,7 +469,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r32"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r39" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r33"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r40" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -2133,51 +2133,42 @@ function goApp(){
   restoreRecentFromStorage();
   var homeRoot=G('tab-home');
   window.__ML_PENDING_PREMIUM_HOME=true;
+  window.__ML_PREMIUM_HOME_STARTING=false;
   if(homeRoot)homeRoot.innerHTML='<div class="ml-premium-home ml-home-loading"><div class="ml-dashboard-brand">MarketLink Gambia</div><div class="ml-skeleton-line" style="width:54%"></div><div class="ml-skeleton-line" style="width:36%"></div><div class="ml-skeleton-card"></div><p style="color:#64748b;font-size:13px;margin-top:14px">Opening your premium marketplace…</p></div>';
-  if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
-    Promise.resolve(window.ML_Premium.load()).catch(function(homeError){
-      console.error('[MarketLink] Premium home failed to load:',homeError);
-      if(homeRoot)homeRoot.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink could not load the premium home</b><span>Please check your connection and retry. The previous homepage has been disabled to prevent showing an outdated screen.</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium&&window.ML_Premium.load&&window.ML_Premium.load()">Retry premium home</button></div></div>';
-    });
-  }else if(homeRoot){
-    // The premium script is deferred and may finish after the splash/session
-    // restore. Wait for its explicit ready event instead of leaving a dead screen.
-    homeRoot.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Loading your premium marketplace…</b><span>Connecting the latest MarketLink experience.</span></div></div>';
-    function startPendingPremiumHome(){
-      var root=G('tab-home');
-      if(!window.__ML_PENDING_PREMIUM_HOME||!root||typeof window.renderHome!=='function')return false;
-      // Do not gate on S.curTab or screen CSS state: restored sessions can
-      // briefly report stale navigation state while the premium bundle boots.
-      window.__ML_PENDING_PREMIUM_HOME=false;
-      try{
-        // Never call the legacy global renderer during premium startup: its
-        // hgreet/catgrid/featured nodes do not exist in the premium DOM.
-        // Call the premium module directly, and wait rather than falling back.
-        if(!window.ML_Premium||typeof window.ML_Premium.load!=='function')return false;
-        Promise.resolve(window.ML_Premium.load()).catch(function(error){
-          window.__ML_PENDING_PREMIUM_HOME=true;
-          console.error('[MarketLink] Premium module load failed:',error);
-          root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Premium marketplace could not load</b><span>'+String(error&&error.message||'Please check your connection and retry.')+'</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.__ML_START_PREMIUM_HOME&&window.__ML_START_PREMIUM_HOME()">Retry premium home</button></div></div>';
-        });
-        return true;
-      }catch(error){
-        window.__ML_PENDING_PREMIUM_HOME=true;
-        console.error('[MarketLink] Premium home startup failed:',error);
-        root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Premium marketplace could not start</b><span>'+String(error&&error.message||'Please retry.')+'</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.__ML_PENDING_PREMIUM_HOME=true;window.__ML_START_PREMIUM_HOME&&window.__ML_START_PREMIUM_HOME()">Retry premium home</button></div></div>';
-        return false;
-      }
-    }
-    window.__ML_START_PREMIUM_HOME=startPendingPremiumHome;
-    if(!window.__ML_PREMIUM_READY_LISTENER){
-      window.__ML_PREMIUM_READY_LISTENER=true;
-      document.addEventListener('marketlink:premium-ready',startPendingPremiumHome);
-    }
-    // Event delivery is the primary path; these bounded checks cover a
-    // readiness event that raced session restoration or a browser WebView.
-    [0,250,1000,2500].forEach(function(delay){
-      setTimeout(startPendingPremiumHome,delay);
-    });
+  function startPendingPremiumHome(){
+    var root=G('tab-home');
+    if(!window.__ML_PENDING_PREMIUM_HOME||!root)return false;
+    if(!window.ML_Premium||typeof window.ML_Premium.load!=='function')return false;
+    if(window.__ML_PREMIUM_HOME_STARTING)return true;
+    window.__ML_PENDING_PREMIUM_HOME=false;
+    window.__ML_PREMIUM_HOME_STARTING=true;
+    var startedAt=Date.now();
+    console.info('[MarketLink boot] premium start requested', {at:startedAt, authenticated:!!(ML_API&&ML_API.auth&&ML_API.auth.isAuthenticated())});
+    Promise.resolve().then(function(){return window.ML_Premium.load();}).then(function(){
+      console.info('[MarketLink boot] premium first render completed in '+(Date.now()-startedAt)+'ms');
+    }).catch(function(error){
+      window.__ML_PENDING_PREMIUM_HOME=true;
+      console.error('[MarketLink boot] premium renderer failed after '+(Date.now()-startedAt)+'ms',error);
+      var message=String(error&&error.message||error||'Unknown premium startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Premium marketplace could not start</b><span>'+message+'</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.__ML_PENDING_PREMIUM_HOME=true;window.__ML_START_PREMIUM_HOME&&window.__ML_START_PREMIUM_HOME()">Retry premium home</button></div></div>';
+    }).finally(function(){window.__ML_PREMIUM_HOME_STARTING=false;});
+    return true;
   }
+  window.__ML_START_PREMIUM_HOME=startPendingPremiumHome;
+  if(!window.__ML_PREMIUM_READY_LISTENER){
+    window.__ML_PREMIUM_READY_LISTENER=true;
+    document.addEventListener('marketlink:premium-ready',startPendingPremiumHome);
+  }
+  // Deferred scripts execute before DOMContentLoaded; the event handles the
+  // normal path, while these bounded retries cover slow WebViews and races.
+  [0,100,300,1000,2500,6500].forEach(function(delay){setTimeout(startPendingPremiumHome,delay);});
+  setTimeout(function(){
+    if(window.__ML_PENDING_PREMIUM_HOME&&!window.__ML_PREMIUM_HOME_STARTING){
+      var root=G('tab-home');
+      if(root)root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium module did not start</b><span>The app shell is ready, but the premium JavaScript entry point is unavailable. Check the connection and retry.</span><button type="button" class="ml-btn ml-btn-primary" onclick="location.reload()">Reload MarketLink</button></div></div>';
+      console.error('[MarketLink boot] premium module unavailable after 10 seconds');
+    }
+  },10000);
   renderCart();renderOrders();renderProfile();
   updateCartBadge();
   var marketLinkRoles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
@@ -2585,54 +2576,16 @@ async function doPin(){
 // HOME SCREEN
 // ═══════════════════════════════════════════════════════════
 function renderHome(){
-  // Premium app shell deliberately omits the legacy home DOM. If the deferred
-  // premium bundle has not finished loading, queue its renderer instead of
-  // writing to missing legacy elements (hgreet/catgrid/feat-list/trend-list).
-  if(!G('hgreet')||!G('catgrid')||!G('feat-list')||!G('trend-list')){
-    window.__ML_PENDING_PREMIUM_HOME=true;
-    if(typeof window.__ML_START_PREMIUM_HOME==='function')window.__ML_START_PREMIUM_HOME();
-    return;
+  // Compatibility bridge only. The legacy homepage renderer is intentionally
+  // retired; all customer home rendering belongs to the premium module.
+  window.__ML_PENDING_PREMIUM_HOME=true;
+  if(typeof window.__ML_START_PREMIUM_HOME==='function')return window.__ML_START_PREMIUM_HOME();
+  if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
+    window.__ML_PENDING_PREMIUM_HOME=false;
+    return window.ML_Premium.load();
   }
-  G('hgreet').textContent='Hello, '+(S.user?S.user.name.split(' ')[0]:'there')+' 👋';
-  // Update location header label
-  var locEl=G('hloc-label');
-  if(locEl){
-    var locLabel=S.delivAddr||S.savedDelivAddr||'Set delivery location';
-    locEl.innerHTML=sanitizeText(locLabel)+' '+gambiaFlagMarkup();
-  }
-  // Update notification bell badge with real unread count
-  var nbell=G('nbell');
-  if(nbell){
-    var unread=NotificationCenter.unreadCount('customer');
-    nbell.textContent=unread>9?'9+':String(unread);
-    nbell.style.display=unread>0?'flex':'none';
-  }
-  // Categories
-  var cg=G('catgrid'); cg.innerHTML='';
-  CATS.forEach(function(c){
-    var d=document.createElement('div'); d.className='cati';
-    d.innerHTML='<div class="catem" style="background:'+c.color+'22;">'+c.emoji+'</div><div class="catn">'+c.name+'</div>';
-    d.onclick=function(){openCategory(c);};
-    cg.appendChild(d);
-  });
-  // Featured
-  var fl=G('feat-list'); fl.innerHTML='';
-  STORES.filter(function(r){return r.open;}).slice(0,6).forEach(function(r){
-    fl.insertAdjacentHTML('beforeend',storeCard(r));
-  });
-  // Trending
-  var tl=G('trend-list'); tl.innerHTML='';
-  TRENDING.forEach(function(p){
-    var h='<div style="min-width:130px;background:var(--sf);border-radius:13px;padding:12px;border:1px solid rgba(255,255,255,0.07);flex-shrink:0;">'+
-      '<div style="font-size:34px;text-align:center;margin-bottom:7px;">'+p.emoji+'</div>'+
-      '<div style="color:var(--tx);font-size:12px;font-weight:600;margin-bottom:2px;">'+p.name+'</div>'+
-      '<div style="color:var(--mu);font-size:10px;margin-bottom:8px;">'+p.store+'</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;">'+
-      '<div style="color:#0D7377;font-size:13px;font-weight:700;">D '+p.price+'</div>'+
-      '<div onclick="addCart('+p.id+',1,\''+p.name+'\','+p.price+')" style="width:25px;height:25px;border-radius:50%;background:linear-gradient(135deg,#0D7377,#FF6B2B);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;cursor:pointer;">+</div>'+
-      '</div></div>';
-    tl.insertAdjacentHTML('beforeend',h);
-  });
+  console.warn('[MarketLink] Premium home requested before its module is ready.');
+  return false;
 }
 
 function doSearch(q){
@@ -7654,7 +7607,7 @@ window.addEventListener('unhandledrejection',function(e){
     var root=premiumRoot();
     if(!root)return;
     var safe=String(message||'Unknown startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
-    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r39 · Cache: shell-v41</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r40 · Cache: shell-v42</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
     var button=document.getElementById('ml-premium-diagnostic-retry');
     if(button)button.addEventListener('click',function(){
       button.disabled=true;button.textContent='Retrying…';
@@ -7663,7 +7616,7 @@ window.addEventListener('unhandledrejection',function(e){
         return;
       }
       var script=document.createElement('script');
-      script.src='./premium-marketlink.js?v=marketlink-premium-canonical-r39-retry';
+      script.src='./premium-marketlink.js?v=marketlink-premium-canonical-r40-retry';
       script.async=true;
       script.onload=function(){
         if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
