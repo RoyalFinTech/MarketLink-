@@ -70,8 +70,6 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                       AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit')) AS affiliate_credit_missing,
                   (NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id)) AS platform_earning_missing,
                   (EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
-                    AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > 0.01)) AS platform_earning_mismatch,
-                  (EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
                     AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > $1)) AS platform_earning_mismatch
            FROM orders o JOIN commission_records c ON c.order_id=o.id
            LEFT JOIN deliveries d ON d.order_id=o.id
@@ -88,8 +86,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                OR (COALESCE(o.affiliate_commission_amount,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_affiliate_payout' AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit'))
                OR NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id)
-               OR EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
-                    AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > 0.01))
+               )
            ORDER BY o.delivered_at DESC NULLS LAST LIMIT $2`, [moneyTolerance, pageSize]),
     query(`SELECT w.id, w.user_id, u.full_name, w.amount, w.payout_method, w.status,
                   w.provider_status, w.provider_ref, w.created_at,
