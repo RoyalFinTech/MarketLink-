@@ -262,6 +262,9 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
             d.picked_up_at, d.delivered_at, d.created_at,
             o.order_number, o.total AS order_total,
             v.business_name AS vendor_name,
+            (SELECT ra.status FROM rider_assignments ra
+             WHERE ra.delivery_id = d.id AND ra.rider_id = d.rider_id
+             ORDER BY ra.created_at DESC LIMIT 1) AS assignment_status,
             re.amount AS earning
      FROM deliveries d
      JOIN orders o ON o.id = d.order_id
