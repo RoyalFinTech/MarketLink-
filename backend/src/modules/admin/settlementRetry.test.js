@@ -27,7 +27,7 @@ describe('Admin financial settlement retry', () => {
       JSON.stringify({ reason: 'Verified COD receipt', idempotencyScope: 'order:order-id' }),
     ]);
     expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-id');
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_completed/i), [
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('financial.settlement_retry_completed'), [
       JSON.stringify({ reason: 'Verified COD receipt', result: { settled: true } }), 42,
     ]);
   });
@@ -39,7 +39,7 @@ describe('Admin financial settlement retry', () => {
 
     await expect(retryFinancialSettlement('order-id', actor, 'Reviewed exception')).rejects.toBe(error);
 
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_failed/i), [
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('financial.settlement_retry_failed'), [
       JSON.stringify({ reason: 'Reviewed exception', errorCode: 'SETTLEMENT_LEDGER_MISMATCH' }), 43,
     ]);
   });
@@ -51,7 +51,7 @@ describe('Admin financial settlement retry', () => {
     const result = await retryFinancialSettlement('order-id', actor, 'Reviewed payment state');
 
     expect(result).toEqual({ settled: false, reason: 'PAYMENT_NOT_CONFIRMED' });
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_not_eligible/i), [
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('financial.settlement_retry_not_eligible'), [
       JSON.stringify({ reason: 'Reviewed payment state', result }), 44,
     ]);
   });
