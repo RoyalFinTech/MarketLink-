@@ -14,6 +14,7 @@ router.post('/:id/continue', authenticate,
   [param('id').isUUID(), body('action').isIn(['confirm','pin']), body('pin').optional({checkFalsy:true}).matches(/^\d{4,8}$/)],
   validate, ctrl.continue);
 router.get('/cod/pending', authenticate, authorize(...ADMIN), ctrl.pendingCod);
+router.get('/cod/remittance-instructions',authenticate,authorize('rider'),ctrl.codRemittanceInstructions);
 router.post('/cod/:id/remittance', authenticate, authorize('rider'),
   [param('id').isUUID(),body('providerReference').trim().isLength({min:4,max:120}),body('depositMethod').optional().isIn(['wave','afrimoney']),body('proofUrl').optional({checkFalsy:true}).isURL({require_protocol:true,protocols:['https']})],
   validate,ctrl.submitCodRemittance);
