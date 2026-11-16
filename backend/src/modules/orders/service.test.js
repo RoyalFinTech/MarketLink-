@@ -109,7 +109,7 @@ describe('order financial settlement safeguards', () => {
       .mockResolvedValueOnce({ rows: [{ ...baseCommission, affiliate_commission_amount: 2 }] });
 
     await expect(require('./service').settleOrderFinancials('order-1'))
-      .rejects.toMatchObject({ code: 'SETTLEMENT_LEDGER_MISMATCH' });
+      .rejects.toMatchObject({ code: 'SETTLEMENT_AFFILIATE_MISSING' });
 
     expect(clientQuery).toHaveBeenCalledTimes(2);
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
