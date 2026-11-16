@@ -113,9 +113,9 @@ assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("pat
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
 assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r41/, 'Premium JS URL must be revised');
-assert.match(html, /marketlink-premium-canonical-r33/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v43/, 'PWA cache must be bumped');
+assert.match(html, /marketlink-premium-canonical-r42/, 'Premium JS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r34/, 'Premium CSS URL must be revised');
+assert.match(serviceWorker, /marketlink-shell-v44/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
@@ -139,7 +139,7 @@ assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'),
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /@media\(min-width:821px\)\{\s*#app\{width:100%!important;max-width:none!important/, 'Desktop app must not remain trapped in the legacy 430px mobile frame');
 assert.doesNotMatch(html, /marketLinkRoles\.indexOf\('vendor'\)>-1\?'vendor':marketLinkRoles\.indexOf\('rider'\)>-1\?'rider'/, 'Role claims must not silently redirect users into legacy role dashboards');
 assert.match(fs.readFileSync(path.join(root, 'MarketLink (7).html'), 'utf8'), /ml_release=20261106-premium-r34/, 'Legacy HTML shortcut must force the current canonical app release');
-assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v43/, 'PWA shell cache must be invalidated for the current release');
+assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v44/, 'PWA shell cache must be invalidated for the current release');
 assert.match(premiumJs, /id='ml-global-refresh'/, 'Desktop app-wide refresh control is missing');
 assert.ok(premiumJs.includes("if(tab==='vendordash')") && premiumJs.includes('return loadVendorLiveData()'), 'Vendor refresh must reload backend data');
 assert.ok(premiumJs.includes("if(tab==='riderdash')") && premiumJs.includes('return loadRiderLiveData()'), 'Rider refresh must reload backend data');
@@ -153,3 +153,5 @@ console.log('MarketLink frontend checks passed: external JS, ' + inlineCount + '
 
 assert.match(html, /marketlink:premium-ready/, 'App startup must wait for the deferred premium bundle ready event');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /dispatchEvent\(new Event\('marketlink:premium-ready'\)\)/, 'Premium bundle must signal readiness after initialization');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /Module initialization failed before API registration/, 'Premium bundle must surface early initialization exceptions');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /marketlink:premium-error/, 'Premium startup exceptions must emit a diagnostic event');
