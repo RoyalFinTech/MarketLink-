@@ -2504,7 +2504,7 @@
           if(x.duplicate_count)detail.push('Duplicates: '+x.duplicate_count);
           ['vendor_credit_missing','rider_credit_missing','rider_earning_record_missing','affiliate_credit_missing','platform_earning_missing','platform_earning_mismatch'].forEach(function(k){if(x[k])detail.push(k.replace(/_/g,' '));});
           var retryAction=item[0]==='pendingSettlement'&&x.id
-            ?'<button type="button" class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.retryFinancialSettlement(\''+esc(x.id)+'\',\''+esc(ref)+'\')">Retry settlement</button>'
+            ?'<button type="button" class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.retryFinancialSettlement(&quot;'+esc(x.id)+'&quot;,&quot;'+esc(ref)+'&quot;)">Retry settlement</button>'
             :'';
           return '<div class="ml-profile-row"><div class="ico">⚠️</div><div class="copy"><b>'+esc(ref)+'</b><span>'+esc(String(status).replace(/_/g,' '))+(detail.length?' · '+esc(detail.join(' · ')):'')+'</span>'+retryAction+'</div><strong>'+esc(amount)+'</strong></div>';
         }).join('')+'</div>':'<div class="ml-empty"><b>No matching records</b><span>This check found no records requiring attention.</span></div>';
