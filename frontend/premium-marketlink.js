@@ -428,6 +428,7 @@
     if(!apiOk()){toast('Admin session required.','error');return;}
     if(!paymentId){toast('The COD payment reference is missing.','error');return;}
     var retry=String(paymentState||'pending').toLowerCase()==='confirmed';
+    if(!retry){toast('This payment cannot be confirmed directly. Ask the assigned rider to submit the Wave or AfriMoney deposit reference, then verify it in the cash deposit desk.','warning');return;}
     var question=retry
       ?'This COD payment is already marked as cash received. Retry the outstanding wallet settlement for this delivered order?'
       :'Confirm that the collected cash for this delivered order has been received and reconciled? This will mark the COD payment as paid and may release the vendor/rider/affiliate settlement.';
@@ -444,6 +445,35 @@
       await loadAdminDashboard();
     }catch(e){
       toast(e.error||'Could not confirm or settle this COD payment. Review the settlement record before retrying.','error');
+      await loadAdminDashboard();
+    }
+  }
+
+
+  async function reviewCodRemittance(remittanceId,decision){
+    if(!apiOk()){toast('Admin sign-in required.','error');return;}
+    if(!remittanceId||!['verified','rejected'].includes(decision)){toast('Invalid cash remittance action.','error');return;}
+    var note='';
+    if(decision==='verified'){
+      if(!window.confirm('Have you matched this exact receipt reference and amount against the official MarketLink Wave or AfriMoney account statement? Only verify after the deposit is visible in the company account.'))return;
+    }else{
+      note=window.prompt('Enter the reason for rejecting this deposit reference:','Reference not found in collection account statement');
+      if(note===null)return;
+      if(!String(note).trim()){toast('A rejection reason is required.','error');return;}
+    }
+    try{
+      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note),data=response&&response.data||response||{};
+      var settlement=data.settlement;
+      if(decision==='verified'&&settlement&&settlement.settled===false){
+        toast('Deposit verified, but order settlement needs Admin review: '+String(settlement.reason||'Settlement pending')+'.','warning');
+      }else if(decision==='verified'){
+        toast('Deposit verified. Vendor, rider, affiliate and platform settlement processed through DAHA.','success');
+      }else{
+        toast('Cash remittance rejected. The rider can review the note and submit a corrected reference.','success');
+      }
+      await loadAdminDashboard();
+    }catch(e){
+      toast(e.error||e.message||'Could not review this cash deposit.','error');
       await loadAdminDashboard();
     }
   }
@@ -2653,7 +2683,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
+    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(){return renderLiveAdminAnalytics('30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
