@@ -96,6 +96,7 @@ assert.match(html, /rel=["']manifest["'][^>]*manifest\.webmanifest/i, 'HTML must
 assert.match(html, /id=["']scr-returning["']/, 'Returning-user PIN screen is missing');
 assert.match(html, /window\.ML_Premium&&typeof window\.ML_Premium\.load==='function'/, 'goApp must explicitly invoke the premium home renderer');
 assert.match(html, /Opening your premium marketplace/, 'goApp must show the premium loading state immediately');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /async function loadLiveHome\(\)[\s\S]*?renderPremiumHome\(\);[\s\S]*?var dataRequest=Promise\.all/, 'Premium home must paint before background API enrichment begins');
 assert.match(html, /previous homepage has been disabled/, 'Do not fall back to the legacy homepage when premium loading fails');
 assert.doesNotMatch(html, /else\{renderHome\(\);\}/, 'Legacy homepage fallback must be removed');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /reconcilePremiumHomeAfterBundleLoad/, 'Deferred premium bundle must reconcile sessions restored before it loaded');
@@ -106,8 +107,8 @@ assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("pat
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
 assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r32/, 'Premium JS URL must be revised');
-assert.match(html, /marketlink-premium-canonical-r29/, 'Premium CSS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r37/, 'Premium JS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r30/, 'Premium CSS URL must be revised');
 assert.match(serviceWorker, /marketlink-shell-v39/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
