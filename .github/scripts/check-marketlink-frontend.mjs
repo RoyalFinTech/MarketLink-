@@ -113,9 +113,9 @@ assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("pat
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
 assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r42/, 'Premium JS URL must be revised');
-assert.match(html, /marketlink-premium-canonical-r34/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v44/, 'PWA cache must be bumped');
+assert.match(html, /marketlink-premium-canonical-r43/, 'Premium JS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r35/, 'Premium CSS URL must be revised');
+assert.match(serviceWorker, /marketlink-shell-v45/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
@@ -155,3 +155,6 @@ assert.match(html, /marketlink:premium-ready/, 'App startup must wait for the de
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /dispatchEvent\(new Event\('marketlink:premium-ready'\)\)/, 'Premium bundle must signal readiness after initialization');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /Module initialization failed before API registration/, 'Premium bundle must surface early initialization exceptions');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /marketlink:premium-error/, 'Premium startup exceptions must emit a diagnostic event');
+
+assert.match(html, /function retryPremiumBundle\(\)[\s\S]*?ml_retry=/, 'Premium startup must force a fresh bundle request when the entry point is missing');
+assert.match(serviceWorker, /isPremiumExecutable[\s\S]*?fetch\(request\)/, 'Premium JavaScript must use network-first delivery to prevent stale bundle cache from masking releases');
