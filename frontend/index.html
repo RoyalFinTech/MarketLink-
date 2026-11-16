@@ -3970,6 +3970,40 @@ async function loadVendorLiveData(){
     S.vOrders=[]; S.vProds=[]; toast(e.error||'Could not load live vendor data.','error');
   }finally{S._vendorLoading=false;renderVDash();}
 }
+async function loadVendorPromotions(){
+  if(S._vendorPromotionsLoading||S._vendorPromotionsLoaded||!ML_API.auth.isAuthenticated())return;
+  S._vendorPromotionsLoading=true;S._vendorPromotionsError=null;
+  try{
+    var response=await ML_API.promotions.mine(),rows=response&&response.data;
+    S.vPromotions=Array.isArray(rows)?rows:[];
+    S._vendorPromotionsLoaded=true;
+  }catch(e){S._vendorPromotionsError=e.error||'Could not load your promotion requests.';}
+  finally{S._vendorPromotionsLoading=false;if(S.vSubTab==='promo')renderVDash();}
+}
+async function vSubmitPromotion(){
+  if(!ML_API.auth.isAuthenticated()){toast('Sign in to request a promotion.','error');return;}
+  var titleEl=G('vpromo-title'),descEl=G('vpromo-description'),placeEl=G('vpromo-placement'),durationEl=G('vpromo-duration'),budgetEl=G('vpromo-budget'),fileEl=G('vpromo-banner');
+  var title=titleEl&&titleEl.value.trim(),description=descEl&&descEl.value.trim(),placement=placeEl&&placeEl.value||'featured_banner';
+  var durationHours=Number(durationEl&&durationEl.value||24),budget=budgetEl&&budgetEl.value.trim()!==''?Number(budgetEl.value):0;
+  if(!title||title.length>120){toast('Enter a promotion title of up to 120 characters.','error');return;}
+  if(!Number.isInteger(durationHours)||durationHours<1||durationHours>720){toast('Choose a duration from 1 to 720 hours.','error');return;}
+  if(!Number.isFinite(budget)||budget<0){toast('Enter a valid suggested budget in Dalasi.','error');return;}
+  var button=G('vpromo-submit'),bannerUrl=null;
+  if(button){button.disabled=true;button.textContent='Submitting request…';}
+  try{
+    var file=fileEl&&fileEl.files&&fileEl.files[0];
+    if(file){
+      if(['image/jpeg','image/png','image/webp'].indexOf(file.type)<0||file.size<=0||file.size>5*1024*1024)throw new Error('Choose a JPG, PNG or WebP banner up to 5 MB.');
+      var uploaded=await ML_API.uploads.upload(file,'banner');bannerUrl=uploaded&&uploaded.url||null;
+      if(!bannerUrl)throw new Error('The banner image was not saved.');
+    }
+    await ML_API.promotions.create({title:title,description:description||undefined,bannerUrl:bannerUrl||undefined,placement:placement,durationHours:durationHours,requestedBudgetGmd:budget});
+    S._vendorPromotionsLoaded=false;S._vendorPromotionsError=null;
+    toast('Promotion request sent for Admin review. No payment has been taken.','success');
+    await loadVendorPromotions();
+  }catch(e){toast(e.error||e.message||'Could not submit the promotion request.','error');}
+  finally{if(button&&button.isConnected){button.disabled=false;button.textContent='Submit promotion request';}}
+}
 function marketlinkDashboardAvatarButton(compact){
   var photo=S.profilePhoto||(S.user&&(S.user.profilePhotoUrl||S.user.avatarUrl))||null;
   try{photo=photo||localStorage.getItem('ml_profile_photo_url')||null;}catch(e){}
@@ -4078,8 +4112,27 @@ function renderVDash(){
           '<span style="color:#F5A623;font-size:11px;">'+p.status+'</span></div>';
       }).join(''):'<div style="color:var(--mu);font-size:12px;text-align:center;padding:10px;">No payouts yet</div>')+
       '</div>';
-  } else if(S.vSubTab==='reviews' || S.vSubTab==='promo'){
-    content='<div class="ml-empty" style="margin-top:4px;"><div style="font-size:30px;">🧩</div><b>Feature not connected</b><span>This feature is intentionally hidden from production until its backend workflow is available. No sample data is shown.</span></div>';
+  } else if(S.vSubTab==='promo'){
+    var promoRows=S.vPromotions||[];
+    content='<section style="background:var(--sf);border:1px solid rgba(255,255,255,.09);border-radius:15px;padding:14px;margin-bottom:13px;">'+
+      '<div style="color:var(--tx);font-size:14px;font-weight:800;margin-bottom:5px;">📣 Request a store promotion</div>'+
+      '<p style="color:var(--mu);font-size:11px;line-height:1.55;margin-bottom:10px;">Request a featured banner, search boost, shop spotlight or category banner. Admin will review the schedule and confirm the GMD cost and payment instructions before publishing. This request does not charge your wallet.</p>'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:750;margin:9px 0 5px;">Promotion title *</label><input class="inp" id="vpromo-title" maxlength="120" placeholder="e.g. Weekend grocery offers">'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:750;margin:9px 0 5px;">Description</label><textarea class="inp" id="vpromo-description" rows="3" maxlength="2000" placeholder="Tell customers what you want to promote"></textarea>'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:750;margin:9px 0 5px;">Placement</label><select class="inp" id="vpromo-placement"><option value="featured_banner">Featured banner</option><option value="search_boost">Search boost</option><option value="vendor_spotlight">Vendor spotlight</option><option value="category_banner">Category banner</option></select>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><label style="flex:1;min-width:120px;color:var(--tx);font-size:11px;font-weight:750;">Duration (hours)<input class="inp" id="vpromo-duration" type="number" min="1" max="720" step="1" value="24" style="margin-top:5px;"></label><label style="flex:1;min-width:120px;color:var(--tx);font-size:11px;font-weight:750;">Suggested budget (GMD)<input class="inp" id="vpromo-budget" type="number" min="0" step="0.01" placeholder="Optional" style="margin-top:5px;"></label></div>'+
+      '<label style="display:block;color:var(--tx);font-size:11px;font-weight:750;margin:10px 0 5px;">Banner image (optional)<input class="inp" id="vpromo-banner" type="file" accept="image/jpeg,image/png,image/webp" style="margin-top:5px;"></label>'+
+      '<button class="btn btn-p" id="vpromo-submit" style="width:100%;margin-top:10px;" onclick="vSubmitPromotion()">Submit promotion request</button></section>'+
+      '<div style="color:var(--tx);font-size:13px;font-weight:800;margin:14px 0 8px;">Your promotion requests</div>'+
+      (S._vendorPromotionsLoading?'<div class="ml-empty"><span>Loading your requests…</span></div>':
+      S._vendorPromotionsError?'<div class="ml-empty"><b>Requests unavailable</b><span>'+sanitizeText(S._vendorPromotionsError)+'</span><button class="btn btn-s" style="margin-top:10px;" onclick="S._vendorPromotionsLoaded=false;S._vendorPromotionsError=null;loadVendorPromotions()">Retry</button></div>':
+      (promoRows.length?promoRows.map(function(p){
+        var state=String(p.status||'pending').replace(/_/g,' '),payment=String(p.payment_status||'unpaid').replace(/_/g,' ');
+        return '<article style="padding:12px;background:var(--sf);border:1px solid rgba(255,255,255,.08);border-radius:13px;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><b style="color:var(--tx);font-size:12px;">'+sanitizeText(p.title||'Promotion request')+'</b><span style="font-size:10px;color:#F5B83D;font-weight:800;text-transform:capitalize;">'+sanitizeText(state)+'</span></div><div style="font-size:10px;color:var(--mu);margin-top:5px;">'+sanitizeText(String(p.placement||'featured_banner').replace(/_/g,' '))+' · '+Number(p.duration_hours||0)+' hours · Payment: '+sanitizeText(payment)+'</div>'+(p.admin_notes?'<div style="font-size:11px;line-height:1.5;color:var(--tx);margin-top:8px;">Admin note: '+sanitizeText(p.admin_notes)+'</div>':'')+(p.starts_at?'<div style="font-size:10px;color:var(--mu);margin-top:5px;">Starts: '+sanitizeText(new Date(p.starts_at).toLocaleString())+'</div>':'')+'</article>';
+      }).join(''):'<div class="ml-empty"><b>No promotion requests yet</b><span>Your submitted requests and Admin payment updates will appear here.</span></div>'))+
+      '<button class="btn btn-s" style="width:100%;margin-top:7px;" onclick="S._vendorPromotionsLoaded=false;loadVendorPromotions()">↻ Refresh requests</button>';
+  } else if(S.vSubTab==='reviews'){
+    content='<div class="ml-empty" style="margin-top:4px;"><b>Reviews</b><span>Customer review management is not yet exposed by the production API. No sample reviews are displayed.</span></div>';
   } else if(S.vSubTab==='analytics') {
     var a=S.vAnalytics&&S.vAnalytics.summary||{};
     var top=S.vAnalytics&&S.vAnalytics.topProducts||[];
@@ -4096,8 +4149,9 @@ function renderVDash(){
     content='<div class="ml-empty" style="margin-top:4px;"><div style="font-size:30px;">🧩</div><b>Feature not connected</b><span>Promotions and review management are not currently exposed by the production API, so no sample content is shown here.</span></div>';
   }
 
-  var tabs=['orders','products','analytics','wallet'];
-  var tabLabels=['📋 Orders','🛍️ Products','📊 Analytics','💰 Wallet'];
+  if(S.vSubTab==='promo'&&!S._vendorPromotionsLoaded&&!S._vendorPromotionsLoading&&!S._vendorPromotionsError)loadVendorPromotions();
+  var tabs=['orders','products','analytics','wallet','promo'];
+  var tabLabels=['📋 Orders','🛍️ Products','📊 Analytics','💰 Wallet','📣 Promotions'];
   el.innerHTML=
     '<div style="background:linear-gradient(160deg,#0F1923,#0A5C60);padding:50px 16px 18px;position:relative;">'+
     '<div class="fb" style="position:absolute;top:0;left:0;right:0;"><div class="g"></div><div class="r"></div><div class="b"></div></div>'+
