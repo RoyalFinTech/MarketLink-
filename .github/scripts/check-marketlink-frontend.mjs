@@ -157,4 +157,6 @@ assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), 
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /marketlink:premium-error/, 'Premium startup exceptions must emit a diagnostic event');
 
 assert.match(html, /function retryPremiumBundle\(\)[\s\S]*?ml_retry=/, 'Premium startup must force a fresh bundle request when the entry point is missing');
+assert.match(html, /var bootDetail=window\.__ML_PREMIUM_BOOT_ERROR\|\|window\.__ML_PREMIUM_SCRIPT_ERROR/, 'Premium retry diagnostic must include captured script execution errors');
+assert.match(html, /Release: premium-r44 · Cache: shell-v46/, 'Premium startup diagnostic must identify the deployed release and cache versions');
 assert.match(serviceWorker, /isPremiumExecutable[\s\S]*?fetch\(request\)/, 'Premium JavaScript must use network-first delivery to prevent stale bundle cache from masking releases');
