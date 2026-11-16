@@ -211,6 +211,13 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
     const isRider = String(d.rider_id || '') === String(actorId || '');
     if (!isAdmin && !isRider) throw new AppError('Not authorised.', 403, 'FORBIDDEN');
 
+    // A previous delivery update may have committed while financial
+    // settlement failed. Repeating "delivered" is therefore a safe retry
+    // path; settlement itself is idempotent and locks its commission record.
+    if (newStatus === 'delivered' && d.status === 'delivered') {
+      return { ...d, settlementRetry: true };
+    }
+
     const allowed = VALID_TRANSITIONS[d.status] || [];
     if (!allowed.includes(newStatus)) {
       throw new AppError(`Cannot transition from ${d.status} to ${newStatus}.`, 400, 'INVALID_TRANSITION');
@@ -277,8 +284,10 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
   });
 
   // Settlement is separately idempotent: it locks the order and commission
-  // record, and exits when the commission has already been paid.
+  // record, and exits when the commission has already been paid. This also
+  // retries a prior failed settlement when the rider repeats the delivered action.
   if (newStatus === 'delivered') await ordersService.settleOrderFinancials(result.order_id);
+  if (result.settlementRetry) delete result.settlementRetry;
   return result;
 }
 
