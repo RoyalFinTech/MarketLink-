@@ -4106,8 +4106,9 @@ function renderVDash(){
       '<button class="btn" style="background:#fff;color:#0D7377;margin-top:12px;width:100%;font-weight:700;" onclick="vRequestPayout('+available+')">Request Payout</button>'+
       '</div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:10px;">💳 Payout Method</div>'+
-      '<div style="color:var(--mu);font-size:12px;">Wave / AfriMoney / Bank Transfer — configurable once a real payments backend is connected.</div></div>'+
+      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:6px;">💳 DAHA Wallet payout destination</div>'+
+      '<div style="color:var(--mu);font-size:12px;line-height:1.55;">Vendor withdrawals are processed through DAHA Wallet. Set or update your Wave or AfriMoney recipient number there; it can be different from your MarketLink sign-in number. A 4-digit PIN is required to confirm each request.</div>'+
+      '<button type="button" class="btn btn-s" style="width:100%;margin-top:10px;" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Manage DAHA payout details →</button></div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);">'+
       '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:10px;">📜 Payout History</div>'+
       (S.vPayoutHistory&&S.vPayoutHistory.length>0?S.vPayoutHistory.map(function(p){
