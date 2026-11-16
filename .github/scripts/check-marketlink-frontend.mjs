@@ -97,6 +97,8 @@ assert.match(html, /id=["']scr-returning["']/, 'Returning-user PIN screen is mis
 assert.match(html, /window\.ML_Premium&&typeof window\.ML_Premium\.load==='function'/, 'goApp must explicitly invoke the premium home renderer');
 assert.match(html, /Opening your premium marketplace/, 'goApp must show the premium loading state immediately');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /async function loadLiveHome\(\)[\s\S]*?renderPremiumHome\(\);[\s\S]*?var dataRequest=Promise\.all/, 'Premium home must paint before background API enrichment begins');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /load:loadLiveHome/, 'Premium module must expose the startup entry point used by session restoration');
+assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /Promise\.all\(APP_SHELL\.filter/, 'PWA installation must tolerate optional asset failures');
 assert.match(html, /previous homepage has been disabled/, 'Do not fall back to the legacy homepage when premium loading fails');
 assert.doesNotMatch(html, /else\{renderHome\(\);\}/, 'Legacy homepage fallback must be removed');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /reconcilePremiumHomeAfterBundleLoad/, 'Deferred premium bundle must reconcile sessions restored before it loaded');
@@ -107,9 +109,9 @@ assert.ok(html.includes("host==='royalfintech.github.io'") && html.includes("pat
 assert.ok(html.includes("location.replace('https://marketlink-gambia-frontend.onrender.com/"), 'Legacy Pages must redirect to canonical premium app');
 assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must use private payment branding and DAHA Wallet');
 assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
-assert.match(html, /marketlink-premium-canonical-r38/, 'Premium JS URL must be revised');
-assert.match(html, /marketlink-premium-canonical-r31/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v40/, 'PWA cache must be bumped');
+assert.match(html, /marketlink-premium-canonical-r39/, 'Premium JS URL must be revised');
+assert.match(html, /marketlink-premium-canonical-r32/, 'Premium CSS URL must be revised');
+assert.match(serviceWorker, /marketlink-shell-v41/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
@@ -133,7 +135,7 @@ assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'),
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /@media\(min-width:821px\)\{\s*#app\{width:100%!important;max-width:none!important/, 'Desktop app must not remain trapped in the legacy 430px mobile frame');
 assert.doesNotMatch(html, /marketLinkRoles\.indexOf\('vendor'\)>-1\?'vendor':marketLinkRoles\.indexOf\('rider'\)>-1\?'rider'/, 'Role claims must not silently redirect users into legacy role dashboards');
 assert.match(fs.readFileSync(path.join(root, 'MarketLink (7).html'), 'utf8'), /ml_release=20261106-premium-r34/, 'Legacy HTML shortcut must force the current canonical app release');
-assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v40/, 'PWA shell cache must be invalidated for the current release');
+assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v41/, 'PWA shell cache must be invalidated for the current release');
 assert.match(premiumJs, /id='ml-global-refresh'/, 'Desktop app-wide refresh control is missing');
 assert.ok(premiumJs.includes("if(tab==='vendordash')") && premiumJs.includes('return loadVendorLiveData()'), 'Vendor refresh must reload backend data');
 assert.ok(premiumJs.includes("if(tab==='riderdash')") && premiumJs.includes('return loadRiderLiveData()'), 'Rider refresh must reload backend data');
