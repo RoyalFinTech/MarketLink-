@@ -355,7 +355,7 @@ async function listPendingCodPayments({page=1,limit=30}={}){
   const {rows}=await query(
     `SELECT p.id AS payment_id,p.amount,p.currency,p.status AS payment_record_status,p.created_at,
             o.id AS order_id,o.order_number,o.total,o.status AS order_status,
-            o.payment_status,o.placed_at,
+            o.payment_status,o.placed_at,r.status AS remittance_status,
             customer.full_name AS customer_name,
             v.business_name AS vendor_name,
             d.status AS delivery_status,
@@ -367,6 +367,7 @@ async function listPendingCodPayments({page=1,limit=30}={}){
      LEFT JOIN deliveries d ON d.order_id=o.id
      LEFT JOIN users rider ON rider.id=d.rider_id
      LEFT JOIN commission_records cr ON cr.order_id=o.id
+     LEFT JOIN cod_cash_remittances r ON r.payment_id=p.id
      WHERE p.method='cod'
        AND o.status='delivered'
        AND (
