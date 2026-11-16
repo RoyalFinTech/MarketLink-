@@ -377,6 +377,105 @@ async function listPendingCodPayments({page=1,limit=30}={}){
   );
   return rows;
 }
+
+async function submitCodCashRemittance({paymentId,riderId,providerReference,depositMethod='wave',proofUrl}){
+  const reference=String(providerReference||'').trim();
+  if(reference.length<4||reference.length>120)throw new AppError('Enter the Wave deposit reference from your receipt.',400,'COD_REMITTANCE_REFERENCE_REQUIRED');
+  const method=String(depositMethod||'wave').toLowerCase();
+  if(!['wave','afrimoney'].includes(method))throw new AppError('Choose Wave or AfriMoney for the cash remittance.',400,'COD_REMITTANCE_METHOD_INVALID');
+  if(proofUrl&&(!/^https:\/\//i.test(String(proofUrl))||String(proofUrl).length>1000))throw new AppError('The deposit proof link must be a valid HTTPS link.',400,'COD_REMITTANCE_PROOF_INVALID');
+  return withTransaction(async(client)=>{
+    const {rows:[payment]}=await client.query(
+      `SELECT p.id,p.order_id,p.amount,p.currency,p.method,p.status AS payment_status,
+              o.status AS order_status,o.payment_status AS order_payment_status,
+              d.id AS delivery_id,d.rider_id,d.status AS delivery_status
+       FROM payments p JOIN orders o ON o.id=p.order_id
+       JOIN deliveries d ON d.order_id=o.id
+       WHERE p.id=$1 FOR UPDATE OF p,o,d`,[paymentId]);
+    if(!payment)throw new AppError('Pay on Delivery payment not found.',404,'COD_PAYMENT_NOT_FOUND');
+    if(payment.method!=='cod')throw new AppError('This order is not a Pay on Delivery order.',400,'COD_METHOD_REQUIRED');
+    if(String(payment.rider_id)!==String(riderId))throw new AppError('Only the rider assigned to this order can submit its cash remittance.',403,'COD_REMITTANCE_FORBIDDEN');
+    if(payment.order_status!=='delivered'||payment.delivery_status!=='delivered')throw new AppError('Mark the delivery complete before submitting the cash remittance.',409,'COD_REMITTANCE_NOT_DELIVERED');
+    if(payment.payment_status==='confirmed'||payment.order_payment_status==='confirmed')throw new AppError('This order payment has already been confirmed.',409,'COD_ALREADY_CONFIRMED');
+    const amount=Number(payment.amount);
+    const {rows:[existing]}=await client.query('SELECT * FROM cod_cash_remittances WHERE payment_id=$1 FOR UPDATE',[paymentId]);
+    if(existing&&existing.status!=='rejected')return existing;
+    if(existing){
+      const {rows:[updated]}=await client.query(
+        `UPDATE cod_cash_remittances SET rider_id=$1,amount=$2,deposit_method=$3,
+          provider_reference=$4,proof_url=$5,status='submitted',submitted_at=now(),
+          reviewed_by=NULL,reviewed_at=NULL,review_note=NULL,updated_at=now()
+         WHERE id=$6 RETURNING *`,
+        [riderId,amount,method,reference,proofUrl||null,existing.id]);
+      return updated;
+    }
+    const {rows:[created]}=await client.query(
+      `INSERT INTO cod_cash_remittances
+        (payment_id,order_id,rider_id,amount,deposit_method,provider_reference,proof_url)
+       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [paymentId,payment.order_id,riderId,amount,method,reference,proofUrl||null]);
+    return created;
+  });
+}
+
+async function listMyCodCashRemittances(riderId,{page=1,limit=20}={}){
+  const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||20,1),50),offset=(page_-1)*limit_;
+  const {rows}=await query(
+    `SELECT r.id,r.order_id,r.payment_id,r.amount,r.currency,r.deposit_method,
+            r.provider_reference,r.proof_url,r.status,r.submitted_at,r.reviewed_at,r.review_note,
+            o.order_number
+     FROM cod_cash_remittances r JOIN orders o ON o.id=r.order_id
+     WHERE r.rider_id=$1 ORDER BY r.submitted_at DESC LIMIT $2 OFFSET $3`,
+    [riderId,limit_,offset]);
+  return rows;
+}
+
+async function listCodCashRemittances({page=1,limit=30,status='submitted'}={}){
+  const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||30,1),100),offset=(page_-1)*limit_;
+  const allowed=['submitted','verified','rejected','all'];
+  const filter=allowed.includes(String(status))?String(status):'submitted';
+  const params=filter==='all'?[limit_,offset]:[filter,limit_,offset];
+  const where=filter==='all'?'':'WHERE r.status=$1';
+  const {rows}=await query(
+    `SELECT r.id,r.payment_id,r.order_id,r.rider_id,r.amount,r.currency,r.deposit_method,
+            r.provider_reference,r.proof_url,r.status,r.submitted_at,r.reviewed_at,r.review_note,
+            o.order_number,o.total,o.status AS order_status,o.payment_status,
+            rider.full_name AS rider_name,v.business_name AS vendor_name
+     FROM cod_cash_remittances r JOIN orders o ON o.id=r.order_id
+     JOIN users rider ON rider.id=r.rider_id
+     LEFT JOIN vendors v ON v.user_id=o.vendor_id
+     ${where} ORDER BY r.submitted_at ASC LIMIT ${params.length-1} OFFSET ${params.length}`,
+    params);
+  return rows;
+}
+
+async function verifyCodCashRemittance(remittanceId,actor,decision='verified',note=''){
+  if(!['verified','rejected'].includes(decision))throw new AppError('Invalid cash remittance decision.',400,'COD_REMITTANCE_DECISION_INVALID');
+  const {rows:[remittance]}=await withTransaction(async(client)=>{
+    const {rows:[r]}=await client.query(
+      'SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE',[remittanceId]);
+    if(!r)throw new AppError('Cash remittance record not found.',404,'COD_REMITTANCE_NOT_FOUND');
+    if(r.status===decision)return{rows:[r]};
+    if(r.status!=='submitted')throw new AppError('This remittance has already been reviewed.',409,'COD_REMITTANCE_ALREADY_REVIEWED');
+    const {rows:[updated]}=await client.query(
+      `UPDATE cod_cash_remittances SET status=$1,reviewed_by=$2,reviewed_at=now(),
+        review_note=$3,updated_at=now() WHERE id=$4 RETURNING *`,
+      [decision,actor.id,String(note||'').trim().slice(0,500)||null,remittanceId]);
+    await client.query(
+      `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES($1,$2,$3,'cod_cash_remittance',$4,$5)`,
+      [actor.id,actor.role||'admin','payment.cod_remittance_'+decision,remittanceId,
+       JSON.stringify({paymentId:r.payment_id,orderId:r.order_id,amount:Number(r.amount),reference:r.provider_reference,note:String(note||'').trim().slice(0,500)})]);
+    return{rows:[updated]};
+  });
+  if(decision==='rejected')return{remittance,settlement:null};
+  const {rows:[payment]}=await query('SELECT * FROM payments WHERE id=$1',[remittance.payment_id]);
+  if(!payment)throw new AppError('Payment record is missing. The remittance is verified but payment confirmation needs Admin attention.',409,'COD_PAYMENT_MISSING');
+  const confirmed=payment.status==='confirmed'?payment:await markPaymentConfirmed(payment.id,{userId:actor.id,role:actor.role||'admin'});
+  const settlement=await ordersService.settleOrderFinancials(remittance.order_id);
+  return{remittance,payment:confirmed,settlement};
+}
+
 async function markPaymentConfirmed(paymentId,actor=null){
   return withTransaction(async(client)=>{
     const {rows:[payment]}=await client.query('SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);
@@ -589,4 +688,4 @@ async function processWebhook({ event, rawBody }) {
 
 async function refund(paymentId,{amount,reason},actor){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id=$1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status!=='confirmed')throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');if(payment.refund_status==='processed')throw new AppError('Payment already refunded.',400,'ALREADY_REFUNDED');const refundAmount=amount||payment.amount;if(refundAmount>payment.amount)throw new AppError('Refund amount exceeds payment amount.',400,'INVALID_AMOUNT');const provider=PROVIDERS[payment.method];if(payment.method!=='cod'&&provider)await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});return withTransaction(async(client)=>{const {rows:[updated]}=await client.query(`UPDATE payments SET refund_status='processed', refund_amount=$1,status=CASE WHEN $1=amount THEN 'refunded' ELSE status END WHERE id=$2 RETURNING *`,[refundAmount,paymentId]);const {rows:[o]}=await client.query('SELECT customer_id FROM orders WHERE id=$1',[payment.order_id]);if(o){const {rows:[w]}=await client.query('SELECT id,balance FROM wallets WHERE user_id=$1',[o.customer_id]);if(w){await client.query('UPDATE wallets SET balance=balance+$1 WHERE id=$2',[refundAmount,w.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,[w.id,refundAmount,Number(w.balance)+Number(refundAmount),paymentId,reason||'Order refund']);}}await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,[actor.id,actor.role,paymentId,JSON.stringify({refundAmount,reason})]);return updated;});}
 async function getHistory(customerId,{page=1,limit=20}){const limit_=Math.min(parseInt(limit)||20,100);const offset=(Math.max(parseInt(page)||1,1)-1)*limit_;const {rows}=await query(`SELECT p.*,o.order_number FROM payments p JOIN orders o ON o.id=p.order_id WHERE o.customer_id=$1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,[customerId,limit_,offset]);return rows;}
-module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,refund,getHistory,processWebhook,markPaymentConfirmed};
+module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,submitCodCashRemittance,listMyCodCashRemittances,listCodCashRemittances,verifyCodCashRemittance,refund,getHistory,processWebhook,markPaymentConfirmed};
