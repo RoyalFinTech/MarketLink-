@@ -193,4 +193,4 @@ async function retryFinancialSettlement(orderId, actor, reason) {
   return result;
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports };
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, retryFinancialSettlement };
