@@ -4,6 +4,7 @@
 */
 (function(){
   'use strict';
+  try {
   var liveProducts=[], liveCategories=[], liveProfile=null, liveOrders=null, liveWallet=null, liveNotifications=[];
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function money(v){return 'D '+Number(v||0).toLocaleString('en-GM',{maximumFractionDigits:2});}
@@ -2842,4 +2843,15 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',reconcilePremiumHomeAfterBundleLoad,{once:true});
   else reconcilePremiumHomeAfterBundleLoad();
+  } catch (bootError) {
+    window.__ML_PREMIUM_BOOT_STATE='error';
+    window.__ML_PREMIUM_BOOT_ERROR=String(bootError&&bootError.stack||bootError&&bootError.message||bootError);
+    console.error('[MarketLink premium] Module initialization failed before API registration:',bootError);
+    var root=document.getElementById('tab-home');
+    if(root){
+      var safe=String(bootError&&bootError.message||bootError||'Unknown initialization error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup error</b><span style="display:block;overflow-wrap:anywhere;margin:10px 0">'+safe+'</span><small style="display:block;opacity:.75">The premium module failed during initialization. Your account and records have not been changed.</small><button type="button" class="ml-btn ml-btn-primary" onclick="location.reload()">Retry MarketLink</button></div></div>';
+    }
+    document.dispatchEvent(new CustomEvent('marketlink:premium-error',{detail:{message:String(bootError&&bootError.message||bootError||'Unknown error')}}));
+  }
 })();
