@@ -1,12 +1,12 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
 // v41: install is failure-tolerant; optional assets can no longer strand users on an old shell.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v42';
+const CACHE_NAME = 'marketlink-shell-v43';
 const APP_SHELL = [
   './',
   './index.html',
   './premium-marketlink.css?v=marketlink-premium-canonical-r33',
-  './premium-marketlink.js?v=marketlink-premium-canonical-r40',
+  './premium-marketlink.js?v=marketlink-premium-canonical-r41',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
   './assets/marketlink-logo.png',
@@ -27,7 +27,7 @@ self.addEventListener('install', event => {
     // update. Cache the document and each critical bundle independently.
     const critical = ['./', './index.html',
       './premium-marketlink.css?v=marketlink-premium-canonical-r33',
-      './premium-marketlink.js?v=marketlink-premium-canonical-r40'];
+      './premium-marketlink.js?v=marketlink-premium-canonical-r41'];
     for (const url of critical) {
       try { await cache.add(url); }
       catch (error) { console.warn('[MarketLink PWA] Critical shell asset will use network:', url, error); }
