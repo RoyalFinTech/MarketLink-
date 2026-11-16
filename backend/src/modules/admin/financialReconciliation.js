@@ -70,6 +70,8 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                       AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit')) AS affiliate_credit_missing,
                   (NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id)) AS platform_earning_missing,
                   (EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
+                    AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > 0.01)) AS platform_earning_mismatch,
+                  (EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
                     AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > $1)) AS platform_earning_mismatch
            FROM orders o JOIN commission_records c ON c.order_id=o.id
            LEFT JOIN deliveries d ON d.order_id=o.id
@@ -85,15 +87,17 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                     AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > $1)
                OR (COALESCE(o.affiliate_commission_amount,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_affiliate_payout' AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit'))
-               OR NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id))
+               OR NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id)
+               OR EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
+                    AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > 0.01))
            ORDER BY o.delivered_at DESC NULLS LAST LIMIT $2`, [moneyTolerance, pageSize]),
     query(`SELECT w.id, w.user_id, u.full_name, w.amount, w.payout_method, w.status,
                   w.provider_status, w.provider_ref, w.created_at,
                   EXTRACT(EPOCH FROM (now()-w.created_at))/3600 AS age_hours
            FROM withdrawals w LEFT JOIN users u ON u.id=w.user_id
-           WHERE w.status IN ('processing','payout_pending')
-              OR w.provider_status IN ('flagged','unknown','unknown_reference','initiation_unknown')
-              OR w.status='rejected' AND w.provider_status='reversed'
+           WHERE w.status IN ('initiating','processing','payout_pending')
+              OR w.provider_status IN ('flagged','unknown','unknown_reference','initiation_unknown','failed','cancelled','initiation_failed','reversed')
+              OR (w.status='rejected' AND w.provider_status='reversed')
            ORDER BY w.created_at ASC LIMIT $1`, [pageSize]),
     query(`SELECT w.id AS wallet_id, w.user_id, w.balance AS wallet_balance,
                   latest.balance_after AS ledger_balance, latest.created_at AS last_transaction_at,
