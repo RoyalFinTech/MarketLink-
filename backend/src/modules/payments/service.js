@@ -355,7 +355,7 @@ async function listPendingCodPayments({page=1,limit=30}={}){
   const {rows}=await query(
     `SELECT p.id AS payment_id,p.amount,p.currency,p.status AS payment_record_status,p.created_at,
             o.id AS order_id,o.order_number,o.total,o.status AS order_status,
-            o.payment_status,o.placed_at,r.status AS remittance_status,
+            o.payment_status,o.placed_at,r.id AS remittance_id,r.status AS remittance_status,
             customer.full_name AS customer_name,
             v.business_name AS vendor_name,
             d.status AS delivery_status,
