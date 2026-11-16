@@ -52,3 +52,66 @@ describe('order status concurrency', () => {
     expect(clientQuery).not.toHaveBeenCalled();
   });
 });
+
+
+describe('order financial settlement safeguards', () => {
+  let clientQuery;
+
+  const baseOrder = {
+    id: 'order-1', status: 'delivered', payment_status: 'confirmed',
+    vendor_id: 'vendor-1', rider_id: 'rider-1', delivery_id: 'delivery-1',
+    affiliate_user_id: null, total: 125, vendor_payout: 95,
+    rider_payout: 25, affiliate_commission_amount: 0,
+    platform_net_fee: 5, platform_fee: 5,
+  };
+  const baseCommission = {
+    id: 'commission-1', status: 'pending', vendor_id: 'vendor-1',
+    affiliate_user_id: null, order_total: 125, commission_amount: 5,
+    vendor_payout: 95, rider_payout: 25,
+    affiliate_commission_amount: 0, platform_net_amount: 5,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clientQuery = jest.fn();
+    withTransaction.mockImplementation((callback) => callback({ query: clientQuery }));
+  });
+
+  test('refuses to mark settlement paid when the rider recipient is missing', async () => {
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ ...baseOrder, rider_id: null, delivery_id: null }] })
+      .mockResolvedValueOnce({ rows: [baseCommission] });
+
+    await expect(require('./service').settleOrderFinancials('order-1'))
+      .rejects.toMatchObject({ code: 'SETTLEMENT_RIDER_MISSING' });
+
+    expect(clientQuery).toHaveBeenCalledTimes(2);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE commission_records SET status='paid'/i.test(sql))).toBe(false);
+  });
+
+  test('refuses settlement when the commission ledger differs from the order', async () => {
+    clientQuery
+      .mockResolvedValueOnce({ rows: [baseOrder] })
+      .mockResolvedValueOnce({ rows: [{ ...baseCommission, rider_payout: 20 }] });
+
+    await expect(require('./service').settleOrderFinancials('order-1'))
+      .rejects.toMatchObject({ code: 'SETTLEMENT_LEDGER_MISMATCH' });
+
+    expect(clientQuery).toHaveBeenCalledTimes(2);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE commission_records SET status='paid'/i.test(sql))).toBe(false);
+  });
+
+  test('refuses settlement when an affiliate reward has no affiliate recipient', async () => {
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ ...baseOrder, affiliate_commission_amount: 2 }] })
+      .mockResolvedValueOnce({ rows: [{ ...baseCommission, affiliate_commission_amount: 2 }] });
+
+    await expect(require('./service').settleOrderFinancials('order-1'))
+      .rejects.toMatchObject({ code: 'SETTLEMENT_LEDGER_MISMATCH' });
+
+    expect(clientQuery).toHaveBeenCalledTimes(2);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
+  });
+});
