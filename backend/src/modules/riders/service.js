@@ -260,7 +260,9 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
   const { rows } = await query(
     `SELECT d.id, d.order_id, d.status, d.distance_km, d.estimated_minutes,
             d.picked_up_at, d.delivered_at, d.created_at,
-            o.order_number, o.total AS order_total,
+            o.order_number, o.total AS order_total, o.payment_method,
+            p.id AS cod_payment_id, p.amount AS cod_payment_amount,
+            ccr.status AS cod_remittance_status,
             v.business_name AS vendor_name,
             (SELECT ra.status FROM rider_assignments ra
              WHERE ra.delivery_id = d.id AND ra.rider_id = d.rider_id
@@ -269,6 +271,12 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
      FROM deliveries d
      JOIN orders o ON o.id = d.order_id
      JOIN vendors v ON v.user_id = o.vendor_id
+     LEFT JOIN LATERAL (
+       SELECT p.id,p.amount,p.status FROM payments p
+       WHERE p.order_id=o.id AND p.method='cod'
+       ORDER BY p.created_at DESC LIMIT 1
+     ) p ON TRUE
+     LEFT JOIN cod_cash_remittances ccr ON ccr.payment_id=p.id
      LEFT JOIN rider_earnings re ON re.delivery_id = d.id
      WHERE ${conditions.join(' AND ')}
      ORDER BY d.created_at DESC
