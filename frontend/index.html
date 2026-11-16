@@ -469,7 +469,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r30"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r37" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r31"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r38" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -7611,6 +7611,71 @@ window.addEventListener('unhandledrejection',function(e){
       }).catch(function(error){console.warn('[MarketLink PWA] Service worker registration failed.',error);});
     }
   });
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+  var premiumScriptError='';
+  window.addEventListener('error',function(event){
+    var target=event.target;
+    var src=target&&target.src?String(target.src):String(event.filename||'');
+    if(src.indexOf('premium-marketlink.js')!==-1){
+      premiumScriptError=event.message||'Premium JavaScript failed to load or execute';
+      window.__ML_PREMIUM_SCRIPT_ERROR=premiumScriptError;
+      console.error('[MarketLink] Premium bundle error:',premiumScriptError,src);
+    }
+  },true);
+  window.addEventListener('unhandledrejection',function(event){
+    var reason=event.reason;
+    var message=String(reason&&reason.message||reason||'Unknown promise rejection');
+    if(message.toLowerCase().indexOf('premium')!==-1){
+      window.__ML_PREMIUM_SCRIPT_ERROR=message;
+      console.error('[MarketLink] Premium startup rejection:',message);
+    }
+  });
+  function premiumRoot(){
+    return document.getElementById('tab-home');
+  }
+  function showBootDiagnostic(){
+    var root=premiumRoot();
+    if(!root)return;
+    var text=String(root.innerText||root.textContent||'');
+    if(text.indexOf('Loading your premium marketplace')===-1&&text.indexOf('Connecting the latest MarketLink experience')===-1)return;
+    if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
+      Promise.resolve().then(function(){return window.ML_Premium.load();}).catch(function(error){
+        renderDiagnostic(error&&error.message||String(error||'Premium renderer rejected startup'));
+      });
+      return;
+    }
+    renderDiagnostic(window.__ML_PREMIUM_SCRIPT_ERROR||'The premium JavaScript bundle did not register window.ML_Premium. The page shell loaded, but the premium module did not initialize.');
+  }
+  function renderDiagnostic(message){
+    var root=premiumRoot();
+    if(!root)return;
+    var safe=String(message||'Unknown startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r38 · Cache: shell-v40</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
+    var button=document.getElementById('ml-premium-diagnostic-retry');
+    if(button)button.addEventListener('click',function(){
+      button.disabled=true;button.textContent='Retrying…';
+      if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
+        Promise.resolve().then(function(){return window.ML_Premium.load();}).catch(function(error){renderDiagnostic(error&&error.message||String(error));});
+        return;
+      }
+      var script=document.createElement('script');
+      script.src='./premium-marketlink.js?v=marketlink-premium-canonical-r38-retry';
+      script.async=true;
+      script.onload=function(){
+        if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
+          Promise.resolve().then(function(){return window.ML_Premium.load();}).catch(function(error){renderDiagnostic(error&&error.message||String(error));});
+        }else renderDiagnostic(window.__ML_PREMIUM_SCRIPT_ERROR||'The premium script loaded but did not initialize its module. Please share this screen with support.');
+      };
+      script.onerror=function(){renderDiagnostic('The premium JavaScript file could not be downloaded. Check the network or static asset response.');};
+      document.head.appendChild(script);
+    });
+  }
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(showBootDiagnostic,6500);},{once:true});
+  if(document.readyState!=='loading')setTimeout(showBootDiagnostic,6500);
 })();
 </script>
 </body>
