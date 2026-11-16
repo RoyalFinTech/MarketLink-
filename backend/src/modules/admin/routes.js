@@ -30,6 +30,20 @@ router.get('/reports',     authenticate, authorize(...ADMIN),
 
 router.get('/financial-reconciliation', authenticate, authorize(...ADMIN),
   [query('limit').optional().isInt({min:1,max:100})], validate, ctrl.financialReconciliation);
+router.get('/transactions', authenticate, authorize(...ADMIN),
+  [
+    query('page').optional().isInt({min:1}),
+    query('limit').optional().isInt({min:1,max:100}),
+    query('type').optional().isIn(['credit','debit']),
+    query('category').optional().isString().isLength({max:40}),
+  ], validate, ctrl.transactions);
+router.get('/failed-payments', authenticate, authorize(...ADMIN),
+  [
+    query('page').optional().isInt({min:1}),
+    query('limit').optional().isInt({min:1,max:100}),
+    query('method').optional().isString().isLength({max:40}),
+  ], validate, ctrl.failedPayments);
+
 router.post('/financial-reconciliation/orders/:id/retry-settlement',
   authenticate, authorize(...ADMIN),
   [
