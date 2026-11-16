@@ -86,7 +86,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                OR (COALESCE(o.affiliate_commission_amount,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_affiliate_payout' AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit'))
                OR NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id))
-           ORDER BY o.delivered_at DESC NULLS LAST LIMIT $1`, [pageSize]),
+           ORDER BY o.delivered_at DESC NULLS LAST LIMIT $2`, [moneyTolerance, pageSize]),
     query(`SELECT w.id, w.user_id, u.full_name, w.amount, w.payout_method, w.status,
                   w.provider_status, w.provider_ref, w.created_at,
                   EXTRACT(EPOCH FROM (now()-w.created_at))/3600 AS age_hours
