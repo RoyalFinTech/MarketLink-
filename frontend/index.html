@@ -3959,7 +3959,7 @@ async function loadVendorLiveData(){
     var rows=Array.isArray(od)?od:(od&&Array.isArray(od.items)?od.items:[]);
     S.vOrders=rows.map(function(o){return {
       id:o.id||o.order_number, order_number:o.order_number, deliveryId:o.delivery_id||null, customer:o.customer_name||'Customer',
-      items:'Order items available in order details', total:Number(o.total||0), status:({pending:'Pending',accepted:'Accepted',preparing:'Preparing',awaiting_rider:'Awaiting Rider',rider_assigned:'Rider Assigned',picked_up:'Picked Up',on_the_way:'On the Way',delivered:'Delivered',cancelled:'Cancelled'})[o.status]||o.status||'Pending',
+      items:o.item_summary||'Order items unavailable', total:Number(o.total||0), status:({pending:'Pending',accepted:'Accepted',preparing:'Preparing',awaiting_rider:'Awaiting Rider',rider_assigned:'Rider Assigned',picked_up:'Picked Up',on_the_way:'On the Way',delivered:'Delivered',cancelled:'Cancelled'})[o.status]||o.status||'Pending',
       rawStatus:o.status, time:o.placed_at?new Date(o.placed_at).toLocaleString():'',
       rider:o.rider_name||o.rider_id||null, timeline:[o.placed_at?'Order placed — '+new Date(o.placed_at).toLocaleString():'Order placed']
     };});
@@ -4049,7 +4049,7 @@ function renderVDash(){
           '<div style="color:var(--mu);font-size:10px;margin-top:1px;">👤 '+o.customer+' · '+o.time+'</div></div>'+
           '<div style="padding:3px 9px;border-radius:99px;background:'+sc+'22;"><span style="color:'+sc+';font-size:9px;font-weight:700;">'+o.status+'</span></div>'+
           '</div>'+
-          '<div style="color:var(--mu);font-size:11px;margin-bottom:8px;">'+o.items+'</div>'+
+          '<div style="color:var(--mu);font-size:11px;margin-bottom:8px;">'+sanitizeText(o.items||'')+'</div>'+
           '<div style="display:flex;justify-content:space-between;align-items:center;">'+
           '<div style="color:#0D7377;font-size:13px;font-weight:700;">D '+o.total+'</div>'+
           '<div style="display:flex;gap:7px;">'+
