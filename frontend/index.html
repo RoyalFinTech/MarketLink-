@@ -1171,10 +1171,12 @@ var LiveAPI = (function(){
   }
   async function riderUpdateDeliveryStep(deliveryId,step){
     var map={picked_up:'picked_up',delivering:'in_transit',delivered:'delivered'};
-    if(map[step]){try{await ML_API.delivery.updateStatus(deliveryId,map[step]);}catch(e){return fail(e.error||'Could not update delivery status.');}}
-    var labels={picked_up:'Order picked up 📦',delivering:'Rider is on the way 🛵',delivered:'Order delivered ✅'};
-    if(labels[step]) NotificationCenter.push('customer','rider_update',labels[step]);
-    return ok({deliveryId:deliveryId,step:step});
+    if(!deliveryId||!map[step])return fail('This delivery step is not supported.');
+    try{
+      var response=await ML_API.delivery.updateStatus(deliveryId,map[step]);
+      var updated=response&&response.data||{};
+      return ok({deliveryId:deliveryId,step:step,status:updated.status||map[step],delivery:updated});
+    }catch(e){return fail(e.error||'Could not update delivery status.');}
   }
   async function riderRequestWithdrawal(amount){
     return fail('Rider withdrawals are submitted through DAHA Wallet. Review your Wave/AfriMoney recipient, enter your 4-digit MarketLink PIN, and confirm there.');
@@ -5961,16 +5963,35 @@ async function rAccept(id){
 }
 async function rDecline(id){try{await ML_API.delivery.decline(id);S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});renderRDash();toast('Delivery declined. The vendor can now assign another rider.','info');}catch(e){toast(e.error||'Could not decline this delivery. Please refresh and try again.','error');}}
 async function rNextStep(){
-  S.delStepIdx++;
-  if(S.delStepIdx<DEL_TOASTS.length) toast(DEL_TOASTS[S.delStepIdx]);
-  var stepKey=DEL_STEPS[S.delStepIdx-1];
-  if(stepKey) await LiveAPI.riderUpdateDeliveryStep(S.activeDel?S.activeDel.id:'DEL-000', stepKey);
-  if(S.delStepIdx>=DEL_STEPS.length){
-    clearInterval(window._rdotTimer);
-    toast('Delivery complete! +D '+(S.activeDel?S.activeDel.pay:0)+' earned 🎉');
-    S.rEarningsToday=(S.rEarningsToday||340)+(S.activeDel?S.activeDel.pay:0);
-    NotificationCenter.push('customer','delivery_completed','Your order has been delivered! Enjoy 🎉');
-    setTimeout(function(){S.activeDel=null;S.delStepIdx=0;renderRDash();},2500);
+  var delivery=S.activeDel;
+  if(!delivery||!delivery.id){toast('There is no active delivery to update.','error');return;}
+  var current=String(delivery.status||'').toLowerCase();
+  var stepKey=current==='assigned'?'picked_up':current==='picked_up'?'delivering':current==='in_transit'?'delivered':null;
+  if(!stepKey){toast('This delivery is not ready for another status update. Refresh the rider dashboard.','error');return;}
+
+  var result=await LiveAPI.riderUpdateDeliveryStep(delivery.id,stepKey);
+  if(!result||!result.success){
+    toast(result&&result.error||'The server did not confirm this delivery update. Your progress has not changed.','error');
+    return;
+  }
+
+  var updatedStatus=String(result.data&&result.data.status||'').toLowerCase();
+  if(!updatedStatus)updatedStatus=stepKey==='delivering'?'in_transit':stepKey;
+  S.activeDel=Object.assign({},delivery,{status:updatedStatus});
+  S.rDeliveries=(S.rDeliveries||[]).map(function(item){
+    return String(item.id)===String(delivery.id)?Object.assign({},item,{status:updatedStatus}):item;
+  });
+
+  if(updatedStatus==='picked_up')toast('Pickup confirmed. You can now start the delivery.','success');
+  else if(updatedStatus==='in_transit')toast('Delivery started. The customer has been notified.','success');
+  else if(updatedStatus==='delivered'){
+    toast('Delivery marked as complete. DAHA earnings update after payment is confirmed.','success');
+    S.activeDel=null;
+    S.delStepIdx=0;
+    S.rSubTab='requests';
+    renderRDash();
+    await loadRiderLiveData();
+    return;
   }
   renderRDash();
 }
