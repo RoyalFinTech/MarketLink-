@@ -413,10 +413,11 @@
         var paymentId=esc(c.payment_id||'');
         var paymentState=String(c.payment_record_status||'pending').toLowerCase();
         var alreadyConfirmed=paymentState==='confirmed';
+        var remittanceVerified=String(c.remittance_status||'').toLowerCase()==='verified';
         var riderLabel=c.rider_name||'Rider not assigned';
-        var actionLabel=alreadyConfirmed?'Retry wallet settlement':'Confirm cash received';
-        var stateLabel=alreadyConfirmed?'Cash confirmed · settlement needs retry':'Delivered · cash confirmation pending';
-        return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>'+stateLabel+'</small></div><button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;,&quot;'+paymentState+'&quot;)">'+actionLabel+'</button></div>';
+        var actionLabel=alreadyConfirmed&&remittanceVerified?'Retry wallet settlement':String(c.remittance_status||'')==='submitted'?'Deposit submitted · Review above':'Awaiting rider deposit';
+        var stateLabel=alreadyConfirmed?'Cash confirmed · settlement needs retry':String(c.remittance_status||'')==='submitted'?'Rider deposit submitted · Admin verification pending':'Delivered · waiting for rider deposit';
+        return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>'+stateLabel+'</small></div>'+(alreadyConfirmed&&remittanceVerified?'<button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;,&quot;'+paymentState+'&quot;)">'+actionLabel+'</button>':'<span style="font-size:10px;color:#B8C8D2">'+actionLabel+'</span>')+'</div>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No delivered COD payments awaiting confirmation</b><span>New cash-on-delivery orders will appear here after delivery is marked complete.</span></div>')+
       codRemittanceHtml+
             '<div class="ml-section-head"><h3>Top vendors</h3></div>'+
