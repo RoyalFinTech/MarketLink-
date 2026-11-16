@@ -62,16 +62,27 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                   (COALESCE(o.rider_payout,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_rider_payout'
                       AND t.reference_id=o.id AND t.category='delivery_earning' AND t.type='credit')) AS rider_credit_missing,
+                  (COALESCE(o.rider_payout,0)>0 AND NOT EXISTS (
+                    SELECT 1 FROM rider_earnings re WHERE re.order_id=o.id AND re.rider_id=d.rider_id
+                      AND ABS(COALESCE(re.amount,0)-COALESCE(o.rider_payout,0)) <= $1)) AS rider_earning_record_missing,
                   (COALESCE(o.affiliate_commission_amount,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_affiliate_payout'
                       AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit')) AS affiliate_credit_missing,
-                  (NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id)) AS platform_earning_missing
+                  (NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id)) AS platform_earning_missing,
+                  (EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
+                    AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > $1)) AS platform_earning_mismatch
            FROM orders o JOIN commission_records c ON c.order_id=o.id
+           LEFT JOIN deliveries d ON d.order_id=o.id
            WHERE o.status='delivered' AND o.payment_status='confirmed' AND c.status='paid'
              AND ((COALESCE(o.vendor_payout,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_vendor_payout' AND t.reference_id=o.id AND t.category='vendor_sale' AND t.type='credit'))
                OR (COALESCE(o.rider_payout,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_rider_payout' AND t.reference_id=o.id AND t.category='delivery_earning' AND t.type='credit'))
+               OR (COALESCE(o.rider_payout,0)>0 AND NOT EXISTS (
+                    SELECT 1 FROM rider_earnings re WHERE re.order_id=o.id AND re.rider_id=d.rider_id
+                      AND ABS(COALESCE(re.amount,0)-COALESCE(o.rider_payout,0)) <= $1))
+               OR EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id
+                    AND ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0)) > $1)
                OR (COALESCE(o.affiliate_commission_amount,0)>0 AND NOT EXISTS (
                     SELECT 1 FROM transactions t WHERE t.reference_type='order_affiliate_payout' AND t.reference_id=o.id AND t.category='affiliate_commission' AND t.type='credit'))
                OR NOT EXISTS (SELECT 1 FROM platform_earnings pe WHERE pe.order_id=o.id))
