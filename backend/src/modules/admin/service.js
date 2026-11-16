@@ -1,7 +1,6 @@
 // src/modules/admin/service.js
 'use strict';
 const { query } = require('../../config/db');
-const ordersService = require('../orders/service');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -219,6 +218,7 @@ async function getFailedPayments({ page=1, limit=50, method } = {}) {
  * The initial audit row is committed before the financial operation begins.
  */
 async function retryFinancialSettlement(orderId, actor, reason) {
+  const ordersService = require('../orders/service');
   const { rows: [audit] } = await query(
     `INSERT INTO admin_action_logs
       (actor_id,actor_role,action,entity_type,entity_id,after_data)
