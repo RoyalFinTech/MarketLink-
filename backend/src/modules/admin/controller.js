@@ -19,6 +19,8 @@ exports.reports    = wrap(async (req,res) => res.json({ success:true, data: awai
 // ── Read-only financial reconciliation ──────────────────────────────
 const financialReconciliationSvc = require('./financialReconciliation');
 exports.financialReconciliation = wrap(async (req,res) => res.json({ success:true, data: await financialReconciliationSvc.getFinancialReconciliation(req.query) }));
+exports.transactions = wrap(async (req,res) => res.json({ success:true, data: await svc.getAdminTransactions(req.query) }));
+exports.failedPayments = wrap(async (req,res) => res.json({ success:true, data: await svc.getFailedPayments(req.query) }));
 
 exports.retryFinancialSettlement = wrap(async (req,res) => {
   if (req.body.confirmation !== 'RETRY_SETTLEMENT') {
