@@ -469,7 +469,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r33"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r40" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r33"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r41" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -2553,7 +2553,7 @@ async function doPin(){
         try{ sessionStorage.setItem('ml_at', userData.accessToken); sessionStorage.setItem('ml_rt', userData.refreshToken); }catch(e){}
         ML_API._savedAt = userData.accessToken;
       }
-      setTimeout(function(){goApp();toast('Welcome, '+S.user.name.split(' ')[0]+'! 🎉');},1000);
+      goApp();toast('Welcome, '+S.user.name.split(' ')[0]+'! 🎉');
     }catch(err){
       if(pinBtn){pinBtn.textContent='Create Account';pinBtn.disabled=false;}
       var msg=err.error||'Registration failed. Please try again.';
@@ -7057,7 +7057,7 @@ window.addEventListener('unhandledrejection',function(e){
     if(S.pinStep==='create'){S.pinStep='confirm';S.cpin=['','','',''];renderAuth();return;}
     if(S.pin.join('')!==S.cpin.join('')){authErr("PINs don't match — try again");S.cpin=['','','',''];renderAuth();return;}
     var btn=document.querySelector('#scr-auth .btn-p');if(btn){btn.textContent='Creating account…';btn.disabled=true;}
-    try{var r=await ML_API.auth.registerComplete(S.regName,S.regPhoneE164||S.regPhone,S._pendingOtp||S.otp.join(''),S.pin.join(''));var u=r.data&&r.data.user;r=r.data||r;S.user={name:u.full_name||S.regName,phone:u.phone||S.regPhone,id:u.id,accountStatus:'Active'};S.roles=r.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;if(r.accessToken&&r.refreshToken){try{sessionStorage.setItem('ml_at',r.accessToken);sessionStorage.setItem('ml_rt',r.refreshToken);}catch(e){}}setTimeout(function(){goApp();toast('Welcome, '+S.user.name.split(' ')[0]+'! 🎉');},300);}
+    try{var r=await ML_API.auth.registerComplete(S.regName,S.regPhoneE164||S.regPhone,S._pendingOtp||S.otp.join(''),S.pin.join(''));var u=r.data&&r.data.user;r=r.data||r;S.user={name:u.full_name||S.regName,phone:u.phone||S.regPhone,id:u.id,accountStatus:'Active'};S.roles=r.roles||['customer'];S.profileName=S.user.name;S.profilePhone=S.user.phone;if(r.accessToken&&r.refreshToken){try{sessionStorage.setItem('ml_at',r.accessToken);sessionStorage.setItem('ml_rt',r.refreshToken);}catch(e){}}goApp();toast('Welcome, '+S.user.name.split(' ')[0]+'! 🎉');}
     catch(e){if(btn){btn.textContent='Create Account';btn.disabled=false;}var m=e.error||'Registration failed. Please try again.';if(e.code==='INVALID_OTP')m='Incorrect OTP. Tap "Resend" to get a new code.';if(e.code==='OTP_EXPIRED')m='OTP has expired. Tap "Resend" to get a new code.';authErr(m);if(e.code==='INVALID_OTP'||e.code==='OTP_EXPIRED'){S.authMode='otp';S.otp=['','','','','',''];setTimeout(renderAuth,300);}}
   };
 
@@ -7607,7 +7607,7 @@ window.addEventListener('unhandledrejection',function(e){
     var root=premiumRoot();
     if(!root)return;
     var safe=String(message||'Unknown startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
-    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r40 · Cache: shell-v42</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r41 · Cache: shell-v43</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
     var button=document.getElementById('ml-premium-diagnostic-retry');
     if(button)button.addEventListener('click',function(){
       button.disabled=true;button.textContent='Retrying…';
@@ -7616,7 +7616,7 @@ window.addEventListener('unhandledrejection',function(e){
         return;
       }
       var script=document.createElement('script');
-      script.src='./premium-marketlink.js?v=marketlink-premium-canonical-r40-retry';
+      script.src='./premium-marketlink.js?v=marketlink-premium-canonical-r41-retry';
       script.async=true;
       script.onload=function(){
         if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
