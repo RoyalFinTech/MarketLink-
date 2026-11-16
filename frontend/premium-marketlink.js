@@ -32,6 +32,12 @@
     if(label==='DAHA Wallet')return 'wallet';
     return String(label||'').toLowerCase().replace(/\s+/g,'-');
   }
+  function paymentMethodLabel(value){
+    var method=String(value||'').toLowerCase();
+    if(method==='cod'||method==='cash on delivery'||method==='pay on delivery')return 'Cash on Delivery';
+    if(method==='wallet'||method==='daha wallet')return 'DAHA Wallet';
+    return String(value||'');
+  }
   var mlPromoIndex=0,mlPromoTimer=null,mlPromoTouchX=null,mlOnboardTimer=null,mlPaymentStatusTimer=null,mlPaymentStatusStarted=0,mlOrderDetailTimer=null,mlOpenOrderDetailId=null;
   var mlPromoSlides=[
     {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
@@ -739,7 +745,7 @@
           if(!summary)summary='Order details available';
           return '<article class="ml-live-order-card"><div class="ml-live-order-top"><div><span class="ml-live-order-id">'+esc(o.order_number||o.id||'MarketLink order')+'</span><div class="ml-live-order-date">'+mlOrderDate(o.placed_at||o.created_at)+'</div></div><span class="ml-live-order-status '+tone+'">'+esc(mlOrderStatusLabel(status))+'</span></div>'+
             '<div class="ml-live-order-vendor">🏪 '+esc(o.vendor_name||'MarketLink vendor')+'</div><div class="ml-live-order-items">'+summary+(items.length>3?' · +'+(items.length-3)+' more':'')+'</div>'+
-            '<div class="ml-live-order-bottom"><div><span>Total</span><strong>'+money(o.total||0)+'</strong><small>'+esc(String(o.payment_method||'').replace(/_/g,' ').toUpperCase()||'Payment method not listed')+'</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||''))+'\')">View details →</button></div></article>';
+            '<div class="ml-live-order-bottom"><div><span>Total</span><strong>'+money(o.total||0)+'</strong><small>'+esc(paymentMethodLabel(o.payment_method)||'Payment method not listed')+'</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||''))+'\')">View details →</button></div></article>';
         }).join('')+'</div></div>';
     }catch(e){
       root.innerHTML='<div class="ml-empty"><div style="font-size:32px">📦</div><b>Order history unavailable</b><span>'+esc(e.error||e.message||'MarketLink could not load your order history.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Retry</button></div>';
@@ -841,7 +847,7 @@
         (closedNotice||'<div class="ml-tracking-steps">'+progressHtml+'</div>')+
         '</section>'+
         '<section class="ml-tracking-info-grid"><div class="ml-live-order-card"><div class="ml-section-head"><h3>Delivery details</h3></div>'+(deliveryDetails||'<p class="ml-tracking-empty">Rider and delivery estimate will appear here when they are assigned by the live delivery system.</p>')+gpsHtml+'</div>'+
-        '<div class="ml-live-order-card"><div class="ml-section-head"><h3>Order summary</h3></div><div class="ml-tracking-meta-row"><span>Vendor</span><b>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</b></div><div class="ml-tracking-meta-row"><span>Payment</span><b>'+esc(String(o.payment_method||'Not listed').replace(/_/g,' '))+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</b></div><div class="ml-tracking-meta-row"><span>Total</span><b>'+money(o.total||0)+'</b></div><div class="ml-tracking-items">'+(items.length?items.map(function(it){return '<div><span>'+esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1)+'</span><b>'+money(it.total||it.line_total||Number(it.price||it.unit_price||0)*Number(it.qty||it.quantity||1))+'</b></div>';}).join(''):'<span>Item details unavailable</span>')+'</div></div></section>'+
+        '<div class="ml-live-order-card"><div class="ml-section-head"><h3>Order summary</h3></div><div class="ml-tracking-meta-row"><span>Vendor</span><b>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</b></div><div class="ml-tracking-meta-row"><span>Payment</span><b>'+esc(paymentMethodLabel(o.payment_method)||'Not listed')+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</b></div><div class="ml-tracking-meta-row"><span>Total</span><b>'+money(o.total||0)+'</b></div><div class="ml-tracking-items">'+(items.length?items.map(function(it){return '<div><span>'+esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1)+'</span><b>'+money(it.total||it.line_total||Number(it.price||it.unit_price||0)*Number(it.qty||it.quantity||1))+'</b></div>';}).join(''):'<span>Item details unavailable</span>')+'</div></div></section>'+
         timeline+
         '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order statuses refresh every 10 seconds. Rider location appears only when a recent GPS ping is recorded for this delivery.</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||id))+'\')">Refresh now ↻</button></div></div>';
       if(terminal)stopCustomerOrderDetailPolling();else startCustomerOrderDetailPolling(id);
@@ -2579,7 +2585,7 @@
       var response=await ML_API.admin.failedPayments({page:current,limit:50}),data=response&&response.data||{},rows=Array.isArray(data.items)?data.items:[];
       var html=rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
         var date=x.created_at?new Date(x.created_at).toLocaleString():'Date unavailable';
-        return '<div class="ml-profile-row"><div class="ico">⚠️</div><div class="copy"><b>'+esc(x.order_number||x.order_id||'Order payment')+' · '+esc(x.method||'Payment method')+'</b><span>'+esc(x.status||'unknown')+' · Order '+esc(x.order_status||'unknown')+' · Payment '+esc(x.payment_status||'unknown')+'</span><small style="display:block;color:#C5D3DA;margin-top:4px">Created: '+esc(date)+' · Refund: '+esc(x.refund_status||'none')+(Number(x.refund_amount||0)>0?' · '+money(x.refund_amount):'')+'</small></div><strong>'+money(x.amount||0)+'</strong></div>';
+        return '<div class="ml-profile-row"><div class="ico">⚠️</div><div class="copy"><b>'+esc(x.order_number||x.order_id||'Order payment')+' · '+esc(paymentMethodLabel(x.method)||'Payment method')+'</b><span>'+esc(x.status||'unknown')+' · Order '+esc(x.order_status||'unknown')+' · Payment '+esc(x.payment_status||'unknown')+'</span><small style="display:block;color:#C5D3DA;margin-top:4px">Created: '+esc(date)+' · Refund: '+esc(x.refund_status||'none')+(Number(x.refund_amount||0)>0?' · '+money(x.refund_amount):'')+'</small></div><strong>'+money(x.amount||0)+'</strong></div>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No failed or stale pending payments</b><span>The production payment table has no failed payments or pending attempts older than 15 minutes.</span></div>';
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">PAYMENT EXCEPTIONS</div><h3 style="margin:4px 0">Failed payments</h3></div><button onclick="window.ML_Premium.refreshAdminFailedPayments(1)">Refresh</button></div>'+
         '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Exceptions</div><div class="ml-stat-value">'+Number(data.total||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Page</div><div class="ml-stat-value">'+Number(data.page||1)+' / '+Number(data.totalPages||0)+'</div></div></div>'+html+
