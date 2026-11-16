@@ -1,11 +1,11 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v39';
+const CACHE_NAME = 'marketlink-shell-v40';
 const APP_SHELL = [
   './',
   './index.html',
-  './premium-marketlink.css?v=marketlink-premium-canonical-r30',
-  './premium-marketlink.js?v=marketlink-premium-canonical-r37',
+  './premium-marketlink.css?v=marketlink-premium-canonical-r31',
+  './premium-marketlink.js?v=marketlink-premium-canonical-r38',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
   './assets/marketlink-logo.png',
