@@ -4141,7 +4141,7 @@ function openVendorNotifs(){
 async function vAccept(id){
   try{
     await ML_API.orders.accept(id);
-    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Preparing'}):o;});
+    S.vOrders=S.vOrders.map(function(o){return o.id===id?Object.assign({},o,{status:'Accepted',rawStatus:'accepted'}):o;});
     renderVDash(); toast('Order accepted! ✅'); refreshNotifBadges();
   }catch(e){toast(e.error||'Could not accept order.','error');}
 }
@@ -5880,11 +5880,7 @@ function openRiderNotifs(){
 async function rAccept(id){
   try{
     var res=await ML_API.delivery.accept(id), server=res.data;
-    var d=Object.assign({},S.rDeliveries.find(function(x){return x.id===id;})||{},{
-      id:server.id||id,status:server.status,rider_id:server.rider_id,order_id:server.order_id
-    });
-    S.rDeliveries=S.rDeliveries.filter(function(x){return x.id!==id;});
-    S.activeDel=d; S.delStepIdx=0; S.rSubTab='active';
+    var d=Object.assign({},S.rDeliveries.find(function(x){return x.id===id;})||{},{\n      id:server.id||id,status:server.status||'assigned',assignmentStatus:'accepted',rider_id:server.rider_id,order_id:server.order_id\n    });\n    S.rDeliveries=S.rDeliveries.map(function(x){return String(x.id)===String(id)?d:x;});\n    S.activeDel=d; S.delStepIdx=0; S.rSubTab='active';
     renderRDash(); toast('Delivery accepted! 🛵 Head to the store.');
   }catch(e){toast(e.error||'Could not accept this delivery.','error');}
 }
