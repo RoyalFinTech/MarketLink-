@@ -29,6 +29,7 @@ describe('rider cash remittance controls',()=>{
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE payment_id'))return{rows:[]};
    if(sql.includes('INSERT INTO cod_cash_remittances'))return{rows:[remittance]};
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
+   if(sql.includes('SELECT p.method,p.amount'))return{rows:[{method:'cod',amount:'145.00',payment_status:'pending',order_status:'delivered',delivery_status:'delivered',rider_id:riderId}]};
    if(sql.includes('UPDATE cod_cash_remittances'))return{rows:[{...remittance,status:params[0]}]};
    if(sql.includes("SELECT * FROM payments WHERE id=$1 FOR UPDATE"))return{rows:[payment]};
    if(sql.includes("UPDATE payments SET status='confirmed'"))return{rows:[{...payment,status:'confirmed'}]};
@@ -89,6 +90,16 @@ describe('rider cash remittance controls',()=>{
   expect(tx.mock.calls.some(([sql])=>sql.includes('admin_action_logs'))).toBe(true);
  });
 
+ test('Admin verification refuses a receipt when the payment amount has changed',async()=>{
+  tx.mockImplementationOnce(async(sql)=>{
+   if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
+   if(sql.includes('SELECT p.method,p.amount'))return{rows:[{method:'cod',amount:'150.00',order_status:'delivered',delivery_status:'delivered',rider_id:riderId}]};
+   return{rows:[]};
+  });
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched reference'))
+   .rejects.toMatchObject({statusCode:409,code:'COD_REMITTANCE_AMOUNT_MISMATCH'});
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
  test('rejecting a remittance does not confirm payment or release wallet settlement',async()=>{
   const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'rejected','Reference not found');
   expect(result.remittance).toMatchObject({status:'rejected'});
