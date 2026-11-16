@@ -162,6 +162,58 @@ async function getReports({ type, startDate, endDate }) {
 
 
 
+
+async function getAdminTransactions({ page=1, limit=50, type, category } = {}) {
+  const page_ = Math.max(parseInt(page,10)||1,1);
+  const limit_ = Math.min(Math.max(parseInt(limit,10)||50,1),100);
+  const offset = (page_-1)*limit_;
+  const where = ['1=1'], params = [];
+  if (type) { params.push(type); where.push(`t.type=${params.length}`); }
+  if (category) { params.push(category); where.push(`t.category=${params.length}`); }
+  const whereSql = where.join(' AND ');
+  const { rows } = await query(
+    `SELECT t.id,t.type,t.category,t.amount,t.balance_after,t.reference_type,t.reference_id,
+            t.description,t.created_at,w.currency,u.full_name AS account_name
+     FROM transactions t
+     JOIN wallets w ON w.id=t.wallet_id
+     LEFT JOIN users u ON u.id=w.user_id
+     WHERE ${whereSql}
+     ORDER BY t.created_at DESC,t.id DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,
+    [...params,limit_,offset]
+  );
+  const { rows:[count] } = await query(
+    `SELECT count(*)::int AS total FROM transactions t WHERE ${whereSql}`, params
+  );
+  const total = Number(count.total||0);
+  return { items:rows,total,page:page_,limit:limit_,totalPages:Math.ceil(total/limit_) };
+}
+
+async function getFailedPayments({ page=1, limit=50, method } = {}) {
+  const page_ = Math.max(parseInt(page,10)||1,1);
+  const limit_ = Math.min(Math.max(parseInt(limit,10)||50,1),100);
+  const offset = (page_-1)*limit_;
+  const where = [`(p.status='failed' OR (p.status='pending' AND p.created_at < now()-INTERVAL '15 minutes'))`];
+  const params = [];
+  if (method) { params.push(method); where.push(`p.method=${params.length}`); }
+  const whereSql = where.join(' AND ');
+  const { rows } = await query(
+    `SELECT p.id,p.order_id,o.order_number,p.method,p.amount,p.currency,p.status,
+            p.refund_status,p.refund_amount,p.created_at,o.status AS order_status,
+            o.payment_status
+     FROM payments p
+     JOIN orders o ON o.id=p.order_id
+     WHERE ${whereSql}
+     ORDER BY p.created_at ASC,p.id ASC LIMIT ${params.length+1} OFFSET ${params.length+2}`,
+    [...params,limit_,offset]
+  );
+  const { rows:[count] } = await query(
+    `SELECT count(*)::int AS total FROM payments p JOIN orders o ON o.id=p.order_id WHERE ${whereSql}`,
+    params
+  );
+  const total = Number(count.total||0);
+  return { items:rows,total,page:page_,limit:limit_,totalPages:Math.ceil(total/limit_) };
+}
+
 /**
  * Retry only the existing locked, idempotent order settlement routine.
  * The initial audit row is committed before the financial operation begins.
@@ -201,4 +253,4 @@ async function retryFinancialSettlement(orderId, actor, reason) {
   return result;
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, retryFinancialSettlement };
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
