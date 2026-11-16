@@ -17,6 +17,10 @@ exports.setSetting = wrap(async (req,res) => res.json({ success:true, data: awai
 exports.auditLogs  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAuditLogs(req.query) }));
 exports.reports    = wrap(async (req,res) => res.json({ success:true, data: await svc.getReports(req.query) }));
 
+// ── Read-only financial reconciliation ──────────────────────────────
+const financialReconciliationSvc = require('./financialReconciliation');
+exports.financialReconciliation = wrap(async (req,res) => res.json({ success:true, data: await financialReconciliationSvc.getFinancialReconciliation(req.query) }));
+
 // ── Withdrawals (admin approval workflow) ───────────────────────────
 const withdrawalsSvc = require('../withdrawals/service');
 exports.pendingWithdrawals = wrap(async (req,res) => res.json({ success:true, data: await withdrawalsSvc.listPendingForAdmin(req.query) }));
