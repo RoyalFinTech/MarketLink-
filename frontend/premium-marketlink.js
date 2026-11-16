@@ -2829,7 +2829,6 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installDesktopRefresh,{once:true});
   else installDesktopRefresh();
 
-}
   // Session restoration may call goApp() before this deferred premium bundle runs.
   // Reconcile that boot order so returning users cannot remain on legacy markup.
   function reconcilePremiumHomeAfterBundleLoad(){
