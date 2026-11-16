@@ -199,55 +199,86 @@ async function declineDelivery(deliveryId, riderId) {
   });
 }
 async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
-  const { rows: [d] } = await query('SELECT * FROM deliveries WHERE id = $1', [deliveryId]);
-  if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
-  const isAdmin = (roles||[]).some(r => ['admin','super_admin'].includes(r));
-  const isRider = d.rider_id === actorId;
-  if (!isAdmin && !isRider) throw new AppError('Not authorised.', 403, 'FORBIDDEN');
-  const allowed = VALID_TRANSITIONS[d.status] || [];
-  if (!allowed.includes(newStatus))
-    throw new AppError(`Cannot transition from ${d.status} to ${newStatus}.`, 400, 'INVALID_TRANSITION');
-
-  const now = new Date();
-  const updates = ['status = $1']; const params = [newStatus];
-  let pi = 2;
-  if (newStatus === 'picked_up')  { updates.push(`picked_up_at = $${pi++}`);  params.push(now); }
-  if (newStatus === 'delivered')  { updates.push(`delivered_at = $${pi++}`);  params.push(now); }
-  if (extra.proofUrl) { updates.push(`proof_of_delivery_url = $${pi++}`); params.push(extra.proofUrl); }
-  params.push(deliveryId);
-
+  // Serialize status changes on the delivery row. The transition must be
+  // checked after acquiring the lock, not against a stale pre-transaction read.
   const result = await withTransaction(async (client) => {
+    const { rows: [d] } = await client.query(
+      'SELECT * FROM deliveries WHERE id = $1 FOR UPDATE', [deliveryId]
+    );
+    if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
+
+    const isAdmin = (roles||[]).some(r => ['admin','super_admin'].includes(r));
+    const isRider = String(d.rider_id || '') === String(actorId || '');
+    if (!isAdmin && !isRider) throw new AppError('Not authorised.', 403, 'FORBIDDEN');
+
+    const allowed = VALID_TRANSITIONS[d.status] || [];
+    if (!allowed.includes(newStatus)) {
+      throw new AppError(`Cannot transition from ${d.status} to ${newStatus}.`, 400, 'INVALID_TRANSITION');
+    }
+
+    const now = new Date();
+    const updates = ['status = $1']; const params = [newStatus];
+    let pi = 2;
+    if (newStatus === 'picked_up') { updates.push(`picked_up_at = $${pi++}`); params.push(now); }
+    if (newStatus === 'delivered') { updates.push(`delivered_at = $${pi++}`); params.push(now); }
+    if (extra.proofUrl) { updates.push(`proof_of_delivery_url = $${pi++}`); params.push(extra.proofUrl); }
+    params.push(deliveryId);
+
     const { rows: [updated] } = await client.query(
-      `UPDATE deliveries SET ${updates.join(', ')} WHERE id = $${pi} RETURNING *`, params);
-    // Sync order status
+      `UPDATE deliveries SET ${updates.join(', ')} WHERE id = $${pi} RETURNING *`, params
+    );
+    if (!updated) throw new AppError('Delivery changed before the status could be saved. Refresh and try again.', 409, 'DELIVERY_STATE_CHANGED');
+
     const orderStatusMap = {
       picked_up: 'picked_up', in_transit: 'on_the_way',
       delivered: 'delivered', cancelled: 'cancelled',
     };
-    if (orderStatusMap[newStatus]) {
+    const orderStatus = orderStatusMap[newStatus];
+    if (orderStatus) {
       await client.query(
-        `UPDATE orders SET status = $1 ${newStatus==='delivered'?', delivered_at = now()':''}
-         WHERE id = $2`, [orderStatusMap[newStatus], d.order_id]);
+        `UPDATE orders SET status = $1 ${newStatus === 'delivered' ? ', delivered_at = now()' : ''}
+         WHERE id = $2`, [orderStatus, d.order_id]
+      );
+      const historyNotes = {
+        picked_up: 'Rider picked up the order.',
+        in_transit: 'Rider is on the way to the customer.',
+        delivered: 'Rider marked the order as delivered.',
+        cancelled: 'Delivery was cancelled.',
+      };
+      await client.query(
+        'INSERT INTO order_status_history (order_id,status,note) VALUES ($1,$2,$3)',
+        [d.order_id, orderStatus, historyNotes[newStatus] || 'Delivery status updated.']
+      );
     }
-    // Notify customer
+
     const custMsgs = {
-      picked_up:  'Your order has been picked up! 📦',
+      picked_up: 'Your order has been picked up! 📦',
       in_transit: 'Your order is on the way! 🛵',
-      delivered:  'Your order has been delivered! ✅',
+      delivered: 'Your order has been delivered! ✅',
     };
     if (custMsgs[newStatus]) {
-      const { rows: [o] } = await client.query('SELECT customer_id FROM orders WHERE id = $1', [d.order_id]);
+      const { rows: [o] } = await client.query(
+        'SELECT customer_id FROM orders WHERE id = $1', [d.order_id]
+      );
       if (o) await client.query(
         `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
          VALUES ($1,$2,$3,$4,'order',$5)`,
-        [o.customer_id, 'delivery_update', 'Order Update', custMsgs[newStatus], d.order_id]);
+        [o.customer_id, 'delivery_update', 'Order Update', custMsgs[newStatus], d.order_id]
+      );
     }
-    if(['delivered','failed','cancelled'].includes(newStatus)&&d.rider_id) {
-      await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[d.rider_id,deliveryId]);
+
+    if (['delivered','failed','cancelled'].includes(newStatus) && d.rider_id) {
+      await client.query(
+        "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",
+        [d.rider_id, deliveryId]
+      );
     }
     return updated;
   });
-  if (newStatus === 'delivered') await ordersService.settleOrderFinancials(d.order_id);
+
+  // Settlement is separately idempotent: it locks the order and commission
+  // record, and exits when the commission has already been paid.
+  if (newStatus === 'delivered') await ordersService.settleOrderFinancials(result.order_id);
   return result;
 }
 
