@@ -1539,6 +1539,7 @@ var ML_API = (function(){
     status: function(id){ return get('/payments/'+id+'/status'); },
     confirm:  function(id){ return post('/payments/'+id+'/confirm'); },
     pendingCod: function(qs){ return get('/payments/cod/pending', qs); },
+    codRemittanceInstructions: function(){ return get('/payments/cod/remittance-instructions'); },
     submitCodRemittance: function(id,data){ return post('/payments/cod/'+id+'/remittance',data); },
     myCodRemittances: function(qs){ return get('/payments/cod/remittances/mine',qs); },
     codRemittances: function(qs){ return get('/payments/cod/remittances',qs); },
