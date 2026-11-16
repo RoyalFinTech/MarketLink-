@@ -36,6 +36,7 @@ describe('admin financial reconciliation', () => {
     expect(query).toHaveBeenCalledTimes(8);
     expect(query.mock.calls[0][1]).toEqual([100]);
     expect(query.mock.calls[2][1]).toEqual([0.01, 100]);
+    expect(query.mock.calls[4][1]).toEqual([0.01, 100]);
     expect(query.mock.calls.every(([sql]) => /^SELECT/i.test(sql.trim()))).toBe(true);
   });
 
