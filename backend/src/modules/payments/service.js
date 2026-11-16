@@ -316,6 +316,8 @@ async function confirmPayment(paymentId,actorId,roles){
   const isAdmin=roleList.some(r=>['admin','super_admin'].includes(r));
   if(payment.method==='cod'){
     if(!isAdmin)throw new AppError('Only admins can confirm collected cash for Pay on Delivery orders.',403,'FORBIDDEN');
+    const {rows:[remittance]}=await query("SELECT status FROM cod_cash_remittances WHERE payment_id=$1",[paymentId]);
+    if(!remittance||remittance.status!=='verified')throw new AppError('Verify the rider’s Wave or AfriMoney cash deposit reference before confirming this Pay on Delivery payment.',409,'COD_REMITTANCE_NOT_VERIFIED');
     const {rows:[order]}=await query('SELECT status FROM orders WHERE id=$1',[payment.order_id]);
     if(!order||order.status!=='delivered'){
       throw new AppError('COD cash can only be reconciled after the order is marked delivered.',409,'COD_NOT_DELIVERED');
