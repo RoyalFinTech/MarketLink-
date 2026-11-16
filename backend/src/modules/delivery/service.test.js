@@ -35,6 +35,20 @@ describe('delivery status transitions', () => {
     expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
   });
 
+  test('retries settlement when the delivery is already marked delivered', async () => {
+    clientQuery.mockResolvedValueOnce({
+      rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }],
+    });
+    ordersService.settleOrderFinancials.mockResolvedValue({ settled: true });
+
+    const result = await updateStatus('delivery-1', 'delivered', 'rider-1', ['rider']);
+
+    expect(result.status).toBe('delivered');
+    expect(result).not.toHaveProperty('settlementRetry');
+    expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-1');
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+  });
+
   test('records the order timeline and settles only after delivery is committed', async () => {
     clientQuery
       .mockResolvedValueOnce({
