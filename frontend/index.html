@@ -1657,6 +1657,7 @@ var ML_API = (function(){
     reports: function(qs){return get('/admin/reports',qs);},
     withdrawals: function(qs){return get('/admin/withdrawals',qs);},
     financialReconciliation: function(qs){return get('/admin/financial-reconciliation',qs);},
+    retryFinancialSettlement: function(id,data){return post('/admin/financial-reconciliation/orders/'+encodeURIComponent(id)+'/retry-settlement',data);},
     approveWithdrawal: function(id){return post('/admin/withdrawals/'+encodeURIComponent(id)+'/approve',{});},
     rejectWithdrawal: function(id){return post('/admin/withdrawals/'+encodeURIComponent(id)+'/reject',{});},
     settings: function(){return get('/admin/settings');},
