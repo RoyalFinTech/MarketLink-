@@ -24,6 +24,9 @@ describe('Admin financial feeds', () => {
       totalPages: 3,
     });
     expect(query.mock.calls[0][1]).toEqual(['credit', 'vendor_sale', 10, 10]);
+    expect(query.mock.calls[0][0]).toMatch(/t\\.type=\\$1/);
+    expect(query.mock.calls[0][0]).toMatch(/t\\.category=\\$2/);
+    expect(query.mock.calls[0][0]).toMatch(/LIMIT \\$3 OFFSET \\$4/);
     expect(query.mock.calls[1][1]).toEqual(['credit', 'vendor_sale']);
     expect(query.mock.calls[0][0]).toMatch(/FROM transactions/i);
   });
@@ -43,6 +46,8 @@ describe('Admin financial feeds', () => {
       totalPages: 1,
     });
     expect(query.mock.calls[0][1]).toEqual(['cod', 10, 10]);
+    expect(query.mock.calls[0][0]).toMatch(/p\\.method=\\$1/);
+    expect(query.mock.calls[0][0]).toMatch(/LIMIT \\$2 OFFSET \\$3/);
     expect(query.mock.calls[0][0]).toMatch(/INTERVAL '15 minutes'/i);
     expect(query.mock.calls[0][0]).not.toMatch(/phone|email/i);
   });
