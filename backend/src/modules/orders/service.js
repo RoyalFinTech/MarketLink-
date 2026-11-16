@@ -168,7 +168,7 @@ function _assertTransitionAllowed(order,targetStatus,userId,roles){const isAdmin
 async function settleOrderFinancials(orderId) {
   return withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
-      'SELECT o.*, d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE',
+      'SELECT o.*, d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE OF o',
       [orderId]);
     if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
     if (order.status !== 'delivered') return { settled:false, reason:'ORDER_NOT_DELIVERED' };
