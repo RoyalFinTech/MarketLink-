@@ -20,12 +20,12 @@ describe('rider cash remittance controls',()=>{
  let tx;
  beforeEach(()=>{
   jest.clearAllMocks();
-  tx=jest.fn(async(sql)=>{
+  tx=jest.fn(async(sql,params=[])=>{
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,payment_status:'pending',order_status:'delivered',order_payment_status:'pending',delivery_id:'delivery-1',rider_id:riderId,delivery_status:'delivered'}]};
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE payment_id'))return{rows:[]};
    if(sql.includes('INSERT INTO cod_cash_remittances'))return{rows:[remittance]};
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
-   if(sql.includes('UPDATE cod_cash_remittances'))return{rows:[{...remittance,status:'verified'}]};
+   if(sql.includes('UPDATE cod_cash_remittances'))return{rows:[{...remittance,status:params[0]}]};
    if(sql.includes("SELECT * FROM payments WHERE id=$1 FOR UPDATE"))return{rows:[payment]};
    if(sql.includes("UPDATE payments SET status='confirmed'"))return{rows:[{...payment,status:'confirmed'}]};
    if(sql.includes('SELECT customer_id,total,status,order_number'))return{rows:[{customer_id:'customer-1',total:'145.00',status:'delivered',order_number:'ML-123'}]};
