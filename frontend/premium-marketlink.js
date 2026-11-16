@@ -413,11 +413,12 @@
         var paymentId=esc(c.payment_id||'');
         var paymentState=String(c.payment_record_status||'pending').toLowerCase();
         var alreadyConfirmed=paymentState==='confirmed';
-        var remittanceVerified=String(c.remittance_status||'').toLowerCase()==='verified';
+        var remittanceStatus=String(c.remittance_status||'').toLowerCase(),remittanceVerified=remittanceStatus==='verified';
         var riderLabel=c.rider_name||'Rider not assigned';
-        var actionLabel=alreadyConfirmed&&remittanceVerified?'Retry wallet settlement':String(c.remittance_status||'')==='submitted'?'Deposit submitted · Review above':'Awaiting rider deposit';
-        var stateLabel=alreadyConfirmed?'Cash confirmed · settlement needs retry':String(c.remittance_status||'')==='submitted'?'Rider deposit submitted · Admin verification pending':'Delivered · waiting for rider deposit';
-        return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>'+stateLabel+'</small></div>'+(alreadyConfirmed&&remittanceVerified?'<button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;,&quot;'+paymentState+'&quot;)">'+actionLabel+'</button>':'<span style="font-size:10px;color:#B8C8D2">'+actionLabel+'</span>')+'</div>';
+        var actionLabel=remittanceVerified?(alreadyConfirmed?'Retry wallet settlement':'Complete payment confirmation'):remittanceStatus==='submitted'?'Deposit submitted · Review above':remittanceStatus==='rejected'?'Deposit rejected · Rider must resubmit':'Awaiting rider deposit';
+        var stateLabel=alreadyConfirmed?'Cash confirmed · settlement needs retry':remittanceVerified?'Deposit verified · payment confirmation pending':remittanceStatus==='submitted'?'Rider deposit submitted · Admin verification pending':remittanceStatus==='rejected'?'Previous deposit reference rejected':'Delivered · waiting for rider deposit';
+        var action=alreadyConfirmed?'window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;,&quot;'+paymentState+'&quot;)':'window.ML_Premium.reviewCodRemittance(&quot;'+esc(c.remittance_id||'')+'&quot;,\'verified\')';
+        return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>'+stateLabel+'</small></div>'+(remittanceVerified?'<button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="'+action+'">'+actionLabel+'</button>':'<span style="font-size:10px;color:#B8C8D2">'+actionLabel+'</span>')+'</div>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No delivered COD payments awaiting confirmation</b><span>New cash-on-delivery orders will appear here after delivery is marked complete.</span></div>')+
       codRemittanceHtml+
             '<div class="ml-section-head"><h3>Top vendors</h3></div>'+
