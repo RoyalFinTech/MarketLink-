@@ -64,7 +64,7 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  const isPremiumExecutable = /\\/premium-marketlink\\.js$/.test(url.pathname);
+  const isPremiumExecutable = /\/premium-marketlink\.js$/.test(url.pathname);
   if (isPremiumExecutable) {
     // Never let a stale cached premium executable mask a newly deployed
     // bundle. Prefer the network; use the cache only when offline.
