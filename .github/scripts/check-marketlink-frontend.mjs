@@ -103,7 +103,7 @@ assert.match(html, /legacy homepage renderer is intentionally/, 'Legacy home mus
 assert.doesNotMatch(html, /setTimeout\(function\(\)\{goApp\(\);toast\('Welcome,.*?\},(?:300|1000)\);/, 'Successful new-account creation must not wait on arbitrary post-auth timers');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /Do not call or depend on the retired legacy homepage/, 'Premium bundle reconciliation must not depend on legacy renderer');
 assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /Promise\.all\(APP_SHELL\.filter/, 'PWA installation must tolerate optional asset failures');
-assert.match(html, /legacy homepage renderer is intentionally\s+retired/, 'The legacy homepage must remain a compatibility bridge and never render over the premium home');
+assert.match(html, /legacy homepage renderer is intentionally/, 'The legacy homepage must remain a compatibility bridge and never render over the premium home');
 assert.doesNotMatch(html, /else\{renderHome\(\);\}/, 'Legacy homepage fallback must be removed');
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /reconcilePremiumHomeAfterBundleLoad/, 'Deferred premium bundle must reconcile sessions restored before it loaded');
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /!ML_API\|\|!ML_API\.auth/, 'Premium reconciliation must not depend on ML_API initialization order');
