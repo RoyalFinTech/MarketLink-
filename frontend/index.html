@@ -4362,7 +4362,8 @@ async function loadRiderLiveData(){
       id:d.id,order_id:d.order_id,from:d.vendor_name||'Vendor',to:'Customer delivery',
       dist:d.distance_km!=null?(Number(d.distance_km).toFixed(1)+' km'):'—',
       pay:Number(d.earning||0),eta:d.estimated_minutes!=null?(d.estimated_minutes+' min'):'—',
-      status:d.status,assignmentStatus:d.assignment_status||'pending',order_number:d.order_number,total:d.order_total
+      status:d.status,assignmentStatus:d.assignment_status||'pending',order_number:d.order_number,total:d.order_total,
+      paymentMethod:d.payment_method||null,paymentId:d.cod_payment_id||null,codRemittanceStatus:d.cod_remittance_status||null
     };});
     var activeDelivery=S.rDeliveries.find(function(d){
       return ['picked_up','in_transit'].indexOf(String(d.status).toLowerCase())>=0 ||
@@ -4473,10 +4474,20 @@ function renderRDash(){
   } else {
     // History — derived only from live delivery records.
     (S.rDeliveries||[]).filter(function(d){return d.status==='delivered';}).forEach(function(h){
-      content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'+
-        '<div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+sanitizeText(h.order_number||h.id)+'</div>'+
+      content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+sanitizeText(h.order_number||h.id)+'</div>'+
         '<div style="color:var(--mu);font-size:10px;margin-top:2px;">📍 '+sanitizeText(h.from||'Vendor')+' · Delivered</div></div>'+
-        '<div style="color:#F5A623;font-size:13px;font-weight:700;">D '+Number(h.pay||0).toLocaleString()+'</div></div>';
+        '<div style="color:#F5A623;font-size:13px;font-weight:700;">D '+Number(h.pay||0).toLocaleString()+'</div></div>'+
+        (String(h.paymentMethod||'').toLowerCase()==='cod'&&h.paymentId?
+          (String(h.codRemittanceStatus||'').toLowerCase()==='verified'?'<div style="margin-top:10px;color:#55D6A0;font-size:11px;font-weight:700">✓ Cash remittance verified by MarketLink</div>':
+           String(h.codRemittanceStatus||'').toLowerCase()==='submitted'?'<div style="margin-top:10px;color:#FFD778;font-size:11px;font-weight:700">Deposit reference submitted · Awaiting Admin verification</div>':
+           '<div style="margin-top:10px;padding:10px;border-radius:10px;background:rgba(245,184,61,.07);border:1px solid rgba(245,184,61,.25)">'+
+           '<b style="color:var(--tx);font-size:11px">Cash collected · Remit to MarketLink</b>'+
+           '<div style="color:var(--mu);font-size:10px;line-height:1.5;margin:4px 0 8px">Deposit the full customer payment into the official MarketLink Wave or AfriMoney collection account. Enter the receipt reference below. Your delivery earnings will be credited separately after verification.</div>'+
+           '<select id="ml-cod-method-'+sanitizeText(h.id)+'" style="width:100%;margin:0 0 7px;padding:9px;border-radius:8px"><option value="wave">Wave deposit</option><option value="afrimoney">AfriMoney deposit</option></select>'+
+           '<input id="ml-cod-ref-'+sanitizeText(h.id)+'" type="text" maxlength="120" placeholder="Deposit receipt / transaction reference" style="width:100%;box-sizing:border-box;margin:0 0 7px;padding:10px;border-radius:8px">'+
+           '<input id="ml-cod-proof-'+sanitizeText(h.id)+'" type="url" placeholder="Optional HTTPS proof link" style="width:100%;box-sizing:border-box;margin:0 0 7px;padding:10px;border-radius:8px">'+
+           '<button type="button" class="ml-btn ml-btn-primary" style="width:100%" onclick="window.ML_Premium.submitCodRemittance(\''+sanitizeText(h.paymentId)+'\',\''+sanitizeText(h.id)+'\')">Submit cash deposit for verification</button></div>'):'')+'</div>';
     });
     }
 
