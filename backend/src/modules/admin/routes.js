@@ -28,6 +28,9 @@ router.get('/reports',     authenticate, authorize(...ADMIN),
   [query('type').isIn(['revenue','vendors','riders']).withMessage('type must be revenue, vendors, or riders')],
   validate, ctrl.reports);
 
+router.get('/financial-reconciliation', authenticate, authorize(...ADMIN),
+  [query('limit').optional().isInt({min:1,max:100})], validate, ctrl.financialReconciliation);
+
 router.get('/withdrawals',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
   validate, ctrl.pendingWithdrawals);
