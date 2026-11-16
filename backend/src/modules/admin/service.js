@@ -1,6 +1,7 @@
 // src/modules/admin/service.js
 'use strict';
 const { query } = require('../../config/db');
+const ordersService = require('../orders/service');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -159,5 +160,37 @@ async function getReports({ type, startDate, endDate }) {
   throw require('../../middleware/errorHandler').AppError('Unknown report type. Use: revenue, vendors, riders', 400, 'INVALID_REPORT_TYPE');
 }
 
+
+
+/**
+ * Retry only the existing locked, idempotent order settlement routine.
+ * The initial audit row is committed before the financial operation begins.
+ */
+async function retryFinancialSettlement(orderId, actor, reason) {
+  const { rows: [audit] } = await query(
+    `INSERT INTO admin_action_logs
+      (actor_id,actor_role,action,entity_type,entity_id,after_data)
+     VALUES ($1,$2,'financial.settlement_retry_requested','order',$3,$4)
+     RETURNING id`,
+    [actor.id, actor.role || 'admin', orderId, JSON.stringify({ reason, idempotencyScope: 'order:' + orderId })]
+  );
+  let result;
+  try {
+    result = await ordersService.settleOrderFinancials(orderId);
+  } catch (error) {
+    await query(
+      `UPDATE admin_action_logs SET action='financial.settlement_retry_failed',after_data=$1
+       WHERE id=$2`,
+      [JSON.stringify({ reason, errorCode: error.code || 'SETTLEMENT_RETRY_FAILED' }), audit.id]
+    ).catch(() => null);
+    throw error;
+  }
+  await query(
+    `UPDATE admin_action_logs SET action='financial.settlement_retry_completed',after_data=$1
+     WHERE id=$2`,
+    [JSON.stringify({ reason, result }), audit.id]
+  ).catch(() => null);
+  return result;
+}
 
 module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports };
