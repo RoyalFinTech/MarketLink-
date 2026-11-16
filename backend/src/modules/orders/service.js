@@ -168,7 +168,7 @@ function _assertTransitionAllowed(order,targetStatus,userId,roles){const isAdmin
 async function settleOrderFinancials(orderId) {
   return withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
-      'SELECT o.*, d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE OF o',
+      'SELECT o.*, d.id AS delivery_id, d.rider_id FROM orders o LEFT JOIN deliveries d ON d.order_id=o.id WHERE o.id=$1 FOR UPDATE OF o',
       [orderId]);
     if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
     if (order.status !== 'delivered') return { settled:false, reason:'ORDER_NOT_DELIVERED' };
@@ -188,11 +188,43 @@ async function settleOrderFinancials(orderId) {
     if (commission.status === 'paid') {
       return { settled:true, alreadySettled:true };
     }
+    if (commission.status !== 'pending') {
+      throw new AppError('The order settlement record has an unsupported state. No wallet balances were changed.', 409, 'SETTLEMENT_STATE_INVALID');
+    }
 
     const vendorAmount = Number(order.vendor_payout || 0);
     const riderAmount = Number(order.rider_payout || 0);
     const affiliateAmount = Number(order.affiliate_commission_amount || 0);
     const platformNet = Number(order.platform_net_fee || 0);
+    const platformFee = Number(order.platform_fee || 0);
+    const commissionAmounts = [
+      vendorAmount, riderAmount, affiliateAmount, platformNet, platformFee,
+      Number(commission.vendor_payout), Number(commission.rider_payout),
+      Number(commission.affiliate_commission_amount), Number(commission.platform_net_amount),
+      Number(commission.commission_amount), Number(commission.order_total),
+    ];
+    if (commissionAmounts.some(value => !Number.isFinite(value) || value < 0)) {
+      throw new AppError('The order contains invalid financial amounts. No wallet balances were changed.', 409, 'SETTLEMENT_AMOUNT_INVALID');
+    }
+    const sameMoney = (a, b) => Math.abs(Number(a) - Number(b)) <= 0.01;
+    if (
+      String(commission.vendor_id) !== String(order.vendor_id) ||
+      String(commission.affiliate_user_id || '') !== String(order.affiliate_user_id || '') ||
+      !sameMoney(commission.order_total, order.total) ||
+      !sameMoney(commission.commission_amount, platformFee) ||
+      !sameMoney(commission.vendor_payout, vendorAmount) ||
+      !sameMoney(commission.rider_payout, riderAmount) ||
+      !sameMoney(commission.affiliate_commission_amount, affiliateAmount) ||
+      !sameMoney(commission.platform_net_amount, platformNet)
+    ) {
+      throw new AppError('The order and commission ledger do not agree. No wallet balances were changed; Admin reconciliation is required.', 409, 'SETTLEMENT_LEDGER_MISMATCH');
+    }
+    if (riderAmount > 0 && (!order.rider_id || !order.delivery_id)) {
+      throw new AppError('This delivered order has a rider payout but no assigned rider and delivery record. No wallet balances were changed.', 409, 'SETTLEMENT_RIDER_MISSING');
+    }
+    if (affiliateAmount > 0 && !order.affiliate_user_id) {
+      throw new AppError('This order has an affiliate reward but no affiliate account. No wallet balances were changed.', 409, 'SETTLEMENT_AFFILIATE_MISSING');
+    }
 
     if (vendorAmount > 0) {
       let { rows: [vendorWallet] } = await client.query(
