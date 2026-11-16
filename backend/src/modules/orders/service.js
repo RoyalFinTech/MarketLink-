@@ -207,6 +207,9 @@ async function settleOrderFinancials(orderId) {
       throw new AppError('The order contains invalid financial amounts. No wallet balances were changed.', 409, 'SETTLEMENT_AMOUNT_INVALID');
     }
     const sameMoney = (a, b) => Math.abs(Number(a) - Number(b)) <= 0.01;
+    if (affiliateAmount > 0 && !order.affiliate_user_id) {
+      throw new AppError('This order has an affiliate reward but no affiliate account. No wallet balances were changed.', 409, 'SETTLEMENT_AFFILIATE_MISSING');
+    }
     if (
       String(commission.vendor_id) !== String(order.vendor_id) ||
       String(commission.affiliate_user_id || '') !== String(order.affiliate_user_id || '') ||
@@ -221,9 +224,6 @@ async function settleOrderFinancials(orderId) {
     }
     if (riderAmount > 0 && (!order.rider_id || !order.delivery_id)) {
       throw new AppError('This delivered order has a rider payout but no assigned rider and delivery record. No wallet balances were changed.', 409, 'SETTLEMENT_RIDER_MISSING');
-    }
-    if (affiliateAmount > 0 && !order.affiliate_user_id) {
-      throw new AppError('This order has an affiliate reward but no affiliate account. No wallet balances were changed.', 409, 'SETTLEMENT_AFFILIATE_MISSING');
     }
 
     if (vendorAmount > 0) {
