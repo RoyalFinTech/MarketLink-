@@ -168,8 +168,8 @@ async function getAdminTransactions({ page=1, limit=50, type, category } = {}) {
   const limit_ = Math.min(Math.max(parseInt(limit,10)||50,1),100);
   const offset = (page_-1)*limit_;
   const where = ['1=1'], params = [];
-  if (type) { params.push(type); where.push(`t.type=${params.length}`); }
-  if (category) { params.push(category); where.push(`t.category=${params.length}`); }
+  if (type) { params.push(type); where.push(`t.type=$${params.length}`); }
+  if (category) { params.push(category); where.push(`t.category=$${params.length}`); }
   const whereSql = where.join(' AND ');
   const { rows } = await query(
     `SELECT t.id,t.type,t.category,t.amount,t.balance_after,t.reference_type,t.reference_id,
@@ -178,7 +178,7 @@ async function getAdminTransactions({ page=1, limit=50, type, category } = {}) {
      JOIN wallets w ON w.id=t.wallet_id
      LEFT JOIN users u ON u.id=w.user_id
      WHERE ${whereSql}
-     ORDER BY t.created_at DESC,t.id DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,
+     ORDER BY t.created_at DESC,t.id DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
     [...params,limit_,offset]
   );
   const { rows:[count] } = await query(
@@ -194,7 +194,7 @@ async function getFailedPayments({ page=1, limit=50, method } = {}) {
   const offset = (page_-1)*limit_;
   const where = [`(p.status='failed' OR (p.status='pending' AND p.created_at < now()-INTERVAL '15 minutes'))`];
   const params = [];
-  if (method) { params.push(method); where.push(`p.method=${params.length}`); }
+  if (method) { params.push(method); where.push(`p.method=$${params.length}`); }
   const whereSql = where.join(' AND ');
   const { rows } = await query(
     `SELECT p.id,p.order_id,o.order_number,p.method,p.amount,p.currency,p.status,
