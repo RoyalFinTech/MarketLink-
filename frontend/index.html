@@ -469,7 +469,7 @@ button:active{opacity:0.82;}
 @media(min-width:821px){#bnav{width:100%;max-width:1080px;left:50%;right:auto;transform:translateX(-50%);}}
 @media(max-width:760px){#app{width:100%;max-width:none;}#bnav{left:0;right:0;width:100%;max-width:430px;transform:none;}}
 .ml-auth-error-shake{animation:mlAuthErrorShake .32s ease-out!important;border-color:#fb7185!important;color:#fff!important;background:linear-gradient(135deg,rgba(127,29,29,.96),rgba(69,10,10,.96))!important;box-shadow:0 8px 24px rgba(239,68,68,.18)!important}@keyframes mlAuthErrorShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
-<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r30"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r35" defer></script><style id="marketlink-gambian-phone-contrast">
+<link rel="stylesheet" href="./premium-marketlink.css?v=marketlink-premium-canonical-r30"><script src="./marketlink-i18n.js?v=marketlink-locale-r2" defer></script><script src="./premium-marketlink.js?v=marketlink-premium-canonical-r36" defer></script><style id="marketlink-gambian-phone-contrast">
 /* Force readable native controls even when the device/browser uses a light theme. */
 select[id$="-operator"],.ml-gm-phone select{
   appearance:auto!important;-webkit-appearance:menulist!important;color-scheme:dark!important;
@@ -2150,7 +2150,15 @@ function goApp(){
       // briefly report stale navigation state while the premium bundle boots.
       window.__ML_PENDING_PREMIUM_HOME=false;
       try{
-        window.renderHome();
+        // Never call the legacy global renderer during premium startup: its
+        // hgreet/catgrid/featured nodes do not exist in the premium DOM.
+        // Call the premium module directly, and wait rather than falling back.
+        if(!window.ML_Premium||typeof window.ML_Premium.load!=='function')return false;
+        Promise.resolve(window.ML_Premium.load()).catch(function(error){
+          window.__ML_PENDING_PREMIUM_HOME=true;
+          console.error('[MarketLink] Premium module load failed:',error);
+          root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Premium marketplace could not load</b><span>'+String(error&&error.message||'Please check your connection and retry.')+'</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.__ML_START_PREMIUM_HOME&&window.__ML_START_PREMIUM_HOME()">Retry premium home</button></div></div>';
+        });
         return true;
       }catch(error){
         window.__ML_PENDING_PREMIUM_HOME=true;
@@ -2577,6 +2585,14 @@ async function doPin(){
 // HOME SCREEN
 // ═══════════════════════════════════════════════════════════
 function renderHome(){
+  // Premium app shell deliberately omits the legacy home DOM. If the deferred
+  // premium bundle has not finished loading, queue its renderer instead of
+  // writing to missing legacy elements (hgreet/catgrid/feat-list/trend-list).
+  if(!G('hgreet')||!G('catgrid')||!G('feat-list')||!G('trend-list')){
+    window.__ML_PENDING_PREMIUM_HOME=true;
+    if(typeof window.__ML_START_PREMIUM_HOME==='function')window.__ML_START_PREMIUM_HOME();
+    return;
+  }
   G('hgreet').textContent='Hello, '+(S.user?S.user.name.split(' ')[0]:'there')+' 👋';
   // Update location header label
   var locEl=G('hloc-label');
