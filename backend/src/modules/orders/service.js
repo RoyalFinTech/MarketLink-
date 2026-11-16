@@ -156,7 +156,7 @@ async function listForCustomer(customerId, { page=1, limit=20, status }) {
 async function listForVendor(vendorId, { page=1, limit=20, status }) {
   const off=(page-1)*limit, conds=['o.vendor_id=$1'], params=[vendorId];
   if (status) { conds.push(`o.status=$${params.length+1}`); params.push(status); }
-  const { rows } = await query(`SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.payment_status,o.placed_at,u.full_name AS customer_name,d.id AS delivery_id,d.status AS delivery_status,d.rider_id,ru.full_name AS rider_name,d.distance_km,d.estimated_minutes FROM orders o JOIN users u ON u.id=o.customer_id LEFT JOIN deliveries d ON d.order_id=o.id LEFT JOIN users ru ON ru.id=d.rider_id WHERE ${conds.join(' AND ')} ORDER BY o.placed_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,[...params,limit,off]);
+  const { rows } = await query(`SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.payment_status,o.placed_at,u.full_name AS customer_name,d.id AS delivery_id,d.status AS delivery_status,d.rider_id,ru.full_name AS rider_name,d.distance_km,d.estimated_minutes, (SELECT COALESCE(string_agg(oi.product_name_snapshot || ' × ' || oi.quantity::text, ', ' ORDER BY oi.id), 'No order items recorded') FROM order_items oi WHERE oi.order_id=o.id) AS item_summary FROM orders o JOIN users u ON u.id=o.customer_id LEFT JOIN deliveries d ON d.order_id=o.id LEFT JOIN users ru ON ru.id=d.rider_id WHERE ${conds.join(' AND ')} ORDER BY o.placed_at DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,[...params,limit,off]);
   return rows;
 }
 
