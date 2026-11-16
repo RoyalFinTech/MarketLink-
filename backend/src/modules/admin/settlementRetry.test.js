@@ -43,5 +43,17 @@ describe('Admin financial settlement retry', () => {
     expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\.settlement_retry_failed/i), [
       JSON.stringify({ reason: 'Reviewed exception', errorCode: 'SETTLEMENT_LEDGER_MISMATCH' }), 43,
     ]);
+
+  test('records a non-eligible order without claiming settlement completed', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 44 }] });
+    ordersService.settleOrderFinancials.mockResolvedValue({ settled: false, reason: 'PAYMENT_NOT_CONFIRMED' });
+
+    const result = await retryFinancialSettlement('order-id', actor, 'Reviewed payment state');
+
+    expect(result).toEqual({ settled: false, reason: 'PAYMENT_NOT_CONFIRMED' });
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_not_eligible/i), [
+      JSON.stringify({ reason: 'Reviewed payment state', result }), 44,
+    ]);
+  });
   });
 });
