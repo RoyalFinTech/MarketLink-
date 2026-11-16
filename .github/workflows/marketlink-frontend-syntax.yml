@@ -25,3 +25,6 @@ jobs:
             echo "Checking $file"
             node --check "$file"
           done
+
+      - name: Run MarketLink frontend release checks
+        run: node .github/scripts/check-marketlink-frontend.mjs
