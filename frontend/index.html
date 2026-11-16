@@ -4349,8 +4349,9 @@ async function loadRiderLiveData(){
   if(!ML_API.auth.isAuthenticated() || (S.roles||[]).indexOf('rider')<0 || S._riderLoading) return;
   S._riderLoading=true; S.rDeliveries=[]; renderRDash();
   try{
-    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||''),ML_API.riders.withdrawals({page:1,limit:50})].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
+    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||''),ML_API.riders.withdrawals({page:1,limit:50}),ML_API.payments.codRemittanceInstructions()].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
     var res=riderResults[0],earnings=riderResults[1]&&riderResults[1].data,profile=riderResults[2]&&riderResults[2].data,wd=riderResults[3]&&riderResults[3].data;
+    S.codRemittanceInstructions=riderResults[4]&&riderResults[4].data||null;
     var rows=res&&res.data&&Array.isArray(res.data)?res.data:(res&&res.data&&Array.isArray(res.data.items)?res.data.items:[]);
     S.rEarningsSummary=earnings&&earnings.summary||{};
     S.rEarningsEntries=earnings&&earnings.entries||[];
@@ -4475,6 +4476,9 @@ function renderRDash(){
   } else {
     // History — derived only from live delivery records.
     (S.rDeliveries||[]).filter(function(d){return d.status==='delivered';}).forEach(function(h){
+      var cashMethods=S.codRemittanceInstructions&&S.codRemittanceInstructions.methods||{};
+      var waveDestination=cashMethods.wave||{},afriDestination=cashMethods.afrimoney||{};
+      var destinationText='Wave: '+(waveDestination.configured?(sanitizeText(waveDestination.accountName)+' · '+sanitizeText(waveDestination.accountNumber)):'Not configured — contact MarketLink Admin')+' | AfriMoney: '+(afriDestination.configured?(sanitizeText(afriDestination.accountName)+' · '+sanitizeText(afriDestination.accountNumber)):'Not configured — contact MarketLink Admin');
       content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div><div style="color:var(--tx);font-size:12px;font-weight:600;">'+sanitizeText(h.order_number||h.id)+'</div>'+
         '<div style="color:var(--mu);font-size:10px;margin-top:2px;">📍 '+sanitizeText(h.from||'Vendor')+' · Delivered</div></div>'+
@@ -4484,6 +4488,7 @@ function renderRDash(){
            String(h.codRemittanceStatus||'').toLowerCase()==='submitted'?'<div style="margin-top:10px;color:#FFD778;font-size:11px;font-weight:700">Deposit reference submitted · Awaiting Admin verification</div>':
            '<div style="margin-top:10px;padding:10px;border-radius:10px;background:rgba(245,184,61,.07);border:1px solid rgba(245,184,61,.25)">'+
            '<b style="color:var(--tx);font-size:11px">Cash collected · Remit to MarketLink</b>'+
+           '<div style="color:var(--tx);font-size:10px;line-height:1.5;margin:4px 0 8px">'+destinationText+'</div>'+
            '<div style="color:var(--mu);font-size:10px;line-height:1.5;margin:4px 0 8px">Deposit the full customer payment of D '+Number(h.codPaymentAmount||0).toFixed(2)+' into the official MarketLink Wave or AfriMoney collection account. Enter the receipt reference below. Your rider delivery earning of D '+Number(h.pay||0).toFixed(2)+' is credited separately after verification.</div>'+
            '<select id="ml-cod-method-'+sanitizeText(h.id)+'" style="width:100%;margin:0 0 7px;padding:9px;border-radius:8px"><option value="wave">Wave deposit</option><option value="afrimoney">AfriMoney deposit</option></select>'+
            '<input id="ml-cod-ref-'+sanitizeText(h.id)+'" type="text" maxlength="120" placeholder="Deposit receipt / transaction reference" style="width:100%;box-sizing:border-box;margin:0 0 7px;padding:10px;border-radius:8px">'+
