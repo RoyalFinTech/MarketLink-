@@ -30,6 +30,14 @@ router.get('/reports',     authenticate, authorize(...ADMIN),
 
 router.get('/financial-reconciliation', authenticate, authorize(...ADMIN),
   [query('limit').optional().isInt({min:1,max:100})], validate, ctrl.financialReconciliation);
+router.post('/financial-reconciliation/orders/:id/retry-settlement',
+  authenticate, authorize(...ADMIN),
+  [
+    param('id').isUUID(),
+    body('confirmation').equals('RETRY_SETTLEMENT'),
+    body('reason').trim().notEmpty().isLength({max:500}),
+  ],
+  validate, ctrl.retryFinancialSettlement);
 
 router.get('/withdrawals',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
