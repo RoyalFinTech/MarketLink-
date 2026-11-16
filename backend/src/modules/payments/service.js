@@ -383,11 +383,11 @@ async function listPendingCodPayments({page=1,limit=30}={}){
 
 
 function getCodRemittanceInstructions(){
-  const waveNumber=String(process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER||'').replace(/\\D/g,'');
+  const waveNumber=String(process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER||'').replace(/\D/g,'');
   const waveName=String(process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME||'').trim();
-  const afriNumber=String(process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER||'').replace(/\\D/g,'');
+  const afriNumber=String(process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER||'').replace(/\D/g,'');
   const afriName=String(process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NAME||'').trim();
-  const validNumber=value=>/^(87|86|83)\\d{7}$/.test(value);
+  const validNumber=value=>/^(87|86|83)\d{7}$/.test(value);
   return {
     currency:'GMD',
     methods:{
