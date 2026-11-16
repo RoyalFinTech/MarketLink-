@@ -2489,7 +2489,7 @@
           if(x.provider_status)detail.push('Provider: '+x.provider_status);
           if(x.difference!=null)detail.push('Difference: '+money(x.difference));
           if(x.duplicate_count)detail.push('Duplicates: '+x.duplicate_count);
-          ['vendor_credit_missing','rider_credit_missing','affiliate_credit_missing','platform_earning_missing'].forEach(function(k){if(x[k])detail.push(k.replace(/_/g,' '));});
+          ['vendor_credit_missing','rider_credit_missing','rider_earning_record_missing','affiliate_credit_missing','platform_earning_missing','platform_earning_mismatch'].forEach(function(k){if(x[k])detail.push(k.replace(/_/g,' '));});
           return '<div class="ml-profile-row"><div class="ico">⚠️</div><div class="copy"><b>'+esc(ref)+'</b><span>'+esc(String(status).replace(/_/g,' '))+(detail.length?' · '+esc(detail.join(' · ')):'')+'</span></div><strong>'+esc(amount)+'</strong></div>';
         }).join('')+'</div>':'<div class="ml-empty"><b>No matching records</b><span>This check found no records requiring attention.</span></div>';
         return '<div class="ml-section-head" style="margin-top:18px"><h3>'+esc(item[1])+'</h3><strong>'+rows.length+'</strong></div>'+html;
