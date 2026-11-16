@@ -1,11 +1,12 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
+// v41: install is failure-tolerant; optional assets can no longer strand users on an old shell.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v40';
+const CACHE_NAME = 'marketlink-shell-v41';
 const APP_SHELL = [
   './',
   './index.html',
-  './premium-marketlink.css?v=marketlink-premium-canonical-r31',
-  './premium-marketlink.js?v=marketlink-premium-canonical-r38',
+  './premium-marketlink.css?v=marketlink-premium-canonical-r32',
+  './premium-marketlink.js?v=marketlink-premium-canonical-r39',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
   './assets/marketlink-logo.png',
@@ -20,11 +21,23 @@ const APP_SHELL = [
   './assets/marketlink-og-preview.jpg'
 ];
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil((async function(){
+    const cache = await caches.open(CACHE_NAME);
+    // A single optional icon or stale asset must never block the entire PWA
+    // update. Cache the document and each critical bundle independently.
+    const critical = ['./', './index.html',
+      './premium-marketlink.css?v=marketlink-premium-canonical-r32',
+      './premium-marketlink.js?v=marketlink-premium-canonical-r39'];
+    for (const url of critical) {
+      try { await cache.add(url); }
+      catch (error) { console.warn('[MarketLink PWA] Critical shell asset will use network:', url, error); }
+    }
+    await Promise.all(APP_SHELL.filter(url => !critical.includes(url)).map(async url => {
+      try { await cache.add(url); }
+      catch (error) { console.warn('[MarketLink PWA] Optional shell asset skipped:', url, error); }
+    }));
+    await self.skipWaiting();
+  })());
 });
 self.addEventListener('activate', event => {
   event.waitUntil(
