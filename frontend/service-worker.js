@@ -1,12 +1,12 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
-// v41: install is failure-tolerant; optional assets can no longer strand users on an old shell.
+// v42: premium JS uses network-first delivery and startup has a forced fresh-bundle retry.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v44';
+const CACHE_NAME = 'marketlink-shell-v45';
 const APP_SHELL = [
   './',
   './index.html',
-  './premium-marketlink.css?v=marketlink-premium-canonical-r34',
-  './premium-marketlink.js?v=marketlink-premium-canonical-r42',
+  './premium-marketlink.css?v=marketlink-premium-canonical-r35',
+  './premium-marketlink.js?v=marketlink-premium-canonical-r43',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
   './assets/marketlink-logo.png',
@@ -26,8 +26,8 @@ self.addEventListener('install', event => {
     // A single optional icon or stale asset must never block the entire PWA
     // update. Cache the document and each critical bundle independently.
     const critical = ['./', './index.html',
-      './premium-marketlink.css?v=marketlink-premium-canonical-r34',
-      './premium-marketlink.js?v=marketlink-premium-canonical-r42'];
+      './premium-marketlink.css?v=marketlink-premium-canonical-r35',
+      './premium-marketlink.js?v=marketlink-premium-canonical-r43'];
     for (const url of critical) {
       try { await cache.add(url); }
       catch (error) { console.warn('[MarketLink PWA] Critical shell asset will use network:', url, error); }
@@ -62,6 +62,19 @@ self.addEventListener('fetch', event => {
         return response;
       }).catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
     );
+    return;
+  }
+  const isPremiumExecutable = /\\/premium-marketlink\\.js$/.test(url.pathname);
+  if (isPremiumExecutable) {
+    // Never let a stale cached premium executable mask a newly deployed
+    // bundle. Prefer the network; use the cache only when offline.
+    event.respondWith(fetch(request).then(response => {
+      if (response && response.ok && response.type === 'basic') {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+      }
+      return response;
+    }).catch(() => caches.match(request)));
     return;
   }
   event.respondWith(
