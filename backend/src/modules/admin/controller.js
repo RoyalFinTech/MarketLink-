@@ -16,6 +16,7 @@ exports.settings   = wrap(async (req,res) => res.json({ success:true, data: awai
 exports.setSetting = wrap(async (req,res) => res.json({ success:true, data: await svc.updateSystemSetting(req.params.key, req.body.value, req.user.id) }));
 exports.auditLogs  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAuditLogs(req.query) }));
 exports.reports    = wrap(async (req,res) => res.json({ success:true, data: await svc.getReports(req.query) }));
+exports.financialReconciliation = wrap(async (req,res) => res.json({ success:true, data: await svc.getFinancialReconciliation(req.query) }));
 
 // ── Read-only financial reconciliation ──────────────────────────────
 const financialReconciliationSvc = require('./financialReconciliation');
