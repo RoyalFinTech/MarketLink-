@@ -4293,8 +4293,15 @@ async function loadRiderLiveData(){
       id:d.id,order_id:d.order_id,from:d.vendor_name||'Vendor',to:'Customer delivery',
       dist:d.distance_km!=null?(Number(d.distance_km).toFixed(1)+' km'):'—',
       pay:Number(d.earning||0),eta:d.estimated_minutes!=null?(d.estimated_minutes+' min'):'—',
-      status:d.status,order_number:d.order_number,total:d.order_total
+      status:d.status,assignmentStatus:d.assignment_status||'pending',order_number:d.order_number,total:d.order_total
     };});
+    var activeDelivery=S.rDeliveries.find(function(d){
+      return ['picked_up','in_transit'].indexOf(String(d.status).toLowerCase())>=0 ||
+        (String(d.status).toLowerCase()==='assigned'&&String(d.assignmentStatus).toLowerCase()==='accepted');
+    });
+    S.activeDel=activeDelivery||null;
+    if(activeDelivery)S.rSubTab='active';
+    else if(S.rSubTab==='active')S.rSubTab='requests';
     if(S.rOnline&&window.ML_Premium&&typeof window.ML_Premium.resumeRiderAvailabilityLocationSharing==='function')window.ML_Premium.resumeRiderAvailabilityLocationSharing();
   }catch(e){S.rDeliveries=[];toast(e.error||'Could not load live rider deliveries.','error');}
   finally{S._riderLoading=false;renderRDash();}
@@ -4306,6 +4313,9 @@ function renderRDash(){
     S._riderLiveLoaded=true; loadRiderLiveData();
   }
   var content='';
+  var riderRequests=(S.rDeliveries||[]).filter(function(d){
+    return String(d.status).toLowerCase()==='assigned'&&String(d.assignmentStatus||'pending').toLowerCase()!=='accepted';
+  });
 
   if(S.rSubTab==='requests'){
     if(!S.rOnline){
@@ -4314,13 +4324,13 @@ function renderRDash(){
         '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:6px;">You\'re Offline</div>'+
         '<div style="color:var(--mu);font-size:12px;margin-bottom:14px;">Go online to receive deliveries</div>'+
         '<button class="btn btn-pu" onclick="rToggleOnline()">Go Online</button></div>';
-    } else if(S.rDeliveries.length===0){
+    } else if(riderRequests.length===0){
       content='<div style="text-align:center;padding:40px 20px;">'+
         '<div style="font-size:44px;margin-bottom:11px;">🛵</div>'+
         '<div style="color:var(--tx);font-size:14px;font-weight:600;">Waiting for requests…</div>'+
         '<div style="color:var(--mu);font-size:12px;margin-top:4px;">New deliveries will appear here</div></div>';
     } else {
-      S.rDeliveries.forEach(function(d){
+      riderRequests.forEach(function(d){
         content+='<div style="background:var(--sf);border-radius:13px;padding:13px;border:1.5px solid rgba(124,58,237,0.4);margin-bottom:11px;">'+
           '<div style="display:flex;justify-content:space-between;margin-bottom:9px;">'+
           '<div style="color:#A78BFA;font-size:11px;font-weight:700;">'+d.id+'</div>'+
@@ -4345,21 +4355,23 @@ function renderRDash(){
         '<div style="color:var(--tx);font-size:14px;font-weight:600;">No active delivery</div>'+
         '<div style="color:var(--mu);font-size:12px;margin-top:4px;">Accept a request to see it here</div></div>';
     } else {
-      var d=S.activeDel, step=S.delStepIdx;
-      var delivered=(step>=DEL_STEPS.length);
+      var d=S.activeDel, deliveryStatus=String(S.activeDel.status||'assigned').toLowerCase();
+      var deliveryLabels={assigned:'Assigned · head to the shop',picked_up:'Order picked up',in_transit:'On the way to customer'};
+      var deliveryActions={assigned:'Confirm pickup',picked_up:'Start delivery',in_transit:'Mark as delivered'};
+      var delivered=deliveryStatus==='delivered';
       content='<div id="rider-amap" style="height:170px;border-radius:15px;overflow:hidden;margin-bottom:13px;position:relative;background:linear-gradient(160deg,#0a0a1a,#1a0a2e);border:1px solid rgba(255,255,255,0.07);">'+
         '<div style="position:absolute;top:18%;left:14%;font-size:18px;">🏪</div>'+
         '<div style="position:absolute;bottom:14%;right:18%;font-size:20px;">📍</div>'+
         '<div id="rdot" style="position:absolute;top:30%;left:20%;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#A78BFA);display:flex;align-items:center;justify-content:center;font-size:13px;transition:top 1s ease,left 1s ease;">🛵</div>'+
         '</div>'+
         '<div style="background:var(--sf);border-radius:13px;padding:13px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-        '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:9px;">'+d.id+' · '+(DEL_LABELS[step]||'Complete')+'</div>'+
+        '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:9px;">'+d.id+' · '+(deliveryLabels[deliveryStatus]||'Active delivery')+'</div>'+
         '<div style="display:flex;gap:7px;margin-bottom:7px;"><div style="width:7px;height:7px;border-radius:50%;background:#22C55E;flex-shrink:0;margin-top:3px;"></div>'+
         '<div style="color:var(--mu);font-size:11px;">'+d.from+'</div></div>'+
         '<div style="display:flex;gap:7px;margin-bottom:13px;"><div style="width:7px;height:7px;border-radius:50%;background:#EF4444;flex-shrink:0;margin-top:3px;"></div>'+
         '<div style="color:var(--mu);font-size:11px;">'+d.to+'</div></div>'+
-        (!delivered&&step<DEL_BTN_LABELS.length?
-          '<button class="btn btn-pu" onclick="rNextStep()">'+DEL_BTN_LABELS[step]+'</button>':
+        (!delivered&&deliveryActions[deliveryStatus]?
+          '<button class="btn btn-pu" onclick="rNextStep()">'+deliveryActions[deliveryStatus]+'</button>':
           '<div style="text-align:center;padding:12px;"><div style="font-size:36px;margin-bottom:8px;">🎉</div>'+
           '<div style="color:#22C55E;font-size:15px;font-weight:700;">Delivery Complete!</div>'+
           '<div style="color:#F5A623;font-size:13px;margin-top:4px;">+D '+d.pay+' earned</div></div>')+
