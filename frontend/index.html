@@ -2183,14 +2183,14 @@ function goApp(){
       if(window.ML_Premium&&typeof window.ML_Premium.load==='function'){
         window.__ML_PENDING_PREMIUM_HOME=true;startPendingPremiumHome();
       }else{
-        var bootDetail=window.__ML_PREMIUM_BOOT_ERROR||window.__ML_PREMIUM_BOOT_STATE||'No initialization error was recorded.';
+        var bootDetail=window.__ML_PREMIUM_BOOT_ERROR||window.__ML_PREMIUM_SCRIPT_ERROR||window.__ML_PREMIUM_BOOT_STATE||'No JavaScript exception was captured. Check whether the browser executed the downloaded asset and whether a content-security or MIME-type policy blocked it.';
         showPremiumBootFailure('The premium file downloaded, but initialization stopped before window.ML_Premium.load was registered. Browser initialization detail: '+bootDetail);
         console.error('[MarketLink boot] premium bundle downloaded but registration failed',bootDetail);
       }
     };
     script.onerror=function(){
       window.__ML_PREMIUM_RETRY_LOADING=false;
-      showPremiumBootFailure('The browser could not download ./premium-marketlink.js (release r43). Check the connection or hosting response. The retry used a fresh URL to bypass the previous cache.');
+      showPremiumBootFailure('The browser could not download ./premium-marketlink.js (release r44). Check the connection or hosting response. The retry used a fresh URL to bypass the previous cache.');
       console.error('[MarketLink boot] fresh premium bundle request failed',script.src);
     };
     document.head.appendChild(script);
@@ -7644,7 +7644,7 @@ window.addEventListener('unhandledrejection',function(e){
     var root=premiumRoot();
     if(!root)return;
     var safe=String(message||'Unknown startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
-    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r42 · Cache: shell-v44</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r44 · Cache: shell-v46</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
     var button=document.getElementById('ml-premium-diagnostic-retry');
     if(button)button.addEventListener('click',function(){
       button.disabled=true;button.textContent='Retrying…';
