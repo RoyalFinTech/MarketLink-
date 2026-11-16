@@ -185,6 +185,14 @@ async function retryFinancialSettlement(orderId, actor, reason) {
     ).catch(() => null);
     throw error;
   }
+  if (result && result.settled === false) {
+    await query(
+      `UPDATE admin_action_logs SET action='financial.settlement_retry_not_eligible',after_data=$1
+       WHERE id=$2`,
+      [JSON.stringify({ reason, result }), audit.id]
+    ).catch(() => null);
+    return result;
+  }
   await query(
     `UPDATE admin_action_logs SET action='financial.settlement_retry_completed',after_data=$1
      WHERE id=$2`,
