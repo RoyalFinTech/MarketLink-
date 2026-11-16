@@ -20,6 +20,21 @@ exports.reports    = wrap(async (req,res) => res.json({ success:true, data: awai
 const financialReconciliationSvc = require('./financialReconciliation');
 exports.financialReconciliation = wrap(async (req,res) => res.json({ success:true, data: await financialReconciliationSvc.getFinancialReconciliation(req.query) }));
 
+exports.retryFinancialSettlement = wrap(async (req,res) => {
+  if (req.body.confirmation !== 'RETRY_SETTLEMENT') {
+    throw new AppError('Explicit settlement retry confirmation is required.',400,'CONFIRMATION_REQUIRED');
+  }
+  const result = await svc.retryFinancialSettlement(req.params.id, actor(req), req.body.reason.trim());
+  if (!result.settled) {
+    throw new AppError('Settlement was not performed: '+result.reason+'. No wallet balances were changed.',409,'SETTLEMENT_NOT_ELIGIBLE');
+  }
+  res.json({
+    success:true,
+    message:result.alreadySettled?'This order was already settled. No additional wallet credit was created.':'Order settlement completed using the existing idempotent financial routine.',
+    data:result,
+  });
+});
+
 // ── Withdrawals (admin approval workflow) ───────────────────────────
 const withdrawalsSvc = require('../withdrawals/service');
 exports.pendingWithdrawals = wrap(async (req,res) => res.json({ success:true, data: await withdrawalsSvc.listPendingForAdmin(req.query) }));
