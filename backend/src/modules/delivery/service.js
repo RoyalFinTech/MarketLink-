@@ -47,12 +47,16 @@ async function list({ page=1, limit=20, status, riderId, vendorId, isAdmin=false
   const { rows } = await query(
     `SELECT d.id, d.status, d.distance_km, d.estimated_minutes,
             d.picked_up_at, d.delivered_at, d.created_at,
-            o.order_number, o.total, o.vendor_id, o.customer_id,
+            o.order_number, o.total, o.vendor_id, o.customer_id, o.payment_method,
+            p.id AS cod_payment_id, p.amount AS cod_payment_amount,
+            ccr.status AS cod_remittance_status,
             u.full_name AS rider_name,
             v.business_name AS vendor_name,
             cu.full_name AS customer_name
      FROM deliveries d
      JOIN orders o ON o.id = d.order_id
+     LEFT JOIN payments p ON p.order_id=o.id AND p.method='cod'
+     LEFT JOIN cod_cash_remittances ccr ON ccr.payment_id=p.id
      LEFT JOIN users u ON u.id = d.rider_id
      JOIN vendors v ON v.user_id = o.vendor_id
      JOIN users cu ON cu.id = o.customer_id
