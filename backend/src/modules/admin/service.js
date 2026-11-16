@@ -203,7 +203,7 @@ async function getFailedPayments({ page=1, limit=50, method } = {}) {
      FROM payments p
      JOIN orders o ON o.id=p.order_id
      WHERE ${whereSql}
-     ORDER BY p.created_at ASC,p.id ASC LIMIT ${params.length+1} OFFSET ${params.length+2}`,
+     ORDER BY p.created_at ASC,p.id ASC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
     [...params,limit_,offset]
   );
   const { rows:[count] } = await query(
