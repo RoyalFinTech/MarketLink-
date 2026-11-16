@@ -14,6 +14,14 @@ router.post('/:id/continue', authenticate,
   [param('id').isUUID(), body('action').isIn(['confirm','pin']), body('pin').optional({checkFalsy:true}).matches(/^\d{4,8}$/)],
   validate, ctrl.continue);
 router.get('/cod/pending', authenticate, authorize(...ADMIN), ctrl.pendingCod);
+router.post('/cod/:id/remittance', authenticate, authorize('rider'),
+  [param('id').isUUID(),body('providerReference').trim().isLength({min:4,max:120}),body('depositMethod').optional().isIn(['wave','afrimoney']),body('proofUrl').optional({checkFalsy:true}).isURL({require_protocol:true,protocols:['https']})],
+  validate,ctrl.submitCodRemittance);
+router.get('/cod/remittances/mine',authenticate,authorize('rider'),ctrl.myCodRemittances);
+router.get('/cod/remittances',authenticate,authorize(...ADMIN),ctrl.codRemittances);
+router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),
+  [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500})],
+  validate,ctrl.reviewCodRemittance);
 router.get('/:id/status', authenticate, [param('id').isUUID()], validate, ctrl.status);
 router.post('/:id/confirm', authenticate,
   [param('id').isUUID()], validate, ctrl.confirm);
