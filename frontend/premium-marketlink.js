@@ -2821,14 +2821,19 @@
   // Session restoration may call goApp() before this deferred premium bundle runs.
   // Reconcile that boot order so returning users cannot remain on legacy markup.
   function reconcilePremiumHomeAfterBundleLoad(){
-    var appRoot=G('scr-app'),homeRoot=G('tab-home');
-    if(!appRoot||!appRoot.classList.contains('active')||!homeRoot)return;
-    // Session is already restored by goApp(); avoid an API-global load-order dependency.
-    if(S.curTab&&S.curTab!=='home')return;
-    window.renderHome();
+    var homeRoot=G('tab-home');
+    window.__ML_PREMIUM_BOOT_STATE='ready';
+    // The pending flag is authoritative; do not gate recovery on screen/tab state.
+    if(window.__ML_PENDING_PREMIUM_HOME&&homeRoot&&typeof window.renderHome==='function'){
+      window.__ML_PENDING_PREMIUM_HOME=false;
+      try{window.renderHome();}
+      catch(error){
+        console.error('[MarketLink] Premium home reconciliation failed:',error);
+        homeRoot.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Premium marketplace could not start</b><span>Please refresh and retry. Your account data has not been changed.</span><button type="button" class="ml-btn ml-btn-primary" onclick="window.renderHome&&window.renderHome()">Retry premium home</button></div></div>';
+      }
+    }
+    document.dispatchEvent(new Event('marketlink:premium-ready'));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',reconcilePremiumHomeAfterBundleLoad,{once:true});
   else reconcilePremiumHomeAfterBundleLoad();
-  // Signal only after the entire premium bundle has initialized its renderers.
-  document.dispatchEvent(new Event('marketlink:premium-ready'));
 })();
