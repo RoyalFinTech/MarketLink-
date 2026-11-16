@@ -27,7 +27,7 @@ describe('Admin financial settlement retry', () => {
       JSON.stringify({ reason: 'Verified COD receipt', idempotencyScope: 'order:order-id' }),
     ]);
     expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-id');
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\.settlement_retry_completed/i), [
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_completed/i), [
       JSON.stringify({ reason: 'Verified COD receipt', result: { settled: true } }), 42,
     ]);
   });
@@ -37,12 +37,12 @@ describe('Admin financial settlement retry', () => {
     const error = Object.assign(new Error('Ledger mismatch'), { code: 'SETTLEMENT_LEDGER_MISMATCH' });
     ordersService.settleOrderFinancials.mockRejectedValue(error);
 
-    await expect(retryFinancialSettlement('order-id', actor, 'Reviewed exception'))
-      .rejects.toBe(error);
+    await expect(retryFinancialSettlement('order-id', actor, 'Reviewed exception')).rejects.toBe(error);
 
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\.settlement_retry_failed/i), [
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_failed/i), [
       JSON.stringify({ reason: 'Reviewed exception', errorCode: 'SETTLEMENT_LEDGER_MISMATCH' }), 43,
     ]);
+  });
 
   test('records a non-eligible order without claiming settlement completed', async () => {
     query.mockResolvedValueOnce({ rows: [{ id: 44 }] });
@@ -54,6 +54,5 @@ describe('Admin financial settlement retry', () => {
     expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/financial\\.settlement_retry_not_eligible/i), [
       JSON.stringify({ reason: 'Reviewed payment state', result }), 44,
     ]);
-  });
   });
 });
