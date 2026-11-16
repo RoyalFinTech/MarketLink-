@@ -24,6 +24,7 @@ describe('Pay on Delivery reconciliation',()=>{
   jest.clearAllMocks();
   query.mockImplementation(async(sql)=>{
    if(sql.startsWith('SELECT * FROM payments WHERE id = $1'))return{rows:[payment]};
+   if(sql.includes('SELECT status FROM cod_cash_remittances'))return{rows:[{status:'verified'}]};
    if(sql.startsWith('SELECT status FROM orders'))return{rows:[{status:'delivered'}]};
    return{rows:[]};
   });
