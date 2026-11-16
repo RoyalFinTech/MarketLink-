@@ -2511,7 +2511,7 @@
         return '<div class="ml-section-head" style="margin-top:18px"><h3>'+esc(item[1])+'</h3><strong>'+rows.length+'</strong></div>'+html;
       }).join('');
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">MarketLink · Admin</div><h3 style="margin:4px 0">Financial reconciliation</h3></div><button onclick="window.ML_Premium.refreshFinancialReconciliation()">Refresh</button></div>'+
-        '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px">Read-only audit. No balances, commissions, withdrawals or payment statuses are changed. Lists are capped at '+Number(data.limit||50)+' records per check.</div>'+
+        '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px">The audit is read-only. Only eligible pending settlements expose a separate, confirmed retry action; that action uses the existing locked settlement routine and will stop on ledger or recipient mismatches. Lists are capped at '+Number(data.limit||50)+' records per check.</div>'+
         '<div class="ml-stat-grid">'+cards+'</div>'+
         '<div class="ml-section-head" style="margin-top:16px"><h3>Total findings returned</h3><strong>'+Number(data.totalFindings||0)+'</strong></div>'+blocks+
         '<div class="ml-empty" style="margin-top:16px"><b>Audit generated</b><span>'+esc(data.generatedAt||'')+'. '+esc(data.note||'Review each finding before taking action.')+'</span></div></div>';
