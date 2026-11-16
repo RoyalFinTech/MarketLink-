@@ -25,6 +25,10 @@ exports.continue = wrap(async (req,res) => res.json({success:true,data:await svc
 exports.status = wrap(async (req,res) => res.json({success:true,data:await svc.getPaymentStatus(req.params.id,req.user.id,req.user.roles)}));
 exports.confirm = wrap(async (req,res) => res.json({success:true,data:await svc.confirmPayment(req.params.id,req.user.id,req.user.roles)}));
 exports.pendingCod = wrap(async (req,res) => res.json({success:true,data:await svc.listPendingCodPayments(req.query)}));
+exports.submitCodRemittance = wrap(async(req,res) => res.status(201).json({success:true,data:await svc.submitCodCashRemittance({...req.body,paymentId:req.params.id,riderId:req.user.id})}));
+exports.myCodRemittances = wrap(async(req,res) => res.json({success:true,data:await svc.listMyCodCashRemittances(req.user.id,req.query)}));
+exports.codRemittances = wrap(async(req,res) => res.json({success:true,data:await svc.listCodCashRemittances(req.query)}));
+exports.reviewCodRemittance = wrap(async(req,res) => res.json({success:true,data:await svc.verifyCodCashRemittance(req.params.id,{id:req.user.id,role:(req.user.roles||[]).includes('super_admin')?'super_admin':'admin'},req.body.decision,req.body.note)}));
 exports.refund = wrap(async (req,res) => { const actor={id:req.user.id,role:(req.user.roles||[])[0]}; res.json({success:true,data:await svc.refund(req.params.id,req.body,actor)}); });
 exports.history = wrap(async (req,res) => res.json({success:true,data:await svc.getHistory(req.user.id,req.query)}));
 exports.webhook = async (req,res,next) => {
