@@ -159,4 +159,180 @@ async function getReports({ type, startDate, endDate }) {
   throw require('../../middleware/errorHandler').AppError('Unknown report type. Use: revenue, vendors, riders', 400, 'INVALID_REPORT_TYPE');
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports };
+
+/**
+ * Read-only financial integrity report for Admin.
+ * This deliberately never repairs balances or changes settlement state.
+ */
+async function getFinancialReconciliation({ page=1, limit=50 } = {}) {
+  const page_ = Math.max(parseInt(page, 10) || 1, 1);
+  const limit_ = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+  const offset = (page_ - 1) * limit_;
+  const issueCte = `
+    WITH issues AS (
+      SELECT 'delivered_missing_commission'::text AS issue_type, 'critical'::text AS severity,
+             o.order_number::text AS reference, o.id::text AS entity_id, o.total::numeric AS amount,
+             COALESCE(o.delivered_at,o.placed_at) AS created_at,
+             'Delivered order has no commission ledger record'::text AS detail
+      FROM orders o
+      LEFT JOIN commission_records cr ON cr.order_id=o.id
+      WHERE o.status='delivered' AND cr.id IS NULL
+
+      UNION ALL
+      SELECT 'settlement_pending','warning',o.order_number::text,o.id::text,o.total::numeric,
+             COALESCE(o.delivered_at,o.placed_at),
+             'Payment is confirmed but commission settlement is not marked paid'
+      FROM orders o
+      LEFT JOIN commission_records cr ON cr.order_id=o.id
+      WHERE o.status='delivered' AND o.payment_status='confirmed'
+        AND COALESCE(cr.status,'') <> 'paid'
+
+      UNION ALL
+      SELECT 'ledger_mismatch','critical',o.order_number::text,o.id::text,o.total::numeric,
+             COALESCE(o.delivered_at,o.placed_at),
+             'Order totals, recipients or payout amounts differ from the commission ledger'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id
+      WHERE o.status='delivered' AND (
+        o.vendor_id IS DISTINCT FROM cr.vendor_id
+        OR o.affiliate_user_id IS DISTINCT FROM cr.affiliate_user_id
+        OR abs(COALESCE(o.total,0)-COALESCE(cr.order_total,0)) > 0.01
+        OR abs(COALESCE(o.platform_fee,0)-COALESCE(cr.commission_amount,0)) > 0.01
+        OR abs(COALESCE(o.vendor_payout,0)-COALESCE(cr.vendor_payout,0)) > 0.01
+        OR abs(COALESCE(o.rider_payout,0)-COALESCE(cr.rider_payout,0)) > 0.01
+        OR abs(COALESCE(o.affiliate_commission_amount,0)-COALESCE(cr.affiliate_commission_amount,0)) > 0.01
+        OR abs(COALESCE(o.platform_net_fee,0)-COALESCE(cr.platform_net_amount,0)) > 0.01
+      )
+
+      UNION ALL
+      SELECT 'missing_rider_recipient','critical',o.order_number::text,o.id::text,cr.rider_payout::numeric,
+             COALESCE(o.delivered_at,o.placed_at),
+             'A positive rider payout exists but the delivery has no assigned rider'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id
+      LEFT JOIN deliveries d ON d.order_id=o.id
+      WHERE o.status='delivered' AND cr.status <> 'paid'
+        AND COALESCE(cr.rider_payout,0) > 0 AND d.rider_id IS NULL
+
+      UNION ALL
+      SELECT 'missing_affiliate_recipient','critical',o.order_number::text,o.id::text,cr.affiliate_commission_amount::numeric,
+             COALESCE(o.delivered_at,o.placed_at),
+             'A positive affiliate commission exists but no affiliate recipient is recorded'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id
+      WHERE o.status='delivered' AND cr.status <> 'paid'
+        AND COALESCE(cr.affiliate_commission_amount,0) > 0
+        AND cr.affiliate_user_id IS NULL
+
+      UNION ALL
+      SELECT 'vendor_credit_missing','critical',o.order_number::text,o.id::text,cr.vendor_payout::numeric,
+             cr.created_at,
+             'Commission is marked paid but the expected vendor wallet credit is missing'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id AND cr.status='paid'
+      LEFT JOIN wallets w ON w.user_id=o.vendor_id
+      LEFT JOIN transactions t ON t.wallet_id=w.id
+        AND t.reference_type='order_vendor_payout' AND t.reference_id=o.id
+        AND t.category='vendor_sale' AND t.type='credit'
+      WHERE COALESCE(cr.vendor_payout,0) > 0 AND t.id IS NULL
+
+      UNION ALL
+      SELECT 'rider_credit_missing','critical',o.order_number::text,o.id::text,cr.rider_payout::numeric,
+             cr.created_at,
+             'Commission is marked paid but the expected rider earning or wallet credit is missing'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id AND cr.status='paid'
+      LEFT JOIN deliveries d ON d.order_id=o.id
+      LEFT JOIN rider_earnings re ON re.order_id=o.id AND re.rider_id=d.rider_id AND re.type='delivery'
+      LEFT JOIN wallets w ON w.user_id=d.rider_id
+      LEFT JOIN transactions t ON t.wallet_id=w.id
+        AND t.reference_type='order_rider_payout' AND t.reference_id=o.id
+        AND t.category='delivery_earning' AND t.type='credit'
+      WHERE COALESCE(cr.rider_payout,0) > 0 AND (re.id IS NULL OR t.id IS NULL)
+
+      UNION ALL
+      SELECT 'platform_earning_missing','critical',o.order_number::text,o.id::text,cr.platform_net_amount::numeric,
+             cr.created_at,
+             'Commission is marked paid but no platform earnings record exists'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id AND cr.status='paid'
+      LEFT JOIN platform_earnings pe ON pe.order_id=o.id
+      WHERE COALESCE(cr.platform_net_amount,0) > 0 AND pe.id IS NULL
+
+      UNION ALL
+      SELECT 'platform_earning_mismatch','critical',o.order_number::text,o.id::text,cr.platform_net_amount::numeric,
+             cr.created_at,
+             'Platform earnings amount differs from the retained net commission'
+      FROM orders o
+      JOIN commission_records cr ON cr.order_id=o.id AND cr.status='paid'
+      JOIN platform_earnings pe ON pe.order_id=o.id
+      WHERE abs(COALESCE(pe.commission_amount,0)-COALESCE(cr.platform_net_amount,0)) > 0.01
+
+      UNION ALL
+      SELECT 'duplicate_provider_reference','warning',p.provider_ref::text,p.id::text,
+             max(p.amount)::numeric,max(p.created_at),
+             'More than one payment row uses the same provider reference'
+      FROM payments p
+      WHERE p.provider_ref IS NOT NULL AND btrim(p.provider_ref) <> ''
+      GROUP BY p.provider_ref
+      HAVING count(*) > 1
+
+      UNION ALL
+      SELECT 'duplicate_settlement_credit','critical',t.reference_id::text,t.reference_id::text,
+             sum(t.amount)::numeric,max(t.created_at),
+             'Multiple wallet credit transactions use the same order payout reference'
+      FROM transactions t
+      WHERE t.type='credit' AND t.reference_type IN ('order_vendor_payout','order_rider_payout')
+      GROUP BY t.wallet_id,t.reference_type,t.reference_id,t.category
+      HAVING count(*) > 1
+
+      UNION ALL
+      SELECT 'wallet_ledger_mismatch','critical',w.id::text,w.id::text,
+             abs(w.balance-COALESCE(sum(CASE WHEN t.type='credit' THEN t.amount ELSE -t.amount END),0))::numeric,
+             w.updated_at,
+             'Wallet balance differs from the net transaction ledger'
+      FROM wallets w
+      LEFT JOIN transactions t ON t.wallet_id=w.id
+      GROUP BY w.id,w.balance,w.updated_at
+      HAVING abs(w.balance-COALESCE(sum(CASE WHEN t.type='credit' THEN t.amount ELSE -t.amount END),0)) > 0.01
+
+      UNION ALL
+      SELECT CASE WHEN wd.status IN ('failed','reversed') THEN 'withdrawal_failed' ELSE 'withdrawal_stale' END,
+             CASE WHEN wd.status IN ('failed','reversed') THEN 'warning' ELSE 'warning' END,
+             wd.id::text,wd.id::text,wd.amount::numeric,wd.created_at,
+             CASE WHEN wd.status IN ('failed','reversed')
+               THEN 'Withdrawal is failed or reversed and requires review'
+               ELSE 'Withdrawal has remained reserved for more than 24 hours'
+             END
+      FROM withdrawals wd
+      WHERE wd.status IN ('failed','reversed')
+         OR (wd.status IN ('processing','payout_pending') AND wd.created_at < now()-INTERVAL '24 hours')
+    )
+  `;
+  const [summary, details] = await Promise.all([
+    query(issueCte + `SELECT issue_type,severity,count(*)::int AS count
+      FROM issues GROUP BY issue_type,severity ORDER BY severity DESC,issue_type`),
+    query(issueCte + `SELECT issue_type,severity,reference,entity_id,amount,created_at,detail
+      FROM issues ORDER BY CASE severity WHEN 'critical' THEN 0 ELSE 1 END,created_at ASC
+      LIMIT $1 OFFSET $2`, [limit_, offset]),
+  ]);
+  const counts = summary.rows.reduce((acc,row) => {
+    acc[row.issue_type] = Number(row.count || 0);
+    return acc;
+  }, {});
+  const total = summary.rows.reduce((n,row) => n + Number(row.count || 0), 0);
+  return {
+    generatedAt: new Date().toISOString(),
+    status: total ? 'attention_required' : 'clear',
+    totalIssues: total,
+    counts,
+    checks: summary.rows,
+    items: details.rows,
+    page: page_,
+    limit: limit_,
+    totalPages: Math.ceil(total / limit_),
+    readOnly: true,
+  };
+}
+
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getFinancialReconciliation };
