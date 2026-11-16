@@ -2045,3 +2045,108 @@ body.ml-photo-viewer-open{overflow:hidden}
   #scr-app{width:100%!important;max-width:none!important;}
   #vdash-body.ml-role-dashboard-premium,#rdash-body.ml-role-dashboard-premium{width:min(100%,1440px)!important;margin-left:auto!important;margin-right:auto!important;}
 }
+
+
+/* Readability pass: DAHA wallet and premium onboarding must remain legible on mobile and desktop. */
+#profile-body .ml-daha-shell .ml-daha-copy,
+#profile-body .ml-daha-shell .ml-wallet-note,
+#profile-body .ml-daha-shell .ml-daha-provider-step>p,
+#profile-body .ml-daha-shell .ml-daha-review-head>p,
+#profile-body .ml-daha-shell .ml-daha-review-row>span,
+#profile-body .ml-daha-shell .ml-daha-ledger-note,
+#profile-body .ml-daha-shell .ml-daha-brand small{
+  color:#DCE7EC!important;
+  -webkit-text-fill-color:#DCE7EC!important;
+  opacity:1!important;
+}
+#profile-body .ml-daha-shell .ml-field-label,
+#profile-body .ml-daha-shell label{
+  color:#F3F7F9!important;
+  -webkit-text-fill-color:#F3F7F9!important;
+  opacity:1!important;
+  font-weight:750!important;
+}
+#profile-body .ml-daha-shell .ml-daha-input{
+  color:#F7FAFC!important;
+  -webkit-text-fill-color:#F7FAFC!important;
+  background:#102637!important;
+  border-color:#718B9B!important;
+  opacity:1!important;
+}
+#profile-body .ml-daha-shell .ml-daha-input::placeholder{
+  color:#B9C9D2!important;
+  -webkit-text-fill-color:#B9C9D2!important;
+  opacity:1!important;
+}
+#profile-body .ml-daha-shell .ml-daha-input option{background:#102637!important;color:#F7FAFC!important}
+#profile-body .ml-daha-shell .ml-daha-review-row>strong,
+#profile-body .ml-daha-shell .ml-daha-review-head>b{color:#FFFFFF!important;opacity:1!important}
+#profile-body .ml-daha-shell .ml-daha-panel-head h4{color:#FFFFFF!important;opacity:1!important}
+#profile-body .ml-daha-shell .ml-daha-panel-head>div>span{color:#F4CB72!important;opacity:1!important}
+#profile-body .ml-daha-shell .ml-wallet-transaction .copy span{color:#C9D7DE!important;opacity:1!important}
+#profile-body .ml-daha-shell .ml-wallet-transaction .copy b{color:#F4F8FA!important;opacity:1!important}
+#profile-body .ml-daha-shell .ml-wallet-transaction>strong{opacity:1!important}
+#profile-body .ml-daha-shell .ml-empty,
+#profile-body .ml-daha-shell .ml-empty span{color:#D2DEE4!important;opacity:1!important}
+.lm #profile-body .ml-daha-shell .ml-daha-copy,
+.lm #profile-body .ml-daha-shell .ml-wallet-note,
+.lm #profile-body .ml-daha-shell .ml-daha-provider-step>p,
+.lm #profile-body .ml-daha-shell .ml-daha-review-head>p,
+.lm #profile-body .ml-daha-shell .ml-daha-review-row>span,
+.lm #profile-body .ml-daha-shell .ml-daha-ledger-note,
+.lm #profile-body .ml-daha-shell .ml-daha-brand small,
+.lm #profile-body .ml-daha-shell .ml-wallet-transaction .copy span,
+.lm #profile-body .ml-daha-shell .ml-empty,
+.lm #profile-body .ml-daha-shell .ml-empty span{
+  color:#334F5B!important;-webkit-text-fill-color:#334F5B!important;opacity:1!important;
+}
+.lm #profile-body .ml-daha-shell .ml-field-label,
+.lm #profile-body .ml-daha-shell label{color:#183746!important;-webkit-text-fill-color:#183746!important}
+.lm #profile-body .ml-daha-shell .ml-daha-input{
+  color:#172B36!important;-webkit-text-fill-color:#172B36!important;background:#FFFFFF!important;border-color:#829BA7!important;color-scheme:light;
+}
+.lm #profile-body .ml-daha-shell .ml-daha-input::placeholder{color:#526B77!important;-webkit-text-fill-color:#526B77!important}
+.lm #profile-body .ml-daha-shell .ml-daha-input option{background:#FFFFFF!important;color:#172B36!important}
+
+/* Onboarding copy sits on a light panel: use dark, solid text and visible progress controls. */
+#scr-onboard .ml-ob-layout-runtime .ml-ob-copy{
+  background:#FFFFFF!important;color:#17313D!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-layout-runtime .ml-ob-copy h1,
+#scr-onboard .ml-ob-layout-runtime .ml-ob-copy h1:not(em){
+  color:#102B3A!important;-webkit-text-fill-color:#102B3A!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-layout-runtime .ml-ob-copy h1 em,
+#scr-onboard .ml-ob-layout-runtime .ml-ob-eyebrow,
+#scr-onboard .ml-ob-layout-runtime .ml-ob-eyebrow *{
+  color:#936000!important;-webkit-text-fill-color:#936000!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-layout-runtime .ml-ob-description,
+#scr-onboard .ml-ob-layout-runtime .ml-ob-copy p{
+  color:#344F5B!important;-webkit-text-fill-color:#344F5B!important;opacity:1!important;text-shadow:none!important;
+}
+#scr-onboard .ml-ob-layout-runtime .ml-ob-chips span{
+  color:#263F4B!important;-webkit-text-fill-color:#263F4B!important;background:#F1F5F6!important;border-color:#C9D6DC!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-layout-runtime .ml-ob-inline-meta,
+#scr-onboard .ml-ob-layout-runtime .ml-ob-inline-meta b{color:#1C3947!important;-webkit-text-fill-color:#1C3947!important;opacity:1!important}
+#scr-onboard .ml-ob-layout-runtime .ml-ob-inline-meta small{color:#526B77!important;-webkit-text-fill-color:#526B77!important;opacity:1!important}
+#scr-onboard .ml-ob-dots{opacity:1!important}
+#scr-onboard .ml-ob-dots button{
+  background:#8296A0!important;border:2px solid #FFFFFF!important;box-shadow:0 0 0 2px #243D4A!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-dots button.active{
+  background:#C28A18!important;border-color:#FFFFFF!important;box-shadow:0 0 0 2px #243D4A!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-bottom h2,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-bottom p,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-top,
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-top *{
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important;
+}
+#scr-onboard .ml-ob-visual-runtime .ml-ob-visual-bottom p{color:#F0F5F7!important;-webkit-text-fill-color:#F0F5F7!important}
+@media(max-width:680px){
+  #scr-onboard .ml-ob-layout-runtime .ml-ob-copy{padding:14px 12px!important;border-radius:15px!important}
+  #scr-onboard .ml-ob-layout-runtime .ml-ob-description{font-size:14px!important;line-height:1.7!important}
+  #scr-onboard .ml-ob-dots button{min-width:11px!important;min-height:11px!important}
+}
