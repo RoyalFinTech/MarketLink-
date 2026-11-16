@@ -6,7 +6,7 @@ jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
-const {submitCodCashRemittance,verifyCodCashRemittance}=require('./service');
+const {submitCodCashRemittance,verifyCodCashRemittance,getCodRemittanceInstructions}=require('./service');
 
 const paymentId='11111111-1111-4111-8111-111111111111';
 const orderId='22222222-2222-4222-8222-222222222222';
@@ -20,6 +20,10 @@ describe('rider cash remittance controls',()=>{
  let tx;
  beforeEach(()=>{
   jest.clearAllMocks();
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER='871234567';
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME='MarketLink Gambia';
+  process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER='861234567';
+  process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NAME='MarketLink Gambia';
   tx=jest.fn(async(sql,params=[])=>{
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,payment_status:'pending',order_status:'delivered',order_payment_status:'pending',delivery_id:'delivery-1',rider_id:riderId,delivery_status:'delivered'}]};
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE payment_id'))return{rows:[]};
@@ -39,6 +43,17 @@ describe('rider cash remittance controls',()=>{
   ordersService.settleOrderFinancials.mockResolvedValue({settled:true,vendorPayout:100,riderPayout:25,affiliatePayout:2,platformNet:18});
  });
 
+ test('publishes only valid configured collection account destinations',()=>{
+  expect(getCodRemittanceInstructions()).toMatchObject({
+   currency:'GMD',
+   methods:{
+    wave:{configured:true,accountNumber:'871234567',accountName:'MarketLink Gambia'},
+    afrimoney:{configured:true,accountNumber:'861234567',accountName:'MarketLink Gambia'}
+   }
+  });
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER='123';
+  expect(getCodRemittanceInstructions().methods.wave.configured).toBe(false);
+ });
  test('rider submission locks and validates the assigned delivered COD order',async()=>{
   const result=await submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234',depositMethod:'wave'});
   expect(result).toMatchObject({payment_id:paymentId,status:'submitted',provider_reference:'WV-2026-1234'});
