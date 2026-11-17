@@ -397,14 +397,20 @@ function getCodRemittanceInstructions(){
   };
 }
 
-async function submitCodCashRemittance({paymentId,riderId,providerReference,depositMethod='wave',proofUrl}){
+async function submitCodCashRemittance({paymentId,riderId,providerReference,depositMethod='wave',proofFileId}){
   const reference=String(providerReference||'').trim();
   if(reference.length<4||reference.length>120)throw new AppError('Enter the Wave deposit reference from your receipt.',400,'COD_REMITTANCE_REFERENCE_REQUIRED');
   const method=String(depositMethod||'wave').toLowerCase();
   if(!['wave','afrimoney'].includes(method))throw new AppError('Choose Wave or AfriMoney for the cash remittance.',400,'COD_REMITTANCE_METHOD_INVALID');
   const destination=getCodRemittanceInstructions().methods[method];
   if(!destination||!destination.configured)throw new AppError('MarketLink has not published a verified collection account for this deposit method yet. Contact Admin before sending cash.',503,'COD_REMITTANCE_DESTINATION_NOT_CONFIGURED');
-  if(proofUrl&&(!/^https:\/\//i.test(String(proofUrl))||String(proofUrl).length>1000))throw new AppError('The deposit proof link must be a valid HTTPS link.',400,'COD_REMITTANCE_PROOF_INVALID');
+  if(!proofFileId||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(proofFileId)))throw new AppError('Upload a clear receipt image or PDF before submitting the cash remittance.',400,'COD_REMITTANCE_PROOF_REQUIRED');
+  const proof={rows:[file]}=await query(
+    "SELECT id FROM file_uploads WHERE id=$1 AND uploaded_by=$2 AND purpose='cod-remittance-document' AND deleted_at IS NULL",
+    [proofFileId,riderId]
+  );
+  if(!file)throw new AppError('The receipt file could not be verified. Upload it again from this rider account.',403,'COD_REMITTANCE_PROOF_INVALID');
+  const proofUrl=String(process.env.API_PUBLIC_URL||process.env.PUBLIC_API_URL||process.env.RENDER_EXTERNAL_URL||'https://marketlink-gambia.onrender.com').replace(/\\/+$/,'')+'/api/v1/uploads/'+proofFileId+'/content';
   return withTransaction(async(client)=>{
     const {rows:[payment]}=await client.query(
       `SELECT p.id,p.order_id,p.amount,p.currency,p.method,p.status AS payment_status,
