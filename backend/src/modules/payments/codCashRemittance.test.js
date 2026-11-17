@@ -13,6 +13,7 @@ const orderId='22222222-2222-4222-8222-222222222222';
 const riderId='33333333-3333-4333-8333-333333333333';
 const adminId='44444444-4444-4444-8444-444444444444';
 const remittanceId='55555555-5555-4555-8555-555555555555';
+const proofFileId='77777777-7777-4777-8777-777777777777';
 const payment={id:paymentId,order_id:orderId,amount:'145.00',currency:'GMD',method:'cod',status:'pending'};
 const remittance={id:remittanceId,payment_id:paymentId,order_id:orderId,rider_id:riderId,amount:'145.00',deposit_method:'wave',provider_reference:'WV-2026-1234',status:'submitted'};
 
@@ -38,6 +39,7 @@ describe('rider cash remittance controls',()=>{
   });
   withTransaction.mockImplementation(async(fn)=>fn({query:tx}));
   query.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT id FROM file_uploads'))return{rows:[{id:proofFileId}]};
    if(sql==='SELECT * FROM payments WHERE id=$1')return{rows:[payment]};
    return{rows:[]};
   });
@@ -56,7 +58,7 @@ describe('rider cash remittance controls',()=>{
   expect(getCodRemittanceInstructions().methods.wave.configured).toBe(false);
  });
  test('rider submission locks and validates the assigned delivered COD order',async()=>{
-  const result=await submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234',depositMethod:'wave'});
+  const result=await submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234',depositMethod:'wave',proofFileId});
   expect(result).toMatchObject({payment_id:paymentId,status:'submitted',provider_reference:'WV-2026-1234'});
   expect(tx.mock.calls[0][0]).toMatch(/FOR UPDATE OF p,o,d/i);
   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO cod_cash_remittances'))).toBe(true);
@@ -67,7 +69,7 @@ describe('rider cash remittance controls',()=>{
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,order_status:'delivered',delivery_status:'delivered',rider_id:'another-rider'}]};
    return{rows:[]};
   });
-  await expect(submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234'}))
+  await expect(submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234',proofFileId}))
    .rejects.toMatchObject({statusCode:403,code:'COD_REMITTANCE_FORBIDDEN'});
  });
 
@@ -76,7 +78,7 @@ describe('rider cash remittance controls',()=>{
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,order_status:'on_the_way',delivery_status:'in_transit',rider_id:riderId}]};
    return{rows:[]};
   });
-  await expect(submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234'}))
+  await expect(submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234',proofFileId}))
    .rejects.toMatchObject({statusCode:409,code:'COD_REMITTANCE_NOT_DELIVERED'});
  });
 
