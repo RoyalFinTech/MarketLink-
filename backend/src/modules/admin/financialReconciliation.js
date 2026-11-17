@@ -98,14 +98,15 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
            ORDER BY w.created_at ASC LIMIT $1`, [pageSize]),
     query(`SELECT w.id AS wallet_id, w.user_id, w.balance AS wallet_balance,
                   latest.balance_after AS ledger_balance, latest.created_at AS last_transaction_at,
-                  (w.balance-latest.balance_after) AS difference
+                  (COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) AS difference,
+                  (latest.created_at IS NULL) AS has_no_ledger_entries
            FROM wallets w
-           JOIN LATERAL (
+           LEFT JOIN LATERAL (
              SELECT t.balance_after,t.created_at FROM transactions t
              WHERE t.wallet_id=w.id ORDER BY t.created_at DESC,t.id DESC LIMIT 1
            ) latest ON TRUE
            WHERE ABS(COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) > $1
-           ORDER BY ABS(w.balance-latest.balance_after) DESC LIMIT $2`, [moneyTolerance, pageSize]),
+           ORDER BY ABS(COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) DESC LIMIT $2`, [moneyTolerance, pageSize]),
     query(`SELECT 'wallet_transaction_reference' AS kind, reference_type, reference_id,
                   category, count(*) AS duplicate_count, sum(amount) AS amount_total
            FROM transactions
