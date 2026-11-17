@@ -328,6 +328,7 @@ async function getAnalytics(vendorId, { period = '30d' } = {}) {
               coalesce(sum(total), 0)       AS revenue
        FROM orders
        WHERE vendor_id = $1
+         AND status='delivered' AND payment_status='confirmed'
          AND placed_at >= now() - ($2 || ' days')::INTERVAL
        GROUP BY 1 ORDER BY 1`,
       [vendorId, days]
@@ -341,7 +342,7 @@ async function getAnalytics(vendorId, { period = '30d' } = {}) {
        JOIN orders o ON o.id = oi.order_id
        WHERE o.vendor_id = $1
          AND o.placed_at >= now() - ($2 || ' days')::INTERVAL
-         AND o.status = 'delivered'
+         AND o.status = 'delivered' AND o.payment_status = 'confirmed'
        GROUP BY 1
        ORDER BY units_sold DESC LIMIT 5`,
       [vendorId, days]
