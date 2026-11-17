@@ -296,11 +296,19 @@ function EXT_CONTENT_TYPE(filePath) {
   const ext=path.extname(filePath).toLowerCase();
   return ({'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.pdf':'application/pdf'})[ext] || 'application/octet-stream';
 }
+async function isCodRemittanceProof(fileId) {
+  const {rows:[reference]}=await query(
+    "SELECT EXISTS(SELECT 1 FROM cod_cash_remittances WHERE proof_url LIKE '%' || $1 || '/content') AS in_use",
+    [String(fileId)]
+  );
+  return Boolean(reference && reference.in_use);
+}
 async function deleteFile(fileId, requesterId, roles) {
   const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL',[fileId]);
   if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
   const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
   if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to delete this file.',403,'FORBIDDEN');
+  if(await isCodRemittanceProof(fileId)) throw new AppError('This receipt is attached to a cash remittance and must be retained for payment audit records.',409,'FILE_IN_USE');
   if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
   else {
     await storageDelete(f.file_url);
@@ -311,6 +319,7 @@ async function deleteFile(fileId, requesterId, roles) {
 async function deleteFileByUrl(url, requesterId) {
   const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE file_url=$1 AND uploaded_by=$2 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1',[url,requesterId]);
   if(!f) return {deleted:false,reason:'NOT_OWNED_OR_NOT_FOUND'};
+  if(await isCodRemittanceProof(f.id)) return {deleted:false,reason:'STILL_IN_USE'};
   const {rows:[refs]}=await query(
     'SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, ' +
     'EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1) AS rider_ref, ' +
