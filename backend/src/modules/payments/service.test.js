@@ -6,7 +6,7 @@ jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
-const {confirmPayment,listPendingCodPayments,initiatePayment}=require('./service');
+const {confirmPayment,listPendingCodPayments,initiatePayment,submitCodCashRemittance}=require('./service');
 
 const payment={
  id:'11111111-1111-4111-8111-111111111111',
@@ -21,6 +21,8 @@ const deliveredOrder={
 describe('Pay on Delivery reconciliation',()=>{
  let transactionQuery;
  beforeEach(()=>{
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER='871234567';
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME='MarketLink Gambia';
   jest.clearAllMocks();
   query.mockImplementation(async(sql)=>{
    if(sql.startsWith('SELECT * FROM payments WHERE id = $1'))return{rows:[payment]};
@@ -94,5 +96,24 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(sql).toContain("o.status='delivered'");
   expect(sql).toContain("p.status='pending'");
   expect(sql).toContain("COALESCE(cr.status,'')<>'paid'");
+ });
+ test('requires a receipt file before accepting a rider cash remittance',async()=>{
+  await expect(submitCodCashRemittance({
+   paymentId:payment.id,riderId:'44444444-4444-4444-8444-444444444444',
+   providerReference:'WAVE-RECEIPT-1',depositMethod:'wave'
+  })).rejects.toMatchObject({statusCode:400,code:'COD_REMITTANCE_PROOF_REQUIRED'});
+  expect(query).not.toHaveBeenCalled();
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+ test('rejects a receipt file that was not uploaded by the submitting rider',async()=>{
+  query.mockResolvedValue({rows:[]});
+  await expect(submitCodCashRemittance({
+   paymentId:payment.id,riderId:'44444444-4444-4444-8444-444444444444',
+   providerReference:'WAVE-RECEIPT-2',depositMethod:'wave',
+   proofFileId:'55555555-5555-4555-8555-555555555555'
+  })).rejects.toMatchObject({statusCode:403,code:'COD_REMITTANCE_PROOF_INVALID'});
+  expect(query).toHaveBeenCalledTimes(1);
+  expect(query.mock.calls[0][0]).toContain('uploaded_by=$2');
+  expect(withTransaction).not.toHaveBeenCalled();
  });
 });
