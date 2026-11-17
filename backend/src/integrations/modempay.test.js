@@ -16,6 +16,11 @@ describe('Modem Pay configuration and webhook verification', () => {
     }
   });
 
+  test('reports webhook configuration as disabled when no signing secret is present', () => {
+    const modemPay = require('./modempay');
+    expect(modemPay.isWebhookConfigured()).toBe(false);
+  });
+
   test('recognizes the webhook secret variable documented by Modem Pay', () => {
     process.env.MODEM_WEBHOOK_SECRET = 'test-webhook-secret';
     const modemPay = require('./modempay');
