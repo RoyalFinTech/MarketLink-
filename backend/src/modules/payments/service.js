@@ -410,7 +410,7 @@ async function submitCodCashRemittance({paymentId,riderId,providerReference,depo
     [proofFileId,riderId]
   );
   if(!file)throw new AppError('The receipt file could not be verified. Upload it again from this rider account.',403,'COD_REMITTANCE_PROOF_INVALID');
-  const proofUrl=String(process.env.API_PUBLIC_URL||process.env.PUBLIC_API_URL||process.env.RENDER_EXTERNAL_URL||'https://marketlink-gambia.onrender.com').replace(/\\/+$/,'')+'/api/v1/uploads/'+proofFileId+'/content';
+  const proofUrl=String(process.env.API_PUBLIC_URL||process.env.PUBLIC_API_URL||process.env.RENDER_EXTERNAL_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'')+'/api/v1/uploads/'+proofFileId+'/content';
   return withTransaction(async(client)=>{
     const {rows:[payment]}=await client.query(
       `SELECT p.id,p.order_id,p.amount,p.currency,p.method,p.status AS payment_status,
