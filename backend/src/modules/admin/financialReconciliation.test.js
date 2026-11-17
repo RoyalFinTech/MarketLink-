@@ -37,6 +37,9 @@ describe('admin financial reconciliation', () => {
     expect(query.mock.calls[0][1]).toEqual([100]);
     expect(query.mock.calls[2][1]).toEqual([0.01, 100]);
     expect(query.mock.calls[4][1]).toEqual([0.01, 100]);
+    expect(query.mock.calls[6][0]).toMatch(/LEFT JOIN LATERAL/i);
+    expect(query.mock.calls[6][0]).toMatch(/has_no_ledger_entries/i);
+    expect(query.mock.calls[6][0]).toMatch(/COALESCE\(latest\.balance_after,0\)/i);
     expect(query.mock.calls.every(([sql]) => /^SELECT/i.test(sql.trim()))).toBe(true);
   });
 
