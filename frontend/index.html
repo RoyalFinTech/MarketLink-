@@ -4494,7 +4494,8 @@ function renderRDash(){
            '<div style="color:var(--mu);font-size:10px;line-height:1.5;margin:4px 0 8px">Deposit the full customer payment of D '+Number(h.codPaymentAmount||0).toFixed(2)+' into the official MarketLink Wave or AfriMoney collection account. Enter the receipt reference below. Your rider delivery earning of D '+Number(h.pay||0).toFixed(2)+' is credited separately after verification.</div>'+
            '<select id="ml-cod-method-'+sanitizeText(h.id)+'" '+(remittanceConfigured?'':'disabled')+' style="width:100%;margin:0 0 7px;padding:9px;border-radius:8px">'+remittanceMethodOptions+'</select>'+
            '<input id="ml-cod-ref-'+sanitizeText(h.id)+'" type="text" maxlength="120" placeholder="Deposit receipt / transaction reference" style="width:100%;box-sizing:border-box;margin:0 0 7px;padding:10px;border-radius:8px">'+
-           '<input id="ml-cod-proof-'+sanitizeText(h.id)+'" type="url" placeholder="Optional HTTPS proof link" style="width:100%;box-sizing:border-box;margin:0 0 7px;padding:10px;border-radius:8px">'+
+           '<label for="ml-cod-proof-file-'+sanitizeText(h.id)+'" style="display:block;color:var(--tx);font-size:10px;font-weight:700;margin:2px 0 5px">Upload deposit receipt (JPG, PNG or PDF · max 10 MB)</label>'+
+           '<input id="ml-cod-proof-file-'+sanitizeText(h.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;box-sizing:border-box;margin:0 0 8px;padding:9px;border:1px solid rgba(148,163,184,.22);border-radius:8px;color:var(--tx);font-size:10px">'+
            '<button type="button" class="ml-btn ml-btn-primary" style="width:100%" '+(remittanceConfigured?'':'disabled')+' onclick="window.ML_Premium.submitCodRemittance(\''+sanitizeText(h.paymentId)+'\',\''+sanitizeText(h.id)+'\')">'+(remittanceConfigured?'Submit cash deposit for verification':'Collection account not configured · Contact Admin')+'</button></div>'):'')+'</div>';
     });
     }
