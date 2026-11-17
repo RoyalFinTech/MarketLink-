@@ -16,7 +16,7 @@ router.post('/:id/continue', authenticate,
 router.get('/cod/pending', authenticate, authorize(...ADMIN), ctrl.pendingCod);
 router.get('/cod/remittance-instructions',authenticate,authorize('rider'),ctrl.codRemittanceInstructions);
 router.post('/cod/:id/remittance', authenticate, authorize('rider'),
-  [param('id').isUUID(),body('providerReference').trim().isLength({min:4,max:120}),body('depositMethod').optional().isIn(['wave','afrimoney']),body('proofUrl').optional({checkFalsy:true}).isURL({require_protocol:true,protocols:['https']})],
+  [param('id').isUUID(),body('providerReference').trim().isLength({min:4,max:120}),body('depositMethod').optional().isIn(['wave','afrimoney']),body('proofFileId').isUUID()],
   validate,ctrl.submitCodRemittance);
 router.get('/cod/remittances/mine',authenticate,authorize('rider'),ctrl.myCodRemittances);
 router.get('/cod/remittances',authenticate,authorize(...ADMIN),ctrl.codRemittances);
