@@ -310,9 +310,10 @@ async function getEarnings(riderId, { page = 1, limit = 20, period = '30d' }) {
        LEFT JOIN deliveries d ON d.id = re.delivery_id
        LEFT JOIN orders o ON o.id = re.order_id
        WHERE re.rider_id = $1
+         AND re.created_at >= now() - ($2 || ' days')::INTERVAL
        ORDER BY re.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [riderId, limit_, offset]
+       LIMIT $3 OFFSET $4`,
+      [riderId, days, limit_, offset]
     ),
   ]);
 
