@@ -405,7 +405,7 @@ async function submitCodCashRemittance({paymentId,riderId,providerReference,depo
   const destination=getCodRemittanceInstructions().methods[method];
   if(!destination||!destination.configured)throw new AppError('MarketLink has not published a verified collection account for this deposit method yet. Contact Admin before sending cash.',503,'COD_REMITTANCE_DESTINATION_NOT_CONFIGURED');
   if(!proofFileId||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(proofFileId)))throw new AppError('Upload a clear receipt image or PDF before submitting the cash remittance.',400,'COD_REMITTANCE_PROOF_REQUIRED');
-  const proof={rows:[file]}=await query(
+  const {rows:[file]}=await query(
     "SELECT id FROM file_uploads WHERE id=$1 AND uploaded_by=$2 AND purpose='cod-remittance-document' AND deleted_at IS NULL",
     [proofFileId,riderId]
   );
