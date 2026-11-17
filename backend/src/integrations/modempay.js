@@ -33,9 +33,14 @@ function isConfigured() {
   const key=String(process.env.MODEM_PAY_API_KEY||'').trim();
   return Boolean(key && !/(placeholder|replace[_ -]?me|change[_ -]?me|your[_ -]?(api[_ -]?)?key|example[_ -]?key)/i.test(key));
 }
+function getWebhookSecrets() {
+  // MODEM_WEBHOOK_SECRET is the name used in Modem Pay's published Node guide.
+  // Keep the MODEM_PAY_* aliases for existing Render deployments and callback setups.
+  return [process.env.MODEM_PAY_WEBHOOK_SECRET, process.env.MODEM_WEBHOOK_SECRET, process.env.MODEM_PAY_SECRET_HASH]
+    .map(value => String(value || '').trim()).filter(Boolean);
+}
 function isWebhookConfigured() {
-  return [process.env.MODEM_PAY_WEBHOOK_SECRET, process.env.MODEM_PAY_SECRET_HASH]
-    .some(value => String(value || '').trim().length > 0);
+  return getWebhookSecrets().length > 0;
 }
 function getApiKey() {
   if (!isConfigured()) throw new AppError('Modem Pay is not configured on the server.', 503, 'PROVIDER_UNAVAILABLE');
@@ -164,26 +169,26 @@ async function initiateTransfer({ amount, currency='GMD', network, accountNumber
   });
 }
 
-function verifyWebhookSignature(rawBody, signature) {
+function verifyWebhookSignature(rawBody, signature, canonicalBody) {
   const crypto = require('crypto');
   if (!signature || !rawBody) return false;
-  // Global dashboard webhooks use MODEM_PAY_WEBHOOK_SECRET. Per-payment
-  // callback_url notifications use MODEM_PAY_SECRET_HASH (SHA-256 of the API
-  // secret). Try configured candidates so both routes may safely share one
-  // webhook endpoint when the merchant intentionally enables both mechanisms.
-  const secrets = [
-    process.env.MODEM_PAY_WEBHOOK_SECRET,
-    process.env.MODEM_PAY_SECRET_HASH,
-  ].filter(value => String(value || '').trim().length > 0).map(value => String(value).trim());
+  const secrets = getWebhookSecrets();
   if (!secrets.length) throw new AppError('Modem Pay webhook signing configuration is missing.', 503, 'PROVIDER_UNAVAILABLE');
   const supplied = Buffer.from(String(signature).trim().toLowerCase());
+  // The provider's published Node example validates the parsed JSON object,
+  // while its PHP example supplies the exact incoming body. Support both
+  // representations during integration, preferring the exact raw bytes.
+  const payloads = [String(rawBody)];
+  if (canonicalBody && String(canonicalBody) !== String(rawBody)) payloads.push(String(canonicalBody));
   let matched = false;
   for (const secret of secrets) {
-    const expected = Buffer.from(crypto.createHmac('sha512', secret).update(rawBody).digest('hex'));
-    const comparable = expected.length === supplied.length;
-    const equal = comparable && crypto.timingSafeEqual(expected, supplied);
-    // Evaluate every configured candidate; do not short-circuit on the first match.
-    matched = Boolean(equal || matched);
+    for (const payload of payloads) {
+      const expected = Buffer.from(crypto.createHmac('sha512', secret).update(payload).digest('hex'));
+      const comparable = expected.length === supplied.length;
+      const equal = comparable && crypto.timingSafeEqual(expected, supplied);
+      // Evaluate every configured candidate; do not short-circuit on the first match.
+      matched = Boolean(equal || matched);
+    }
   }
   return matched;
 }
