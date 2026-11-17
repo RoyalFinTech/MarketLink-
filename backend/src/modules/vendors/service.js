@@ -306,9 +306,14 @@ async function getAnalytics(vendorId, { period = '30d' } = {}) {
     // Overall summary
     query(
       `SELECT
-         count(*)                                    AS total_orders,
-         coalesce(sum(o.total), 0)                  AS total_revenue,
-         coalesce(avg(o.total), 0)                  AS avg_order_value,
+         count(*) AS total_orders,
+         coalesce(sum(o.total) FILTER (WHERE o.status='delivered' AND o.payment_status='confirmed'),0) AS total_revenue,
+         coalesce(avg(o.total) FILTER (WHERE o.status='delivered' AND o.payment_status='confirmed'),0) AS avg_order_value,
+         coalesce(sum(o.vendor_payout) FILTER (WHERE o.status='delivered' AND o.payment_status='confirmed'),0) AS vendor_earnings,
+         coalesce(sum(o.vendor_payout) FILTER (WHERE o.status='delivered' AND o.payment_status='confirmed'
+           AND EXISTS (SELECT 1 FROM commission_records c WHERE c.order_id=o.id AND c.status='pending')),0) AS pending_vendor_settlement,
+         coalesce(sum(o.vendor_payout) FILTER (WHERE o.status='delivered' AND o.payment_status='confirmed'
+           AND EXISTS (SELECT 1 FROM commission_records c WHERE c.order_id=o.id AND c.status='paid')),0) AS settled_vendor_earnings,
          count(*) FILTER (WHERE o.status='delivered') AS completed_orders,
          count(*) FILTER (WHERE o.status='cancelled') AS cancelled_orders
        FROM orders o
