@@ -2329,15 +2329,21 @@
   async function submitCodRemittance(paymentId,deliveryId){
     if(!apiOk()){toast('Rider sign-in required.','error');return;}
     if(!paymentId||!deliveryId){toast('The COD payment reference is missing. Refresh your delivery history.','error');return;}
-    var refEl=G('ml-cod-ref-'+deliveryId),methodEl=G('ml-cod-method-'+deliveryId),proofEl=G('ml-cod-proof-'+deliveryId);
+    var refEl=G('ml-cod-ref-'+deliveryId),methodEl=G('ml-cod-method-'+deliveryId),proofEl=G('ml-cod-proof-file-'+deliveryId);
     var providerReference=String(refEl&&refEl.value||'').trim();
-    var proofUrl=String(proofEl&&proofEl.value||'').trim();
+    var receiptFile=proofEl&&proofEl.files&&proofEl.files[0];
     if(providerReference.length<4){toast('Enter the deposit receipt reference from Wave or AfriMoney.','error');if(refEl)refEl.focus();return;}
-    if(proofUrl&&!/^https:\/\//i.test(proofUrl)){toast('The optional proof link must begin with https://.','error');if(proofEl)proofEl.focus();return;}
+    if(!receiptFile){toast('Upload the Wave or AfriMoney receipt image or PDF before submitting.','error');if(proofEl)proofEl.focus();return;}
+    if(!['image/jpeg','image/png','application/pdf'].includes(receiptFile.type)){toast('Receipt must be a JPG, PNG or PDF file.','error');return;}
+    if(receiptFile.size>10*1024*1024){toast('Receipt file must be 10 MB or smaller.','error');return;}
     var button=refEl&&refEl.parentNode&&refEl.parentNode.querySelector('button');
-    if(button){button.disabled=true;button.textContent='Submitting…';}
+    if(button){button.disabled=true;button.textContent='Uploading receipt…';}
     try{
-      await ML_API.payments.submitCodRemittance(paymentId,{providerReference:providerReference,depositMethod:methodEl&&methodEl.value||'wave',proofUrl:proofUrl||undefined});
+      var uploaded=await ML_API.uploads.upload(receiptFile,'cod-remittance-document');
+      var proofFileId=uploaded&&uploaded.record&&uploaded.record.id;
+      if(!proofFileId)throw {error:'The receipt upload did not return a secure file reference. Please try again.'};
+      if(button)button.textContent='Submitting deposit…';
+      await ML_API.payments.submitCodRemittance(paymentId,{providerReference:providerReference,depositMethod:methodEl&&methodEl.value||'wave',proofFileId:proofFileId});
       toast('Cash deposit reference submitted. MarketLink will verify it before releasing the order settlement.','success');
       S._riderLiveLoaded=false;
       await loadRiderLiveData();
