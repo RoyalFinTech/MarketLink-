@@ -2540,6 +2540,7 @@
           if(x.commission_status)detail.push('Commission: '+x.commission_status);
           if(x.provider_status)detail.push('Provider: '+x.provider_status);
           if(x.difference!=null)detail.push('Difference: '+money(x.difference));
+          if(x.has_no_ledger_entries)detail.push('No ledger transactions recorded');
           if(x.duplicate_count)detail.push('Duplicates: '+x.duplicate_count);
           ['vendor_credit_missing','rider_credit_missing','rider_earning_record_missing','affiliate_credit_missing','platform_earning_missing','platform_earning_mismatch'].forEach(function(k){if(x[k])detail.push(k.replace(/_/g,' '));});
           var retryAction=item[0]==='pendingSettlement'&&x.id
