@@ -130,6 +130,20 @@ router.post('/support-tickets/:id/replies', authenticate, authorize(...ADMIN), [
   param('id').isUUID(), body('body').trim().notEmpty().isLength({max:4000}),
 ], validate, ctrl.replySupportTicket);
 
+router.get('/conversations', authenticate, authorize(...ADMIN), [
+  query('page').optional().isInt({min:1}),
+  query('limit').optional().isInt({min:1,max:100}),
+  query('search').optional().isString().isLength({max:120}),
+], validate, ctrl.conversations);
+router.get('/conversations/:id/messages', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(),
+  query('limit').optional().isInt({min:1,max:100}),
+], validate, ctrl.conversationMessages);
+router.post('/conversations/:id/messages', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(),
+  body('body').trim().notEmpty().isLength({max:4000}),
+], validate, ctrl.sendConversationMessage);
+
 router.get('/users/:id/profile', authenticate, authorize(...ADMIN),
   [param('id').isUUID()], validate, ctrl.crmProfile);
 router.post('/users/:id/notes', authenticate, authorize(...ADMIN), [
