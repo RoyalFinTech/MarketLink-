@@ -240,13 +240,53 @@
     }, true);
   }
 
+  function unlockAdminLoginViewport() {
+    var login = document.getElementById('scr-admin-login');
+    if (!login || !login.classList.contains('active')) return;
+    var app = document.getElementById('app');
+    var html = document.documentElement;
+    var body = document.body;
+    // The shared customer shell locks #app to 100vh with overflow:hidden.
+    // Do not rely on :has() support in mobile WebViews: set actual scroll
+    // containers inline while the Admin login is the active screen.
+    if (app) {
+      app.style.setProperty('position', 'relative', 'important');
+      app.style.setProperty('inset', 'auto', 'important');
+      app.style.setProperty('height', 'auto', 'important');
+      app.style.setProperty('min-height', '100dvh', 'important');
+      app.style.setProperty('max-height', 'none', 'important');
+      app.style.setProperty('overflow-x', 'hidden', 'important');
+      app.style.setProperty('overflow-y', 'visible', 'important');
+    }
+    login.style.setProperty('position', 'relative', 'important');
+    login.style.setProperty('inset', 'auto', 'important');
+    login.style.setProperty('width', '100%', 'important');
+    login.style.setProperty('height', 'auto', 'important');
+    login.style.setProperty('min-height', '100dvh', 'important');
+    login.style.setProperty('max-height', 'none', 'important');
+    login.style.setProperty('overflow', 'visible', 'important');
+    login.style.setProperty('touch-action', 'pan-y', 'important');
+    [html, body].forEach(function (node) {
+      if (!node) return;
+      node.style.setProperty('height', 'auto', 'important');
+      node.style.setProperty('min-height', '100%', 'important');
+      node.style.setProperty('max-height', 'none', 'important');
+      node.style.setProperty('overflow-x', 'hidden', 'important');
+      node.style.setProperty('overflow-y', 'auto', 'important');
+      node.style.setProperty('touch-action', 'pan-y', 'important');
+    });
+  }
+
   function openAdmin() {
     buildAdminLogin();
     if (typeof window.openAdminLogin === 'function') {
       try {
         window.openAdminLogin();
         var opened = document.getElementById('scr-admin-login');
-        if (opened && opened.classList.contains('active')) return true;
+        if (opened && opened.classList.contains('active')) {
+          unlockAdminLoginViewport();
+          return true;
+        }
       } catch (error) {
         // Fall through to the isolated Admin-only screen activation below.
       }
@@ -261,6 +301,7 @@
       login.style.setProperty('pointer-events', 'auto', 'important');
       login.removeAttribute('aria-hidden');
       login.classList.add('active');
+      unlockAdminLoginViewport();
       return true;
     }
     return false;
@@ -774,6 +815,10 @@
     installAdminTabIsolation();
     if (document.getElementById('scr-app') && document.getElementById('scr-app').classList.contains('active')) ensureAdminWorkspace();
     buildAdminLogin();
+    if (document.getElementById('scr-admin-login') &&
+        document.getElementById('scr-admin-login').classList.contains('active')) {
+      unlockAdminLoginViewport();
+    }
     normalizeAdminAuthResponse();
     window.goOnboard = openAdmin;
     window.goAuth = openAdmin;
