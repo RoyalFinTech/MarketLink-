@@ -8,6 +8,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
   if(!['cod','wallet','wave','afrimoney','qmoney','modempay'].includes(paymentMethod))throw new AppError('Choose an enabled MarketLink payment method.',400,'UNSUPPORTED_PAYMENT_METHOD');
   if (!Array.isArray(items) || !items.length) throw new AppError('Order must contain at least one item.',400,'EMPTY_ORDER');
   if (!vendorId) throw new AppError('Vendor is required.',400,'VENDOR_REQUIRED');
+  if (!deliveryAddressId) throw new AppError('Select a saved delivery address before placing your order.',400,'DELIVERY_ADDRESS_REQUIRED');
   for (const item of items) {
     if (!item || !item.productId || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
       throw new AppError('Each order item must have a valid product and positive integer quantity.',400,'INVALID_ORDER_ITEM');
