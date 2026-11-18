@@ -34,4 +34,11 @@ describe('product category filtering',()=>{
   expect(query.mock.calls[0][0]).toContain('WITH RECURSIVE category_branch');
   expect(query.mock.calls[0][0]).toContain('JOIN category_branch parent ON child.parent_id=parent.id');
  });
+ test('clamps invalid catalog pagination before querying',async()=>{
+  query.mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[{count:'0'}]});
+  const result=await list({page:-5,limit:-2});
+  expect(result).toMatchObject({page:1,limit:1});
+  expect(query.mock.calls[0][1]).toEqual([1,0]);
+ });
+
 });
