@@ -149,6 +149,17 @@
   window.__ML_ADMIN_AUDIT=adminAuditView;
   window.__ML_ADMIN_SETTINGS=adminSettingsView;
 
+  async function adminPromotionsView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Promotion requests</h3><p>Loading vendor requests…</p></div>';
+    try{
+      var r=await ML_API.promotions.adminList({page:1,limit:50}),d=r.data,rows=Array.isArray(d)?d:(d&&(d.items||d.requests))||[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Promotion requests</h3><button onclick="window.__ML_ADMIN_PROMOTIONS()">Refresh</button></div>'+
+      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">🎫</div><div class="copy"><b>'+adminSafe(x.title||x.business_name||x.vendor_name||'Promotion request')+'</b><span>'+adminSafe(x.status||'pending')+' · '+adminSafe(x.vendor_name||x.business_name||'Vendor')+'</span><small>'+adminSafe(x.created_at?new Date(x.created_at).toLocaleString():'')+'</small></div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No promotion requests</b><span>The live API returned no promotion requests for review.</span></div>')+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Promotion requests unavailable</b><span>'+adminSafe(e.error||e.message||'Could not load promotion requests.')+'</span></div>';}
+  }
+  window.__ML_ADMIN_PROMOTIONS=adminPromotionsView;
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
@@ -157,7 +168,7 @@
       settings: adminSettingsView,
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
-      promotions: function () { if (typeof window.adminGoTo === 'function') window.adminGoTo('promotions'); },
+      promotions: adminPromotionsView,
       analytics: function () { if (api.refreshAdminAnalytics) api.refreshAdminAnalytics(); },
       revenue: function () { if (api.refreshAdminRevenue) api.refreshAdminRevenue(); },
       payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
@@ -203,6 +214,7 @@
       '<div class="ml-admin-side-label">MANAGEMENT</div>' +
       '<button data-ml-admin-route="audit"><span>◷</span>Audit trail</button>' +
       '<button data-ml-admin-route="settings"><span>⚙</span>System settings</button>' +
+      '<button data-ml-admin-route="promotions"><span>✦</span>Promotion requests</button>' +
       '<button data-ml-admin-route="users"><span>♙</span>Users & CRM</button>' +
       '<button data-ml-admin-route="ai"><span>✧</span>AI operations</button>' +
       '</nav><div class="ml-admin-side-foot"><span class="ml-admin-secure-dot"></span> Protected operations<br><small>Powered by Royal FinTech</small></div></aside>' +
