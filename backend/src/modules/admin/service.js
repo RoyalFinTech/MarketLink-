@@ -68,6 +68,40 @@ async function getUsers({ page=1, limit=20, search, role, status }) {
   return { items: rows, total: parseInt(c.count), page: parseInt(page), limit: limit_, totalPages: Math.ceil(parseInt(c.count)/limit_) };
 }
 
+async function grantAdminRole(userId, actor) {
+  const AppError = require('../../middleware/errorHandler').AppError;
+  if (!actor || actor.role !== 'super_admin') {
+    throw new AppError('Only a super administrator can grant administrator access.', 403, 'ADMIN_ROLE_GRANT_FORBIDDEN');
+  }
+  return withTransaction(async (client) => {
+    const { rows:[target] } = await client.query(
+      'SELECT id,full_name,status FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!target) throw new AppError('User not found.', 404, 'USER_NOT_FOUND');
+    if (target.status !== 'active') {
+      throw new AppError('Only active MarketLink accounts can be granted administrator access.', 409, 'ADMIN_ROLE_TARGET_INACTIVE');
+    }
+    const { rows: currentRoles } = await client.query(
+      'SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1 FOR UPDATE OF ur',
+      [userId]);
+    const beforeRoles = currentRoles.map(row => row.name);
+    if (beforeRoles.includes('super_admin') || beforeRoles.includes('admin')) {
+      return { user:{id:target.id,full_name:target.full_name,status:target.status}, roles:beforeRoles, alreadyAssigned:true };
+    }
+    const { rows:[adminRole] } = await client.query(
+      "SELECT id FROM roles WHERE name='admin'");
+    if (!adminRole) throw new AppError('The administrator role is not configured.', 503, 'ADMIN_ROLE_NOT_CONFIGURED');
+    await client.query(
+      'INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2) ON CONFLICT (user_id,role_id) DO NOTHING',
+      [userId,adminRole.id]);
+    const afterRoles = [...beforeRoles,'admin'];
+    await client.query(
+      `INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
+       VALUES ($1,'super_admin','user.admin_role_granted','user',$2,$3,$4)`,
+      [actor.id,userId,JSON.stringify({roles:beforeRoles}),JSON.stringify({roles:afterRoles})]);
+    return { user:{id:target.id,full_name:target.full_name,status:target.status}, roles:afterRoles, alreadyAssigned:false };
+  });
+}
+
 async function suspendUser(userId, reason, actor) {
   return withTransaction(async (client) => {
     if (String(actor.id) === String(userId)) {
@@ -621,4 +655,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
