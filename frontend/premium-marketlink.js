@@ -1641,7 +1641,7 @@
         '<p class="ml-daha-copy">Choose an amount and payment rail. Wave, AfriMoney and QMoney are offered only when enabled by the active merchant payment configuration.</p>'+
         '<label class="ml-field-label" for="ml-daha-deposit-amount">Amount (GMD)</label><input id="ml-daha-deposit-amount" class="ml-daha-input" type="number" min="'+(direct?'1':'10')+'" step="0.01" inputmode="decimal" placeholder="e.g. 250.00">'+
         '<label class="ml-field-label" for="ml-daha-deposit-method">Payment method</label><select id="ml-daha-deposit-method" class="ml-daha-input">'+railOptions+'</select>'+
-        (direct?'<label class="ml-field-label" for="ml-daha-deposit-number">7-digit mobile-money number</label><input id="ml-daha-deposit-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="7" placeholder="e.g. 87XXXXX">':'')+
+        (direct?'<label class="ml-field-label" for="ml-daha-deposit-number">9-digit mobile-money number</label><input id="ml-daha-deposit-number" class="ml-daha-input" type="tel" inputmode="numeric" maxlength="9" placeholder="87••••••• / 86••••••• / 83•••••••">':'')+
         '<button type="button" class="ml-btn ml-btn-primary ml-daha-submit" '+(!configured?'disabled':'')+' onclick="window.ML_Premium.submitDahaDeposit()">Continue to secure deposit →</button>'+
         (!configured?'<div class="ml-wallet-note">Mobile-money deposits are not available yet. Deposits are disabled; your DAHA balance and wallet-funded checkout remain available.</div>':'<div class="ml-wallet-note">Funds are credited only after the backend verifies the signed payment confirmation, transaction reference, amount and GMD currency.</div>')+
         '</section>'+
@@ -1672,7 +1672,7 @@
     var method=String(G('ml-daha-deposit-method')&&G('ml-daha-deposit-method').value||'modempay');
     var accountNumber=String(G('ml-daha-deposit-number')&&G('ml-daha-deposit-number').value||'').replace(/\D/g,'');
     if(!(amount>0)){toast('Enter a valid deposit amount.','error');return;}
-    if(S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&!/^\d{7}$/.test(accountNumber)){toast('Enter the 7-digit mobile-money number.','error');return;}
+    if(S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&!/^(87|86|83)\d{7}$/.test(accountNumber)){toast('Enter the full 9-digit mobile-money number, including its 87, 86 or 83 prefix.','error');return;}
     try{
       var response=await ML_API.wallet.createDeposit({amount:amount,method:method,accountNumber:accountNumber||undefined});
       var data=response&&response.data||response;
