@@ -181,8 +181,9 @@ assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /__ML_A
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /Start direct chat/, 'CRM profile must provide an obvious direct chat control');
 assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
 assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
-assert.match(html, /Gamcel is still using its existing 7-digit number/, 'Phone selector must distinguish Gamcel Phase 1 from migrated nine-digit networks');
-assert.match(premiumJs, /gamcelLegacy\?\!\/\^\\d\{7\}\$\//, 'Admin login must preserve current Gamcel Phase 1 seven-digit compatibility');
+assert.match(html, /Gamcel \(enter full 9 digits\)/, 'Gamcel selector must request all nine national digits');
+assert.match(html, /Enter the full 9-digit Gambian number/, 'Gamcel login and registration must require nine digits');
+assert.match(premiumJs, /if\(!\/\^\\d\{9\}\$\/.test\(phone\)\)/, 'Admin login must require nine national digits for every selected network');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
@@ -198,3 +199,5 @@ assert.match(html, /maxlength="9"[^>]*id="lphone"/, 'Customer login must accept 
 assert.match(html, /maxlength="9"[^>]*id="rphone"/, 'New customer registration must accept nine national digits');
 assert.match(html, /Enter the full 9-digit Gambian mobile number/, 'Customer registration must reject legacy seven-digit numbers');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/service.js'), 'utf8'), /canonicalRegistrationPhone/, 'Backend must enforce nine-digit Gambian numbers for new registrations');
+
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js'), 'utf8'), /if \(digits.length === 9\) return digits;/, 'Phone normalization must accept the complete nine-digit Gambian national format without guessing an unverified prefix');
