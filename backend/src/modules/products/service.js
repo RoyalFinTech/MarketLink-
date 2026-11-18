@@ -2,7 +2,8 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, maxPrice, sort='newest', includeAllStatuses=false }) {
-  const off = (page-1) * Math.min(limit,100), conds = includeAllStatuses ? [] : ["p.status='active'", "v.kyc_status='approved'"], params = []; let pi = 1;
+  const safePage=Math.max(1,Number.parseInt(page,10)||1),safeLimit=Math.min(100,Math.max(1,Number.parseInt(limit,10)||20));
+  const off=(safePage-1)*safeLimit, conds = includeAllStatuses ? [] : ["p.status='active'", "v.kyc_status='approved'"], params = []; let pi = 1;
   if (includeAllStatuses && !vendorId) throw new AppError('Vendor ownership is required to view unpublished products.',403,'FORBIDDEN');
   if (search)     { conds.push(`to_tsvector('english', p.name||' '||coalesce(p.description,'')) @@ plainto_tsquery('english',$${pi++})`); params.push(search); }
   if (categoryId) {
@@ -23,10 +24,10 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
   const orderMap = { newest:'p.created_at DESC', price_asc:'p.price ASC', price_desc:'p.price DESC', top_rated:'p.rating_avg DESC' };
   const ob = orderMap[sort]||'p.created_at DESC', wh = conds.length ? 'WHERE '+conds.join(' AND ') : '';
   const [d,c] = await Promise.all([
-    query(`SELECT p.id,p.vendor_id,p.name,p.slug,p.price,p.compare_at_price,p.status,p.rating_avg,p.rating_count,p.sold_count,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,(SELECT image_url FROM product_images WHERE product_id=p.id AND is_primary=TRUE LIMIT 1) AS primary_image,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL ${wh} ORDER BY ${ob} LIMIT $${pi++} OFFSET $${pi++}`, [...params, limit, off]),
+    query(`SELECT p.id,p.vendor_id,p.name,p.slug,p.price,p.compare_at_price,p.status,p.rating_avg,p.rating_count,p.sold_count,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,(SELECT image_url FROM product_images WHERE product_id=p.id AND is_primary=TRUE LIMIT 1) AS primary_image,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL ${wh} ORDER BY ${ob} LIMIT $${pi++} OFFSET $${pi++}`, [...params, safeLimit, off]),
     query(`SELECT count(*) FROM products p LEFT JOIN vendors v ON v.user_id=p.vendor_id ${wh}`, params),
   ]);
-  return { items: d.rows, total: parseInt(c.rows[0].count), page, limit, totalPages: Math.ceil(parseInt(c.rows[0].count)/limit) };
+  return { items: d.rows, total: parseInt(c.rows[0].count), page:safePage, limit:safeLimit, totalPages: Math.ceil(parseInt(c.rows[0].count)/safeLimit) };
 }
 async function getById(id) {
   const { rows } = await query(`SELECT p.*,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL WHERE p.id=$1 AND p.status='active' AND v.kyc_status='approved'`, [id]);
