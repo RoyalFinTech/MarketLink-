@@ -236,3 +236,11 @@ assert.match(authService, /const types=\['customer'\]/, 'Public registration mus
 assert.doesNotMatch(authService, /Array\.isArray\(userType\).*userType/, 'Client-supplied userType must never grant privileged roles during public registration');
 assert.match(premiumJs, /openstreetmap\.org\/export\/embed\.html/, 'Customer order tracking must render an in-page live rider map when a fresh GPS ping exists');
 assert.match(premiumJs, /title="Live rider location map"/, 'Live rider map must have an accessible title');
+
+const productService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/service.js'), 'utf8');
+assert.match(productService, /conds = includeAllStatuses \? \[\] : \["p\.status='active'", "v\.kyc_status='approved'"\]/, 'Public product catalog must exclude products from vendors awaiting approval');
+assert.match(productService, /WHERE p\.id=\$1 AND p\.status='active' AND v\.kyc_status='approved'/, 'Public product detail lookup must exclude products from vendors awaiting approval');
+const orderService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/orders/service.js'), 'utf8');
+assert.match(orderService, /JOIN vendors v ON v\.user_id=p\.vendor_id WHERE p\.id=\$1 FOR UPDATE OF p/, 'Checkout must lock the product row while checking vendor approval');
+assert.match(orderService, /p\.vendor_kyc_status!=='approved'/, 'Checkout must reject products from unapproved vendors even if a client knows the product ID');
+
