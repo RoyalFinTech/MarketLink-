@@ -172,6 +172,10 @@ async function getReports({ type, startDate, endDate }) {
     return rows;
   }
 
+
+  throw require('../../middleware/errorHandler').AppError('Unknown report type. Use: revenue, vendors, riders', 400, 'INVALID_REPORT_TYPE');
+}
+
 async function getAffiliateDirectory({page=1,limit=50,search}={}) {
   const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||50,1),100),offset=(page_-1)*limit_;
   const params=[],where=[];
@@ -188,9 +192,6 @@ async function getAffiliateDirectory({page=1,limit=50,search}={}) {
     ORDER BY a.created_at DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,[...params,limit_,offset]);
   const {rows:[count]}=await query(`SELECT count(*)::int AS total FROM affiliates a JOIN users u ON u.id=a.user_id ${whereSql}`,params);
   return {items:rows,total:Number(count.total||0),page:page_,limit:limit_,totalPages:Math.ceil(Number(count.total||0)/limit_)};
-}
-
-  throw require('../../middleware/errorHandler').AppError('Unknown report type. Use: revenue, vendors, riders', 400, 'INVALID_REPORT_TYPE');
 }
 
 
