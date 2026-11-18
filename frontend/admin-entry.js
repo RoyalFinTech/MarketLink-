@@ -821,26 +821,16 @@
   }
 
   function enablePinAutofillAndSubmit() {
+    // Never submit automatically when the PIN reaches four digits.
+    // Mobile keyboards/autofill may dispatch input/change before the user
+    // has finished reviewing the phone/network fields. Require explicit tap
+    // on Sign in or deliberate Enter from the PIN field.
     var pin = document.getElementById('admin-password');
-    if (!pin || pin.dataset.mlAutoSubmit === '1') return;
-    pin.dataset.mlAutoSubmit = '1';
-    var busy = false;
-    function maybeSubmit() {
-      var value = String(pin.value || '');
-      if (busy || !/^\d{4}$/.test(value)) return;
-      busy = true;
-      Promise.resolve().then(function () {
-        if (typeof window.doAdminLogin === 'function') window.doAdminLogin();
-        window.setTimeout(function () {
-          var button = document.getElementById('admin-lbtn');
-          if (button && !button.disabled) busy = false;
-          else window.setTimeout(function () { busy = false; }, 12000);
-        }, 1200);
-      });
+    if (pin) {
+      pin.setAttribute('autocomplete', 'off');
+      pin.setAttribute('inputmode', 'numeric');
+      pin.setAttribute('maxlength', '4');
     }
-    pin.addEventListener('input', maybeSubmit);
-    pin.addEventListener('change', maybeSubmit);
-    window.setTimeout(maybeSubmit, 500);
   }
 
   function showAdminBootDiagnostic(error) {
