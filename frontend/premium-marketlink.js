@@ -498,56 +498,67 @@
       toast('Admin session requires backend sign-in.','error');
       return;
     }
+    var loadToken=String(Date.now())+'-'+String(Math.random()).slice(2);
+    root.setAttribute('data-admin-load-token',loadToken);
     root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">MarketLink Operations</div><div class="ml-hero-title">Opening Admin control center…</div><div class="ml-hero-sub">Your account is authenticated. Loading live platform information.</div><div class="ml-loading" role="status" aria-live="polite">Connecting to production records…</div></div>';
     try{
+      // The core dashboard is the critical path. Render it as soon as its
+      // authenticated metrics arrive; optional COD/remittance queues must not
+      // hold the entire Admin portal behind secondary requests.
       var r=await ML_API.admin.dashboard(),d=r.data||{},s=d.stats||{},p=d.pendingApprovals||{};
       var orders=Array.isArray(d.recentOrders)?d.recentOrders:[],vendors=Array.isArray(d.topVendors)?d.topVendors:[];
-      var codPayments=[],codRemittances=[],codQueueErrorMessage=null,remittanceQueueErrorMessage=null;
-      var queueResults=await Promise.all([
-        ML_API.payments.pendingCod({page:1,limit:30}).then(function(response){return {kind:'cod',data:response&&response.data};}).catch(function(error){return {kind:'cod-error',error:error};}),
-        ML_API.payments.codRemittances({page:1,limit:50,status:'submitted'}).then(function(response){return {kind:'remittance',data:response&&response.data};}).catch(function(error){return {kind:'remittance-error',error:error};})
-      ]);
-      queueResults.forEach(function(result){
-        if(result.kind==='cod')codPayments=normalizeProducts(result.data);
-        else if(result.kind==='remittance')codRemittances=normalizeProducts(result.data);
-        else if(result.kind==='cod-error')codQueueErrorMessage=result.error.error||result.error.message||'The COD payment queue could not be loaded.';
-        else if(result.kind==='remittance-error')remittanceQueueErrorMessage=result.error.error||result.error.message||'The rider cash deposit queue could not be loaded.';
-      });
-      var codRemittanceHtml='<div class="ml-section-head"><h3>Rider cash deposit verification</h3><button onclick="window.ML_Premium.adminRefresh()">Refresh</button></div>'+
-        '<div class="ml-wallet-note" style="margin:8px 0 12px;padding:12px;border-radius:12px">Compare each submitted receipt reference against the official MarketLink Wave or AfriMoney collection account statement before verifying. Verification confirms the payment and starts the existing order settlement.</div>'+
-        (remittanceQueueErrorMessage?'<div class="ml-empty"><b>Cash deposit queue unavailable</b><span>'+esc(remittanceQueueErrorMessage)+'</span></div>':(codRemittances.length?'<div class="ml-profile-card">'+codRemittances.map(function(r){
-          var proof=r.proof_url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:5px 8px;margin-top:4px" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(r.proof_url)+'&quot;,&quot;COD deposit receipt&quot;)">View receipt ↗</button>':'<span>Receipt not attached</span>';
-          return '<div class="ml-profile-row"><div class="ico">🏦</div><div class="copy"><b>'+esc(r.order_number||r.order_id)+' · '+money(r.amount||0)+'</b><span>'+esc(r.rider_name||'Rider')+' · '+esc(String(r.deposit_method||'wave').toUpperCase())+' · Ref: '+esc(r.provider_reference||'—')+'</span><small>'+esc(r.vendor_name||'Vendor')+' · '+esc(r.status||'submitted')+' · '+proof+'</small></div><div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:7px" onclick="window.ML_Premium.reviewCodRemittance(\''+esc(r.id)+'\',\'verified\')">Verify deposit</button><button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:7px" onclick="window.ML_Premium.reviewCodRemittance(\''+esc(r.id)+'\',\'rejected\')">Reject</button></div></div>';
-        }).join('')+'</div>':'<div class="ml-empty"><b>No rider cash deposits awaiting verification</b><span>Submitted Wave or AfriMoney references will appear here after riders complete cash-on-delivery jobs.</span></div>'));
       root.innerHTML='<div class="ml-premium-home" style="padding-top:18px"><div class="ml-home-top"><div><div class="ml-eyebrow">MarketLink Operations</div><div class="ml-hero-title">Admin control center</div><div class="ml-hero-sub">Live platform metrics from the production database. No preview records are shown.</div></div><div class="ml-live-dot">Backend connected</div><button class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.reviewPromotions()">🎫 Promotion requests</button></div>'+
       '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Active customers</div><div class="ml-stat-value">'+Number(s.activeCustomers||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Approved vendors</div><div class="ml-stat-value">'+Number(s.approvedVendors||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Online riders</div><div class="ml-stat-value">'+Number(s.onlineRiders||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">30d revenue</div><div class="ml-stat-value">'+money(s.revenue30d||0)+'</div></div></div>'+
-      '<div class="ml-promo-strip"><div class="ml-promo"><strong>Vendor approvals</strong><span>'+Number(p.pending_vendors||0)+' pending applications require review.</span><button class="ml-btn ml-btn-secondary" style="margin-top:9px" onclick="window.ML_Premium.adminApprovals(\'vendor\')">Review vendors</button></div><div class="ml-promo"><strong>Rider approvals</strong><span>'+Number(p.pending_riders||0)+' pending rider applications require review.</span><button class="ml-btn ml-btn-secondary" style="margin-top:9px" onclick="window.ML_Premium.adminApprovals(\'rider\')">Review riders</button></div><div class="ml-promo"><strong>Support</strong><span>'+Number(p.open_tickets||0)+' open support tickets in the production database.</span></div></div>'+
+      '<div class="ml-promo-strip"><div class="ml-promo"><strong>Vendor approvals</strong><span>'+Number(p.pending_vendors||0)+' pending applications require review.</span><button class="ml-btn ml-btn-secondary" style="margin-top:9px" onclick="window.ML_Premium.adminApprovals(\'vendor\')">Review vendors</button></div><div class="ml-promo"><strong>Rider approvals</strong><span>'+Number(p.pending_riders||0)+' pending applications require review.</span><button class="ml-btn ml-btn-secondary" style="margin-top:9px" onclick="window.ML_Premium.adminApprovals(\'rider\')">Review riders</button></div><div class="ml-promo"><strong>Support</strong><span>'+Number(p.open_tickets||0)+' open support tickets in the production database.</span></div></div>'+
       '<div class="ml-section-head"><h3>Financial reconciliation</h3><button onclick="window.ML_Premium.refreshFinancialReconciliation()">Open live audit</button></div>'+
       '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px">Read-only checks for settlement gaps, missing wallet credits, duplicate references, payout exceptions and wallet/ledger differences.</div>'+
       '<div class="ml-section-head"><h3>Recent orders</h3><button onclick="window.ML_Premium.adminRefresh()">Refresh</button></div>'+
       (orders.length?'<div class="ml-profile-card">'+orders.map(function(o){return '<div class="ml-profile-row"><div class="ico">🛒</div><div class="copy"><b>'+esc(o.order_number||o.id)+'</b><span>'+esc(o.customer_name||'Customer')+' · '+esc(o.vendor_name||'Vendor')+' · '+money(o.total||0)+'</span></div><span style="font-size:10px;color:#42D2C9">'+esc(o.status||'')+'</span></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No orders yet</b><span>The production database currently has no recent orders.</span></div>')+
-      '<div class="ml-section-head"><h3>Pay on Delivery reconciliation</h3><button onclick="window.ML_Premium.adminRefresh()">Refresh</button></div>'+
+      '<div id="ml-admin-cod-queue"><div class="ml-section-head"><h3>Pay on Delivery reconciliation</h3></div><div class="ml-loading">Loading COD reconciliation separately…</div></div>'+
+      '<div id="ml-admin-remittance-queue"><div class="ml-section-head"><h3>Rider cash deposit verification</h3></div><div class="ml-loading">Loading rider deposits separately…</div></div>'+
+      '<div class="ml-section-head"><h3>Top vendors</h3></div>'+
+      (vendors.length?'<div class="ml-profile-card">'+vendors.map(function(v){return '<div class="ml-profile-row"><div class="ico">🏪</div><div class="copy"><b>'+esc(v.business_name||'Vendor')+'</b><span>'+Number(v.total_sales||0)+' sales · '+money(v.total_revenue||0)+'</span></div><span style="color:#FFD778">★ '+Number(v.rating_avg||0).toFixed(1)+'</span></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No approved vendors yet</b><span>Vendor performance will appear here after real vendors are approved.</span></div>')+
+      '<div style="display:flex;gap:8px;margin-top:14px"><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="window.ML_Premium.adminUsers()">Users</button><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="adminLogout()">Sign out</button></div></div>';
+      // Fire-and-render: this work is deliberately not awaited by sign-in or
+      // the main dashboard. A slow optional endpoint cannot block navigation.
+      loadAdminFinancialQueues(root,loadToken);
+    }catch(e){
+      var message=e&&(e.error||e.message)||'Could not load the Admin dashboard.';
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Admin dashboard could not finish loading</b><span>'+esc(message)+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.adminRefresh()">Retry dashboard</button></div></div>';
+      toast(message,'error');
+    }
+  }
+  async function loadAdminFinancialQueues(root,loadToken){
+    var codSlot=G('ml-admin-cod-queue'),remitSlot=G('ml-admin-remittance-queue');
+    if(!codSlot||!remitSlot)return;
+    var results=await Promise.all([
+      ML_API.payments.pendingCod({page:1,limit:30}).then(function(response){return {kind:'cod',data:response&&response.data};}).catch(function(error){return {kind:'cod-error',error:error};}),
+      ML_API.payments.codRemittances({page:1,limit:50,status:'submitted'}).then(function(response){return {kind:'remittance',data:response&&response.data};}).catch(function(error){return {kind:'remittance-error',error:error};})
+    ]);
+    if(!root||root.getAttribute('data-admin-load-token')!==loadToken)return;
+    var cod=results[0],remit=results[1];
+    var codPayments=cod.kind==='cod'?normalizeProducts(cod.data):[];
+    var codRemittances=remit.kind==='remittance'?normalizeProducts(remit.data):[];
+    var codError=cod.kind==='cod-error'?(cod.error&&(cod.error.error||cod.error.message)||'The COD payment queue could not be loaded.'):'';
+    var remitError=remit.kind==='remittance-error'?(remit.error&&(remit.error.error||remit.error.message)||'The rider cash deposit queue could not be loaded.'):'';
+    codSlot=G('ml-admin-cod-queue');remitSlot=G('ml-admin-remittance-queue');
+    if(codSlot)codSlot.innerHTML='<div class="ml-section-head"><h3>Pay on Delivery reconciliation</h3><button onclick="window.ML_Premium.adminRefresh()">Refresh</button></div>'+
       '<div class="ml-wallet-note" style="margin:8px 0 12px;padding:12px;border-radius:12px">Only confirm cash after an Admin has verified that the rider/vendor handed over the collected amount. This queue includes delivered orders only; wallet settlement remains blocked until payment is confirmed.</div>'+
-      (codQueueErrorMessage?'<div class="ml-empty"><b>COD payment queue unavailable</b><span>'+esc(codQueueErrorMessage)+'</span></div>':(codPayments.length?'<div class="ml-profile-card">'+codPayments.map(function(c){
-        var paymentId=esc(c.payment_id||'');
-        var paymentState=String(c.payment_record_status||'pending').toLowerCase();
-        var alreadyConfirmed=paymentState==='confirmed';
+      (codError?'<div class="ml-empty"><b>COD payment queue unavailable</b><span>'+esc(codError)+'</span></div>':(codPayments.length?'<div class="ml-profile-card">'+codPayments.map(function(c){
+        var paymentId=esc(c.payment_id||''),paymentState=String(c.payment_record_status||'pending').toLowerCase(),alreadyConfirmed=paymentState==='confirmed';
         var remittanceStatus=String(c.remittance_status||'').toLowerCase(),remittanceVerified=remittanceStatus==='verified';
         var riderLabel=c.rider_name||'Rider not assigned';
         var actionLabel=remittanceVerified?(alreadyConfirmed?'Retry wallet settlement':'Complete payment confirmation'):remittanceStatus==='submitted'?'Deposit submitted · Review above':remittanceStatus==='rejected'?'Deposit rejected · Rider must resubmit':'Awaiting rider deposit';
         var stateLabel=alreadyConfirmed?'Cash confirmed · settlement needs retry':remittanceVerified?'Deposit verified · payment confirmation pending':remittanceStatus==='submitted'?'Rider deposit submitted · Admin verification pending':remittanceStatus==='rejected'?'Previous deposit reference rejected':'Delivered · waiting for rider deposit';
         var action=alreadyConfirmed?'window.ML_Premium.confirmCodPayment(&quot;'+paymentId+'&quot;,&quot;'+paymentState+'&quot;)':'window.ML_Premium.reviewCodRemittance(&quot;'+esc(c.remittance_id||'')+'&quot;,\'verified\')';
         return '<div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>'+esc(c.order_number||c.order_id||'COD order')+' · '+money(c.amount||c.total||0)+'</b><span>'+esc(c.customer_name||'Customer')+' → '+esc(c.vendor_name||'Vendor')+' · '+esc(riderLabel)+'</span><small>'+stateLabel+'</small></div>'+(remittanceVerified?'<button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:8px 10px" onclick="'+action+'">'+actionLabel+'</button>':'<span style="font-size:10px;color:#B8C8D2">'+actionLabel+'</span>')+'</div>';
-      }).join('')+'</div>':'<div class="ml-empty"><b>No delivered COD payments awaiting confirmation</b><span>New cash-on-delivery orders will appear here after delivery is marked complete.</span></div>'))+
-      codRemittanceHtml+
-            '<div class="ml-section-head"><h3>Top vendors</h3></div>'+
-      (vendors.length?'<div class="ml-profile-card">'+vendors.map(function(v){return '<div class="ml-profile-row"><div class="ico">🏪</div><div class="copy"><b>'+esc(v.business_name||'Vendor')+'</b><span>'+Number(v.total_sales||0)+' sales · '+money(v.total_revenue||0)+'</span></div><span style="color:#FFD778">★ '+Number(v.rating_avg||0).toFixed(1)+'</span></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No approved vendors yet</b><span>Vendor performance will appear here after real vendors are approved.</span></div>')+
-      '<div style="display:flex;gap:8px;margin-top:14px"><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="window.ML_Premium.adminUsers()">Users</button><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="adminLogout()">Sign out</button></div></div>';
-    }catch(e){
-      var message=e&&(e.error||e.message)||'Could not load the Admin dashboard.';
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Admin dashboard could not finish loading</b><span>'+esc(message)+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.adminRefresh()">Retry dashboard</button></div></div>';
-      toast(message,'error');
-    }
+      }).join('')+'</div>':'<div class="ml-empty"><b>No delivered COD payments awaiting confirmation</b><span>New cash-on-delivery orders will appear here after delivery is marked complete.</span></div>'));
+    if(remitSlot)remitSlot.innerHTML='<div class="ml-section-head"><h3>Rider cash deposit verification</h3><button onclick="window.ML_Premium.adminRefresh()">Refresh</button></div>'+
+      '<div class="ml-wallet-note" style="margin:8px 0 12px;padding:12px;border-radius:12px">Compare each submitted receipt reference against the official MarketLink Wave or AfriMoney collection account statement before verifying. Verification confirms the payment and starts the existing order settlement.</div>'+
+      (remitError?'<div class="ml-empty"><b>Cash deposit queue unavailable</b><span>'+esc(remitError)+'</span></div>':(codRemittances.length?'<div class="ml-profile-card">'+codRemittances.map(function(r){
+        var proof=r.proof_url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:5px 8px;margin-top:4px" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(r.proof_url)+'&quot;,&quot;COD deposit receipt&quot;)">View receipt ↗</button>':'<span>Receipt not attached</span>';
+        return '<div class="ml-profile-row"><div class="ico">🏦</div><div class="copy"><b>'+esc(r.order_number||r.order_id)+' · '+money(r.amount||0)+'</b><span>'+esc(r.rider_name||'Rider')+' · '+esc(String(r.deposit_method||'wave').toUpperCase())+' · Ref: '+esc(r.provider_reference||'—')+'</span><small>'+esc(r.vendor_name||'Vendor')+' · '+esc(r.status||'submitted')+' · '+proof+'</small></div><div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:7px" onclick="window.ML_Premium.reviewCodRemittance(\''+esc(r.id)+'\',\'verified\')">Verify deposit</button><button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:7px" onclick="window.ML_Premium.reviewCodRemittance(\''+esc(r.id)+'\',\'rejected\')">Reject</button></div></div>';
+      }).join('')+'</div>':'<div class="ml-empty"><b>No rider cash deposits awaiting verification</b><span>Submitted Wave or AfriMoney references will appear here after riders complete cash-on-delivery jobs.</span></div>'));
   }
   async function confirmCodPayment(paymentId,paymentState){
     if(!apiOk()){toast('Admin session required.','error');return;}
