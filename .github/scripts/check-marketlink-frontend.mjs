@@ -184,6 +184,8 @@ assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all ni
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
 assert.match(premiumJs, /ml-daha-deposit-number[\s\S]*?maxlength="9"/, 'DAHA mobile-money deposit must request the full nine-digit number');
+assert.match(premiumJs, /id="ml-checkout-mobile-number"[\s\S]*?maxlength="9"/, 'Direct customer checkout must request the full nine-digit Gambian mobile number');
+assert.match(premiumJs, /Enter the complete 9-digit Gambian mobile-money number/, 'Direct customer checkout must validate the national nine-digit number');
 assert.match(premiumJs, /\^\(87\|86\|83\)\\d\{7\}\$/, 'DAHA mobile-money input must validate its two-digit network prefix plus seven digits');
 assert.match(fs.readFileSync(path.join(root, 'backend/src/modules/wallets/service.js'), 'utf8'), /nationalAccountNumber\.slice\(2\)/, 'Backend must send the seven subscriber digits to Modem Pay only after validating the full nine-digit national number');
 assert.match(fs.readFileSync(path.join(root, 'backend/src/modules/wallets/routes.js'), 'utf8'), /matches\(\/\^\(87\|86\|83\)\\d\{7\}\//, 'Wallet API must validate full nine-digit Gambian mobile numbers');
