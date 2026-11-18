@@ -69,21 +69,59 @@ async function getUsers({ page=1, limit=20, search, role, status }) {
 }
 
 async function suspendUser(userId, reason, actor) {
-  const { rows:[u] } = await query(`UPDATE users SET status='suspended' WHERE id=$1 RETURNING id,full_name,status`, [userId]);
-  if (!u) throw require('../../middleware/errorHandler').AppError('User not found.', 404, 'USER_NOT_FOUND');
-  await query(`INSERT INTO suspensions (user_id,reason,suspended_by) VALUES ($1,$2,$3)`, [userId,reason,actor.id]);
-  await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES ($1,$2,'user.suspended','user',$3,$4)`,
-    [actor.id,actor.role,userId,JSON.stringify({reason})]);
-  return u;
+  return withTransaction(async (client) => {
+    if (String(actor.id) === String(userId)) {
+      throw new (require('../../middleware/errorHandler').AppError)('Administrators cannot suspend their own account.', 403, 'SELF_SUSPENSION_BLOCKED');
+    }
+    const { rows:[target] } = await client.query(
+      'SELECT id,full_name,status FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!target) throw new (require('../../middleware/errorHandler').AppError)('User not found.', 404, 'USER_NOT_FOUND');
+    const { rows: targetRoles } = await client.query(
+      'SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1', [userId]);
+    const privileged = targetRoles.some(row => ['admin','super_admin'].includes(row.name));
+    if (privileged && actor.role !== 'super_admin') {
+      throw new (require('../../middleware/errorHandler').AppError)('Only a super administrator can suspend another administrator.', 403, 'ADMIN_TARGET_RESTRICTED');
+    }
+    if (targetRoles.some(row => row.name === 'super_admin') && target.status === 'active') {
+      const { rows:[count] } = await client.query(
+        `SELECT count(*)::int AS active_super_admins
+         FROM users u JOIN user_roles ur ON ur.user_id=u.id
+         JOIN roles r ON r.id=ur.role_id
+         WHERE r.name='super_admin' AND u.status='active'`);
+      if (Number(count.active_super_admins) <= 1) {
+        throw new (require('../../middleware/errorHandler').AppError)('The last active super administrator cannot be suspended.', 409, 'LAST_SUPER_ADMIN_PROTECTED');
+      }
+    }
+    const { rows:[u] } = await client.query(
+      `UPDATE users SET status='suspended',updated_at=now() WHERE id=$1 RETURNING id,full_name,status`, [userId]);
+    await client.query('INSERT INTO suspensions (user_id,reason,suspended_by) VALUES ($1,$2,$3)', [userId,reason,actor.id]);
+    await client.query(
+      `INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES ($1,$2,'user.suspended','user',$3,$4)`,
+      [actor.id,actor.role,userId,JSON.stringify({reason})]);
+    return u;
+  });
 }
 
 async function reinstateUser(userId, actor) {
-  const { rows:[u] } = await query(`UPDATE users SET status='active' WHERE id=$1 RETURNING id,full_name,status`, [userId]);
-  if (!u) throw require('../../middleware/errorHandler').AppError('User not found.', 404, 'USER_NOT_FOUND');
-  await query(`UPDATE suspensions SET lifted_at=now() WHERE user_id=$1 AND lifted_at IS NULL`, [userId]);
-  await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id) VALUES ($1,$2,'user.reinstated','user',$3)`,
-    [actor.id,actor.role,userId]);
-  return u;
+  return withTransaction(async (client) => {
+    const { rows:[target] } = await client.query(
+      'SELECT id,full_name FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!target) throw new (require('../../middleware/errorHandler').AppError)('User not found.', 404, 'USER_NOT_FOUND');
+    const { rows: targetRoles } = await client.query(
+      'SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1', [userId]);
+    if (targetRoles.some(row => ['admin','super_admin'].includes(row.name)) && actor.role !== 'super_admin') {
+      throw new (require('../../middleware/errorHandler').AppError)('Only a super administrator can reinstate another administrator.', 403, 'ADMIN_TARGET_RESTRICTED');
+    }
+    const { rows:[u] } = await client.query(
+      `UPDATE users SET status='active',updated_at=now() WHERE id=$1 RETURNING id,full_name,status`, [userId]);
+    await client.query('UPDATE suspensions SET lifted_at=now() WHERE user_id=$1 AND lifted_at IS NULL', [userId]);
+    await client.query(
+      `INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id)
+       VALUES ($1,$2,'user.reinstated','user',$3)`,
+      [actor.id,actor.role,userId]);
+    return u;
+  });
 }
 
 async function getAnalytics({ period='30d' }) {
