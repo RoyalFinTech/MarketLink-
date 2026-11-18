@@ -4554,7 +4554,7 @@ function renderRDash(){
     (S.rDeliveries||[]).filter(function(d){return d.status==='delivered';}).forEach(function(h){
       var cashMethods=S.codRemittanceInstructions&&S.codRemittanceInstructions.methods||{};
       var waveDestination=cashMethods.wave||{},afriDestination=cashMethods.afrimoney||{};
-      var destinationText='Wave: '+(waveDestination.configured?(sanitizeText(waveDestination.accountName)+' · '+sanitizeText(waveDestination.accountNumber)):'Not configured — contact MarketLink Admin')+' | AfriMoney: '+(afriDestination.configured?(sanitizeText(afriDestination.accountName)+' · '+sanitizeText(afriDestination.accountNumber)):'Not configured — contact MarketLink Admin');
+      var destinationText='Wave: '+(waveDestination.configured?(sanitizeText(waveDestination.accountName)+' · '+sanitizeText(waveDestination.accountNumber)):'Pending official account details · Do not transfer yet')+' | AfriMoney: '+(afriDestination.configured?(sanitizeText(afriDestination.accountName)+' · '+sanitizeText(afriDestination.accountNumber)):'Pending official account details · Do not transfer yet');
       var remittanceConfigured=!!(waveDestination.configured||afriDestination.configured);
       var remittanceMethodOptions=(waveDestination.configured?'<option value="wave">Wave deposit</option>':'')+(afriDestination.configured?'<option value="afrimoney">AfriMoney deposit</option>':'')||'<option value="wave" disabled>Collection destination not configured</option>';
       content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.07);margin-bottom:8px;">'+
@@ -4573,7 +4573,7 @@ function renderRDash(){
            '<input id="ml-cod-ref-'+sanitizeText(h.id)+'" type="text" maxlength="120" placeholder="Deposit receipt / transaction reference" style="width:100%;box-sizing:border-box;margin:0 0 7px;padding:10px;border-radius:8px">'+
            '<label for="ml-cod-proof-file-'+sanitizeText(h.id)+'" style="display:block;color:var(--tx);font-size:10px;font-weight:700;margin:2px 0 5px">Upload deposit receipt (JPG, PNG or PDF · max 10 MB)</label>'+
            '<input id="ml-cod-proof-file-'+sanitizeText(h.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;box-sizing:border-box;margin:0 0 8px;padding:9px;border:1px solid rgba(148,163,184,.22);border-radius:8px;color:var(--tx);font-size:10px">'+
-           '<button type="button" class="ml-btn ml-btn-primary" style="width:100%" '+(remittanceConfigured?'':'disabled')+' onclick="window.ML_Premium.submitCodRemittance(\''+sanitizeText(h.paymentId)+'\',\''+sanitizeText(h.id)+'\')">'+(remittanceConfigured?'Submit cash deposit for verification':'Collection account not configured · Contact Admin')+'</button></div>'):'')+'</div>';
+           '<button type="button" class="ml-btn ml-btn-primary" style="width:100%" '+(remittanceConfigured?'':'disabled')+' onclick="window.ML_Premium.submitCodRemittance(\''+sanitizeText(h.paymentId)+'\',\''+sanitizeText(h.id)+'\')">'+(remittanceConfigured?'Submit cash deposit for verification':'Official collection account pending · Do not transfer')+'</button></div>'):'')+'</div>';
     });
     }
 
