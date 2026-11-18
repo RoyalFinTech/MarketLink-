@@ -5,6 +5,18 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { normalizePhone } = require('../../utils/phone');
+function normalizeGambianContact(value, label) {
+  if (value == null || String(value).trim() === '') return null;
+  try {
+    const parsed = normalizePhone(String(value), 'GM');
+    if (!parsed.e164.startsWith('+220') || String(parsed.national).length !== 9) throw new Error('Invalid Gambian mobile number');
+    return parsed.e164;
+  } catch (error) {
+    throw new AppError((label || 'Contact number') + ' must be a valid Gambian mobile number with 9 national digits.', 400, 'INVALID_PHONE');
+  }
+}
+
 
 function auditLog(actor, action, entityId, before, after) {
   return query(
@@ -23,6 +35,8 @@ async function register(userId, data) {
   const { vehicleType, plateNumber, licenseNumber, nationalId, idDocumentUrl,
           licenseDocumentUrl, vehiclePhotoUrl, profilePhotoUrl, emergencyContact, address, deliveryZone,
           mobileNumber, whatsappNumber, latitude, longitude } = data;
+  const normalizedMobileNumber = normalizeGambianContact(mobileNumber, 'Rider mobile number');
+  const normalizedWhatsapp = normalizeGambianContact(whatsappNumber, 'Rider WhatsApp contact');
 
   const { rows: existing } = await query(
     'SELECT user_id FROM riders WHERE user_id = $1', [userId]);
@@ -37,7 +51,7 @@ async function register(userId, data) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE) RETURNING *`,
       [userId, vehicleType || null, plateNumber || null, licenseNumber || null,
        nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null, profilePhotoUrl || null,
-       emergencyContact || null, address || null, deliveryZone || null, mobileNumber || null, whatsappNumber || null, latitude ?? null, longitude ?? null]
+       emergencyContact || null, address || null, deliveryZone || null, normalizedMobileNumber, normalizedWhatsapp, latitude ?? null, longitude ?? null]
     );
 
     // Grant rider role
