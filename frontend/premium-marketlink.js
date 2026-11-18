@@ -2631,29 +2631,21 @@
   }
   async function renderLiveAdminRevenue(){
     var root=G('adash-body');if(!root)return;
-    root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live revenue</div><div class="ml-hero-sub">Loading delivered-order revenue from the production database…</div></div>';
+    root.innerHTML='<div class="ml-premium-home"><h3>MarketLink revenue & marketplace settlements</h3><p>Loading confirmed delivered-order financials…</p></div>';
     try{
-      var r=await ML_API.admin.reports({type:'revenue'}),rows=normalizeProducts(r.data),sum=rows.reduce(function(a,x){return a+Number(x.revenue||0);},0);
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Live revenue</h3><button onclick="window.ML_Premium.refreshAdminRevenue()">Refresh</button></div><div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Delivered-order revenue</div><div class="ml-stat-value">'+money(sum)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Report days</div><div class="ml-stat-value">'+rows.length+'</div></div></div>'+
-      (rows.length?'<div class="ml-profile-card" style="margin-top:12px">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">💰</div><div class="copy"><b>'+esc(String(x.day||'').slice(0,10))+'</b><span>'+Number(x.orders||0)+' delivered order(s) · platform fees '+money(x.platform_fees||0)+'</span></div><strong>'+money(x.revenue||0)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty" style="margin-top:12px"><b>No order activity yet</b><span>No delivered orders were returned for the current report.</span></div>')+'</div>';
-    }catch(e){root.innerHTML='<div class="ml-empty"><b>Live revenue unavailable</b><span>'+esc(e.error||'The backend did not return a revenue report.')+'</span></div>';}
+      var r=await ML_API.admin.reports({type:'revenue'}),rows=normalizeProducts(r.data);
+      var totals=rows.reduce(function(a,x){
+        ['gross_order_value','net_merchandise','platform_gross_commission','affiliate_commission','platform_net_revenue','vendor_payouts','rider_payouts'].forEach(function(k){a[k]+=Number(x[k]||0);});
+        a.orders+=Number(x.orders||0);return a;
+      },{orders:0,gross_order_value:0,net_merchandise:0,platform_gross_commission:0,affiliate_commission:0,platform_net_revenue:0,vendor_payouts:0,rider_payouts:0});
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">FINANCE · CONFIRMED SETTLEMENTS</div><h3>MarketLink revenue & marketplace settlements</h3></div><button onclick="window.ML_Premium.refreshAdminRevenue()">↻ Refresh</button></div>'+
+      '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px"><b>How to read these figures:</b> GMV is customer order value, not MarketLink income. MarketLink gross commission is calculated separately. Affiliate rewards are funded from that commission; platform net revenue is what remains before provider charges, taxes and operating costs. Only delivered orders with confirmed payment are included.</div>'+
+      '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Gross order value (GMV)</div><div class="ml-stat-value">'+money(totals.gross_order_value)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Platform gross commission</div><div class="ml-stat-value">'+money(totals.platform_gross_commission)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Affiliate rewards</div><div class="ml-stat-value">'+money(totals.affiliate_commission)+'</div></div><div class="ml-stat"><div class="ml-stat-label">MarketLink net commission</div><div class="ml-stat-value">'+money(totals.platform_net_revenue)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Vendor wallet allocations</div><div class="ml-stat-value">'+money(totals.vendor_payouts)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Rider wallet allocations</div><div class="ml-stat-value">'+money(totals.rider_payouts)+'</div></div></div>'+
+      '<div class="ml-section-head"><h3>Daily confirmed settlements</h3><span>'+totals.orders+' qualifying orders</span></div>'+
+      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">📊</div><div class="copy"><b>'+esc(String(x.day||'').slice(0,10))+' · '+Number(x.orders||0)+' delivered orders</b><span>GMV '+money(x.gross_order_value||0)+' · Gross commission '+money(x.platform_gross_commission||0)+' · Affiliate '+money(x.affiliate_commission||0)+'</span><small>Vendor '+money(x.vendor_payouts||0)+' · Rider '+money(x.rider_payouts||0)+'</small></div><strong>'+money(x.platform_net_revenue||0)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No confirmed delivered orders in this report period</b><span>Figures will appear after real orders are delivered and payment is confirmed. This is not a zero-fee configuration.</span></div>')+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Revenue report unavailable</b><span>'+esc(e.error||e.message||'Could not load the live finance report.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.ML_Premium.refreshAdminRevenue()">Retry</button></div>';}
   }
-  async function approveDahaWithdrawal(id){
-    try{
-      var result=await ML_API.admin.approveWithdrawal(id),data=result&&result.data||{};
-      toast(result&&result.message||'Payout request submitted.','success');
-      if(data.status==='payout_pending')toast('Payout is awaiting payment provider confirmation. It has not been marked paid.','info');
-      await renderLiveAdminPayouts();
-    }catch(e){toast(e.error||'Could not approve the payout.','error');}
-  }
-  async function rejectDahaWithdrawal(id){
-    if(!confirm('Reject this withdrawal request? No money will be sent.'))return;
-    try{
-      await ML_API.admin.rejectWithdrawal(id);
-      toast('Withdrawal request rejected.','success');
-      await renderLiveAdminPayouts();
-    }catch(e){toast(e.error||'Could not reject the payout.','error');}
-  }
+
   async function renderLiveAdminPayouts(){
     var root=G('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live payouts</div><div class="ml-hero-sub">Loading pending withdrawals from the production database…</div></div>';
