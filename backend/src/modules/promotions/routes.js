@@ -24,6 +24,7 @@ router.patch('/admin/requests/:id', authenticate, authorize(...ADMIN), [
   param('id').isUUID(),
   body('status').optional().isIn(['reviewing','approved','rejected','published','cancelled']),
   body('paymentStatus').optional().isIn(['unpaid','pending','paid','refunded']),
+  body('paymentReference').optional({nullable:true}).trim().isLength({min:4,max:160}).matches(/^[A-Za-z0-9._:/-]+$/),
   body('adminNotes').optional({nullable:true}).trim().isLength({max:2000}),
   body('startsAt').optional({nullable:true}).isISO8601(),
   body('endsAt').optional({nullable:true}).isISO8601(),
