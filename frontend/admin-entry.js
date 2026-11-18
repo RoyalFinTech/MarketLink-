@@ -131,7 +131,7 @@
       overview: function () { if (api.adminRefresh) api.adminRefresh(); },
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
-      promotions: function () { if (api.reviewPromotions) api.reviewPromotions(); },
+      promotions: function () { if (typeof window.adminGoTo === 'function') window.adminGoTo('promotions'); },
       analytics: function () { if (api.refreshAdminAnalytics) api.refreshAdminAnalytics(); },
       revenue: function () { if (api.refreshAdminRevenue) api.refreshAdminRevenue(); },
       payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
@@ -198,7 +198,15 @@
       if (event.target.closest('#ml-admin-drawer-close')) {
         document.getElementById('ml-admin-drawer').classList.remove('is-open');
       }
-      if (event.target.closest('#ml-admin-refresh')) adminNavigate('overview');
+      if (event.target.closest('#ml-admin-refresh')) {
+        var refreshButton = document.getElementById('ml-admin-refresh');
+        if (refreshButton) { refreshButton.disabled = true; refreshButton.textContent = 'Refreshing…'; }
+        adminNavigate('overview');
+        window.setTimeout(function () {
+          var current = document.getElementById('ml-admin-refresh');
+          if (current) { current.disabled = false; current.innerHTML = '↻ <span>Refresh</span>'; }
+        }, 900);
+      }
       if (event.target.closest('#ml-admin-signout') && typeof window.adminLogout === 'function') window.adminLogout();
     });
     var date = document.getElementById('ml-admin-date');
@@ -251,6 +259,11 @@
 
     if (!window.__ML_ADMIN_SCREEN_OBSERVER && window.MutationObserver) {
       var observer = new MutationObserver(function () {
+        var appScreen = document.getElementById('scr-app');
+        if (appScreen && appScreen.classList.contains('active')) {
+          installAdminWorkspaceStyles();
+          ensureAdminWorkspace();
+        }
         var customerScreen = document.querySelector(
           '#scr-splash.active,#scr-onboard.active,#scr-auth.active,#scr-returning.active'
         );
