@@ -146,6 +146,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
     missingWalletCredits: missingCredits.rows,
     withdrawalsNeedingAttention: withdrawalQueue.rows,
     walletLedgerMismatches: walletMismatches.rows,
+    codRemittancesNeedingAttention: codRemittancesNeedingAttention.rows,
     duplicateReferences: duplicateReferences.rows,
   };
   const counts = Object.fromEntries(Object.entries(sections).map(([key, rows]) => [key, rows.length]));
