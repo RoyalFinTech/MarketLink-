@@ -7481,7 +7481,7 @@ window.addEventListener('unhandledrejection',function(e){
     AFRICELL:{label:'Africell (87)',prefix:'87'},
     QCELL:{label:'QCell (83)',prefix:'83'},
     COMIUM:{label:'Comium (86)',prefix:'86'},
-    GAMCEL:{label:'Gamcel (no new prefix)',prefix:''}
+    GAMCEL:{label:'Gamcel (legacy 7 digits)',prefix:''}
   };
   function digits(v){return String(v||'').replace(/\D/g,'');}
   function stateKey(target){return target==='reg'?'regPhone':'loginPhone';}
@@ -7507,13 +7507,14 @@ window.addEventListener('unhandledrejection',function(e){
     var opts=Object.keys(operators).map(function(k){
       return '<option value="'+k+'" '+(k===selected?'selected':'')+'>'+operators[k].label+'</option>';
     }).join('');
+    var guidanceText=selected==='GAMCEL'?'Gamcel is still using its existing 7-digit number in the current migration phase. No new prefix is added; enter the number beginning with 9. PURA has designated 89 for Phase 2, but has not set its migration date.':'Select Africell, QCell or Comium and enter the remaining 7 digits. MarketLink adds the selected two-digit prefix (87, 83 or 86), making 9 digits total.';
     return '<div class="ml-gm-phone" style="display:grid;grid-template-columns:auto minmax(112px,.9fr) minmax(110px,1fr);align-items:stretch;gap:0;width:100%;margin-bottom:6px;border:1px solid rgba(245,184,61,.5);border-radius:12px;overflow:hidden;background:#071521;min-width:0;box-shadow:0 0 0 1px rgba(245,184,61,.08) inset;">'+
       '<span style="display:flex;align-items:center;padding:0 10px;font-size:13px;color:#fff;white-space:nowrap;background:#0B1F2E;">'+
       '<span style="display:inline-flex;align-items:center;margin-right:7px;">'+gambiaFlagMarkup()+'</span><strong>+220</strong></span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="appearance:auto;color-scheme:dark;max-width:49%;min-width:100px;flex:1 1 125px;height:46px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 8px;background:#071521;color:#fff;font-weight:700;font-size:12px;">'+opts+'</select>'+
       '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="e.g. 1234567" value="'+nat.slice(0,7)+'" style="flex:1 1 115px;min-width:110px;width:0;height:46px;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
       '<input type="hidden" id="'+(target==='admin'?'admin-staffid':target==='reg'?'rphone':'lphone')+'" value="">'+
-      '</div><div class="ml-phone-guidance"><div class="ml-phone-guidance-title">'+gambiaFlagMarkup()+' <strong>Your Gambian number</strong></div><div>Select your mobile network and enter the remaining <b>7 digits</b>. The two-digit network prefix is added automatically, making <b>9 digits total</b>.</div><div class="ml-phone-guidance-example">Your complete number is the selected two-digit prefix plus the 7 digits you enter.</div><span id="'+target+'-phone-help" class="ml-phone-guidance-help"></span></div>';
+      '</div><div class="ml-phone-guidance"><div class="ml-phone-guidance-title">'+gambiaFlagMarkup()+' <strong>Your Gambian number</strong></div><div>'+guidanceText+'</div><span id="'+target+'-phone-help" class="ml-phone-guidance-help"></span></div>';
   }
   function nationalValue(target){
     var sel=document.getElementById(target+'-operator'), inp=document.getElementById(target+'-national');
