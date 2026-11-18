@@ -819,7 +819,7 @@
     window.__ML_ADMIN_EXPLICIT_SUBMIT_INSTALLED = true;
     function submit(event) {
       if (event) { event.preventDefault(); event.stopPropagation(); if (event.stopImmediatePropagation) event.stopImmediatePropagation(); }
-      if (window.__ML_ADMIN_LOGIN_IN_FLIGHT) return;
+      if (window.__ML_ADMIN_SUBMIT_DISPATCHING || window.__ML_ADMIN_LOGIN_IN_FLIGHT) return;
       var login = window.doAdminLogin;
       if (typeof login !== 'function') {
         var err = document.getElementById('admin-auth-err');
@@ -831,12 +831,12 @@
       button.textContent = 'Connecting securely…';
       var errBox = document.getElementById('admin-auth-err');
       if (errBox) { errBox.textContent = 'Connecting to the MarketLink server securely…'; errBox.style.display = 'block'; errBox.setAttribute('role','status'); }
-      window.__ML_ADMIN_LOGIN_IN_FLIGHT = true;
+      window.__ML_ADMIN_SUBMIT_DISPATCHING = true;
       Promise.resolve().then(function () { return login(); }).catch(function (error) {
         var box = document.getElementById('admin-auth-err');
         if (box) { box.textContent = String(error && (error.message || error.error) || 'Sign-in could not be completed. Please try again.'); box.style.display = 'block'; box.setAttribute('role','alert'); }
       }).finally(function () {
-        window.__ML_ADMIN_LOGIN_IN_FLIGHT = false;
+        window.__ML_ADMIN_SUBMIT_DISPATCHING = false;
         var active = document.getElementById('scr-admin-login');
         if (active && active.classList.contains('active')) {
           button.disabled = false;
