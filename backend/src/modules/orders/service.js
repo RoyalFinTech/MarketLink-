@@ -242,6 +242,9 @@ async function settleOrderFinancials(orderId) {
       await client.query(
         "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','vendor_sale',$2,$3,'order_vendor_payout',$4,'MarketLink vendor payout credited to DAHA Wallet')",
         [vendorWallet.id, vendorAmount, credited.balance, orderId]);
+      await client.query(
+        'UPDATE vendors SET total_sales=COALESCE(total_sales,0)+1,total_revenue=COALESCE(total_revenue,0)+$1,updated_at=now() WHERE user_id=$2',
+        [vendorAmount,order.vendor_id]);
     }
 
     if (order.rider_id && riderAmount > 0) {
