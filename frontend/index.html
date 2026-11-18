@@ -7836,5 +7836,48 @@ window.addEventListener('unhandledrejection',function(e){
   if(document.readyState!=='loading')setTimeout(showBootDiagnostic,6500);
 })();
 </script>
+
+<script id="ml-admin-premium-login-recovery">
+(function(){
+  if(String(location.hostname||'').toLowerCase()!=='marketlink-gambia-admin.onrender.com')return;
+  function renderPremiumAdminLogin(){
+    var screen=document.getElementById('scr-admin-login');
+    if(!screen)return;
+    var complete=screen.querySelector('#admin-password')&&screen.querySelector('#admin-lbtn')&&screen.querySelector('.ml-admin-shield')&&screen.querySelector('.ml-admin-brandmark img')&&screen.querySelector('#admin-national');
+    if(complete)return;
+    screen.innerHTML=
+      '<section class="ml-admin-hero" style="padding:34px 22px 28px;text-align:center;background:linear-gradient(145deg,#fff 0%,#eaf2f8 62%,#fff7e6 100%);border-bottom:1px solid rgba(16,48,68,.12)">'+
+        '<div class="ml-admin-brandmark" style="position:relative;width:112px;height:90px;margin:0 auto 13px;display:flex;align-items:center;justify-content:center"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia logo" style="display:block;width:104px;height:84px;object-fit:contain" onerror="this.onerror=null;this.src=\'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png\'"><span class="ml-admin-shield" aria-label="Secure administrator access" style="position:absolute;right:-3px;bottom:0;width:32px;height:32px;border-radius:11px;display:grid;place-items:center;background:#fff;border:1px solid rgba(18,111,116,.28);box-shadow:0 3px 12px rgba(16,48,68,.13);font-size:18px">🛡️</span></div>'+
+        '<h1 style="margin:0;color:#102d40;font-size:23px;line-height:1.2;font-weight:850">MarketLink Admin Portal</h1>'+
+        '<p style="margin:8px auto 0;max-width:320px;color:#526779;font-size:13px;line-height:1.55">Secure access for authorised MarketLink administrators and staff.</p>'+
+      '</section>'+
+      '<section style="width:min(100% - 32px,460px);margin:24px auto 0;padding:22px 19px 20px;background:#fff;border:1px solid #dce5ec;border-radius:20px;box-shadow:0 12px 35px rgba(20,47,68,.08)" aria-label="Administrator sign in">'+
+        '<p style="margin:0 0 17px;color:#176b70;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">Administrator sign in</p>'+
+        '<div id="admin-auth-err" role="alert" aria-live="polite" style="display:none;margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fff0f0;color:#9b2424;font-size:12px"></div>'+
+        '<label for="admin-national" style="display:block;margin:0 0 7px;color:#344b5d;font-size:12px;font-weight:750">Gambian mobile number</label>'+
+        '<div id="ml-admin-phone-slot" style="margin-bottom:17px;border:1px solid #cbd8e2;border-radius:13px;overflow:hidden;background:#fff">'+
+          '<div style="display:grid;grid-template-columns:auto minmax(0,1fr);min-height:54px;background:#fff">'+
+            '<span style="display:flex;align-items:center;gap:7px;padding:0 11px;background:#eef4f8;color:#18384d;font-size:13px;font-weight:800;white-space:nowrap">🇬🇲 +220</span>'+
+            '<select id="admin-operator" aria-label="Mobile network" style="width:100%;min-width:0;height:52px;padding:0 9px;border:0;border-bottom:1px solid #e6edf2;background:#fff;color:#18384d;font-size:12px;font-weight:750">'+
+              '<option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel</option>'+
+            '</select>'+
+            '<input id="admin-national" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" placeholder="Mobile number" aria-label="Gambian mobile number" oninput="this.value=this.value.replace(/\\D/g,\'\').slice(0,7);var p={AFRICELL:\'87\',QCELL:\'83\',COMIUM:\'86\',GAMCEL:\'\'};document.getElementById(\'admin-staffid\').value=(p[document.getElementById(\'admin-operator\').value]||\'\')+this.value" onkeydown="if(event.key===\'Enter\')doAdminLogin()" style="grid-column:1/-1;width:100%;height:52px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;background:#fff;color:#142b3d;padding:12px 14px;font-size:17px;letter-spacing:.08em">'+
+          '</div>'+
+        '</div>'+
+        '<input type="hidden" id="admin-staffid" value="">'+
+        '<label for="admin-password" style="display:block;margin:0 0 7px;color:#344b5d;font-size:12px;font-weight:750">4-digit security PIN</label>'+
+        '<input type="password" id="admin-password" name="admin-pin" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="current-password" placeholder="Enter your 4-digit PIN" aria-label="Four digit administrator PIN" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,4)" onkeydown="if(event.key===\'Enter\')doAdminLogin()" style="display:block!important;visibility:visible!important;opacity:1!important;width:100%;box-sizing:border-box;min-height:56px;margin:0 0 18px;padding:13px 15px;border:1px solid #cbd8e2;border-radius:13px;background:#fff;color:#142b3d;-webkit-text-fill-color:#142b3d;font-size:20px;font-weight:750;letter-spacing:.32em;color-scheme:light">'+
+        '<button type="button" id="admin-lbtn" onclick="doAdminLogin()" style="width:100%;min-height:52px;border:0;border-radius:13px;background:linear-gradient(100deg,#126f74,#0b505a);color:#fff;font-size:15px;font-weight:800">Sign in securely</button>'+
+        '<div style="display:flex;gap:10px;align-items:flex-start;margin:17px 2px 0;padding:12px 13px;border:1px solid #e7dfc9;border-radius:12px;background:#fffaf0;color:#5b5545;font-size:11px;line-height:1.55"><span aria-hidden="true">🔒</span><div><strong style="display:block;color:#755719;font-size:11px;margin-bottom:2px">Restricted administrator area</strong>Only approved MarketLink admin accounts can enter. Access is verified securely by the MarketLink server. Unauthorized access attempts are logged.</div></div>'+
+        '<p style="margin:17px auto 0;text-align:center;color:#718393;font-size:10px;line-height:1.5">MarketLink Gambia · Royal FinTech Company</p>'+
+      '</section>';
+    screen.setAttribute('data-ml-admin-redesigned','1');
+  }
+  function ensure(){var s=document.getElementById('scr-admin-login');if(s&&s.classList.contains('active'))renderPremiumAdminLogin();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensure,{once:true});else ensure();
+  if(window.MutationObserver){var observer=new MutationObserver(ensure);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});}
+  window.__ML_ADMIN_PREMIUM_LOGIN_RECOVERY=renderPremiumAdminLogin;
+})();
+</script>
 </body>
 </html>
