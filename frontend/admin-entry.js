@@ -284,7 +284,9 @@
     document.head.appendChild(css);
   }
 
-  function installAdminGuards() {\n    installAdminWorkspaceStyles();\n    if (document.getElementById('scr-app') && document.getElementById('scr-app').classList.contains('active')) ensureAdminWorkspace();
+  function installAdminGuards() {
+    installAdminWorkspaceStyles();
+    if (document.getElementById('scr-app') && document.getElementById('scr-app').classList.contains('active')) ensureAdminWorkspace();
     buildAdminLogin();
     normalizeAdminAuthResponse();
     window.goOnboard = openAdmin;
