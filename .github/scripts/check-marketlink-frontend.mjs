@@ -176,3 +176,5 @@ assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), 
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /Verify deposit/, 'Admin financial reconciliation must expose deposit verification');
 assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /codRemittanceNote/, 'Rider delivery history must receive the Admin remittance review note');
 assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /Previous deposit rejected/, 'Riders must see why a cash deposit was rejected before resubmitting');
+assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /__ML_ADMIN_START_CHAT/, 'CRM must expose a direct chat action for customer, vendor and rider accounts');
+assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /Start direct chat/, 'CRM profile must provide an obvious direct chat control');
