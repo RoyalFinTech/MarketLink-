@@ -4,7 +4,18 @@ const { AppError } = require('../../middleware/errorHandler');
 async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, maxPrice, sort='newest' }) {
   const off = (page-1) * Math.min(limit,100), conds = ["p.status='active'"], params = []; let pi = 1;
   if (search)     { conds.push(`to_tsvector('english', p.name||' '||coalesce(p.description,'')) @@ plainto_tsquery('english',$${pi++})`); params.push(search); }
-  if (categoryId) { conds.push(`p.category_id=$${pi++}`); params.push(categoryId); }
+  if (categoryId) {
+    conds.push(`p.category_id IN (
+      WITH RECURSIVE category_branch AS (
+        SELECT id FROM categories WHERE id=${pi} AND deleted_at IS NULL AND is_active=TRUE
+        UNION ALL
+        SELECT child.id FROM categories child
+        JOIN category_branch parent ON child.parent_id=parent.id
+        WHERE child.deleted_at IS NULL AND child.is_active=TRUE
+      ) SELECT id FROM category_branch
+    )`);
+    params.push(categoryId); pi++;
+  }
   if (vendorId)   { conds.push(`p.vendor_id=$${pi++}`);   params.push(vendorId); }
   if (minPrice)   { conds.push(`p.price>=$${pi++}`);      params.push(minPrice); }
   if (maxPrice)   { conds.push(`p.price<=$${pi++}`);      params.push(maxPrice); }
