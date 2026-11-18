@@ -22,6 +22,15 @@ Do not ask the user to paste secrets into chat. Do not switch to live-money mode
 - Analytics should distinguish confirmed GMV from MarketLink gross/net commission and show actual period comparisons, order/category pie charts, revenue trend charts and data-grounded recommendations.
 - Customer-side product affiliate links and shopping UX remain on hold until the Admin walkthrough is signed off.
 
+## Progress recorded on 18 November 2026
+
+- [x] Admin analytics backend expanded with complete-day 7/30/90-day reporting, confirmed GMV, platform gross/net commission, affiliate rewards, order-status counts, category counts, signups and same-length previous-period comparisons.
+- [x] Admin analytics UI now includes a two-series revenue/net-commission trend line, daily GMV bars, order-status pie, sales-category pie, period controls and evidence-based recommendations.
+- [x] Production SQL was checked against the live schema. The current production period has no order or signup activity and category records have no products/orders, so charts must show empty states rather than fabricated values.
+- [x] Promotion workflow now requires a transaction/company-statement reference to mark payment paid, requires approval + paid status + a banner before publication, and writes the review/payment reference into the Admin audit log.
+- [x] Automated tests cover analytics period/trend insights and promotion payment/publish guards.
+- [ ] Authenticated browser walkthrough of every Admin navigation page — implementation is deployed, but a signed-in browser session has not yet been exercised in this run.
+
 ## Verification rules
 
 - Distinguish source changes, automated tests, deployment state and authenticated browser verification.
