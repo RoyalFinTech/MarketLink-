@@ -454,19 +454,30 @@
         S.profileName = user.fullName || user.full_name || user.name || '';
         S.profilePhone = user.phone || phone;
       }
-      AdminSession.start(user.id || phone);
-      // Route to the authenticated app first. Only retire the login screen
-      // after the app screen has been activated, so transition errors remain
-      // recoverable and cannot be written into a hidden login panel.
-      showScreen('scr-app');
-      var appScreen=G('scr-app');
+      adminAuthErr('Administrator verified. Opening the premium Admin dashboard…');
+      // Keep the transition independent from the shared customer showScreen
+      // helper: that helper can contain customer-only routing/scroll locks.
+      if(window.AdminSession&&typeof window.AdminSession.start==='function')window.AdminSession.start(user.id||phone);
+      var appScreen=G('scr-app'),appRoot=G('app'),adminLoginScreen=G('scr-admin-login');
+      if(appRoot){
+        appRoot.style.setProperty('height','auto','important');
+        appRoot.style.setProperty('min-height','100dvh','important');
+        appRoot.style.setProperty('max-height','none','important');
+        appRoot.style.setProperty('overflow','visible','important');
+      }
       if(appScreen){
         appScreen.classList.add('active');
         appScreen.style.setProperty('display','block','important');
         appScreen.style.setProperty('visibility','visible','important');
         appScreen.style.setProperty('pointer-events','auto','important');
+        appScreen.style.setProperty('position','relative','important');
+        appScreen.style.setProperty('inset','auto','important');
+        appScreen.style.setProperty('height','auto','important');
+        appScreen.style.setProperty('min-height','100dvh','important');
+        appScreen.style.setProperty('max-height','none','important');
+        appScreen.style.setProperty('overflow','visible','important');
+        appScreen.removeAttribute('aria-hidden');
       }
-      var adminLoginScreen=G('scr-admin-login');
       if(adminLoginScreen){
         adminLoginScreen.classList.remove('active');
         adminLoginScreen.style.setProperty('display','none','important');
@@ -474,11 +485,28 @@
         adminLoginScreen.style.setProperty('pointer-events','none','important');
         adminLoginScreen.setAttribute('aria-hidden','true');
       }
-      var appScreen=G('scr-app'),appRoot=G('app');
-      if(appRoot){appRoot.style.setProperty('height','auto','important');appRoot.style.setProperty('min-height','100dvh','important');appRoot.style.setProperty('overflow','visible','important');}
-      if(appScreen){appScreen.style.setProperty('position','relative','important');appScreen.style.setProperty('inset','auto','important');appScreen.style.setProperty('height','auto','important');appScreen.style.setProperty('min-height','100dvh','important');appScreen.style.setProperty('overflow','visible','important');}
-      G('bnav').style.display='none';G('fab').classList.remove('fab-visible');
-      switchTab('admindash');toast('Welcome to the Admin Portal ✓');
+      if(document.documentElement){
+        document.documentElement.style.setProperty('height','auto','important');
+        document.documentElement.style.setProperty('overflow-y','auto','important');
+        document.documentElement.style.setProperty('touch-action','pan-y','important');
+      }
+      if(document.body){
+        document.body.style.setProperty('height','auto','important');
+        document.body.style.setProperty('overflow-y','auto','important');
+        document.body.style.setProperty('touch-action','pan-y','important');
+      }
+      var bottomNav=G('bnav'),floatingAction=G('fab');
+      if(bottomNav)bottomNav.style.display='none';
+      if(floatingAction)floatingAction.classList.remove('fab-visible');
+      // This tab renderer is the premium MarketLink Admin control center.
+      try{switchTab('admindash');}
+      catch(routeError){
+        console.error('[MarketLink Admin] Premium dashboard route failed:',routeError);
+        var dashboardTab=G('tab-admindash');
+        if(dashboardTab)dashboardTab.style.display='block';
+        loadAdminDashboard();
+      }
+      if(typeof toast==='function')toast('Welcome to the Admin Portal ✓');
     }catch(e){
       adminAuthErr(e&&(e.error||e.message)||'Admin sign-in failed. Please try again.');
     }finally{
