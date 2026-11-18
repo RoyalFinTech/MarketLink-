@@ -289,7 +289,55 @@ async function pushToUser(userId, notification) {
   return { sent: sentCount > 0, sentCount, failedCount: results.length - sentCount, results: results.map(result => ({ sent: result.sent, reason: result.reason || null })) };
 }
 
+
+async function listCampaigns({page=1,limit=25}={}){
+ const p=Math.max(parseInt(page,10)||1,1),l=Math.min(Math.max(parseInt(limit,10)||25,1),100),offset=(p-1)*l;
+ const {rows}=await query("SELECT id,title,body,audience,channels,status,recipient_count,sent_count,failed_count,created_at,sent_at FROM notification_campaigns ORDER BY created_at DESC LIMIT $1 OFFSET $2",[l,offset]);
+ const {rows:[count]}=await query("SELECT count(*)::int AS total FROM notification_campaigns",[]);
+ return {items:rows,total:count.total,page:p,limit:l,totalPages:Math.ceil(count.total/l)};
+}
+async function createCampaign({title,body,audience,channels,createdBy}){
+ const allowed=['all','customers','vendors','riders','admins'];
+ if(!allowed.includes(audience)){const e=new Error('Unsupported campaign audience.');e.status=400;e.code='INVALID_CAMPAIGN_AUDIENCE';throw e;}
+ const safeChannels={inapp:true,email:!!(channels&&channels.email),sms:!!(channels&&channels.sms),push:!!(channels&&channels.push)};
+ if(!safeChannels.inapp&&!safeChannels.email&&!safeChannels.sms&&!safeChannels.push){const e=new Error('Select at least one delivery channel.');e.status=400;e.code='CAMPAIGN_CHANNEL_REQUIRED';throw e;}
+ const {rows:[campaign]}=await query("INSERT INTO notification_campaigns(title,body,audience,channels,created_by) VALUES($1,$2,$3,$4::jsonb,$5) RETURNING *",[title,body||null,audience,JSON.stringify(safeChannels),createdBy]);
+ return campaign;
+}
+async function sendCampaign(campaignId,actorId){
+ const {rows:[campaign]}=await query("UPDATE notification_campaigns SET status='sending',updated_at=now() WHERE id=$1 AND status='draft' RETURNING *",[campaignId]);
+ if(!campaign){const e=new Error('Campaign not found or it has already been sent.');e.status=409;e.code='CAMPAIGN_NOT_SENDABLE';throw e;}
+ let audienceSql="u.status='active'";
+ if(campaign.audience==='customers')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='customer')";
+ if(campaign.audience==='vendors')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='vendor')";
+ if(campaign.audience==='riders')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='rider')";
+ if(campaign.audience==='admins')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name IN ('admin','super_admin','moderator'))";
+ const {rows:users}=await query("SELECT u.id,u.email,u.phone FROM users u WHERE "+audienceSql+" ORDER BY u.created_at ASC LIMIT 1000",[]);
+ await query("UPDATE notification_campaigns SET recipient_count=$2,updated_at=now() WHERE id=$1",[campaignId,users.length]);
+ let sent=0,failed=0;
+ for(let i=0;i<users.length;i+=5){
+  const batch=users.slice(i,i+5);
+  await Promise.all(batch.map(async user=>{
+   try{
+    const result=await send({userId:user.id,type:'admin_campaign',title:campaign.title,body:campaign.body,referenceType:'notification_campaign',referenceId:campaignId,channels:{email:!!campaign.channels.email,emailAddress:user.email,sms:!!campaign.channels.sms,phone:user.phone,push:!!campaign.channels.push,data:{campaignId:String(campaignId)}}});
+    const delivery=result.deliveryResults||{},requested=['email','sms','push'].filter(k=>campaign.channels[k]);
+    const externalSent=requested.filter(k=>delivery[k]&&delivery[k].sent).length;
+    const status=requested.length&&externalSent<requested.length?(externalSent?'partial':'partial'):'sent';
+    await query("INSERT INTO notification_campaign_recipients(campaign_id,user_id,status,notification_id,delivery_results,attempted_at) VALUES($1,$2,$3,$4,$5::jsonb,now()) ON CONFLICT(campaign_id,user_id) DO UPDATE SET status=EXCLUDED.status,notification_id=EXCLUDED.notification_id,delivery_results=EXCLUDED.delivery_results,attempted_at=now()",[campaignId,user.id,status,result.id,JSON.stringify({inapp:{sent:true},...delivery})]);
+    if(status==='sent')sent++;else failed++;
+   }catch(error){
+    failed++;
+    await query("INSERT INTO notification_campaign_recipients(campaign_id,user_id,status,delivery_results,attempted_at) VALUES($1,$2,'failed',$3::jsonb,now()) ON CONFLICT(campaign_id,user_id) DO UPDATE SET status='failed',delivery_results=EXCLUDED.delivery_results,attempted_at=now()",[campaignId,user.id,JSON.stringify({error:error.code||'DELIVERY_FAILED'})]).catch(()=>null);
+   }
+  }));
+ }
+ const finalStatus=failed===0?'sent':sent===0?'failed':'partial';
+ const {rows:[updated]}=await query("UPDATE notification_campaigns SET status=$2,sent_count=$3,failed_count=$4,sent_at=now(),updated_at=now() WHERE id=$1 RETURNING id,title,audience,status,recipient_count,sent_count,failed_count,sent_at",[campaignId,finalStatus,sent,failed]);
+ await query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) SELECT $1,COALESCE((SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1 AND r.name IN ('admin','super_admin','moderator') LIMIT 1),'admin'),'notification.campaign_sent','notification_campaign',$2,$3::jsonb",[actorId,campaignId,JSON.stringify({audience:campaign.audience,recipientCount:users.length,sent,failed})]).catch(()=>null);
+ return updated;
+}
+
 module.exports = {
   send, getForUser, markRead, getUnreadCount, sendEmail, sendSms, sendPush,
-  registerPushToken, removePushToken, pushToUser
+  registerPushToken, removePushToken, pushToUser, listCampaigns, createCampaign, sendCampaign
 };
