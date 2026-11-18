@@ -2109,6 +2109,7 @@
         businessAddress:String(f.saddr).trim(),
         latitude:f.latitude==null?undefined:f.latitude,
         longitude:f.longitude==null?undefined:f.longitude,
+        phone:vendorWhatsapp,
         whatsappNumber:vendorWhatsapp,
         email:f.email||undefined,
         servicesOffered:f.services||undefined,
@@ -2125,9 +2126,13 @@
       S._vendorLiveLoaded=false;
       if(typeof renderPremiumProfile==='function')await renderPremiumProfile();
     }catch(e){
-      for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}
+      // Keep uploaded files when the request outcome is uncertain (expired
+      // session, timeout or network loss). The server may have committed the
+      // application even if the browser did not receive its response.
+      var uncertain=!!(e&&(e.code==='SESSION_EXPIRED'||e.code==='REQUEST_TIMEOUT'||e.code==='UPLOAD_TIMEOUT'||e.code==='UPLOAD_NETWORK_ERROR'||e.code==='NETWORK_ERROR'));
+      if(!uncertain){for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}}
       if(btn){btn.disabled=false;btn.textContent='Submit Application 🎉';}
-      toast(e.error||e.message||'Vendor application could not be submitted. Please try again.','error');
+      toast(e.error||e.message||'Vendor application could not be submitted. Please check your connection and try again.','error');
     }finally{
       if(btn&&btn.isConnected&&btn.disabled){btn.disabled=false;if(btn.textContent==='Uploading documents…'||btn.textContent==='Submitting application…')btn.textContent='Submit Application 🎉';}
     }
@@ -2162,6 +2167,8 @@
         vehicleType:f.vehicleType||'motorbike',
         plateNumber:String(f.plate).trim(),
         licenseNumber:String(f.licence).trim(),
+        mobileNumber:(f.phone&&window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:String(f.phone||'').trim())||undefined,
+        whatsappNumber:(f.whatsappNumber&&window.PhoneUtil?window.PhoneUtil.normalize(f.whatsappNumber,'GM').e164:String(f.whatsappNumber||'').trim())||undefined,
         emergencyContact:emergencyPhone||undefined,
         address:String(f.addr).trim(),
         deliveryZone:f.deliveryZone||undefined,
@@ -2178,9 +2185,12 @@
       S._riderLiveLoaded=false;
       if(typeof renderPremiumProfile==='function')await renderPremiumProfile();
     }catch(e){
-      for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}
+      // Do not delete documents after an ambiguous network/session failure:
+      // the application may already have been committed by the backend.
+      var uncertain=!!(e&&(e.code==='SESSION_EXPIRED'||e.code==='REQUEST_TIMEOUT'||e.code==='UPLOAD_TIMEOUT'||e.code==='UPLOAD_NETWORK_ERROR'||e.code==='NETWORK_ERROR'));
+      if(!uncertain){for(var i=0;i<uploaded.length;i++){try{await ML_API.uploads.deleteByUrl(uploaded[i]);}catch(cleanupError){}}}
       if(btn){btn.disabled=false;btn.textContent='Submit Application 🚀';}
-      toast(e.error||e.message||'Rider application could not be submitted. Please try again.','error');
+      toast(e.error||e.message||'Rider application could not be submitted. Please check your connection and try again.','error');
     }finally{
       if(btn&&btn.isConnected&&btn.disabled){btn.disabled=false;if(btn.textContent==='Uploading documents…'||btn.textContent==='Submitting application…')btn.textContent='Submit Application 🚀';}
     }
