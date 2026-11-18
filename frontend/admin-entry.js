@@ -6,29 +6,12 @@
 
   window.__ML_ADMIN_PORTAL_MODE = true;
 
-  // The Admin site shares the customer app shell, but must not inherit its PWA
-  // service-worker cache. A stale cached shell can otherwise hide the Admin
-  // entry point after a deployment. Make the Admin login visible immediately,
-  // then remove only this origin's old service-worker registrations/caches.
-  try {
-    var adminLoginNow = document.getElementById('scr-admin-login');
-    if (adminLoginNow) {
-      document.querySelectorAll('.screen.active').forEach(function (screen) {
-        screen.classList.remove('active');
-      });
-      adminLoginNow.style.setProperty('display', 'block', 'important');
-      adminLoginNow.style.setProperty('visibility', 'visible', 'important');
-      adminLoginNow.style.setProperty('pointer-events', 'auto', 'important');
-      adminLoginNow.removeAttribute('aria-hidden');
-      adminLoginNow.classList.add('active');
-    }
-  } catch (adminVisibilityError) {
-    if (window.console && console.error) console.error('[MarketLink Admin] Immediate login activation:', adminVisibilityError);
-  }
+  // The shared shell contains the normal MarketLink splash. On the
+  // dedicated Admin host it is allowed to complete once; index.html then
+  // routes directly to the Admin login instead of customer onboarding.
+  // Remove stale PWA control/caches without forcing a second page reload.
   (function clearCustomerPwaCacheFromAdminOrigin() {
     if (!('serviceWorker' in navigator)) return;
-    var reloadKey = 'ml_admin_sw_cleanup_reload_v1';
-    var hadController = !!navigator.serviceWorker.controller;
     Promise.all([
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
         return Promise.all(registrations.map(function (registration) { return registration.unregister(); }));
@@ -36,14 +19,8 @@
       ('caches' in window ? caches.keys().then(function (keys) {
         return Promise.all(keys.map(function (key) { return caches.delete(key); }));
       }) : Promise.resolve())
-    ]).then(function () {
-      try {
-        if ((hadController || window.sessionStorage.getItem(reloadKey) !== 'done') &&
-            window.sessionStorage.getItem(reloadKey) !== 'done') {
-          window.sessionStorage.setItem(reloadKey, 'done');
-          window.location.replace(window.location.pathname + '?admin-fresh=' + Date.now());
-        }
-      } catch (_) {}
+    ]).catch(function (error) {
+      if (window.console && console.warn) console.warn('[MarketLink Admin] PWA cleanup skipped:', error);
     });
   })();
 
