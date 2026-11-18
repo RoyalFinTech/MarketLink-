@@ -15,6 +15,13 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
   }
 
   return withTransaction(async (client) => {
+    if (deliveryAddressId) {
+      const { rows:[address] } = await client.query(
+        'SELECT id FROM delivery_addresses WHERE id=$1 AND customer_id=$2',
+        [deliveryAddressId, customerId]
+      );
+      if (!address) throw new AppError('The selected delivery address does not belong to your account.',403,'DELIVERY_ADDRESS_FORBIDDEN');
+    }
     let sub=0; const lines=[];
     const lockedProductIds = new Set();
     for (const item of items) {
