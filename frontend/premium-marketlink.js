@@ -362,8 +362,9 @@
         S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();switchTab('orders');startOrderTracking();
       }
     }catch(e){
-      if(payMethod==='wallet'&&order&&!walletPaymentCompleted){
-        try{await ML_API.orders.cancel(order.id,'DAHA Wallet checkout could not be completed.');}catch(cancelError){}
+      var pendingForThisOrder=Boolean(S.pendingPayment&&S.pendingPayment.order&&String(S.pendingPayment.order.id)===String(order&&order.id));
+      if(order&&!walletPaymentCompleted&&!pendingForThisOrder){
+        try{await ML_API.orders.cancel(order.id,'Payment could not be completed; order cancelled and stock released.');}catch(cancelError){}
       }
       if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
       toast(e.error||'Could not place your order.','error');
