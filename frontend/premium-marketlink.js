@@ -657,18 +657,23 @@
   }
 
   async function adminApprovals(kind){
+    var root=G('adash-body');
+    if(!root)return;
+    if(kind!=='vendor'&&kind!=='rider'){toast('Unknown application type.','error');return;}
+    var label=kind==='vendor'?'vendor':'rider';
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending '+label+' applications</h3><button onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div><div class="ml-loading">Refreshing applications from the production database…</div></div>';
     try{
       var r=kind==='vendor'
         ?await ML_API.vendors.adminApplications({page:1,limit:50,kycStatus:'pending'})
         :await ML_API.riders.adminApplications({page:1,limit:50,kycStatus:'pending'});
-      var rows=normalizeProducts(r.data),root=G('adash-body');if(!root)return;
+      var rows=normalizeProducts(r.data);
       function field(label,value){
-        return value?'<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 106px;color:#8da2b0;font-size:10px;">'+esc(label)+'</b><span style="min-width:0;overflow-wrap:anywhere;color:#e8f0f4;font-size:11px;">'+esc(value)+'</span></div>':'';
+        return value!==null&&value!==undefined&&String(value).trim()!==''?'<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 106px;color:#8da2b0;font-size:10px;">'+esc(label)+'</b><span style="min-width:0;overflow-wrap:anywhere;color:#e8f0f4;font-size:11px;">'+esc(value)+'</span></div>':'';
       }
       function doc(label,url){
         return url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:8px 10px;margin:4px 5px 0 0;" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(url)+'&quot;,&quot;'+esc(label)+'&quot;)">View '+esc(label)+'</button>':'';
       }
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending '+(kind==='vendor'?'vendor':'rider')+' applications</h3><button onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div>'+
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>Pending '+label+' applications</h3><span style="display:block;color:#91a4b4;font-size:11px;margin-top:4px">'+rows.length+' pending · refreshed '+esc(new Date().toLocaleTimeString())+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap"><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.adminApprovals(\''+kind+'\')">↻ Refresh applications</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div></div>'+
       (rows.length?'<div style="display:grid;gap:12px;">'+rows.map(function(a){
         var id=a.user_id||a.id,name=a.owner_name||a.full_name||'Applicant';
         var title=kind==='vendor'?(a.business_name||'Vendor application'):name;
@@ -676,13 +681,16 @@
         var image=logo?'<img src="'+esc(logo)+'" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:#fff;">':'<div class="ico">'+(kind==='vendor'?'🏪':'🛵')+'</div>';
         var details=kind==='vendor'
           ?field('Owner',name)+field('Account phone',a.owner_phone||'')+field('Account email',a.owner_email||'')+field('Business name',a.business_name)+field('Shop phone',a.business_phone||'')+field('Business email',a.business_email||'')+field('Category',a.business_category)+field('Marketplace group',a.business_category_group)+field('WhatsApp',a.whatsapp_number)+field('Address',a.business_address)+field('GPS',a.latitude!=null&&a.longitude!=null?a.latitude+', '+a.longitude:'')+field('Description',a.description)
-          :field('Full name',name)+field('Phone',a.phone)+field('Email',a.email)+field('Residential address',a.address)+field('Emergency contact',a.emergency_contact)+field('WhatsApp',a.whatsapp_number)+field('GPS',a.current_lat!=null&&a.current_lng!=null?a.current_lat+', '+a.current_lng:'')+field('Vehicle type',a.vehicle_type)+field('Plate number',a.plate_number)+field('Licence number',a.license_number)+field('Delivery zone',a.delivery_zone);
+          :field('Full name',name)+field('Phone',a.phone||a.mobile_number||'')+field('Email',a.email)+field('Residential address',a.address)+field('Emergency contact',a.emergency_contact)+field('WhatsApp',a.whatsapp_number)+field('GPS',a.current_lat!=null&&a.current_lng!=null?a.current_lat+', '+a.current_lng:'')+field('Vehicle type',a.vehicle_type)+field('Plate number',a.plate_number)+field('Licence number',a.license_number)+field('Delivery zone',a.delivery_zone);
         var docs=kind==='vendor'
           ?doc('National ID / Passport',a.id_document_url)+doc('Shop photo',a.shop_photo_url)
           :doc('National ID / Passport',a.id_document_url)+doc('Driver licence',a.license_document_url)+doc('Rider profile photo',a.profile_photo_url)+doc('Vehicle photo',a.vehicle_photo_url);
-        return '<article class="ml-profile-card" style="padding:14px;"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'+image+'<div style="min-width:0;flex:1;"><b style="color:#f6fafb;font-size:14px;">'+esc(title)+'</b><div style="color:#91a4b4;font-size:10px;margin-top:4px;">KYC: '+esc(a.kyc_status||'pending')+' · ID '+esc(id)+'</div></div></div>'+details+'<div style="margin-top:8px;">'+docs+'</div><div style="display:flex;gap:9px;margin-top:12px;"><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(&quot;'+esc(id)+'&quot;,&quot;'+esc(kind)+'&quot;)">Approve</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectApplication(&quot;'+esc(id)+'&quot;,&quot;'+esc(kind)+'&quot;)">Reject</button></div></article>';
-      }).join('')+'</div>':'<div class="ml-empty"><b>No pending applications</b><span>The live database has no pending '+(kind==='vendor'?'vendor':'rider')+' applications.</span></div>')+'</div>';
-    }catch(e){toast(e.error||e.message||'Could not load applications.','error');}
+        return '<article class="ml-profile-card" style="padding:14px;"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'+image+'<div style="min-width:0;flex:1;"><b style="color:#f6fafb;font-size:14px;">'+esc(title)+'</b><div style="color:#91a4b4;font-size:10px;margin-top:4px;">KYC: '+esc(a.kyc_status||'pending')+' · Submitted '+esc(a.created_at?new Date(a.created_at).toLocaleString():'date unavailable')+' · ID '+esc(id)+'</div></div></div>'+details+'<div style="margin-top:8px;">'+docs+'</div><div style="display:flex;gap:9px;margin-top:12px;"><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approve(&quot;'+esc(id)+'&quot;,&quot;'+esc(kind)+'&quot;)">Approve</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectApplication(&quot;'+esc(id)+'&quot;,&quot;'+esc(kind)+'&quot;)">Reject</button></div></article>';
+      }).join('')+'</div>':'<div class="ml-empty"><b>No pending applications</b><span>The live database currently returned no pending '+label+' applications. Use Refresh applications to check again.</span></div>')+'</div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending '+label+' applications</h3><button onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div><div class="ml-empty"><b>Could not load applications</b><span>'+esc(e.error||e.message||'The application service is temporarily unavailable.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.adminApprovals(\''+kind+'\')">Retry applications</button></div></div>';
+      toast(e.error||e.message||'Could not load applications.','error');
+    }
   }
 
   async function rejectApplication(id,kind){
