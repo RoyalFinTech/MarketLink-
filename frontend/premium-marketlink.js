@@ -403,9 +403,22 @@
     if(button){button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='Signing in…';}
     try{
       adminAuthErr('');
-      // Respect the API client's 120-second login timeout so a sleeping
-      // Render backend has time to wake. The button remains visibly busy and
-      // the API client returns a clear timeout/network error if it cannot.
+      // Wake and verify the production API before sending credentials.
+      // This separates a sleeping/unreachable backend from an auth failure.
+      var apiBase=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com').replace(/\\/+$/,'');
+      var healthController=typeof AbortController==='function'?new AbortController():null;
+      var healthTimer=healthController?window.setTimeout(function(){healthController.abort();},45000):null;
+      try{
+        adminAuthErr('Waking the MarketLink server and checking the secure connection…');
+        var healthResponse=await Promise.race([
+          fetch(apiBase+'/health',{method:'GET',cache:'no-store',signal:healthController?healthController.signal:undefined}),
+          new Promise(function(_,reject){window.setTimeout(function(){reject(new Error('The MarketLink server did not become ready within 45 seconds. Please retry.'));},45000);})
+        ]);
+        if(!healthResponse.ok)throw new Error('The MarketLink server health check failed (HTTP '+healthResponse.status+'). Please retry.');
+      }catch(healthError){
+        throw {error:healthError&&healthError.message||'Could not connect to the MarketLink server. Check your connection and retry.'};
+      }finally{if(healthTimer!==null)window.clearTimeout(healthTimer);}
+      adminAuthErr('Server connected. Verifying your administrator account…');
       var loginResponse=await ML_API.auth.login(phone,pin);
 
       // Normalize the authenticated user across the direct API result and
