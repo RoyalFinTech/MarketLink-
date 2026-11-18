@@ -2612,20 +2612,54 @@
   }
   async function renderLiveAdminAnalytics(period){
     var root=G('adash-body');if(!root)return;
+    var selectedPeriod=period||'30d';
     root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live analytics</div><div class="ml-hero-sub">Loading production analytics…</div></div>';
     try{
-      var r=await ML_API.admin.analytics({period:period||'30d'}),d=r.data||{};
-      var daily=Array.isArray(d.dailyRevenue)?d.dailyRevenue:[],statusRows=Array.isArray(d.ordersByStatus)?d.ordersByStatus:[],signups=Array.isArray(d.signups)?d.signups:[];
-      var totalOrders=statusRows.reduce(function(a,x){return a+Number(x.count||0);},0);
+      var r=await ML_API.admin.analytics({period:selectedPeriod}),d=r.data||{};
+      var daily=Array.isArray(d.dailyRevenue)?d.dailyRevenue:[],statusRows=Array.isArray(d.ordersByStatus)?d.ordersByStatus:[],signups=Array.isArray(d.signups)?d.signups:[],categories=Array.isArray(d.topCategories)?d.topCategories:[];
+      var trend=d.trend||{},insights=d.insights||{},insightRows=Array.isArray(insights.items)?insights.items:[];
+      var totalOrders=Number(d.totals&&d.totals.orders||statusRows.reduce(function(a,x){return a+Number(x.count||0);},0));
       var totalRevenue=daily.reduce(function(a,x){return a+Number(x.revenue||0);},0);
+      var totalNet=daily.reduce(function(a,x){return a+Number(x.platform_net_revenue||0);},0);
+      var totalGrossCommission=daily.reduce(function(a,x){return a+Number(x.platform_gross_commission||0);},0);
+      var totalAffiliate=daily.reduce(function(a,x){return a+Number(x.affiliate_commission||0);},0);
       var maxRev=Math.max.apply(null,daily.map(function(x){return Number(x.revenue||0);}).concat([1]));
-      var revBars=daily.slice(-14).map(function(x){var v=Number(x.revenue||0),h=Math.max(4,Math.round(v/maxRev*120));return '<div title="'+esc(String(x.day||''))+': '+money(v)+'" style="flex:1;min-width:9px;height:'+h+'px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#42D2C9,#0D7377);"></div>';}).join('');
+      var revBars=daily.slice(-14).map(function(x){var v=Number(x.revenue||0),h=Math.max(2,Math.round(v/maxRev*112));return '<div title="'+esc(String(x.day||''))+': '+money(v)+' GMV" style="flex:1;min-width:5px;height:'+h+'px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#42D2C9,#0D7377);"></div>';}).join('');
+      var chartColors=['#D9A441','#21A69A','#6686D8','#D97878','#8C6AC7','#56A6CE','#A5A84B','#C58A54'];
+      function pie(items,labelKey,valueKey){
+        var valid=items.filter(function(x){return Number(x[valueKey]||0)>0;});
+        var total=valid.reduce(function(sum,x){return sum+Number(x[valueKey]||0);},0);
+        if(!total)return '<div class="ml-empty"><b>No distribution data yet</b><span>Pie chart will populate when production records are available.</span></div>';
+        var angle=0,stops=[],legend='';
+        valid.forEach(function(x,i){
+          var next=angle+Number(x[valueKey]||0)/total*100;
+          stops.push(chartColors[i%chartColors.length]+' '+angle.toFixed(2)+'% '+next.toFixed(2)+'%');
+          legend+='<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin:5px 0"><i style="width:9px;height:9px;border-radius:50%;background:'+chartColors[i%chartColors.length]+';flex:none"></i><span style="flex:1;min-width:0;overflow-wrap:anywhere">'+esc(x[labelKey]||'Other')+'</span><b>'+Number(x[valueKey]||0)+'</b></div>';
+          angle=next;
+        });
+        return '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 4px"><div role="img" aria-label="Distribution pie chart" style="width:150px;height:150px;max-width:42vw;border-radius:50%;background:conic-gradient('+stops.join(',')+');position:relative;flex:none"><div style="position:absolute;inset:28%;border-radius:50%;background:var(--sf,#111827);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">'+total+'</div></div><div style="flex:1;min-width:135px">'+legend+'</div></div>';
+      }
       var statusHtml=statusRows.length?statusRows.map(function(x){return '<div class="ml-profile-row"><div class="ico">📦</div><div class="copy"><b>'+esc(x.status||'Unknown')+'</b><span>Orders in selected period</span></div><strong>'+Number(x.count||0)+'</strong></div>';}).join(''):'<div class="ml-empty"><b>No order activity yet</b><span>The selected period contains no production orders.</span></div>';
       var signupHtml=signups.length?signups.slice(-10).map(function(x){return '<div class="ml-profile-row"><div class="ico">👥</div><div class="copy"><b>'+esc(String(x.day||'').slice(0,10))+'</b><span>New user registrations</span></div><strong>'+Number(x.users||0)+'</strong></div>';}).join(''):'<div class="ml-empty"><b>No customer growth data yet</b><span>No registrations were recorded in the selected period.</span></div>';
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">MarketLink Operations</div><h3 style="margin:4px 0">Live analytics</h3></div><button onclick="window.ML_Premium.refreshAdminAnalytics()">Refresh</button></div>'+
-        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Orders</div><div class="ml-stat-value">'+totalOrders+'</div></div><div class="ml-stat"><div class="ml-stat-label">Confirmed GMV</div><div class="ml-stat-value">'+money(totalRevenue)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Signup days</div><div class="ml-stat-value">'+signups.length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Period</div><div class="ml-stat-value">'+esc(period||'30d')+'</div></div></div>'+
-        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Confirmed GMV by day</h3><span style="color:#91A4B4;font-size:10px">Live backend data</span></div><div style="height:150px;display:flex;align-items:flex-end;gap:5px;padding:12px 4px 4px">'+(revBars||'<div class="ml-empty"><b>No revenue data</b></div>')+'</div></div>'+
-        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Order status</h3></div>'+statusHtml+'</div>'+
+      var maxLine=Math.max.apply(null,daily.map(function(x){return Math.max(Number(x.revenue||0),Number(x.platform_net_revenue||0));}).concat([1]));
+      var pointsGmv=daily.map(function(x,i){var px=daily.length<2?50:i/(daily.length-1)*680+30,py=170-(Number(x.revenue||0)/maxLine*145);return px.toFixed(1)+','+py.toFixed(1);}).join(' ');
+      var pointsNet=daily.map(function(x,i){var px=daily.length<2?50:i/(daily.length-1)*680+30,py=170-(Number(x.platform_net_revenue||0)/maxLine*145);return px.toFixed(1)+','+py.toFixed(1);}).join(' ');
+      var lineChart=daily.length?'<svg viewBox="0 0 740 190" role="img" aria-label="Daily confirmed GMV and MarketLink net commission line chart" style="width:100%;height:auto;min-height:150px;overflow:visible"><line x1="25" y1="170" x2="715" y2="170" stroke="rgba(148,163,184,.35)"/><line x1="25" y1="95" x2="715" y2="95" stroke="rgba(148,163,184,.18)"/><line x1="25" y1="20" x2="715" y2="20" stroke="rgba(148,163,184,.18)"/><polyline points="'+pointsGmv+'" fill="none" stroke="#21A69A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="'+pointsNet+'" fill="none" stroke="#D9A441" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--mu,#94a3b8);padding:0 8px 8px"><span>🟢 Confirmed GMV</span><span>🟡 MarketLink net commission</span></div>':'<div class="ml-empty"><b>No revenue trend data</b><span>Confirmed sales will appear here after delivered orders have confirmed payments.</span></div>';
+      function trendText(value,current,previous){
+        if(value===null||value===undefined)return previous>0?'No comparable change available':'New baseline';
+        return (Number(value)>0?'↑ ':Number(value)<0?'↓ ':'→ ')+Math.abs(Number(value))+'% vs previous '+selectedPeriod;
+      }
+      function trendColor(value){return value===null||value===undefined?'#94a3b8':Number(value)>0?'#20B486':Number(value)<0?'#E07878':'#D9A441';}
+      var gmvTrend=trendText(trend.gmvChangePct,trend.currentGmv,trend.previousGmv),netTrend=trendText(trend.platformNetChangePct,trend.currentPlatformNet,trend.previousPlatformNet);
+      var insightsHtml=insightRows.length?insightRows.map(function(x){var c=x.type==='positive'?'#20B486':x.type==='attention'?'#D9A441':'#6686D8';return '<div style="border-left:3px solid '+c+';padding:9px 12px;margin:9px 0;background:rgba(148,163,184,.06);border-radius:0 10px 10px 0"><b>'+esc(x.title||'Business insight')+'</b><div style="font-size:12px;line-height:1.55;margin-top:4px">'+esc(x.detail||'')+'</div><div style="font-size:12px;line-height:1.55;margin-top:5px;color:var(--mu,#94a3b8)"><b>Recommended:</b> '+esc(x.recommendation||'Review the underlying report.')+'</div></div>';}).join(''):'<div class="ml-empty">Not enough production data to generate insights yet.</div>';
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">MarketLink Operations</div><h3 style="margin:4px 0">Live analytics & business insights</h3></div><button onclick="window.ML_Premium.refreshAdminAnalytics()">Refresh</button></div>'+
+        '<div style="display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 14px">'+['7d','30d','90d'].map(function(p){return '<button class="ml-btn '+(p===selectedPeriod?'ml-btn-primary':'ml-btn-secondary')+'" onclick="window.ML_Premium.refreshAdminAnalytics(\''+p+'\')">'+p+'</button>';}).join('')+'</div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Orders</div><div class="ml-stat-value">'+totalOrders+'</div></div><div class="ml-stat"><div class="ml-stat-label">Confirmed GMV</div><div class="ml-stat-value">'+money(totalRevenue)+'</div><small style="color:'+trendColor(trend.gmvChangePct)+'">'+esc(gmvTrend)+'</small></div><div class="ml-stat"><div class="ml-stat-label">MarketLink net commission</div><div class="ml-stat-value">'+money(totalNet)+'</div><small style="color:'+trendColor(trend.platformNetChangePct)+'">'+esc(netTrend)+'</small></div><div class="ml-stat"><div class="ml-stat-label">New registrations</div><div class="ml-stat-value">'+Number(d.totals&&d.totals.signups||0)+'</div></div></div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Revenue & income trend</h3><span style="color:#91A4B4;font-size:10px">Confirmed paid deliveries only</span></div>'+lineChart+'</div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Order mix · pie chart</h3></div>'+pie(statusRows,'status','count')+'</div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Sales by category · pie chart</h3></div>'+pie(categories,'name','orders')+'</div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Daily confirmed GMV</h3><span style="color:#91A4B4;font-size:10px">Last 14 days in selected period</span></div><div style="height:135px;display:flex;align-items:flex-end;gap:5px;padding:12px 4px 4px">'+(revBars||'<div class="ml-empty"><b>No revenue data</b></div>')+'</div></div>'+
+        '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Business insights & recommendations</h3><span style="font-size:10px;color:#91A4B4">Data-backed</span></div><p style="font-size:12px;line-height:1.6;color:var(--mu,#94a3b8)">'+esc(insights.summary||'')+'</p>'+insightsHtml+'<small style="display:block;margin-top:10px;color:var(--mu,#94a3b8)">'+esc(insights.method||'Insights are generated from production records.')+'</small></div>'+
         '<div class="ml-profile-card" style="margin-top:12px"><div class="ml-section-head"><h3>Customer growth</h3></div>'+signupHtml+'</div></div>';
     }catch(e){root.innerHTML='<div class="ml-empty" style="margin:20px"><b>Live analytics unavailable</b><span>'+esc(e.error||'The backend did not return analytics.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshAdminAnalytics()">Retry</button></div>';}
   }
