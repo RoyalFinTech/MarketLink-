@@ -181,8 +181,8 @@ assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /__ML_A
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /Start direct chat/, 'CRM profile must provide an obvious direct chat control');
 assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
 assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
-assert.match(html, /Gamcel is still using its existing 7-digit number/, 'Phone selector must distinguish Gamcel Phase 1 from migrated nine-digit networks');
-assert.match(premiumJs, /gamcelLegacy\?\!\/\^\\d\{7\}\$\//, 'Admin login must preserve current Gamcel Phase 1 seven-digit compatibility');
+assert.match(html, /Gamcel \(enter full 9 digits\)/, 'Gamcel selector must request all nine national digits');
+assert.match(premiumJs, /if\(!\/\^\\d\{9\}\$\/.test\(phone\)\)/, 'Admin login must require nine national digits for every selected network');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
@@ -207,3 +207,11 @@ assert.match(premiumJs, /Payment could not be completed; order cancelled and sto
 
 assert.match(premiumJs, /payment_attempt_pending/, 'Order tracking must respect pending mobile-money attempts before showing cancellation');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/orders/service.js'), 'utf8'), /PAYMENT_ATTEMPT_PENDING/, 'Backend must block cancellation while a mobile-money payment is pending');
+
+const riderRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/routes.js'), 'utf8');
+const vendorRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/routes.js'), 'utf8');
+assert.ok(html.includes("maxlength=\"'+(selected==='GAMCEL'?'9':'7')+'\""), 'Network selector must request nine digits for Gamcel and seven subscriber digits after the two-digit prefix for other networks');
+assert.ok(html.includes("if(op==='GAMCEL'){if(n.length!==9)"), 'Gamcel network selector must validate nine national digits');
+assert.ok(riderRoutes.includes('/^\\+220\\d{9}$/'), 'Rider Gambian contacts must require nine national digits');
+assert.ok(vendorRoutes.includes('/^\\+220\\d{9}$/'), 'Vendor Gambian contacts must require nine national digits');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js'), 'utf8'), /if \(digits.length === 9\) return digits;/, 'Phone normalization must accept the complete nine-digit Gambian national format without guessing an unverified prefix');
