@@ -317,8 +317,7 @@ async function getPaymentStatus(paymentId, actorId, roles) {
 }
 
 async function confirmPayment(paymentId,actorId,roles){
-  const {rows:[payment]}=await query('SELECT * FROM payments WHERE id = $1',[paymentId]);
-  if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+  const payment=await findOwnedPayment(paymentId,actorId,roles);
   const roleList=Array.isArray(roles)?roles:[];
   const isAdmin=roleList.some(r=>['admin','super_admin'].includes(r));
   if(payment.method==='cod'){

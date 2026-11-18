@@ -26,7 +26,7 @@ describe('Pay on Delivery reconciliation',()=>{
   process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME='MarketLink Gambia';
   jest.clearAllMocks();
   query.mockImplementation(async(sql)=>{
-   if(sql.startsWith('SELECT * FROM payments WHERE id = $1'))return{rows:[payment]};
+   if(sql.includes('FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.id=$1'))return{rows:[{...payment,customer_id:deliveredOrder.customer_id}]};
    if(sql.includes('SELECT status FROM cod_cash_remittances'))return{rows:[{status:'verified'}]};
    if(sql.startsWith('SELECT status FROM orders'))return{rows:[{status:'delivered'}]};
    return{rows:[]};
@@ -91,9 +91,23 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(withTransaction).not.toHaveBeenCalled();
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
+ test('does not expose another customer\'s already-confirmed mobile-money payment',async()=>{
+  const confirmed={...payment,method:'wave',status:'confirmed'};
+  query.mockResolvedValueOnce({rows:[{...confirmed,customer_id:'another-customer'}]});
+  await expect(confirmPayment(payment.id,'attacker',['customer']))
+   .rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+ test('allows the owning customer to read their already-confirmed payment',async()=>{
+  const confirmed={...payment,method:'wave',status:'confirmed'};
+  query.mockResolvedValueOnce({rows:[{...confirmed,customer_id:'owner-customer'}]});
+  await expect(confirmPayment(payment.id,'owner-customer',['customer']))
+   .resolves.toMatchObject({id:payment.id,status:'confirmed'});
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
  test('refuses to confirm COD before the order is delivered',async()=>{
   query.mockImplementation(async(sql)=>{
-   if(sql.startsWith('SELECT * FROM payments WHERE id = $1'))return{rows:[payment]};
+   if(sql.includes('FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.id=$1'))return{rows:[{...payment,customer_id:deliveredOrder.customer_id}]};
    if(sql.includes('SELECT status FROM cod_cash_remittances'))return{rows:[{status:'verified'}]};
    if(sql.startsWith('SELECT status FROM orders'))return{rows:[{status:'preparing'}]};
    return{rows:[]};
