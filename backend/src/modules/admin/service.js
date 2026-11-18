@@ -146,10 +146,22 @@ async function getAnalytics({ period='30d' }) {
 
 async function getSystemSettings() {
   const { rows } = await query('SELECT * FROM system_settings ORDER BY category, key');
-  return rows;
+  // Redact on the server. Hiding a secret in the browser UI is not protection:
+  // the raw API response would still expose it in DevTools and network logs.
+  return rows.map(row => {
+    const isSecret = /(secret|token|password|api.?key|private|credential)/i.test(String(row.key || ''));
+    return isSecret ? { ...row, value: '[protected]', is_secret: true } : { ...row, is_secret: false };
+  });
 }
 
 async function updateSystemSetting(key, value, actorId) {
+  if (/(secret|token|password|api.?key|private|credential)/i.test(String(key || ''))) {
+    throw new (require('../../middleware/errorHandler').AppError)(
+      'Provider credentials and secrets must be stored in Render environment variables, not system settings.',
+      400,
+      'SECRET_MUST_USE_ENVIRONMENT'
+    );
+  }
   const { rows:[s] } = await query(
     `INSERT INTO system_settings (key, value, category, updated_by)
      VALUES ($1,$2,$3,$4)
