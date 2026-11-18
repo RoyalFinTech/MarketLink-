@@ -51,9 +51,9 @@ async function getUsers({ page=1, limit=20, search, role, status }) {
   if (role)   { conds.push(`r.name=$${pi++}`);   params.push(role); }
   const join = role ? 'JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id' : 'LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id';
   const { rows } = await query(
-    `SELECT DISTINCT u.id, u.full_name, u.phone, u.email, u.status, u.created_at, u.last_login_at,
+    `SELECT DISTINCT u.id, u.full_name, u.phone, u.email, u.status, u.created_at, u.last_login_at, c.profile_photo_url,
             array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles
-     FROM users u ${join}
+     FROM users u LEFT JOIN customers c ON c.user_id=u.id ${join}
      WHERE ${conds.join(' AND ')}
      GROUP BY u.id
      ORDER BY u.created_at DESC LIMIT $${pi} OFFSET $${pi+1}`,
@@ -294,7 +294,7 @@ async function replySupportTicket(ticketId,body,actor){
  });
 }
 async function getCrmProfile(userId){
- const {rows:[user]}=await query("SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,array_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL) AS roles,(SELECT count(*)::int FROM support_tickets st WHERE st.raised_by=u.id) AS support_tickets,(SELECT count(*)::int FROM orders o WHERE o.customer_id=u.id) AS orders_count FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id",[userId]);
+ const {rows:[user]}=await query("SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,c.profile_photo_url,array_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL) AS roles,(SELECT count(*)::int FROM support_tickets st WHERE st.raised_by=u.id) AS support_tickets,(SELECT count(*)::int FROM orders o WHERE o.customer_id=u.id) AS orders_count FROM users u LEFT JOIN customers c ON c.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id,c.profile_photo_url",[userId]);
  if(!user){const e=new Error('CRM user not found.');e.status=404;e.code='USER_NOT_FOUND';throw e;}
  const [customer,vendor,rider,notes]=await Promise.all([
   query('SELECT * FROM customers WHERE user_id=$1',[userId]),query('SELECT * FROM vendors WHERE user_id=$1',[userId]),query('SELECT * FROM riders WHERE user_id=$1',[userId]),
