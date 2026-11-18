@@ -1706,9 +1706,11 @@
   async function submitDahaDeposit(){
     var amount=Number(G('ml-daha-deposit-amount')&&G('ml-daha-deposit-amount').value||0);
     var method=String(G('ml-daha-deposit-method')&&G('ml-daha-deposit-method').value||'modempay');
-    var accountNumber=String(G('ml-daha-deposit-number')&&G('ml-daha-deposit-number').value||'').replace(/\D/g,'');
+     var depositDigits=String(G('ml-daha-deposit-number')&&G('ml-daha-deposit-number').value||'').replace(/\D/g,'');
+     var depositPrefix=String(G('ml-daha-deposit-prefix')&&G('ml-daha-deposit-prefix').value||'87');
+     var accountNumber=/^(87|83|86)$/.test(depositPrefix)&&/^\d{7}$/.test(depositDigits)?depositPrefix+depositDigits:'';
     if(!(amount>0)){toast('Enter a valid deposit amount.','error');return;}
-    if(S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&!/^(87|86|83)\d{7}$/.test(accountNumber)){toast('Enter the full 9-digit mobile-money number, including its 87, 86 or 83 prefix.','error');return;}
+     if(S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&!/^(87|86|83)\d{7}$/.test(accountNumber)){toast('Select your mobile network and enter the 7 digits after its prefix.','error');if(G('ml-daha-deposit-number'))G('ml-daha-deposit-number').focus();return;}
     try{
       var response=await ML_API.wallet.createDeposit({amount:amount,method:method,accountNumber:accountNumber||undefined});
       var data=response&&response.data||response;
@@ -1732,9 +1734,11 @@
     var isRider=roles.indexOf('rider')>=0;
     if(!isVendor&&!isRider){toast('Only vendor and rider accounts can save a payout destination.','error');return;}
     var payoutMethod=String(G('ml-daha-payout-method')&&G('ml-daha-payout-method').value||'wave');
-    var accountNumber=String(G('ml-daha-payout-number')&&G('ml-daha-payout-number').value||'').replace(/\D/g,'');
+     var payoutDigits=String(G('ml-daha-payout-number')&&G('ml-daha-payout-number').value||'').replace(/\D/g,'');
+     var payoutPrefix=String(G('ml-daha-payout-prefix')&&G('ml-daha-payout-prefix').value||'87');
+     var accountNumber=/^(87|83|86)$/.test(payoutPrefix)&&/^\d{7}$/.test(payoutDigits)?payoutPrefix+payoutDigits:'';
     var beneficiaryName=String(G('ml-daha-payout-name')&&G('ml-daha-payout-name').value||'').trim();
-    if(!/^(87|86|83)\d{7}$/.test(accountNumber)){toast('Enter a 9-digit payout number beginning 87, 86 or 83.','error');return;}
+     if(!/^(87|86|83)\d{7}$/.test(accountNumber)){toast('Choose a mobile network and enter the 7 digits after its prefix.','error');return;}
     if(!beneficiaryName){toast('Enter the payout account holder name.','error');return;}
     try{
       var payload={payoutMethod:payoutMethod,accountNumber:accountNumber,beneficiaryName:beneficiaryName};
@@ -1749,11 +1753,13 @@
   function reviewDahaWithdrawal(){
     var amount=Number(G('ml-daha-withdraw-amount')&&G('ml-daha-withdraw-amount').value||0);
     var payoutMethod=String(G('ml-daha-withdraw-method')&&G('ml-daha-withdraw-method').value||'').toLowerCase();
-    var account=String(G('ml-daha-withdraw-number')&&G('ml-daha-withdraw-number').value||'').replace(/\D/g,'');
+     var subscriber=String(G('ml-daha-withdraw-number')&&G('ml-daha-withdraw-number').value||'').replace(/\D/g,'');
+     var prefix=String(G('ml-daha-withdraw-prefix')&&G('ml-daha-withdraw-prefix').value||'87');
+     var account=/^(87|83|86)$/.test(prefix)&&/^\d{7}$/.test(subscriber)?prefix+subscriber:'';
     var name=String(G('ml-daha-withdraw-name')&&G('ml-daha-withdraw-name').value||'').trim();
     if(!(amount>=50)){toast('The minimum withdrawal is D 50.00.','error');return;}
     if(['wave','afrimoney'].indexOf(payoutMethod)<0){toast('Choose Wave or AfriMoney.','error');return;}
-    if(!/^(87|86|83)\d{7}$/.test(account)){toast('Enter a valid 9-digit receiver number beginning 87, 86 or 83.','error');return;}
+     if(!/^(87|86|83)\d{7}$/.test(account)){toast('Select the receiver network and enter the 7 digits after its prefix.','error');if(G('ml-daha-withdraw-number'))G('ml-daha-withdraw-number').focus();return;}
     if(!name){toast('Enter the recipient account holder name.','error');return;}
     dahaWithdrawalDraft={amount:Math.round(amount*100)/100,payoutMethod:payoutMethod,accountNumber:account,beneficiaryName:name};
     var review=G('ml-daha-withdraw-review');
