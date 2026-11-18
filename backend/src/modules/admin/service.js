@@ -133,7 +133,7 @@ async function getAnalytics({ period='30d' }) {
              AND status='delivered' AND payment_status='confirmed'
            GROUP BY 1 ORDER BY 1`, [days]),
     query(`SELECT status, count(*) FROM orders WHERE placed_at>=now()-($1||' days')::INTERVAL GROUP BY status`, [days]),
-    query(`SELECT c.name, count(p.id) AS products, count(DISTINCT o.id) AS orders
+    query(`SELECT c.name, count(DISTINCT p.id) AS products, count(DISTINCT o.id) AS orders
            FROM categories c LEFT JOIN products p ON p.category_id=c.id
            LEFT JOIN order_items oi ON oi.product_id=p.id
            LEFT JOIN orders o ON o.id=oi.order_id AND o.status='delivered' AND o.payment_status='confirmed'
