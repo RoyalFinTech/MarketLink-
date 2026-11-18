@@ -5,7 +5,7 @@ function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(
 
 async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paymentMethod, couponCode, affiliateCode }) {
   paymentMethod=String(paymentMethod||'').toLowerCase();
-  if(!['cod','wallet'].includes(paymentMethod))throw new AppError('Choose Cash on Delivery or DAHA Wallet.',400,'UNSUPPORTED_PAYMENT_METHOD');
+  if(!['cod','wallet','wave','afrimoney','qmoney','modempay'].includes(paymentMethod))throw new AppError('Choose an enabled MarketLink payment method.',400,'UNSUPPORTED_PAYMENT_METHOD');
   if (!Array.isArray(items) || !items.length) throw new AppError('Order must contain at least one item.',400,'EMPTY_ORDER');
   if (!vendorId) throw new AppError('Vendor is required.',400,'VENDOR_REQUIRED');
   for (const item of items) {
