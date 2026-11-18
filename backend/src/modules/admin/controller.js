@@ -48,3 +48,11 @@ exports.approveWithdrawal = wrap(async (req,res) => {
   res.json({ success:true, message, data });
 });
 exports.rejectWithdrawal   = wrap(async (req,res) => res.json({ success:true, message:'Withdrawal rejected.', data: await withdrawalsSvc.reject(req.params.id, req.user.id) }));
+
+
+exports.supportTickets = wrap(async (req,res) => res.json({success:true,data:await svc.listSupportTickets(req.query)}));
+exports.supportTicket = wrap(async (req,res) => res.json({success:true,data:await svc.getSupportTicket(req.params.id)}));
+exports.updateSupportTicket = wrap(async (req,res) => res.json({success:true,data:await svc.updateSupportTicket(req.params.id,req.body,actor(req))}));
+exports.replySupportTicket = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.replySupportTicket(req.params.id,req.body.body,actor(req))}));
+exports.crmProfile = wrap(async (req,res) => res.json({success:true,data:await svc.getCrmProfile(req.params.id)}));
+exports.addCrmNote = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.addCrmNote(req.params.id,req.body.note,actor(req))}));
