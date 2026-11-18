@@ -211,7 +211,16 @@ async function approve(withdrawalId, adminUserId) {
   const saved = await query(
     "UPDATE withdrawals SET provider_ref=$1,provider_status=$2,provider_response=$3,updated_at=now() WHERE id=$4 AND status='payout_pending' RETURNING *",
     [providerRef ? String(providerRef) : null, providerStatus.slice(0,40), JSON.stringify(data), wd.id]);
-  if (!saved.rows.length) throw new AppError('Withdrawal changed while the provider transfer was being recorded.', 409, 'WITHDRAWAL_STATE_CHANGED');
+  if (!saved.rows.length) {
+    // A signed provider webhook can complete or reject the transfer before
+    // the synchronous initiation response is persisted. Re-read the locked
+    // outcome instead of returning a false failure to the Admin operator.
+    const { rows: [current] } = await query('SELECT * FROM withdrawals WHERE id=$1', [wd.id]);
+    if (current && ['completed','rejected'].includes(current.status)) return current;
+    if (current && current.status === 'payout_pending' &&
+        providerRef && String(current.provider_ref || '') === String(providerRef)) return current;
+    throw new AppError('Withdrawal changed while the provider transfer was being recorded. Check its provider status before retrying.', 409, 'WITHDRAWAL_STATE_CHANGED');
+  }
 
   if (['completed','succeeded','success'].includes(providerStatus)) {
     const result = Object.assign({}, data, {
@@ -329,6 +338,41 @@ async function processProviderWebhook(event) {
   if (!/^[0-9a-f-]{36}$/i.test(String(withdrawalId))) return { ignored:true, reason:'invalid_withdrawal_id' };
 
   if (event.event === 'transfer.succeeded') {
+    const references = [payload.id,payload.transfer_reference,payload.transaction_reference,payload.reference]
+      .filter(Boolean).map(String);
+    if (!references.length) return { ignored:true, reason:'missing_provider_reference' };
+
+    // A success webhook may beat the HTTP response from /transfers. Bind its
+    // signed reference to the reserved withdrawal before the normal guarded
+    // completion path checks it. The HMAC-verified metadata identifies the
+    // withdrawal; amount/currency and the reference are independently checked.
+    const binding = await withTransaction(async (client) => {
+      const { rows: [wd] } = await client.query(
+        'SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [withdrawalId]);
+      if (!wd) return { ignored:true, reason:'withdrawal_not_found' };
+      if (wd.status === 'completed') return { alreadyCompleted:true };
+      if (wd.status !== 'payout_pending') return { ignored:true, reason:'withdrawal_not_pending' };
+      if (String(wd.provider_ref || '') && !references.includes(String(wd.provider_ref))) {
+        return { ignored:true, reason:'provider_reference_mismatch' };
+      }
+      const amount = Number(payload.amount);
+      if (!Number.isFinite(amount) || Math.abs(amount - Number(wd.amount)) > 0.01) {
+        return { ignored:true, reason:'amount_mismatch' };
+      }
+      if (String(payload.currency || '').toUpperCase() !== 'GMD') {
+        return { ignored:true, reason:'currency_mismatch' };
+      }
+      const providerRef = wd.provider_ref || references[0];
+      const { rows: [updated] } = await client.query(
+        "UPDATE withdrawals SET provider_ref=$1,provider_status='completed',provider_response=$2,updated_at=now() WHERE id=$3 AND status='payout_pending' RETURNING id",
+        [String(providerRef),JSON.stringify(payload),wd.id]);
+      return updated ? { bound:true } : { ignored:true, reason:'withdrawal_state_changed' };
+    });
+    if (binding.alreadyCompleted) {
+      const { rows: [current] } = await query('SELECT * FROM withdrawals WHERE id=$1',[withdrawalId]);
+      return { duplicate:true, data:current || null };
+    }
+    if (binding.ignored) return binding;
     return { processed:true, data:await completeProviderWithdrawal(withdrawalId,payload) };
   }
   if (event.event === 'transfer.flagged') {
