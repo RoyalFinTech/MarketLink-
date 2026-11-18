@@ -27,7 +27,11 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply non-breaking dependency security fixes
+      - name: Upgrade patched Express and CommonJS-compatible UUID releases
+        run: |
+          npm install 'express@^4.22.3' 'uuid@^11.1.1' --save
+          npm update qs
+      - name: Apply remaining non-breaking dependency security fixes
         run: npm audit fix || echo 'Some advisories may require a major upgrade; continue to tests and report the remaining findings.'
       - name: Run backend test suite
         run: npm test -- --runInBand
