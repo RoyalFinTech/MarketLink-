@@ -11,8 +11,10 @@ async function getDashboard() {
                  count(*) FILTER (WHERE status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned','picked_up','on_the_way')) AS active
            FROM orders WHERE placed_at >= now() - INTERVAL '30 days'`),
     query(`SELECT coalesce(sum(total),0) AS total_30d,
-                  coalesce(sum(CASE WHEN placed_at>=now()-INTERVAL '7 days' THEN total END),0) AS total_7d
-           FROM orders WHERE status='delivered'`),
+                  coalesce(sum(CASE WHEN placed_at>=now()-INTERVAL '7 days' THEN total END),0) AS total_7d,
+                  coalesce(sum(platform_net_fee),0) AS platform_net_30d
+           FROM orders WHERE status='delivered' AND payment_status='confirmed'
+             AND placed_at>=now()-INTERVAL '30 days'`),
     query(`SELECT
              (SELECT count(*) FROM vendors WHERE kyc_status='pending') AS pending_vendors,
              (SELECT count(*) FROM riders  WHERE kyc_status='pending') AS pending_riders,
@@ -35,6 +37,7 @@ async function getDashboard() {
       activeOrders:     parseInt(orders.rows[0].active),
       revenue30d:       parseFloat(revenue.rows[0].total_30d),
       revenue7d:        parseFloat(revenue.rows[0].total_7d),
+      platformNetRevenue30d: parseFloat(revenue.rows[0].platform_net_30d),
     },
     pendingApprovals: pendingApprovals.rows[0],
     recentOrders: recentOrders.rows,
@@ -135,9 +138,18 @@ async function getReports({ type, startDate, endDate }) {
   const end   = endDate   || new Date().toISOString();
   if (type==='revenue') {
     const { rows } = await query(
-      `SELECT date_trunc('day',placed_at) AS day, sum(total) AS revenue, count(*) AS orders,
-              sum(platform_fee) AS platform_fees
-       FROM orders WHERE placed_at BETWEEN $1 AND $2 AND status='delivered'
+      `SELECT date_trunc('day',o.placed_at) AS day,
+              count(*)::int AS orders,
+              coalesce(sum(o.total),0) AS gross_order_value,
+              coalesce(sum(o.subtotal-o.discount_amount),0) AS net_merchandise,
+              coalesce(sum(o.platform_fee),0) AS platform_gross_commission,
+              coalesce(sum(o.affiliate_commission_amount),0) AS affiliate_commission,
+              coalesce(sum(o.platform_net_fee),0) AS platform_net_revenue,
+              coalesce(sum(o.vendor_payout),0) AS vendor_payouts,
+              coalesce(sum(o.rider_payout),0) AS rider_payouts
+       FROM orders o
+       WHERE o.placed_at BETWEEN $1 AND $2
+         AND o.status='delivered' AND o.payment_status='confirmed'
        GROUP BY 1 ORDER BY 1`, [start, end]);
     return rows;
   }
@@ -159,6 +171,25 @@ async function getReports({ type, startDate, endDate }) {
        ORDER BY r.total_deliveries DESC LIMIT 50`, []);
     return rows;
   }
+
+async function getAffiliateDirectory({page=1,limit=50,search}={}) {
+  const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||50,1),100),offset=(page_-1)*limit_;
+  const params=[],where=[];
+  if(search){params.push('%'+String(search).trim().slice(0,120)+'%');where.push('(u.full_name ILIKE $1 OR u.phone ILIKE $1 OR u.email ILIKE $1 OR a.affiliate_code ILIKE $1)');}
+  const whereSql=where.length?'WHERE '+where.join(' AND '):'';
+  const {rows}=await query(`SELECT a.user_id,a.affiliate_code,a.commission_pct,a.total_clicks,a.total_orders,
+      a.total_earnings,a.created_at,u.full_name,u.phone,u.email,u.status,
+      coalesce(w.balance,0) AS wallet_balance,
+      coalesce((SELECT count(*)::int FROM orders o WHERE o.affiliate_user_id=a.user_id AND o.status='delivered' AND o.payment_status='confirmed'),0) AS delivered_orders,
+      coalesce((SELECT sum(o.affiliate_commission_amount) FROM orders o WHERE o.affiliate_user_id=a.user_id AND o.status='delivered' AND o.payment_status='confirmed'),0) AS settled_commission
+    FROM affiliates a JOIN users u ON u.id=a.user_id
+    LEFT JOIN wallets w ON w.user_id=a.user_id
+    ${whereSql}
+    ORDER BY a.created_at DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,[...params,limit_,offset]);
+  const {rows:[count]}=await query(`SELECT count(*)::int AS total FROM affiliates a JOIN users u ON u.id=a.user_id ${whereSql}`,params);
+  return {items:rows,total:Number(count.total||0),page:page_,limit:limit_,totalPages:Math.ceil(Number(count.total||0)/limit_)};
+}
+
   throw require('../../middleware/errorHandler').AppError('Unknown report type. Use: revenue, vendors, riders', 400, 'INVALID_REPORT_TYPE');
 }
 
@@ -325,4 +356,4 @@ async function addCrmNote(userId,note,actor){
  return created;
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
