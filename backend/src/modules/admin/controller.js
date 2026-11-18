@@ -3,7 +3,7 @@
 const svc = require('./service');
 const { AppError } = require('../../middleware/errorHandler');
 const wrap = fn => async (req,res,next) => { try { await fn(req,res); } catch(e) { next(e); } };
-const actor = req => ({ id: req.user.id, role: (req.user.roles||[])[0] });
+const actor = req => ({ id: req.user.id, role: (req.user.roles||[]).includes('super_admin') ? 'super_admin' : ((req.user.roles||[])[0] || 'admin') });
 exports.dashboard  = wrap(async (req,res) => res.json({ success:true, data: await svc.getDashboard() }));
 exports.users      = wrap(async (req,res) => res.json({ success:true, data: await svc.getUsers(req.query) }));
 exports.suspend    = wrap(async (req,res) => {
