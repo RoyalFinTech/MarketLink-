@@ -482,4 +482,99 @@ async function addCrmNote(userId,note,actor){
  return created;
 }
 
+
+async function listAdminConversations({page=1,limit=30,search}={}) {
+  const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||30,1),100),offset=(page_-1)*limit_;
+  const params=[],where=[];
+  if(search){
+    params.push('%'+String(search).trim().slice(0,120)+'%');
+    const p=' getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage };
++params.length;
+    where.push('(ua.full_name ILIKE '+p+' OR ua.phone ILIKE '+p+' OR ub.full_name ILIKE '+p+' OR ub.phone ILIKE '+p+' OR va.business_name ILIKE '+p+' OR vb.business_name ILIKE '+p+' OR o.order_number ILIKE '+p+')');
+  }
+  const whereSql=where.length?'WHERE '+where.join(' AND '):'';
+  const {rows}=await query(
+    `SELECT c.id,c.order_id,c.created_at,
+       c.participant_a AS participant_a_id,ua.full_name AS participant_a_name,ua.phone AS participant_a_phone,
+       c.participant_b AS participant_b_id,ub.full_name AS participant_b_name,ub.phone AS participant_b_phone,
+       COALESCE(va.business_name,vb.business_name) AS vendor_name,o.order_number,
+       lm.body AS last_message,lm.created_at AS last_message_at,lm.sender_id AS last_sender_id,
+       (SELECT count(*)::int FROM messages unread
+        WHERE unread.conversation_id=c.id AND unread.read_at IS NULL
+          AND unread.sender_id IN (c.participant_a,c.participant_b)) AS unread_messages
+     FROM conversations c
+     JOIN users ua ON ua.id=c.participant_a
+     JOIN users ub ON ub.id=c.participant_b
+     LEFT JOIN vendors va ON va.user_id=c.participant_a
+     LEFT JOIN vendors vb ON vb.user_id=c.participant_b
+     LEFT JOIN orders o ON o.id=c.order_id
+     LEFT JOIN LATERAL (SELECT body,created_at,sender_id FROM messages
+       WHERE conversation_id=c.id ORDER BY created_at DESC LIMIT 1) lm ON TRUE
+     ${whereSql}
+     ORDER BY COALESCE(lm.created_at,c.created_at) DESC
+     LIMIT ${params.length+1} OFFSET ${params.length+2}`,
+    [...params,limit_,offset]
+  );
+  const {rows:[count]}=await query(
+    `SELECT count(*)::int AS total FROM conversations c
+      JOIN users ua ON ua.id=c.participant_a JOIN users ub ON ub.id=c.participant_b
+      LEFT JOIN vendors va ON va.user_id=c.participant_a LEFT JOIN vendors vb ON vb.user_id=c.participant_b
+      LEFT JOIN orders o ON o.id=c.order_id ${whereSql}`,params
+  );
+  const total=Number(count.total||0);
+  return {items:rows,total,page:page_,limit:limit_,totalPages:Math.ceil(total/limit_)};
+}
+
+async function getAdminConversationMessages(conversationId,{limit=100}={}) {
+  const {rows:[conversation]}=await query(
+    `SELECT c.id,c.order_id,c.created_at,
+       c.participant_a AS participant_a_id,ua.full_name AS participant_a_name,ua.phone AS participant_a_phone,
+       c.participant_b AS participant_b_id,ub.full_name AS participant_b_name,ub.phone AS participant_b_phone,
+       COALESCE(va.business_name,vb.business_name) AS vendor_name,o.order_number
+     FROM conversations c JOIN users ua ON ua.id=c.participant_a JOIN users ub ON ub.id=c.participant_b
+     LEFT JOIN vendors va ON va.user_id=c.participant_a LEFT JOIN vendors vb ON vb.user_id=c.participant_b
+     LEFT JOIN orders o ON o.id=c.order_id WHERE c.id=$1`,[conversationId]
+  );
+  if(!conversation)throw new (require('../../middleware/errorHandler').AppError)('Conversation not found.',404,'CONVERSATION_NOT_FOUND');
+  const limit_=Math.min(Math.max(parseInt(limit,10)||100,1),100);
+  const {rows}=await query(
+    `SELECT m.id,m.conversation_id,m.sender_id,m.body,m.attachment_url,m.status,m.created_at,m.read_at,
+       u.full_name AS sender_name,
+       CASE WHEN m.sender_id=$2 THEN 'participant_a'
+            WHEN m.sender_id=$3 THEN 'participant_b' ELSE 'admin' END AS sender_type
+     FROM messages m JOIN users u ON u.id=m.sender_id
+     WHERE m.conversation_id=$1 ORDER BY m.created_at DESC LIMIT $4`,
+    [conversationId,conversation.participant_a_id,conversation.participant_b_id,limit_]
+  );
+  return {conversation,messages:rows.reverse()};
+}
+
+async function sendAdminConversationMessage(conversationId,body,actor) {
+  const text=String(body||'').trim();
+  if(!text||text.length>4000)throw new (require('../../middleware/errorHandler').AppError)('Message must contain 1–4000 characters.',400,'INVALID_MESSAGE');
+  return withTransaction(async client=>{
+    const {rows:[conversation]}=await client.query(
+      'SELECT id,participant_a,participant_b FROM conversations WHERE id=$1 FOR UPDATE',[conversationId]
+    );
+    if(!conversation)throw new (require('../../middleware/errorHandler').AppError)('Conversation not found.',404,'CONVERSATION_NOT_FOUND');
+    const {rows:[message]}=await client.query(
+      `INSERT INTO messages(conversation_id,sender_id,body,status)
+       VALUES($1,$2,$3,'sent') RETURNING id,conversation_id,sender_id,body,status,created_at`,
+      [conversationId,actor.id,text]
+    );
+    await client.query(
+      `INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id)
+       VALUES($1,'chat_message','MarketLink support replied','An administrator replied in your MarketLink conversation.','conversation',$3),
+             ($2,'chat_message','MarketLink support replied','An administrator replied in your MarketLink conversation.','conversation',$3)`,
+      [conversation.participant_a,conversation.participant_b,conversationId]
+    );
+    await client.query(
+      `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES($1,$2,'chat.admin_reply_sent','conversation',$3,$4)`,
+      [actor.id,actor.role||'admin',conversationId,JSON.stringify({messageId:message.id,recipientIds:[conversation.participant_a,conversation.participant_b]})]
+    );
+    return message;
+  });
+}
+
 module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
