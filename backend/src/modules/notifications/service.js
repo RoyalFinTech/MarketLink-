@@ -296,23 +296,36 @@ async function listCampaigns({page=1,limit=25}={}){
  const {rows:[count]}=await query("SELECT count(*)::int AS total FROM notification_campaigns",[]);
  return {items:rows,total:count.total,page:p,limit:l,totalPages:Math.ceil(count.total/l)};
 }
-async function createCampaign({title,body,audience,channels,createdBy}){
- const allowed=['all','customers','vendors','riders','admins'];
+async function createCampaign({title,body,audience,channels,createdBy,recipientIds=[]}){
+ const allowed=['all','customers','vendors','riders','admins','selected'];
  if(!allowed.includes(audience)){const e=new Error('Unsupported campaign audience.');e.status=400;e.code='INVALID_CAMPAIGN_AUDIENCE';throw e;}
+ const ids=Array.isArray(recipientIds)?Array.from(new Set(recipientIds.map(x=>String(x)))):[];
+ if(audience==='selected'&&(!ids.length||ids.length>100)){const e=new Error('Select between 1 and 100 individual recipients.');e.status=400;e.code='CAMPAIGN_RECIPIENTS_REQUIRED';throw e;}
+ if(audience!=='selected'&&ids.length){const e=new Error('Individual recipients are only valid for a selected-recipient campaign.');e.status=400;e.code='CAMPAIGN_RECIPIENTS_NOT_ALLOWED';throw e;}
  const safeChannels={inapp:true,email:!!(channels&&channels.email),sms:!!(channels&&channels.sms),push:!!(channels&&channels.push)};
  if(!safeChannels.inapp&&!safeChannels.email&&!safeChannels.sms&&!safeChannels.push){const e=new Error('Select at least one delivery channel.');e.status=400;e.code='CAMPAIGN_CHANNEL_REQUIRED';throw e;}
+ const {rows:valid}=ids.length?await query("SELECT id FROM users WHERE id=ANY($1::uuid[]) AND status='active'",[ids]):{rows:[]};
+ if(ids.length&&valid.length!==ids.length){const e=new Error('One or more selected recipients are unavailable or inactive. Refresh the directory and try again.');e.status=400;e.code='INVALID_CAMPAIGN_RECIPIENTS';throw e;}
  const {rows:[campaign]}=await query("INSERT INTO notification_campaigns(title,body,audience,channels,created_by) VALUES($1,$2,$3,$4::jsonb,$5) RETURNING *",[title,body||null,audience,JSON.stringify(safeChannels),createdBy]);
+ if(ids.length) await query("INSERT INTO notification_campaign_recipients(campaign_id,user_id,status) SELECT $1,recipient_id,'queued' FROM unnest($2::uuid[]) AS recipient_id ON CONFLICT(campaign_id,user_id) DO NOTHING",[campaign.id,ids]);
  return campaign;
 }
 async function sendCampaign(campaignId,actorId){
  const {rows:[campaign]}=await query("UPDATE notification_campaigns SET status='sending',updated_at=now() WHERE id=$1 AND status='draft' RETURNING *",[campaignId]);
  if(!campaign){const e=new Error('Campaign not found or it has already been sent.');e.status=409;e.code='CAMPAIGN_NOT_SENDABLE';throw e;}
- let audienceSql="u.status='active'";
- if(campaign.audience==='customers')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='customer')";
- if(campaign.audience==='vendors')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='vendor')";
- if(campaign.audience==='riders')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='rider')";
- if(campaign.audience==='admins')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name IN ('admin','super_admin','moderator'))";
- const {rows:users}=await query("SELECT u.id,u.email,u.phone FROM users u WHERE "+audienceSql+" ORDER BY u.created_at ASC LIMIT 1000",[]);
+ let users=[];
+ if(campaign.audience==='selected'){
+  const {rows}=await query("SELECT u.id,u.email,u.phone FROM notification_campaign_recipients cr JOIN users u ON u.id=cr.user_id WHERE cr.campaign_id=$1 AND cr.status='queued' AND u.status='active' ORDER BY u.created_at ASC",[campaignId]);
+  users=rows;
+ }else{
+  let audienceSql="u.status='active'";
+  if(campaign.audience==='customers')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='customer')";
+  if(campaign.audience==='vendors')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='vendor')";
+  if(campaign.audience==='riders')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name='rider')";
+  if(campaign.audience==='admins')audienceSql+=" AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.name IN ('admin','super_admin','moderator'))";
+  const result=await query("SELECT u.id,u.email,u.phone FROM users u WHERE "+audienceSql+" ORDER BY u.created_at ASC LIMIT 1000",[]);
+  users=result.rows;
+ }
  await query("UPDATE notification_campaigns SET recipient_count=$2,updated_at=now() WHERE id=$1",[campaignId,users.length]);
  let sent=0,failed=0;
  for(let i=0;i<users.length;i+=5){
