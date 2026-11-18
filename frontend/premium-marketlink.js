@@ -379,10 +379,25 @@
     var idEl=G('admin-staffid'),pinEl=G('admin-password');
     var phone=(idEl&&idEl.value||'').trim(),pin=(pinEl&&pinEl.value||'').trim();
     if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
+    if(!/^\\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
+    if(!/^\\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
     try{
-      var user=await ML_API.auth.login(phone,pin),roles=user.roles||[];
-      if(!roles.some(function(r){return r==='admin'||r==='super_admin';})){await ML_API.auth.logout();throw {error:'This account is not authorized for the Admin Portal.'};}
-      AdminSession.start(phone);showScreen('scr-app');G('bnav').style.display='none';G('fab').classList.remove('fab-visible');switchTab('admindash');toast('Welcome to the Admin Portal ✓');
+      var loginResponse=await ML_API.auth.login(phone,pin);
+      // The API response is { user: { roles: [...] }, accessToken, refreshToken }.
+      // Some older Admin-only builds returned the envelope one level deeper.
+      var user=loginResponse&&loginResponse.data&&loginResponse.data.user
+        ?loginResponse.data.user
+        :(loginResponse&&loginResponse.user?loginResponse.user:loginResponse);
+      var roles=Array.isArray(user&&user.roles)?user.roles:[];
+      if(!roles.some(function(r){return r==='admin'||r==='super_admin';})){
+        // Keep the authenticated session intact for diagnostics; do not silently
+        // discard a valid customer session just because role data was nested.
+        await ML_API.auth.logout();
+        throw {error:'Your MarketLink account signed in, but its administrator role could not be confirmed. Please contact support with code ADMIN_ROLE_RESPONSE.'};
+      }
+      AdminSession.start(phone);
+      showScreen('scr-app');G('bnav').style.display='none';G('fab').classList.remove('fab-visible');
+      switchTab('admindash');toast('Welcome to the Admin Portal ✓');
     }catch(e){adminAuthErr(e.error||'Admin sign-in failed.');}
   }
   async function loadAdminDashboard(){
