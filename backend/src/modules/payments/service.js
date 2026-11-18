@@ -746,11 +746,12 @@ async function refund(paymentId,{amount,reason},actor){
       throw new AppError('A refund has already been processed or is awaiting reconciliation.',409,'ALREADY_REFUNDED');
     if(payment.status!=='confirmed')
       throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');
-    const refundAmount=amount==null?Number(payment.amount):Number(amount);
-    const paymentAmount=Number(payment.amount);
-    if(!Number.isFinite(refundAmount)||refundAmount<=0||refundAmount>paymentAmount+0.01)
+    const requestedAmount=amount==null?Number(payment.amount):Number(amount);
+    const paymentAmount=Math.round(Number(payment.amount)*100)/100;
+    const refundAmount=Math.round(requestedAmount*100)/100;
+    if(!Number.isFinite(requestedAmount)||!Number.isFinite(refundAmount)||refundAmount<=0||refundAmount>paymentAmount)
       throw new AppError('Enter a valid refund amount not exceeding the payment amount.',400,'INVALID_AMOUNT');
-    if(Math.abs(refundAmount-paymentAmount)>0.01)
+    if(refundAmount!==paymentAmount)
       throw new AppError('Partial refunds are not enabled yet. Process a full refund so the customer ledger and revenue reconciliation remain consistent.',409,'PARTIAL_REFUND_NOT_SUPPORTED');
     const fullRefund=true;
     if(payment.method!=='cod'&&payment.method!=='wallet'){
