@@ -7872,7 +7872,7 @@ window.addEventListener('unhandledrejection',function(e){
     var root=premiumRoot();
     if(!root)return;
     var safe=String(message||'Unknown startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
-    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r49 · Cache: shell-v52</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r50 · Cache: shell-v53</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
     var button=document.getElementById('ml-premium-diagnostic-retry');
     if(button)button.addEventListener('click',function(){
       button.disabled=true;button.textContent='Retrying…';
