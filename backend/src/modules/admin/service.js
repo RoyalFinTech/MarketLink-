@@ -488,8 +488,7 @@ async function listAdminConversations({page=1,limit=30,search}={}) {
   const params=[],where=[];
   if(search){
     params.push('%'+String(search).trim().slice(0,120)+'%');
-    const p=' getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage };
-+params.length;
+    const p='$'+params.length;
     where.push('(ua.full_name ILIKE '+p+' OR ua.phone ILIKE '+p+' OR ub.full_name ILIKE '+p+' OR ub.phone ILIKE '+p+' OR va.business_name ILIKE '+p+' OR vb.business_name ILIKE '+p+' OR o.order_number ILIKE '+p+')');
   }
   const whereSql=where.length?'WHERE '+where.join(' AND '):'';
@@ -577,4 +576,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage };
