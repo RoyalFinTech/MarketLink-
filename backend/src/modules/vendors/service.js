@@ -5,6 +5,18 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { normalizePhone } = require('../../utils/phone');
+function normalizeGambianContact(value, label) {
+  if (value == null || String(value).trim() === '') return null;
+  try {
+    const parsed = normalizePhone(String(value), 'GM');
+    if (!parsed.e164.startsWith('+220') || String(parsed.national).length !== 9) throw new Error('Invalid Gambian mobile number');
+    return parsed.e164;
+  } catch (error) {
+    throw new AppError((label || 'Contact number') + ' must be a valid Gambian mobile number with 9 national digits.', 400, 'INVALID_PHONE');
+  }
+}
+
 
 function actorLog(actor, action, entityId, before, after) {
   return query(
@@ -24,6 +36,23 @@ async function register(userId, data) {
           description, servicesOffered, workingDays, openingTime, closingTime, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
 
   if (!businessName?.trim()) throw new AppError('Business name is required.', 400, 'VALIDATION_ERROR');
+  const normalizedBusinessPhone = normalizeGambianContact(phone, 'Business phone');
+  const normalizedWhatsapp = normalizeGambianContact(whatsappNumber, 'WhatsApp contact');
+  let resolvedBusinessCategory = businessCategory ? String(businessCategory).trim() : null;
+  let resolvedBusinessCategoryGroup = businessCategoryGroup || null;
+  if (resolvedBusinessCategory) {
+    const { rows: categoryRows } = await query(
+      `SELECT c.name, parent.name AS parent_name
+       FROM categories c LEFT JOIN categories parent ON parent.id=c.parent_id
+       WHERE lower(c.name)=lower($1) AND c.is_active=TRUE AND c.deleted_at IS NULL
+       ORDER BY c.id ASC LIMIT 1`,
+      [resolvedBusinessCategory]
+    );
+    if (categoryRows.length) {
+      resolvedBusinessCategory = categoryRows[0].name;
+      resolvedBusinessCategoryGroup = categoryRows[0].parent_name || resolvedBusinessCategoryGroup;
+    }
+  }
 
   // Check user exists and doesn't already have a vendor profile
   const { rows: existing } = await query(
@@ -36,8 +65,8 @@ async function register(userId, data) {
          (user_id, business_name, business_category, business_category_group, business_address, phone, email, whatsapp_number,
           description, services_offered, working_days, opening_time, closing_time, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, kyc_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending') RETURNING *`,
-      [userId, businessName.trim(), businessCategory || null, businessCategoryGroup || null, businessAddress || null,
-       phone || null, email || null, whatsappNumber || null, description || null, servicesOffered || null,
+      [userId, businessName.trim(), resolvedBusinessCategory, resolvedBusinessCategoryGroup, businessAddress || null,
+       normalizedBusinessPhone, email || null, normalizedWhatsapp, description || null, servicesOffered || null,
        Array.isArray(workingDays) ? workingDays : [], openingTime || null, closingTime || null,
        nationalId || null, idDocumentUrl || null, shopPhotoUrl || null, logoUrl || shopPhotoUrl || null,
        latitude ?? null, longitude ?? null]
