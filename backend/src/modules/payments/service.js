@@ -127,6 +127,13 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
   if(method!=='cod'&&modemPay.isH2H()&&!modemPay.isH2HApproved()) throw new AppError('Direct mobile-money checkout is not available yet. Choose Pay on Delivery or DAHA Wallet.',503,'PROVIDER_UNAVAILABLE');
   if(modemPay.isH2H()&&!['cod','wave','afrimoney','qmoney'].includes(method)) throw new AppError('Choose Wave, AfriMoney or QMoney for direct mobile-money checkout.',400,'UNSUPPORTED_METHOD');
   if (method!=='cod'&&!modemPay.isH2H()&&requestedAmount<10) throw new AppError('Mobile-money checkout requires a minimum payment of D 10.00.',400,'BELOW_PROVIDER_MINIMUM');
+  let providerAccountNumber=accountNumber;
+  if(modemPay.isH2H()&&method!=='cod'){
+    const nationalAccountNumber=String(accountNumber||'').replace(/\\D/g,'');
+    if(!/^(87|83|86)\\d{7}$/.test(nationalAccountNumber)) throw new AppError('Enter the full 9-digit Gambian mobile-money number beginning 87, 83 or 86.',400,'INVALID_ACCOUNT_NUMBER');
+    // Modem Pay H2H takes seven subscriber digits separately from the selected network.
+    providerAccountNumber=nationalAccountNumber.slice(2);
+  }
 
   // Reserve a pending payment while holding the order lock, so two requests cannot
   // both start a provider charge for the same order and method.
@@ -184,7 +191,7 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
       amount: requestedAmount,
       currency: 'GMD',
       method,
-      accountNumber,
+      accountNumber:providerAccountNumber,
       idempotencyKey: reservation.idempotencyKey,
       metadata: { orderId, customerId, paymentId: payment.id },
     });
