@@ -379,8 +379,8 @@
     var idEl=G('admin-staffid'),pinEl=G('admin-password');
     var phone=(idEl&&idEl.value||'').trim(),pin=(pinEl&&pinEl.value||'').trim();
     if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
-    if(!/^\\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
-    if(!/^\\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
+    if(!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
+    if(!/^\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
     try{
       var loginResponse=await ML_API.auth.login(phone,pin);
       // The API response is { user: { roles: [...] }, accessToken, refreshToken }.
