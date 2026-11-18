@@ -196,6 +196,57 @@
     window.__ML_ADMIN_PHONE_SUBMIT = true;
   }
 
+  // Capture Admin login intent before the shared inline handler runs.
+  // This bridge does not depend on when premium-marketlink.js publishes doAdminLogin.
+  function syncAdminPhoneFromSelection() {
+    var operator = document.getElementById('admin-operator');
+    var national = document.getElementById('admin-national');
+    var hidden = document.getElementById('admin-staffid');
+    if (!operator || !national || !hidden) return false;
+    var digits = String(national.value || '').replace(/\\D/g, '');
+    var err = document.getElementById('admin-auth-err');
+    if (digits.length !== 7) {
+      if (err) { err.textContent = 'Enter all 7 digits of your Gambian mobile number.'; err.style.display = 'block'; }
+      return false;
+    }
+    var rules = {
+      AFRICELL: { prefix: '87', legacy: /^(2|7|40|41)/ },
+      QCELL: { prefix: '83', legacy: /^(3|5)/ },
+      COMIUM: { prefix: '86', legacy: /^(6|8)/ },
+      GAMCEL: { prefix: '', legacy: /^9/ }
+    };
+    var rule = rules[operator.value];
+    if (!rule || !rule.legacy.test(digits)) {
+      if (err) { err.textContent = 'The number does not match the selected network. Check the number and network, then try again.'; err.style.display = 'block'; }
+      national.focus();
+      return false;
+    }
+    hidden.value = rule.prefix + digits;
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+    return true;
+  }
+
+  if (!window.__ML_ADMIN_PHONE_BRIDGE) {
+    window.__ML_ADMIN_PHONE_BRIDGE = true;
+    document.addEventListener('click', function (event) {
+      var target = event.target && event.target.closest ? event.target.closest('#admin-lbtn') : null;
+      if (target) syncAdminPhoneFromSelection();
+    }, true);
+    document.addEventListener('keydown', function (event) {
+      if (event.target && event.target.id === 'admin-password' && event.key === 'Enter') {
+        syncAdminPhoneFromSelection();
+      }
+    }, true);
+    document.addEventListener('input', function (event) {
+      if (event.target && event.target.id === 'admin-national') syncAdminPhoneFromSelection();
+    }, true);
+    document.addEventListener('change', function (event) {
+      if (event.target && (event.target.id === 'admin-national' || event.target.id === 'admin-operator')) {
+        syncAdminPhoneFromSelection();
+      }
+    }, true);
+  }
+
   function openAdmin() {
     buildAdminLogin();
     if (typeof window.openAdminLogin === 'function') {
