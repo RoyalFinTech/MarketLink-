@@ -103,7 +103,6 @@
     '#scr-admin-login .ml-admin-security strong{display:block;color:#755719;font-size:11px;margin-bottom:2px}',
     '#scr-admin-login #admin-auth-err{margin:0 0 14px!important;border-radius:11px!important;font-size:12px!important}',
     '#scr-admin-login .ml-admin-footer{margin:17px auto 0;text-align:center;color:#718393;font-size:10px;line-height:1.5}',
-    '@media(prefers-color-scheme:dark){#scr-admin-login{background:#09131e!important;color:#eaf2f8!important;color-scheme:dark}#scr-admin-login .ml-admin-hero{background:linear-gradient(145deg,#101e2b 0%,#142b3b 65%,#302817 100%);border-color:rgba(245,184,61,.2)}#scr-admin-login .ml-admin-title{color:#f5f8fb}#scr-admin-login .ml-admin-subtitle{color:#a9bbc8}#scr-admin-login .ml-admin-card{background:#101e2b;border-color:#294052;box-shadow:0 14px 38px rgba(0,0,0,.24)}#scr-admin-login .ml-admin-kicker{color:#70d6c4}#scr-admin-login .ml-admin-label{color:#d0dce5}#scr-admin-login #ml-admin-phone-slot{background:#0b1925;border-color:#395064}#scr-admin-login #ml-admin-phone-slot .ml-gm-phone>span{background:#18384d!important;color:#f4f8fb!important}#scr-admin-login #ml-admin-phone-slot .ml-gm-phone select,#scr-admin-login #ml-admin-phone-slot .ml-gm-phone input{background:#0b1925!important;color:#f4f8fb!important;-webkit-text-fill-color:#f4f8fb!important;color-scheme:dark!important}#scr-admin-login #admin-password{background:#0b1925;color:#f4f8fb;-webkit-text-fill-color:#f4f8fb;border-color:#395064;color-scheme:dark}#scr-admin-login .ml-admin-security{background:#172a32;border-color:#43513d;color:#c4d3d9}#scr-admin-login .ml-admin-security strong{color:#f4cf78}#scr-admin-login .ml-admin-footer{color:#8297a7}}',
     '@media(max-width:480px){#scr-admin-login .ml-admin-hero{padding:26px 18px 23px}#scr-admin-login .ml-admin-title{font-size:21px}#scr-admin-login .ml-admin-card{margin-top:18px;padding:19px 15px}}'
   ].join('');
   (document.head || document.documentElement).appendChild(style);
@@ -131,7 +130,9 @@
 
   function buildAdminLogin() {
     var screen = document.getElementById('scr-admin-login');
-    if (!screen || screen.getAttribute('data-ml-admin-redesigned') === '1') return;
+    if (!screen) return;
+    var complete = screen.querySelector('#admin-password') && screen.querySelector('#admin-lbtn') && screen.querySelector('.ml-admin-shield') && screen.querySelector('.ml-admin-brandmark img') && screen.querySelector('#admin-national');
+    if (screen.getAttribute('data-ml-admin-redesigned') === '1' && complete) return;
     screen.innerHTML =
       '<section class="ml-admin-hero">' +
         '<div class="ml-admin-brandmark"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia logo"><span class="ml-admin-shield" aria-hidden="true">🛡️</span></div>' +
@@ -600,6 +601,13 @@
           installAdminWorkspaceStyles();
           ensureAdminWorkspace();
         }
+        var activeAdminLogin = document.getElementById('scr-admin-login');
+        if (activeAdminLogin && activeAdminLogin.classList.contains('active')) {
+          var adminPin = activeAdminLogin.querySelector('#admin-password');
+          var adminButton = activeAdminLogin.querySelector('#admin-lbtn');
+          var adminShield = activeAdminLogin.querySelector('.ml-admin-shield');
+          if (!adminPin || !adminButton || !adminShield) buildAdminLogin();
+        }
         var customerScreen = document.querySelector(
           '#scr-splash.active,#scr-onboard.active,#scr-auth.active,#scr-returning.active'
         );
@@ -607,7 +615,7 @@
         customerScreen.classList.remove('active');
         openAdmin();
       });
-      observer.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'] });
+      observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
       window.__ML_ADMIN_SCREEN_OBSERVER = observer;
     }
 
