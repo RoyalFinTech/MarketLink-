@@ -397,17 +397,17 @@
         AFRICELL:{prefix:'87',legacy:/^(2|7|40|41)/},
         QCELL:{prefix:'83',legacy:/^(3|5)/},
         COMIUM:{prefix:'86',legacy:/^(6|8)/},
-        GAMCEL:{prefix:'',legacy:/^9/}
+        GAMCEL:{prefix:'',legacy:/^\d{9}$/}
       };
       var networkRule=networkRules[operatorEl.value];
-      if(national.length!==7){adminAuthErr('Enter the 7 digits after the selected network prefix (9 digits total).');nationalEl.focus();return;}
+      var expectedLength=operatorEl.value==='GAMCEL'?9:7;
+      if(national.length!==expectedLength){adminAuthErr(operatorEl.value==='GAMCEL'?'Enter the full 9-digit Gambian number, including its network prefix.':'Enter the 7 subscriber digits after the selected network prefix.');nationalEl.focus();return;}
       if(!networkRule||!networkRule.legacy.test(national)){adminAuthErr('The number does not match the selected network. Check the number and network, then try again.');nationalEl.focus();return;}
       phone=networkRule.prefix+national;
       if(idEl)idEl.value=phone;
     }
     if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
-    var gamcelLegacy=Boolean(operatorEl&&operatorEl.value==='GAMCEL');
-    if(gamcelLegacy?!/^\d{7}$/.test(phone):!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
+    if(!/^\d{9}$/.test(phone)){adminAuthErr('Enter a complete 9-digit Gambian mobile number.');return;}
     if(!/^\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
     window.__ML_ADMIN_LOGIN_IN_FLIGHT=true;
     if(button){button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='Signing in…';}
