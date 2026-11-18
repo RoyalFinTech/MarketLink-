@@ -1,0 +1,23 @@
+name: MarketLink AI dataset checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-training/**"
+      - ".github/workflows/marketlink-ai-dataset.yml"
+  pull_request:
+    paths:
+      - "ai-training/**"
+      - ".github/workflows/marketlink-ai-dataset.yml"
+
+jobs:
+  validate-seed-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate synthetic training examples
+        run: python ai-training/scripts/validate_dataset.py
