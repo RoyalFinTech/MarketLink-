@@ -33,6 +33,8 @@ const configuredOrigins = (process.env.CORS_ORIGIN || '')
 // Keep this explicit; do not wildcard arbitrary *.onrender.com sites.
 const deployedFrontendOrigins = new Set([
   'https://marketlink-gambia-frontend.onrender.com',
+  // Dedicated administrator portal; exact origin only (no wildcard Render hosts).
+  'https://marketlink-gambia-admin.onrender.com',
 ]);
 const allowedOrigins = new Set([...localOrigins, ...configuredOrigins, ...deployedFrontendOrigins]);
 
