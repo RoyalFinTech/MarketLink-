@@ -178,8 +178,8 @@ assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /codRemitta
 assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /Previous deposit rejected/, 'Riders must see why a cash deposit was rejected before resubmitting');
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /__ML_ADMIN_START_CHAT/, 'CRM must expose a direct chat action for customer, vendor and rider accounts');
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /Start direct chat/, 'CRM profile must provide an obvious direct chat control');
-assert.match(html, /va-phone[^\n]*maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
-assert.match(html, /ra-phone[^\n]*maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
+assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
+assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
