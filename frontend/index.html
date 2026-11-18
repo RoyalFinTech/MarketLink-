@@ -640,22 +640,32 @@ select[id$="-operator"] option,.ml-gm-phone select option{
 </div>
 
 <!-- ═══ ADMIN PORTAL (separate from customer auth) ═══ -->
-<div id="scr-admin-login" class="screen">
-  <div style="background:linear-gradient(160deg,#0B0F17,#1F2937);padding:52px 20px 36px;text-align:center;position:relative;">
-    <div onclick="exitAdminLogin()" style="position:absolute;top:18px;left:18px;color:rgba(255,255,255,0.5);font-size:22px;cursor:pointer;">×</div>
-    <div style="width:60px;height:60px;border-radius:18px;background:rgba(124,58,237,0.15);border:1.5px solid rgba(124,58,237,0.4);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px;">🛡️</div>
-    <h2 style="color:#fff;font-size:19px;font-weight:800;margin:0 0 4px;">MarketLink Admin Portal</h2>
-    <p style="color:rgba(255,255,255,0.45);font-size:12px;margin:0;">Staff authentication required</p>
-  </div>
-  <div style="padding:26px 20px 60px;background:#0B0F17;min-height:60vh;">
-    <div id="admin-auth-err" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:10px 13px;color:#EF4444;font-size:12px;margin-bottom:16px;display:none;"></div>
-    <label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:6px;">Staff ID</label>
-    <input class="inp" type="text" autocapitalize="characters" placeholder="e.g. 871234567" id="admin-staffid" style="margin-bottom:16px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;">
-    <label style="color:rgba(255,255,255,0.45);font-size:11px;font-weight:600;display:block;margin-bottom:6px;">Password</label>
-    <input class="inp" type="password" placeholder="Enter 4-digit PIN" id="admin-password" style="margin-bottom:22px;background:#161E2B;border-color:rgba(255,255,255,0.1);color:#fff;" onkeydown="if(event.key==='Enter')doAdminLogin()">
-    <button class="btn" style="width:100%;background:linear-gradient(135deg,#7C3AED,#4C1D95);color:#fff;" onclick="doAdminLogin()" id="admin-lbtn">🔐 Sign In to Admin Portal</button>
-    <div style="text-align:center;margin-top:18px;color:rgba(255,255,255,0.25);font-size:10.5px;line-height:1.6;">Authorized MarketLink staff only.<br>Unauthorized access attempts are logged.</div>
-  </div>
+<div id="scr-admin-login" class="screen" style="background:#f4f7fb;color:#152536;min-height:100vh;padding-bottom:28px;">
+  <section style="padding:34px 22px 28px;text-align:center;background:linear-gradient(145deg,#fff 0%,#eaf2f8 62%,#fff7e6 100%);border-bottom:1px solid rgba(16,48,68,.12);">
+    <div style="width:112px;height:90px;margin:0 auto 13px;display:flex;align-items:center;justify-content:center;"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia logo" style="display:block;width:104px;height:84px;object-fit:contain;" onerror="this.onerror=null;this.src='https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png';"></div>
+    <h1 style="margin:0;color:#102d40;font-size:23px;line-height:1.2;font-weight:850;">MarketLink Admin Portal</h1>
+    <p style="margin:8px auto 0;max-width:320px;color:#526779;font-size:13px;line-height:1.55;">Secure access for authorised MarketLink administrators and staff.</p>
+  </section>
+  <section style="width:min(100% - 32px,460px);margin:24px auto 0;padding:22px 19px 20px;background:#fff;border:1px solid #dce5ec;border-radius:20px;box-shadow:0 12px 35px rgba(20,47,68,.08);" aria-label="Administrator sign in">
+    <p style="margin:0 0 17px;color:#176b70;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">Administrator sign in</p>
+    <div id="admin-auth-err" role="alert" aria-live="polite" style="display:none;margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fff0f0;color:#9b2424;font-size:12px;"></div>
+    <label for="admin-national" style="display:block;margin:0 0 7px;color:#344b5d;font-size:12px;font-weight:750;">Gambian mobile number</label>
+    <div id="ml-admin-phone-slot" style="margin-bottom:17px;border:1px solid #cbd8e2;border-radius:13px;overflow:hidden;background:#fff;">
+      <div style="display:grid;grid-template-columns:auto minmax(0,1fr);min-height:54px;background:#fff;">
+        <span style="display:flex;align-items:center;gap:7px;padding:0 11px;background:#eef4f8;color:#18384d;font-size:13px;font-weight:800;white-space:nowrap;">🇬🇲 +220</span>
+        <select id="admin-operator" aria-label="Mobile network" onchange="var n=document.getElementById('admin-national'),h=document.getElementById('admin-staffid'),p={AFRICELL:'87',QCELL:'83',COMIUM:'86',GAMCEL:''};h.value=(p[this.value]||'')+(n.value||'').replace(/\\D/g,'');" style="width:100%;min-width:0;height:52px;padding:0 9px;border:0;border-bottom:1px solid #e6edf2;background:#fff;color:#18384d;font-size:12px;font-weight:750;">
+          <option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel</option>
+        </select>
+        <input id="admin-national" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" placeholder="7-digit mobile number" aria-label="Seven-digit mobile number" oninput="this.value=this.value.replace(/\\D/g,'').slice(0,7);var p={AFRICELL:'87',QCELL:'83',COMIUM:'86',GAMCEL:''};document.getElementById('admin-staffid').value=(p[document.getElementById('admin-operator').value]||'')+this.value;" onkeydown="if(event.key==='Enter')doAdminLogin()" style="grid-column:1/-1;width:100%;height:48px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;border-radius:0;background:#fff;color:#142b3d;padding:12px 14px;font-size:16px;letter-spacing:.08em;">
+      </div>
+    </div>
+    <input type="hidden" id="admin-staffid" value="">
+    <label for="admin-password" style="display:block;margin:0 0 7px;color:#344b5d;font-size:12px;font-weight:750;">4-digit security PIN</label>
+    <input class="inp" type="password" id="admin-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" autocapitalize="off" spellcheck="false" placeholder="Enter your PIN" aria-label="Four digit administrator PIN" onkeydown="if(event.key==='Enter')doAdminLogin()" style="display:block;width:100%;box-sizing:border-box;min-height:54px;margin:0 0 18px;padding:13px 15px;border:1px solid #cbd8e2;border-radius:13px;background:#fff;color:#142b3d;font-size:20px;font-weight:750;letter-spacing:.32em;">
+    <button class="btn" type="button" id="admin-lbtn" onclick="doAdminLogin()" style="width:100%;min-height:52px;border:0;border-radius:13px;background:linear-gradient(100deg,#126f74,#0b505a);color:#fff;font-size:15px;font-weight:800;">Sign in securely</button>
+    <div style="display:flex;gap:10px;align-items:flex-start;margin:17px 2px 0;padding:12px 13px;border:1px solid #e7dfc9;border-radius:12px;background:#fffaf0;color:#5b5545;font-size:11px;line-height:1.55;"><span aria-hidden="true">🔒</span><div><strong style="display:block;color:#755719;font-size:11px;margin-bottom:2px;">Restricted administrator area</strong>Only approved MarketLink admin accounts can enter. Access is verified securely by the MarketLink server.</div></div>
+    <p style="margin:17px auto 0;text-align:center;color:#718393;font-size:10px;line-height:1.5;">MarketLink Gambia · Royal FinTech Company</p>
+  </section>
 </div>
 
 <!-- ═══ APP ═══ -->
