@@ -2624,7 +2624,7 @@
       var totalGrossCommission=daily.reduce(function(a,x){return a+Number(x.platform_gross_commission||0);},0);
       var totalAffiliate=daily.reduce(function(a,x){return a+Number(x.affiliate_commission||0);},0);
       var maxRev=Math.max.apply(null,daily.map(function(x){return Number(x.revenue||0);}).concat([1]));
-      var revBars=daily.slice(-14).map(function(x){var v=Number(x.revenue||0),h=Math.max(2,Math.round(v/maxRev*112));return '<div title="'+esc(String(x.day||''))+': '+money(v)+' GMV" style="flex:1;min-width:5px;height:'+h+'px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#42D2C9,#0D7377);"></div>';}).join('');
+      var revBars=daily.some(function(x){return Number(x.revenue||0)>0;})?daily.slice(-14).map(function(x){var v=Number(x.revenue||0),h=Math.max(2,Math.round(v/maxRev*112));return '<div title="'+esc(String(x.day||''))+': '+money(v)+' GMV" style="flex:1;min-width:5px;height:'+h+'px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#42D2C9,#0D7377);"></div>';}).join(''):'';
       var chartColors=['#D9A441','#21A69A','#6686D8','#D97878','#8C6AC7','#56A6CE','#A5A84B','#C58A54'];
       function pie(items,labelKey,valueKey){
         var valid=items.filter(function(x){return Number(x[valueKey]||0)>0;});
