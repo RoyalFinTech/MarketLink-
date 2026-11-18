@@ -7737,7 +7737,9 @@ window.addEventListener('unhandledrejection',function(e){
     window.addEventListener('beforeinstallprompt',function(event){event.preventDefault();deferredPrompt=event;maybeShowInstall();});
     window.addEventListener('appinstalled',function(){if(installBanner)installBanner.classList.remove('visible');deferredPrompt=null;});
     setTimeout(function(){if(!window.matchMedia||!window.matchMedia('(display-mode: standalone)').matches)maybeShowInstall();},2200);
-    if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+    // The dedicated Admin static site shares this HTML shell but must never install the customer PWA worker. A worker on the Admin origin can cache the customer shell and interfere with the isolated Admin boot flow.
+    var isDedicatedAdminHost = String(location.hostname || '').toLowerCase() === 'marketlink-gambia-admin.onrender.com';
+    if(!isDedicatedAdminHost && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
       navigator.serviceWorker.register('./service-worker.js',{scope:'./',updateViaCache:'none'}).then(function(reg){
         if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
         // Do not let the browser's HTTP cache pin an older service-worker script.
