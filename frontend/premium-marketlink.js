@@ -406,7 +406,8 @@
       if(idEl)idEl.value=phone;
     }
     if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
-    if(!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
+    var gamcelLegacy=Boolean(operatorEl&&operatorEl.value==='GAMCEL');
+    if(gamcelLegacy?!/^\d{7}$/.test(phone):!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
     if(!/^\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
     window.__ML_ADMIN_LOGIN_IN_FLIGHT=true;
     if(button){button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='Signing in…';}
