@@ -405,13 +405,15 @@ async function submitCodCashRemittance({paymentId,riderId,providerReference,depo
   const destination=getCodRemittanceInstructions().methods[method];
   if(!destination||!destination.configured)throw new AppError('MarketLink has not published a verified collection account for this deposit method yet. Contact Admin before sending cash.',503,'COD_REMITTANCE_DESTINATION_NOT_CONFIGURED');
   if(!proofFileId||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(proofFileId)))throw new AppError('Upload a clear receipt image or PDF before submitting the cash remittance.',400,'COD_REMITTANCE_PROOF_REQUIRED');
-  const {rows:[file]}=await query(
-    "SELECT id FROM file_uploads WHERE id=$1 AND uploaded_by=$2 AND purpose='cod-remittance-document' AND deleted_at IS NULL",
-    [proofFileId,riderId]
-  );
-  if(!file)throw new AppError('The receipt file could not be verified. Upload it again from this rider account.',403,'COD_REMITTANCE_PROOF_INVALID');
   const proofUrl=String(process.env.API_PUBLIC_URL||process.env.PUBLIC_API_URL||process.env.RENDER_EXTERNAL_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'')+'/api/v1/uploads/'+proofFileId+'/content';
   return withTransaction(async(client)=>{
+    // Serialize receipt submission against deletion. Whichever operation locks
+    // the file row first wins; a deleted file can never be attached afterwards.
+    const {rows:[file]}=await client.query(
+      "SELECT id FROM file_uploads WHERE id=$1 AND uploaded_by=$2 AND purpose='cod-remittance-document' AND deleted_at IS NULL FOR UPDATE",
+      [proofFileId,riderId]
+    );
+    if(!file)throw new AppError('The receipt file could not be verified. Upload it again from this rider account.',403,'COD_REMITTANCE_PROOF_INVALID');
     const {rows:[payment]}=await client.query(
       `SELECT p.id,p.order_id,p.amount,p.currency,p.method,p.status AS payment_status,
               o.status AS order_status,o.payment_status AS order_payment_status,
