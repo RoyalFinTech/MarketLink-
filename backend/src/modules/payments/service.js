@@ -737,6 +737,58 @@ async function processWebhook({ event, rawBody }) {
   return result;
 }
 
-async function refund(paymentId,{amount,reason},actor){const {rows:[payment]}=await query('SELECT * FROM payments WHERE id=$1',[paymentId]);if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');if(payment.status!=='confirmed')throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');if(payment.refund_status==='processed')throw new AppError('Payment already refunded.',400,'ALREADY_REFUNDED');const refundAmount=amount||payment.amount;if(refundAmount>payment.amount)throw new AppError('Refund amount exceeds payment amount.',400,'INVALID_AMOUNT');const provider=PROVIDERS[payment.method];if(payment.method!=='cod'&&provider)await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});return withTransaction(async(client)=>{const {rows:[updated]}=await client.query(`UPDATE payments SET refund_status='processed', refund_amount=$1,status=CASE WHEN $1=amount THEN 'refunded' ELSE status END WHERE id=$2 RETURNING *`,[refundAmount,paymentId]);const {rows:[o]}=await client.query('SELECT customer_id FROM orders WHERE id=$1',[payment.order_id]);if(o){const {rows:[w]}=await client.query('SELECT id,balance FROM wallets WHERE user_id=$1',[o.customer_id]);if(w){await client.query('UPDATE wallets SET balance=balance+$1 WHERE id=$2',[refundAmount,w.id]);await client.query(`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,[w.id,refundAmount,Number(w.balance)+Number(refundAmount),paymentId,reason||'Order refund']);}}await query(`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,[actor.id,actor.role,paymentId,JSON.stringify({refundAmount,reason})]);return updated;});}
+async function refund(paymentId,{amount,reason},actor){
+  return withTransaction(async(client)=>{
+    const {rows:[payment]}=await client.query(
+      'SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);
+    if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+    if(payment.status!=='confirmed'&&payment.status!=='partially_refunded')
+      throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');
+    if(['processed','requested'].includes(String(payment.refund_status||'none')))
+      throw new AppError('A refund has already been processed or is awaiting reconciliation.',409,'ALREADY_REFUNDED');
+    const refundAmount=amount==null?Number(payment.amount):Number(amount);
+    const paymentAmount=Number(payment.amount);
+    if(!Number.isFinite(refundAmount)||refundAmount<=0||refundAmount>paymentAmount+0.01)
+      throw new AppError('Enter a valid refund amount not exceeding the payment amount.',400,'INVALID_AMOUNT');
+    const fullRefund=Math.abs(refundAmount-paymentAmount)<=0.01;
+    if(payment.method!=='cod'&&payment.method!=='wallet'){
+      const provider=PROVIDERS[payment.method];
+      if(!provider||typeof provider.refund!=='function')
+        throw new AppError('Refunds are not available for this payment method.',503,'REFUND_PROVIDER_UNAVAILABLE');
+      // Provider confirmation is required before the local ledger is updated.
+      // The payment row stays locked so duplicate Admin requests cannot race.
+      await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});
+    }
+    const {rows:[customerOrder]}=await client.query(
+      'SELECT customer_id FROM orders WHERE id=$1 FOR UPDATE',[payment.order_id]);
+    if(!customerOrder)throw new AppError('The customer order linked to this payment was not found.',409,'REFUND_ORDER_MISSING');
+    const {rows:[wallet]}=await client.query(
+      'SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE',[customerOrder.customer_id]);
+    if(!wallet)throw new AppError('The customer DAHA Wallet is not available for this refund.',409,'REFUND_WALLET_MISSING');
+    const balanceAfter=Number(wallet.balance)+refundAmount;
+    await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[balanceAfter,wallet.id]);
+    await client.query(
+      `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
+       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,
+      [wallet.id,refundAmount,balanceAfter,paymentId,String(reason||'Order refund').trim().slice(0,500)||'Order refund']);
+    const {rows:[updated]}=await client.query(
+      `UPDATE payments SET refund_status='processed',refund_amount=$1,
+         status=CASE WHEN $2 THEN 'refunded' ELSE 'partially_refunded' END
+       WHERE id=$3 RETURNING *`,
+      [refundAmount,fullRefund,paymentId]);
+    if(fullRefund){
+      await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
+    }
+    await client.query(
+      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'payment_refunded','Refund processed',$2,'payment',$3)`,
+      [customerOrder.customer_id,'A refund of D '+refundAmount.toFixed(2)+' has been credited to your DAHA Wallet.',paymentId]);
+    await client.query(
+      `INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,
+      [actor.id,actor.role||'admin',paymentId,JSON.stringify({refundAmount,fullRefund,reason:String(reason||'').trim().slice(0,500)})]);
+    return updated;
+  });
+}
 async function getHistory(customerId,{page=1,limit=20}){const limit_=Math.min(parseInt(limit)||20,100);const offset=(Math.max(parseInt(page)||1,1)-1)*limit_;const {rows}=await query(`SELECT p.*,o.order_number FROM payments p JOIN orders o ON o.id=p.order_id WHERE o.customer_id=$1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,[customerId,limit_,offset]);return rows;}
 module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,getCodRemittanceInstructions,submitCodCashRemittance,listMyCodCashRemittances,listCodCashRemittances,verifyCodCashRemittance,refund,getHistory,processWebhook,markPaymentConfirmed};
