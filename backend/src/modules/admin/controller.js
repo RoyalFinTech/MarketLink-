@@ -58,6 +58,7 @@ exports.replySupportTicket = wrap(async (req,res) => res.status(201).json({succe
 exports.crmProfile = wrap(async (req,res) => res.json({success:true,data:await svc.getCrmProfile(req.params.id)}));
 exports.addCrmNote = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.addCrmNote(req.params.id,req.body.note,actor(req))}));
 exports.conversations = wrap(async (req,res) => res.json({success:true,data:await svc.listAdminConversations(req.query)}));
+exports.startConversation = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.startAdminConversation(req.body.participantUserId,actor(req))}));
 exports.conversationMessages = wrap(async (req,res) => res.json({success:true,data:await svc.getAdminConversationMessages(req.params.id,req.query)}));
 exports.sendConversationMessage = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.sendAdminConversationMessage(req.params.id,req.body.body,actor(req))}));
 
