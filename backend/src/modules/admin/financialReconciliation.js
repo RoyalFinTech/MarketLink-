@@ -107,9 +107,10 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
            ) latest ON TRUE
            WHERE ABS(COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) > $1
            ORDER BY ABS(COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) DESC LIMIT $2`, [moneyTolerance, pageSize]),
-    query(`SELECT r.id AS remittance_id,r.payment_id,r.order_id,r.amount,r.currency,
-                  r.deposit_method,r.provider_reference,r.status AS remittance_status,
-                  r.submitted_at,r.reviewed_at,o.order_number,o.status AS order_status,
+    query(`SELECT r.id AS remittance_id,r.payment_id,r.order_id,r.rider_id,r.amount,r.currency,
+                  r.deposit_method,r.provider_reference,r.proof_url,r.review_note,
+                  r.status AS remittance_status,r.submitted_at,r.reviewed_at,
+                  o.order_number,o.status AS order_status,
                   o.payment_status,p.status AS payment_record_status,
                   c.status AS commission_status,rider.full_name AS rider_name
            FROM cod_cash_remittances r
