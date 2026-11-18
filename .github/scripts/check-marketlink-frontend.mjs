@@ -181,6 +181,8 @@ assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /__ML_A
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /Start direct chat/, 'CRM profile must provide an obvious direct chat control');
 assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
 assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
+assert.match(html, /Gamcel is still using its existing 7-digit number/, 'Phone selector must distinguish Gamcel Phase 1 from migrated nine-digit networks');
+assert.match(premiumJs, /gamcelLegacy\?\!\/\^\\d\{7\}\$\//, 'Admin login must preserve current Gamcel Phase 1 seven-digit compatibility');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
