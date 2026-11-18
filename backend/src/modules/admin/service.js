@@ -55,7 +55,7 @@ async function getUsers({ page=1, limit=20, search, role, status }) {
             array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles
      FROM users u LEFT JOIN customers c ON c.user_id=u.id ${join}
      WHERE ${conds.join(' AND ')}
-     GROUP BY u.id
+     GROUP BY u.id,c.profile_photo_url
      ORDER BY u.created_at DESC LIMIT $${pi} OFFSET $${pi+1}`,
     [...params, limit_, offset]);
   const { rows:[c] } = await query(`SELECT count(DISTINCT u.id) FROM users u ${join} WHERE ${conds.join(' AND ')}`, params);
