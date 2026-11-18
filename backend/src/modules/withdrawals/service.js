@@ -90,18 +90,20 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
 }
 
 async function listMine(userId, { page = 1, limit = 20, status } = {}) {
-  const off = (page - 1) * limit;
+  const safePage=Math.max(1,Number.parseInt(page,10)||1),safeLimit=Math.min(100,Math.max(1,Number.parseInt(limit,10)||20));
+  const off=(safePage-1)*safeLimit;
   const conds = ['user_id=$1']; const params = [userId];
   if (status) { conds.push(`status=$${params.length + 1}`); params.push(status); }
   const { rows } = await query(
     `SELECT * FROM withdrawals WHERE ${conds.join(' AND ')}
      ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, limit, off]);
+    [...params, safeLimit, off]);
   return rows;
 }
 
 async function listPendingForAdmin({ page = 1, limit = 20 } = {}) {
-  const off = (page - 1) * limit;
+  const safePage=Math.max(1,Number.parseInt(page,10)||1),safeLimit=Math.min(100,Math.max(1,Number.parseInt(limit,10)||20));
+  const off=(safePage-1)*safeLimit;
   const { rows } = await query(
     `SELECT w.*, u.full_name, u.phone, u.email,
             CASE WHEN v.user_id IS NOT NULL THEN 'vendor' WHEN r.user_id IS NOT NULL THEN 'rider' WHEN a.user_id IS NOT NULL THEN 'affiliate' ELSE 'customer / other' END AS user_type
@@ -112,7 +114,7 @@ async function listPendingForAdmin({ page = 1, limit = 20 } = {}) {
      LEFT JOIN affiliates a ON a.user_id = w.user_id
      WHERE w.status IN ('processing','payout_pending')
      ORDER BY w.created_at ASC LIMIT $1 OFFSET $2`,
-    [limit, off]);
+    [safeLimit, off]);
   return rows;
 }
 
