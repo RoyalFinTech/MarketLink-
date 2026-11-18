@@ -9,7 +9,7 @@ It is **not** a trained model and it does not alter production responses by itse
 Initial candidate: `Qwen/Qwen3-4B-Instruct-2507` (Apache-2.0 model card; verify the upstream licence and terms again before each release). It is an open-weight model that can be self-hosted. MarketLink's own LoRA adapter can be trained without sending prompts to the OpenAI API.
 
 ## Training method
-Supervised fine-tuning (SFT) with LoRA/QLoRA using Hugging Face Transformers, TRL and PEFT. LoRA trains a small adapter while keeping the base weights frozen. This reduces training cost compared with full-model training.
+Supervised fine-tuning (SFT) with LoRA/QLoRA using Hugging Face Transformers, TRL and PEFT. QLoRA loads the base model in 4-bit NF4 and trains a small LoRA adapter while keeping base weights frozen. The pilot script requires CUDA and checks available VRAM before training.
 
 ## Data format
 `datasets/marketlink_seed.jsonl` uses one JSON object per line with a `messages` array (system, user, assistant). All examples are synthetic seed examples, not copied customer conversations.
@@ -29,16 +29,16 @@ python scripts/validate_dataset.py
 ```
 
 ## GPU fine-tuning
-Create a clean Python 3.11/3.12 environment on a CUDA GPU host, then:
+Create a clean Python 3.11/3.12 environment on a CUDA GPU host with at least 16 GB VRAM (24 GB recommended), then:
 ```bash
 pip install -r requirements.txt
 python scripts/train_lora.py --dry-run
 ```
-After reviewing the dataset and confirming GPU availability:
+After reviewing the dataset and confirming GPU availability, run a short capped pilot first:
 ```bash
-python scripts/train_lora.py --train
+python scripts/train_lora.py --train --max-steps 30 --epochs 1
 ```
-The script saves only the adapter and tokenizer/config artifacts under `artifacts/marketlink-qwen3-4b-lora`. It does not publish, upload or deploy them.
+The script saves only the adapter and tokenizer/config artifacts under `artifacts/marketlink-qwen3-4b-qlora`. It does not publish, upload or deploy them.
 
 ## Production rollout gate
 1. Review/expand the corpus with native speakers and product owners.
