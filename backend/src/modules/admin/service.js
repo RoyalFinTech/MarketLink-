@@ -608,7 +608,7 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
         `INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id)
          SELECT recipient_id,'chat_message','MarketLink support replied',
            'An administrator replied in your MarketLink conversation.','conversation',$2
-         FROM unnest($1::uuid[]) AS recipient_id`,
+         FROM unnest($1::uuid[]) AS recipients(recipient_id)`,
         [recipientIds,conversationId]
       );
     }
