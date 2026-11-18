@@ -252,7 +252,7 @@ assert.match(paymentUi, /window\.ML_Premium\.selectPayment/, 'Payment method cho
 assert.match(paymentUi, /selectPayment:selectPayment/, 'Payment method click handler must be exported to the checkout UI');
 assert.match(paymentUi, /placeOrder:placeLiveOrder/, 'Checkout submit button must call the authenticated live order flow');
 assert.match(paymentUi, /action!=='wallet_paid'/, 'DAHA Wallet checkout must require explicit confirmed wallet-payment response');
-assert.match(paymentUi, /action:'cod_pending'/, 'Cash on Delivery must create a pending payment rather than mark cash as received');
+assert.match(paymentService, /action: 'cod_pending'/, 'Cash on Delivery must create a pending payment rather than mark cash as received');
 
 const paymentApi = fs.readFileSync(path.join(root, '..', 'frontend/index.html'), 'utf8');
 assert.match(paymentApi, /methods: function\(\)\{ return get\('\/payments\/methods'\); \}/, 'Checkout must load enabled payment capabilities from the backend');
