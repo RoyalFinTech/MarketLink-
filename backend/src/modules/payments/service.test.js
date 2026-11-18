@@ -112,8 +112,9 @@ describe('Pay on Delivery reconciliation',()=>{
    providerReference:'WAVE-RECEIPT-2',depositMethod:'wave',
    proofFileId:'55555555-5555-4555-8555-555555555555'
   })).rejects.toMatchObject({statusCode:403,code:'COD_REMITTANCE_PROOF_INVALID'});
-  expect(query).toHaveBeenCalledTimes(1);
-  expect(query.mock.calls[0][0]).toContain('uploaded_by=$2');
-  expect(withTransaction).not.toHaveBeenCalled();
+  expect(withTransaction).toHaveBeenCalledTimes(1);
+  expect(transactionQuery).toHaveBeenCalledTimes(1);
+  expect(transactionQuery.mock.calls[0][0]).toContain('uploaded_by=$2');
+  expect(transactionQuery.mock.calls[0][0]).toContain('FOR UPDATE');
  });
 });

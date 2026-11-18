@@ -26,6 +26,7 @@ describe('rider cash remittance controls',()=>{
   process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER='861234567';
   process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NAME='MarketLink Gambia';
   tx=jest.fn(async(sql,params=[])=>{
+   if(sql.includes('SELECT id FROM file_uploads'))return{rows:[{id:proofFileId}]};
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,payment_status:'pending',order_status:'delivered',order_payment_status:'pending',delivery_id:'delivery-1',rider_id:riderId,delivery_status:'delivered'}]};
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE payment_id'))return{rows:[]};
    if(sql.includes('INSERT INTO cod_cash_remittances'))return{rows:[remittance]};
@@ -60,12 +61,14 @@ describe('rider cash remittance controls',()=>{
  test('rider submission locks and validates the assigned delivered COD order',async()=>{
   const result=await submitCodCashRemittance({paymentId,riderId,providerReference:'WV-2026-1234',depositMethod:'wave',proofFileId});
   expect(result).toMatchObject({payment_id:paymentId,status:'submitted',provider_reference:'WV-2026-1234'});
-  expect(tx.mock.calls[0][0]).toMatch(/FOR UPDATE OF p,o,d/i);
+  expect(tx.mock.calls[0][0]).toContain('FOR UPDATE');
+  expect(tx.mock.calls[1][0]).toMatch(/FOR UPDATE OF p,o,d/i);
   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO cod_cash_remittances'))).toBe(true);
  });
 
  test('rejects a rider who is not assigned to the delivery',async()=>{
-  tx.mockImplementationOnce(async(sql)=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT id FROM file_uploads'))return{rows:[{id:proofFileId}]};
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,order_status:'delivered',delivery_status:'delivered',rider_id:'another-rider'}]};
    return{rows:[]};
   });
@@ -74,7 +77,8 @@ describe('rider cash remittance controls',()=>{
  });
 
  test('rejects a reference before delivery is complete',async()=>{
-  tx.mockImplementationOnce(async(sql)=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT id FROM file_uploads'))return{rows:[{id:proofFileId}]};
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,order_status:'on_the_way',delivery_status:'in_transit',rider_id:riderId}]};
    return{rows:[]};
   });
