@@ -19,7 +19,7 @@ Last reviewed: 13 October 2026
 - API base defaults to `https://api.modempay.com/h2h/v1`.
 - This is a separate contract from hosted Merchant API and requires Modem Pay to approve/activate the merchant for H2H direct charge.
 - `MODEM_PAY_H2H_APPROVED=true` is an explicit local activation gate. Set it only after Modem Pay has confirmed the account is enabled for H2H. A key alone does not prove H2H permission.
-- When enabled, MarketLink collects the local 7-digit mobile-money number (without +220), then follows the provider's actual `next_step`: Wave redirects externally, AfriMoney uses confirmation, and QMoney/APS can request a temporary PIN/OTP. Never store that code.
+- When enabled, the customer enters the full 9-digit Gambian national number (87/83/86 + the 7-digit subscriber number), without +220. The backend validates the full 9-digit value, then passes only the 7-digit subscriber portion to the Modem Pay H2H `account_number` field because that provider contract expects the subscriber digits alongside its separate `network` field. The UI must never ask customers to omit the national network prefix. MarketLink then follows the provider's actual `next_step`: Wave redirects externally, AfriMoney uses confirmation, and QMoney/APS can request a temporary PIN/OTP. Never store that code.
 - Verify final status by webhook or H2H transaction status. Only `completed` represents a confirmed payment. Polling is every 5 seconds, stopping at a final state or after 5 minutes.
 
 ## Backend environment variables
