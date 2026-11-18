@@ -103,11 +103,12 @@ router.post('/register',
     body('businessCategoryGroup')
       .optional().trim().isLength({ max: 80 }),
     body('whatsappNumber')
-      .optional({ nullable: true }).isMobilePhone('any').withMessage('Invalid WhatsApp number.'),
+      .optional({ nullable: true }).custom(value => /^\+220(?:87|83|86)\d{7}$/.test(String(value)) || /^\+?[1-9]\d{7,14}$/.test(String(value))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
+
     body('businessAddress')
       .optional().trim().isLength({ max: 500 }),
     body('phone')
-      .optional().isMobilePhone('any').withMessage('Invalid phone number.'),
+      .optional().custom(value => /^\+220(?:87|83|86)\d{7}$/.test(String(value)) || /^\+?[1-9]\d{7,14}$/.test(String(value))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
     body('email')
       .optional().isEmail().normalizeEmail().withMessage('Invalid email address.'),
     body('description')
