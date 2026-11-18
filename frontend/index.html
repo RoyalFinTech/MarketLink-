@@ -1366,14 +1366,28 @@ var ML_API = (function(){
 
       // 401 + we have a refresh token → try refresh once for protected routes only
       if(res.status === 401 && _refreshToken && !opts._retried && !skipRefresh){
+        // The first request has completed. Do not let its nearly-expired
+        // AbortController cancel the refresh retry after a slow 401 response.
+        if(timeoutId !== null){clearTimeout(timeoutId);timeoutId=null;}
         var refreshed = await _doRefresh();
         if(refreshed){
-          // Retry original request with new token
+          // Give the retried request its own bounded timeout and signal.
+          controller = typeof AbortController === 'function' ? new AbortController() : null;
+          timedOut = false;
+          if(controller){
+            fetchOpts.signal = controller.signal;
+            timeoutId = setTimeout(function(){timedOut=true;controller.abort();},timeoutMs);
+          } else {
+            delete fetchOpts.signal;
+          }
           headers['Authorization'] = 'Bearer ' + _accessToken;
           fetchOpts.headers = headers;
           res = await fetch(url, fetchOpts);
+          if(res.status === 401){
+            _onSessionExpired();
+            throw { code: 'SESSION_EXPIRED', error: 'Your session has expired. Please log in again.' };
+          }
         } else {
-          // Refresh failed — force logout
           _onSessionExpired();
           throw { code: 'SESSION_EXPIRED', error: 'Your session has expired. Please log in again.' };
         }
