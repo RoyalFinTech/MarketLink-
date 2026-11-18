@@ -149,7 +149,7 @@
     if (screen.getAttribute('data-ml-admin-redesigned') === '1' && complete) return;
     screen.innerHTML =
       '<section class="ml-admin-hero">' +
-        '<div class="ml-admin-brandmark"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia logo"><span class="ml-admin-shield" aria-hidden="true">🛡️</span></div>' +
+        '<div class="ml-admin-brandmark"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia logo" onerror="this.onerror=null;this.src=\'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png\';"><span class="ml-admin-shield" aria-hidden="true">🛡️</span></div>' +
         '<h1 class="ml-admin-title">MarketLink Admin Portal</h1>' +
         '<p class="ml-admin-subtitle">Secure access for authorised MarketLink administrators and staff.</p>' +
       '</section>' +
@@ -442,9 +442,20 @@
   function ensureAdminWorkspace() {
     var tab = document.getElementById('tab-admindash');
     var body = document.getElementById('adash-body');
-    if (!tab || !body || tab.getAttribute('data-ml-admin-workspace') === '1') return;
+    if (!tab || !body) return;
+    var mounted = document.getElementById('ml-admin-workspace');
+    if (mounted) {
+      var mountedContent = mounted.querySelector('#ml-admin-content');
+      if (mountedContent && body.parentNode !== mountedContent) mountedContent.appendChild(body);
+      tab.setAttribute('data-ml-admin-workspace', '1');
+      tab.style.cssText = 'display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
+      body.style.cssText = 'display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
+      return;
+    }
+    // Recover from a stale marker left by an interrupted/older mount.
+    tab.removeAttribute('data-ml-admin-workspace');
     tab.setAttribute('data-ml-admin-workspace', '1');
-    tab.style.cssText = 'height:auto;min-height:100vh;overflow:visible;background:#f3f6fa;';
+    tab.style.cssText = 'display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
     var shell = document.createElement('div');
     shell.id = 'ml-admin-workspace';
     shell.innerHTML =
@@ -479,7 +490,7 @@
       '<div id="ml-admin-drawer" class="ml-admin-drawer"><div class="ml-admin-drawer-panel"><div class="ml-admin-drawer-head"><button type="button" class="ml-admin-drawer-brand" id="ml-admin-drawer-brand" aria-label="Close menu"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia"><span><b>MARKETLINK</b><small>ADMINISTRATION</small></span></button><button id="ml-admin-drawer-close" aria-label="Close navigation">×</button></div><div class="ml-admin-theme-row"><span>Appearance</span><button type="button" id="ml-admin-theme-toggle" aria-pressed="false"><span class="ml-admin-theme-icon">☀</span><span class="ml-admin-theme-label">Daylight</span><i></i></button></div><div class="ml-admin-drawer-links"></div><div class="ml-admin-drawer-foot">Protected administrator access<br><b>Royal FinTech Company</b></div></div></div>';
     tab.insertBefore(shell, body);
     document.getElementById('ml-admin-content').appendChild(body);
-    body.style.cssText = 'height:auto;min-height:55vh;overflow:visible;';
+    body.style.cssText = 'display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
     var nav = shell.querySelector('.ml-admin-nav');
     var drawerLinks = shell.querySelector('.ml-admin-drawer-links');
     drawerLinks.innerHTML = nav.innerHTML;
@@ -520,7 +531,11 @@
     var css = document.createElement('style');
     css.id = 'ml-admin-workspace-style';
     css.textContent = [
-      '#scr-app:has(#ml-admin-workspace){background:#f3f6fa!important;color:#14283a!important;min-height:100vh}',
+      '#tab-admindash{display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}',
+      '#tab-admindash>#ml-admin-workspace{display:grid!important;min-height:100vh!important;height:auto!important;overflow:visible!important}',
+      '#tab-admindash #ml-admin-content,#tab-admindash #adash-body{display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
+      '#scr-app:has(#ml-admin-workspace),body:has(#ml-admin-workspace),html:has(#ml-admin-workspace){height:auto!important;min-height:100vh!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important}',
+      '#scr-app:has(#ml-admin-workspace){background:#f3f6fa!important;color:#14283a!important;min-height:100vh!important;height:auto!important;overflow:visible!important}',
       '#ml-admin-workspace{--ink:#14283a;--muted:#718397;--line:#e2e9f0;--gold:#d6a43b;--teal:#147b78;display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh;background:#f3f6fa;color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif}',
       '.ml-admin-sidebar{position:sticky;top:0;height:100vh;overflow:auto;background:#102638;color:#eaf1f5;padding:24px 16px;box-sizing:border-box;display:flex;flex-direction:column;z-index:20}',
       '.ml-admin-side-brand{display:flex;align-items:center;gap:11px;padding:4px 8px 26px;border-bottom:1px solid rgba(255,255,255,.1)}.ml-admin-side-brand img{width:45px;height:45px;object-fit:contain}.ml-admin-side-brand b{display:block;font-size:14px;letter-spacing:.12em}.ml-admin-side-brand span{display:block;color:#8fa8b8;font-size:9px;letter-spacing:.16em;margin-top:4px}',
@@ -584,8 +599,38 @@
     document.head.appendChild(css);
   }
 
+  function installAdminTabIsolation() {
+    if (typeof window.switchTab !== 'function' || window.switchTab.__mlAdminPremiumIsolated) return;
+    var originalSwitchTab = window.switchTab;
+    var isolatedSwitchTab = function (tabName) {
+      var result = originalSwitchTab.apply(this, arguments);
+      if (tabName === 'admindash') {
+        // Let the shared app update its internal tab state, then force the
+        // dedicated premium Admin shell to own the visible dashboard surface.
+        ensureAdminWorkspace();
+        window.setTimeout(function () {
+          ensureAdminWorkspace();
+          var adminTab = document.getElementById('tab-admindash');
+          var appScreen = document.getElementById('scr-app');
+          if (adminTab) {
+            adminTab.style.setProperty('display', 'block', 'important');
+            adminTab.style.setProperty('height', 'auto', 'important');
+            adminTab.style.setProperty('min-height', '100vh', 'important');
+            adminTab.style.setProperty('overflow', 'visible', 'important');
+          }
+          if (appScreen) appScreen.style.setProperty('overflow', 'visible', 'important');
+          if (document.getElementById('ml-admin-workspace')) adminNavigate('overview');
+        }, 0);
+      }
+      return result;
+    };
+    isolatedSwitchTab.__mlAdminPremiumIsolated = true;
+    window.switchTab = isolatedSwitchTab;
+  }
+
   function installAdminGuards() {
     installAdminWorkspaceStyles();
+    installAdminTabIsolation();
     if (document.getElementById('scr-app') && document.getElementById('scr-app').classList.contains('active')) ensureAdminWorkspace();
     buildAdminLogin();
     normalizeAdminAuthResponse();
