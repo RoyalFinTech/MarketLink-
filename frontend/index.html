@@ -6209,6 +6209,30 @@ function marketlinkVendorCategoryOptions(categories,selected){
     return '<optgroup label="'+g+'">'+grouped[g].map(function(label){return '<option value="'+sanitizeText(label)+'"'+(selected===label?' selected':'')+'>'+sanitizeText(label)+'</option>';}).join('')+'</optgroup>';
   }).join('');
 }
+async function marketlinkLoadVendorCategories(){
+  var select=G('va-cat');
+  if(!select||select.dataset.loaded==='1'||select.dataset.loading==='1')return;
+  if(!window.ML_API||!ML_API.auth||!ML_API.auth.isAuthenticated()){
+    select.innerHTML='<option value="">Sign in to load live categories</option>';return;
+  }
+  select.dataset.loading='1';
+  select.innerHTML='<option value="">Loading MarketLink categories…</option>';
+  try{
+    var response=await ML_API.categories.list({page:1,limit:200});
+    var payload=response&&response.data;
+    var categories=Array.isArray(payload)?payload:(payload&&Array.isArray(payload.items)?payload.items:[]);
+    categories=categories.filter(function(category){return category&&category.id!=null&&category.name&&category.is_active!==false;});
+    if(!categories.length){
+      select.innerHTML='<option value="">No active MarketLink categories available</option>';
+      select.dataset.loaded='1';return;
+    }
+    select.innerHTML=marketlinkVendorCategoryOptions(categories.map(function(category){return String(category.name);}),S.vForm&&S.vForm.cat||'');
+    select.dataset.loaded='1';
+  }catch(error){
+    select.innerHTML='<option value="">Could not load categories — tap to retry</option>';
+    select.dataset.loaded='';
+  }finally{select.dataset.loading='';}
+}
 function marketlinkCaptureGPS(kind){
   if(!navigator.geolocation){toast('This browser does not provide GPS location. Enter the address manually.','error');return;}
   toast('Waiting for your phone GPS permission…','info');
@@ -6248,7 +6272,7 @@ function renderVApp(){
       '<label class="ml-role-field-label" for="va-bname">Business / registered name <span>*</span></label><input class="inp ml-role-field" placeholder="e.g. Lamin General Trading" id="va-bname" value="'+sanitizeText(f.bname||'')+'" autocomplete="organization">'+
       '<label class="ml-role-field-label" for="va-sname">Shop / display name <span>*</span></label><input class="inp ml-role-field" placeholder="Name customers will see" id="va-sname" value="'+sanitizeText(f.sname||'')+'">'+
       '<label class="ml-role-field-label" for="va-saddr">Shop address <span>*</span></label><input class="inp ml-role-field" placeholder="Area, town and nearby landmark" id="va-saddr" value="'+sanitizeText(f.saddr||'')+'">'+
-      '<label class="ml-role-field-label" for="va-cat">Business category <span>*</span></label><div class="ml-select-wrap"><select id="va-cat" class="ml-role-field ml-role-select" required>'+
+      '<label class="ml-role-field-label" for="va-cat">Business category <span>*</span></label><div class="ml-select-wrap"><select id="va-cat" class="ml-role-field ml-role-select" required onfocus="marketlinkLoadVendorCategories()">'+
       marketlinkVendorCategoryOptions(cats,f.cat)+'</select><span aria-hidden="true">▾</span></div>'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">Account phone (sign-in): <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
       '<label class="ml-role-field-label" for="va-phone">WhatsApp / contact phone <span>*</span></label>'+
@@ -6284,6 +6308,7 @@ function renderVApp(){
   el.innerHTML=stepBar+
     '<h4 style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:12px;">Step '+(step+1)+': '+steps[step]+'</h4>'+
     body+btnRow;
+  if(step===0)marketlinkLoadVendorCategories();
 }
 function vendorAppFileSelected(input,key){
   var file=input&&input.files&&input.files[0];if(!file)return;
