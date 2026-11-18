@@ -4,7 +4,7 @@ const { body, param, query } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
-router.post('/', authenticate, authorize('customer'), [body('vendorId').isUUID(), body('items').isArray({min:1}), body('items.*.productId').isUUID(), body('items.*.quantity').isInt({min:1}), body('paymentMethod').notEmpty()], validate, ctrl.place);
+router.post('/', authenticate, authorize('customer'), [body('vendorId').isUUID(), body('deliveryAddressId').isUUID().withMessage('Select a saved delivery address before placing your order.'), body('items').isArray({min:1}), body('items.*.productId').isUUID(), body('items.*.quantity').isInt({min:1}), body('paymentMethod').notEmpty()], validate, ctrl.place);
 router.get('/my', authenticate, ctrl.myOrders);
 router.get('/vendor', authenticate, authorize('vendor'), [
   query('page').optional().isInt({min:1}),
