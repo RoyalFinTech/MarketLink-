@@ -180,6 +180,7 @@ assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /Previous d
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /__ML_ADMIN_START_CHAT/, 'CRM must expose a direct chat action for customer, vendor and rider accounts');
 assert.match(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8'), /Start direct chat/, 'CRM profile must provide an obvious direct chat control');
 assert.ok(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8').includes("replace(/\\D/g, '')"), 'Admin phone normalization must strip non-digits before validating the selected network number');
+assert.ok(!fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8').includes(String.raw`replace(/\\D/g, '')`), 'Admin phone selector must not use an escaped literal-backslash regex');
 assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
 assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
 assert.match(html, /Gamcel is still using its existing 7-digit number/, 'Phone selector must distinguish Gamcel Phase 1 from migrated nine-digit networks');
