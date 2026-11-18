@@ -234,7 +234,7 @@
     document.addEventListener('change', function (event) {
       var national = document.getElementById('admin-national');
       if (event.target && (event.target.id === 'admin-national' || event.target.id === 'admin-operator') &&
-          national && String(national.value || '').replace(/\\D/g, '').length === 7) {
+          national && String(national.value || '').replace(/\D/g, '').length === 7) {
         syncAdminPhoneFromSelection();
       }
     }, true);
