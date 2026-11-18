@@ -703,6 +703,30 @@
       '@media(min-width:721px){.ml-admin-drawer-panel{width:340px}.ml-admin-drawer-links{padding-top:18px}}'
     ].join('');
     document.head.appendChild(css);
+    // Keep the dedicated Admin workspace as the only scroll container after
+    // authentication; the shared customer shell was originally viewport-locked.
+    if (!document.getElementById('ml-admin-viewport-fix')) {
+      var viewportFix = document.createElement('style');
+      viewportFix.id = 'ml-admin-viewport-fix';
+      viewportFix.textContent = [
+        'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;min-width:0!important;height:auto!important;min-height:100%!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
+        'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
+        'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
+        'body:has(#ml-admin-workspace) #scr-admin-login{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+        'body:has(#ml-admin-workspace) #tab-admindash{display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
+        'body:has(#ml-admin-workspace) #tab-admindash,#tab-admindash>#ml-admin-workspace,#ml-admin-workspace,.ml-admin-main,.ml-admin-content,#adash-body{box-sizing:border-box;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
+        '#ml-admin-workspace{width:100%!important;min-width:0!important;min-height:100dvh!important;height:auto!important}',
+        '#ml-admin-workspace .ml-admin-content{width:100%!important;min-width:0!important;padding-bottom:calc(120px + env(safe-area-inset-bottom))!important}',
+        '@media(max-width:720px){#ml-admin-workspace{display:block!important;padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}#ml-admin-workspace .ml-admin-main{width:100%!important;min-width:0!important}#ml-admin-workspace .ml-admin-mobilebar{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;z-index:100!important}}',
+        '#scr-admin-login .ml-admin-phone{grid-template-columns:104px minmax(0,1fr)!important;grid-template-rows:52px 56px!important;width:100%!important;min-width:0!important}',
+        '#scr-admin-login .ml-admin-country{grid-column:1!important;grid-row:1!important;justify-content:center!important;padding:0 8px!important;font-size:12px!important}',
+        '#scr-admin-login #admin-operator{grid-column:2!important;grid-row:1!important;width:100%!important;min-width:0!important;height:52px!important;box-sizing:border-box!important;appearance:auto!important;color-scheme:light!important;background:#fff!important;color:#18384d!important;-webkit-text-fill-color:#18384d!important}',
+        '#scr-admin-login #admin-national{grid-column:1/3!important;grid-row:2!important;width:100%!important;min-width:0!important;height:56px!important;box-sizing:border-box!important;border:0!important;border-top:1px solid #e6edf2!important;border-radius:0 0 12px 12px!important;background:#f3f7fb!important;color:#18384d!important;-webkit-text-fill-color:#18384d!important;color-scheme:light!important}',
+        '#scr-admin-login #ml-admin-phone-slot{width:100%!important;overflow:hidden!important;border-radius:13px!important;background:#fff!important;box-shadow:0 4px 14px rgba(18,48,68,.05)!important}',
+        '@media(max-width:380px){#scr-admin-login .ml-admin-phone{grid-template-columns:90px minmax(0,1fr)!important}#scr-admin-login .ml-admin-country{font-size:11px!important}}'
+      ].join('');
+      document.head.appendChild(viewportFix);
+    }
   }
 
   function installAdminTabIsolation() {
