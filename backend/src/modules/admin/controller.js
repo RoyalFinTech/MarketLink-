@@ -5,7 +5,7 @@ const { AppError } = require('../../middleware/errorHandler');
 const wrap = fn => async (req,res,next) => { try { await fn(req,res); } catch(e) { next(e); } };
 const actor = req => ({ id: req.user.id, role: (req.user.roles||[]).includes('super_admin') ? 'super_admin' : ((req.user.roles||[])[0] || 'admin') });
 exports.dashboard  = wrap(async (req,res) => res.json({ success:true, data: await svc.getDashboard() }));
-exports.users      = wrap(async (req,res) => res.json({ success:true, data: await svc.getUsers(req.query) }));
+exports.users      = wrap(async (req,res) => { const data=await svc.getUsers(req.query); res.json({ success:true, data:{...data,canManageAdminRoles:(req.user.roles||[]).includes('super_admin')} }); });
 exports.grantAdminRole = wrap(async (req,res) => res.json({ success:true, data: await svc.grantAdminRole(req.params.id, actor(req)) }));
 exports.suspend    = wrap(async (req,res) => {
   if (!req.body.reason?.trim()) throw new AppError('Reason required.',400,'VALIDATION_ERROR');
