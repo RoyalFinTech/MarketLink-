@@ -1566,15 +1566,37 @@ var ML_API = (function(){
       var controller = typeof AbortController === 'function' ? new AbortController() : null;
       var timeout = controller ? setTimeout(function(){controller.abort();}, 60000) : null;
       try {
-        var res = await fetch(BASE + '/uploads', {
+        var uploadOptions = {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + _accessToken },
           body: form,
           signal: controller ? controller.signal : undefined
-        });
+        };
+        var res = await fetch(BASE + '/uploads', uploadOptions);
+
+        // Multipart uploads use their own fetch path (rather than req()), so
+        // they must perform the same single-flight refresh as JSON API calls.
+        // Otherwise an expired access token fails during document upload and
+        // the vendor/rider application never reaches its registration endpoint.
+        if(res.status === 401 && _refreshToken){
+          var refreshed = await _doRefresh();
+          if(refreshed){
+            uploadOptions.headers = { 'Authorization': 'Bearer ' + _accessToken };
+            res = await fetch(BASE + '/uploads', uploadOptions);
+          } else {
+            _onSessionExpired();
+            throw {code:'SESSION_EXPIRED', error:'Your session has expired. Please log in again before uploading documents.'};
+          }
+        }
         var data;
         try { data = await res.json(); } catch(e){ data = {}; }
-        if(!res.ok) throw {code: data.code||'UPLOAD_ERROR', error: data.error||'Upload failed.', status:res.status};
+        if(!res.ok){
+          if(res.status === 401){
+            _onSessionExpired();
+            throw {code:'SESSION_EXPIRED', error:'Your session has expired. Please log in again before uploading documents.'};
+          }
+          throw {code: data.code||'UPLOAD_ERROR', error: data.error||'Upload failed.', status:res.status};
+        }
         if(!data.data||!data.data.url) throw {code:'UPLOAD_RESPONSE_INVALID',error:'The server did not return a saved image URL.'};
         return data.data;
       } catch(e) {
@@ -6110,7 +6132,7 @@ function marketlinkVendorCategoryGroup(label){
   if(/childcare|daycare|school|education|tutoring|training|books & stationery|church & community|ngo & social|community services/.test(s))return 'Education & Community';
   if(/healthcare|medical|dental|health products|elder care|pet & animal|wellness/.test(s))return 'Health & Wellness';
   if(/electronics|computer|laptop|mobile phone|telecommunications|internet|electrical|solar|appliance|technical support|repair & technical/.test(s))return 'Electronics';
-  if(/software|web & app|digital|cyber café|fintech|payment|mobile money|graphic design|branding|marketing|advertising|content creator|printing & photocopying/.test(s))return 'Digital Goods';
+  if(/software|web\\s*(?:&|and)\\s*app|app\\s*(?:&|and)\\s*web|app development|mobile app|digital|cyber café|fintech|payment|mobile money|graphic design|branding|marketing|advertising|content creator|printing & photocopying/.test(s))return 'Digital Goods';
   if(/fashion|clothing|tailoring|dressmaking|fabric & textiles|textile|shoe|footwear|bag|jewellery|watch|uniform|leather goods|batik|tie-dye|baby & maternity|children’s products|toys|cosmetics|beauty products|hair products|wigs|makeup|skincare|nail technician|hair salon|barber/.test(s))return /cosmetic|beauty products|hair products|wigs|makeup|skincare|nail technician|hair salon|barber/.test(s)?'Beauty':'Fashion';
   if(/construction|building|cement|blocks|sand, gravel|quarry|paint|plumbing|welding|metal fabrication|glass|aluminium|roofing|ceiling|tiles|flooring|interior design|architecture|engineering|wholesale building/.test(s))return 'Construction';
   if(/vehicle|transport|taxi|car hire|motorbike|tricycle|delivery|courier|moving|haulage|auto sales|spare parts|mechanic|tyres|batteries|fuel|lubricants/.test(s))return 'Vehicles';
