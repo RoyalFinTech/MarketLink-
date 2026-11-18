@@ -2,7 +2,7 @@
 const svc = require('./service');
 const isAdmin = u => (u.roles||[]).some(r => ['admin','super_admin'].includes(r));
 const w = fn => async(req,res,next) => { try { await fn(req,res); } catch(e) { next(e); } };
-exports.list           = w(async(req,res) => res.json({ success:true, data: await svc.list({ page:+req.query.page||1, limit:+req.query.limit||20, ...req.query }) }));
+exports.list           = w(async(req,res) => res.json({ success:true, data: await svc.list({ page:+req.query.page||1, limit:+req.query.limit||20, search:req.query.search, categoryId:req.query.categoryId, vendorId:req.query.vendorId, minPrice:req.query.minPrice, maxPrice:req.query.maxPrice, sort:req.query.sort||'newest' }) }));
 exports.listMine       = w(async(req,res) => res.json({ success:true, data: await svc.list({ page:+req.query.page||1, limit:+req.query.limit||20, sort:req.query.sort||'newest', vendorId:req.user.id, includeAllStatuses:true }) }));
 exports.getById        = w(async(req,res) => res.json({ success:true, data: await svc.getById(req.params.id) }));
 exports.create         = w(async(req,res) => res.status(201).json({ success:true, data: await svc.create({ vendorId:req.user.id, ...req.body }) }));
