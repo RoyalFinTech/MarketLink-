@@ -40,14 +40,9 @@ function getWebhookSecrets() {
     .map(value => String(value || '').trim()).filter(Boolean);
 }
 function isWebhookConfigured() {
-  const globalSecret = String(process.env.MODEM_PAY_WEBHOOK_SECRET || process.env.MODEM_WEBHOOK_SECRET || '').trim();
-  if (globalSecret) return true;
-  // MODEM_PAY_SECRET_HASH is used only to sign a per-payment callback.
-  // Merchant-hosted checkout currently uses the dashboard-level global
-  // webhook, so a callback hash alone must not unlock that payment mode.
-  return isH2H() &&
-    Boolean(String(process.env.MODEM_PAY_CALLBACK_URL || '').trim()) &&
-    Boolean(String(process.env.MODEM_PAY_SECRET_HASH || '').trim());
+  // Modem Pay documents all three names across its webhook guides. Accept
+  // whichever single signing secret the merchant has configured.
+  return getWebhookSecrets().length > 0;
 }
 function getApiKey() {
   if (!isConfigured()) throw new AppError('Modem Pay is not configured on the server.', 503, 'PROVIDER_UNAVAILABLE');
