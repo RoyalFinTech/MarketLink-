@@ -449,6 +449,44 @@
       if(searchInput)searchInput.addEventListener('keydown',function(event){if(event.key==='Enter')window.__ML_ADMIN_CRM();});
     }catch(e){root.innerHTML='<div class="ml-empty"><b>CRM directory unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CRM()">Retry</button></div>';}
   }
+  async function adminAccessManagement(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Staff & access management</h3><p>Loading MarketLink accounts…</p></div>';
+    try{
+      var term=String((document.getElementById('ml-admin-access-search')||{}).value||'').trim();
+      var params=new URLSearchParams({page:'1',limit:'100',status:'active'});
+      if(term)params.set('search',term);
+      var data=await adminRequest('/admin/users?'+params.toString(),'GET');
+      var rows=Array.isArray(data.items)?data.items:[];
+      var canGrant=data.canManageAdminRoles===true;
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>Staff & access management</h3><p style="margin:5px 0;color:var(--mu)">Find an existing MarketLink account and grant administrator access</p></div><button type="button" onclick="window.__ML_ADMIN_ACCESS()">Refresh</button></div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin:12px 0"><label class="ml-admin-label" for="ml-admin-access-search">Search active users by name, phone or email</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ml-admin-access-search" class="inp" maxlength="120" value="'+adminSafe(term)+'" placeholder="Search MarketLink users" style="flex:1;min-width:180px"><button type="button" class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_ACCESS()">Search accounts</button></div>'+
+        (canGrant?'<p style="font-size:11px;color:var(--mu);margin:10px 0 0">Administrator grants are recorded in the audit trail. This action grants the Admin role only; it never grants super administrator access.</p>':'<p style="font-size:11px;color:var(--mu);margin:10px 0 0">Read-only view. Only a super administrator can grant administrator access.</p>')+'</div>'+
+        '<div class="ml-section-head"><h3>Active MarketLink accounts</h3><span>'+adminSafe(data.total||rows.length)+' accounts</span></div>'+
+        (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
+          var roles=Array.isArray(x.roles)?x.roles:[];
+          var hasAdmin=roles.indexOf('admin')>=0||roles.indexOf('super_admin')>=0;
+          var action=hasAdmin?'<span class="ml-access-assigned">Admin access already active</span>':(canGrant?'<button type="button" class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_GRANT_ROLE(\''+adminSafe(x.id)+'\',\''+adminSafe(x.full_name||'MarketLink user')+'\')">Grant Admin role</button>':'<span style="font-size:11px;color:var(--mu)">No admin access</span>');
+          return '<div class="ml-profile-row" style="align-items:center;gap:12px"><div class="copy" style="min-width:0;flex:1"><b>'+adminSafe(x.full_name||'MarketLink user')+'</b><span>'+adminSafe(x.phone||'No phone')+' · '+adminSafe(x.email||'No email')+'</span><small>'+adminSafe(roles.join(', ')||'No role')+' · '+adminSafe(x.status||'active')+'</small>'+action+'</div></div>';
+        }).join('')+'</div>':'<div class="ml-empty"><b>No active accounts found</b><span>Try a different name, phone number or email.</span></div>')+'</div>';
+      var search=document.getElementById('ml-admin-access-search');
+      if(search)search.addEventListener('keydown',function(event){if(event.key==='Enter')window.__ML_ADMIN_ACCESS();});
+    }catch(e){
+      root.innerHTML='<div class="ml-empty"><b>Access management unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_ACCESS()">Retry</button></div>';
+    }
+  }
+  async function adminGrantRole(id,name){
+    if(!id)return;
+    if(!window.confirm('Grant the Admin role to '+String(name||'this account')+'? The account will be able to sign in to the MarketLink Admin Portal using its existing phone number and PIN.'))return;
+    try{
+      var result=await adminRequest('/admin/users/'+encodeURIComponent(id)+'/roles','POST',{role:'admin'});
+      if(window.toast)window.toast(result.alreadyAssigned?'This account already has administrator access.':'Administrator access granted. Ask the user to sign in again to refresh their role.','success');
+      await adminAccessManagement();
+    }catch(e){if(window.toast)window.toast(e.message||'Could not grant administrator access.','error');}
+  }
+  window.__ML_ADMIN_ACCESS=adminAccessManagement;
+  window.__ML_ADMIN_GRANT_ROLE=adminGrantRole;
+
   async function adminSupportQueue(){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><h3>Customer support desk</h3><p>Loading the live support queue…</p></div>';
@@ -693,6 +731,7 @@
       chat: adminChatView,
       communications: adminCampaignView,
       crm: adminCrmView,
+      access: adminAccessManagement,
       settings: adminSettingsView,
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
@@ -775,6 +814,7 @@
       '<button data-ml-admin-route="chat"><span>💬</span>Customer chat</button>' +
       '<button data-ml-admin-route="communications"><span>📨</span>Communications</button>' +
       '<button data-ml-admin-route="crm"><span>👥</span>CRM directory</button>' +
+      '<button data-ml-admin-route="access"><span>🛡️</span>Staff & access</button>' +
       '<button data-ml-admin-route="settings"><span>⚙️</span>System settings</button>' +
       '<button data-ml-admin-route="ai"><span>🤖</span>AI operations</button>' +
       '</nav><div class="ml-admin-side-foot"><span class="ml-admin-secure-dot"></span> Protected operations<br><small>Powered by Royal FinTech</small></div></aside>' +
