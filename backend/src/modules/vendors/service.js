@@ -224,8 +224,13 @@ async function updateProfile(userId, data) {
   const sets = [], params = []; let pi = 1;
   for (const [jsKey, col] of Object.entries(allowed)) {
     if (data[jsKey] !== undefined) {
-      sets.push(`${col} = $${pi++}`);
-      params.push(data[jsKey]);
+      sets.push(`${col} = ${pi++}`);
+      const value = jsKey === 'phone'
+        ? normalizeGambianContact(data[jsKey], 'Business phone')
+        : jsKey === 'whatsappNumber'
+          ? normalizeGambianContact(data[jsKey], 'WhatsApp contact')
+          : data[jsKey];
+      params.push(value);
     }
   }
   if (!sets.length) throw new AppError('No valid fields to update.', 400, 'VALIDATION_ERROR');
