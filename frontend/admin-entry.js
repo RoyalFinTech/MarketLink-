@@ -535,6 +535,60 @@
   window.__ML_ADMIN_CAMPAIGN_CREATE=adminCampaignCreate;
   window.__ML_ADMIN_CAMPAIGN_SEND=adminCampaignSend;
 
+  // MarketLink AI Training & Experimentation Centre.
+  // This manages the production retrieval knowledge base; it does not fine-tune model weights.
+  var adminAiDraft = null;
+  async function adminAiTrainingView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>🧠 MarketLink AI Training Centre</h3><p>Loading approved knowledge and live assistant tools…</p></div>';
+    try{
+      var result=await adminRequest('/admin/knowledge?page=1&limit=50','GET');
+      var rows=Array.isArray(result)?result:(Array.isArray(result.items)?result.items:[]);
+      root.innerHTML='<div class="ml-premium-home">'+
+        '<div class="ml-section-head"><div><div class="ml-eyebrow">ROYAL FINTECH · MARKETLINK AI</div><h3>🧠 AI Training & Experimentation</h3><p style="margin:5px 0;color:var(--mu)">Teach MarketLink local knowledge, test answers and review what is active.</p></div><button onclick="window.__ML_ADMIN_AI()">🔄 Refresh</button></div>'+
+        '<div class="ml-wallet-note">Important: MarketLink Assistant currently uses a searchable knowledge base. Saving approved entries updates what the assistant can retrieve; it does not fine-tune an external model or change model weights.</div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Knowledge entries loaded</div><div class="ml-stat-value">'+rows.length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Active entries</div><div class="ml-stat-value">'+rows.filter(function(x){return x.status==='active';}).length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Inactive entries</div><div class="ml-stat-value">'+rows.filter(function(x){return x.status==='inactive';}).length+'</div></div></div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin-top:12px"><h3>🎓 Teach MarketLink a new word, phrase or rule</h3><p style="color:var(--mu);font-size:12px">Add Gambian expressions, local terminology, marketplace policies, delivery instructions and approved answers.</p><label class="ml-admin-label">Knowledge statement</label><textarea id="ml-ai-teach-statement" class="inp" rows="4" maxlength="2000" placeholder="Example: In The Gambia, customers may say “send am” when asking a vendor to arrange delivery. In MarketLink, guide them to place an order and confirm the delivery address."></textarea><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.__ML_ADMIN_AI_DRAFT()">✨ Create teaching draft</button><div id="ml-ai-teach-preview" style="margin-top:10px"></div></div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin-top:12px"><h3>🧪 Test the live MarketLink Assistant</h3><p style="color:var(--mu);font-size:12px">Ask a question and inspect the actual production assistant response before changing knowledge.</p><label class="ml-admin-label">Test question</label><textarea id="ml-ai-test-question" class="inp" rows="2" maxlength="500" placeholder="Try a local word or customer question…"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><select id="ml-ai-test-role" class="inp" style="flex:1;min-width:140px"><option value="customer">Customer context</option><option value="vendor">Vendor context</option><option value="rider">Rider context</option><option value="admin">Admin context</option></select><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_AI_TEST()">▶ Test assistant</button></div><div id="ml-ai-test-result" style="margin-top:12px"></div></div>'+
+        '<div class="ml-section-head"><h3>📚 Knowledge currently available to MarketLink AI</h3><span>'+rows.length+' entries</span></div>'+
+        (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">📘</div><div class="copy"><b>'+adminSafe(x.title||'Untitled knowledge')+'</b><span>'+adminSafe(x.category||'general')+' · '+adminSafe((x.roles||[]).join(', ')||'all roles')+'</span><small>'+adminSafe(x.status||'unknown')+' · Priority '+adminSafe(x.priority||0)+'</small><small>'+adminSafe(x.answer||'')+'</small></div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No knowledge entries returned</b><span>Create an approved teaching entry to begin.</span></div>')+
+        '</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>AI Training Centre unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_AI()">Retry</button></div>';}
+  }
+  async function adminAiDraft(){
+    var field=document.getElementById('ml-ai-teach-statement'),preview=document.getElementById('ml-ai-teach-preview'),statement=String(field&&field.value||'').trim();
+    if(!statement){if(window.toast)window.toast('Enter a word, phrase or rule to teach.','error');return;}
+    if(preview)preview.textContent='Preparing a draft…';
+    try{
+      var d=await adminRequest('/admin/knowledge/teach','POST',{statement:statement,save:false});
+      adminAiDraft=d;
+      if(preview)preview.innerHTML='<div class="ml-wallet-note"><b>Review this draft before adding it:</b><br>Title: '+adminSafe(d.title)+'<br>Category: '+adminSafe(d.category)+'<br>Question: '+adminSafe(d.question)+'<br>Answer: '+adminSafe(d.answer)+'<br>Keywords: '+adminSafe((d.keywords||[]).join(', '))+'<div style="margin-top:10px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_AI_SAVE()">✅ Add approved knowledge</button> <button class="ml-btn" onclick="window.__ML_ADMIN_AI_DRAFT()">↻ Regenerate draft</button></div></div>';
+    }catch(e){if(preview)preview.textContent=e.message;}
+  }
+  async function adminAiSaveDraft(){
+    if(!adminAiDraft)return;
+    try{
+      await adminRequest('/admin/knowledge','POST',adminAiDraft);
+      adminAiDraft=null;if(window.toast)window.toast('Knowledge entry saved. MarketLink AI can now retrieve it.','success');
+      await adminAiTrainingView();
+    }catch(e){if(window.toast)window.toast(e.message,'error');}
+  }
+  async function adminAiTest(){
+    var question=String((document.getElementById('ml-ai-test-question')||{}).value||'').trim();
+    var role=String((document.getElementById('ml-ai-test-role')||{}).value||'customer');
+    var target=document.getElementById('ml-ai-test-result');
+    if(!question){if(window.toast)window.toast('Enter a test question.','error');return;}
+    if(target)target.textContent='Asking the live MarketLink Assistant…';
+    try{
+      var result=await adminRequest('/assistant/ask','POST',{question:question,role:role});
+      if(target)target.innerHTML='<div class="ml-wallet-note"><b>🤖 Assistant response</b><p style="white-space:pre-wrap">'+adminSafe(result.answer||result.reply||result.message||JSON.stringify(result))+'</p><small>Production assistant response · '+adminSafe(role)+' context</small></div>';
+    }catch(e){if(target)target.innerHTML='<div class="ml-empty"><b>Test failed</b><span>'+adminSafe(e.message)+'</span></div>';}
+  }
+  window.__ML_ADMIN_AI=adminAiTrainingView;
+  window.__ML_ADMIN_AI_DRAFT=adminAiDraft;
+  window.__ML_ADMIN_AI_SAVE=adminAiSaveDraft;
+  window.__ML_ADMIN_AI_TEST=adminAiTest;
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
@@ -554,7 +608,7 @@
       ledger: function () { if (api.refreshAdminTransactions) api.refreshAdminTransactions(1); },
       exceptions: function () { if (api.refreshAdminFailedPayments) api.refreshAdminFailedPayments(1); },
       users: function () { if (api.adminUsers) api.adminUsers(); },
-      ai: function () { if (typeof window.adminGoTo === 'function') window.adminGoTo('ai'); }
+      ai: adminAiTrainingView
     };
     if (routes[key]) routes[key]();
     document.querySelectorAll('[data-ml-admin-route]').forEach(function (el) {
