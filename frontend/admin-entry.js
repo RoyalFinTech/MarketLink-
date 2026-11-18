@@ -623,7 +623,13 @@
     });
     var date = document.getElementById('ml-admin-date');
     if (date) date.textContent = new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).format(new Date());
-    adminNavigate('overview');
+    // The premium dashboard loader was started by switchTab('admindash').
+    // Mounting the shell must not start another concurrent overview request.
+    document.querySelectorAll('[data-ml-admin-route]').forEach(function (el) {
+      var active = el.getAttribute('data-ml-admin-route') === 'overview';
+      el.classList.toggle('is-active', active);
+      el.setAttribute('aria-current', active ? 'page' : 'false');
+    });
   }
 
   function installAdminWorkspaceStyles() {
@@ -747,7 +753,14 @@
             adminTab.style.setProperty('overflow', 'visible', 'important');
           }
           if (appScreen) appScreen.style.setProperty('overflow', 'visible', 'important');
-          if (document.getElementById('ml-admin-workspace')) adminNavigate('overview');
+          // switchTab('admindash') already starts the overview request. Only
+          // mark the Overview navigation item active here; do not fire a
+          // second or third dashboard refresh during the login transition.
+          document.querySelectorAll('[data-ml-admin-route]').forEach(function (el) {
+            var active = el.getAttribute('data-ml-admin-route') === 'overview';
+            el.classList.toggle('is-active', active);
+            el.setAttribute('aria-current', active ? 'page' : 'false');
+          });
         }, 0);
       }
       return result;
@@ -783,10 +796,21 @@
 
     if (!window.__ML_ADMIN_SCREEN_OBSERVER && window.MutationObserver) {
       var observer = new MutationObserver(function () {
+        // This observer is only needed to keep the dedicated host on the Admin
+        // login until authentication. Once the authenticated app is active,
+        // mount the workspace once and disconnect. Observing every dashboard
+        // class/DOM mutation after login caused unnecessary repeated work on
+        // low-memory mobile browsers.
         var appScreen = document.getElementById('scr-app');
-        if (appScreen && appScreen.classList.contains('active')) {
+        if (appScreen && appScreen.classList.contains('active') &&
+            window.AdminSession && window.AdminSession.active) {
           installAdminWorkspaceStyles();
           ensureAdminWorkspace();
+          if (window.__ML_ADMIN_SCREEN_OBSERVER) {
+            window.__ML_ADMIN_SCREEN_OBSERVER.disconnect();
+            window.__ML_ADMIN_SCREEN_OBSERVER = null;
+          }
+          return;
         }
         var activeAdminLogin = document.getElementById('scr-admin-login');
         if (activeAdminLogin && activeAdminLogin.classList.contains('active')) {
