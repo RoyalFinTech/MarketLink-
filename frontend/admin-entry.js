@@ -190,12 +190,39 @@
       (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){var photo=x.profile_photo_url?'<img class="ml-crm-avatar" src="'+adminSafe(x.profile_photo_url)+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'"><span class="ml-crm-avatar-fallback" style="display:none">♙</span>':'<span class="ml-crm-avatar-fallback">♙</span>';return '<button type="button" class="ml-profile-row ml-crm-user-row" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer" onclick="window.__ML_ADMIN_CRM_PROFILE(\''+adminSafe(x.id)+'\')">'+photo+'<div class="copy"><b>'+adminSafe(x.full_name||'MarketLink user')+'</b><span>'+adminSafe(x.phone)+' · '+adminSafe((x.roles||[]).join(', '))+'</span><small>'+adminSafe(x.status)+' · Joined '+adminFormatDate(x.created_at)+'</small></div></button>';}).join('')+'</div>':'<div class="ml-empty"><b>No matching profiles</b><span>Try another name, phone number or email.</span></div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>CRM unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
   }
+  function adminCrmFieldLabel(key){
+    return String(key||'').replace(/_/g,' ').replace(/\b\w/g,function(ch){return ch.toUpperCase();});
+  }
+  function adminCrmValue(value){
+    if(value===null||value===undefined||value==='')return 'Not provided';
+    if(typeof value==='boolean')return value?'Yes':'No';
+    if(Array.isArray(value))return value.join(', ')||'Not provided';
+    if(typeof value==='object')return JSON.stringify(value);
+    return String(value);
+  }
+  function adminCrmSection(title,record,exclude){
+    if(!record)return '';
+    var skip=new Set(['user_id','id','created_at','updated_at','password_hash','pin_hash','national_id','id_document_url','license_document_url','vehicle_photo_url','kyc_reviewed_by']);
+    (exclude||[]).forEach(function(k){skip.add(k);});
+    var fields=Object.keys(record).filter(function(k){return !skip.has(k)&&record[k]!==null&&record[k]!==''&&(typeof record[k]!=='object'||Array.isArray(record[k]));});
+    if(!fields.length)return '';
+    return '<section class="ml-crm-detail-section"><h4>'+adminSafe(title)+'</h4><div class="ml-crm-detail-grid">'+fields.map(function(k){return '<div class="ml-crm-detail-field"><small>'+adminSafe(adminCrmFieldLabel(k))+'</small><b>'+adminSafe(adminCrmValue(record[k]))+'</b></div>';}).join('')+'</div></section>';
+  }
+  function adminCrmDetails(data){
+    var sections='';
+    sections+=adminCrmSection('Account information',data.user,['profile_photo_url','roles','status','last_login_at']);
+    sections+=adminCrmSection('Customer profile',data.customer,['profile_photo_url','referral_code','referred_by']);
+    sections+=adminCrmSection('Vendor profile',data.vendor,['logo_url','banner_url','shop_photo_url','id_document_url']);
+    sections+=adminCrmSection('Rider profile',data.rider,['profile_photo_url','id_document_url','license_document_url','vehicle_photo_url']);
+    return sections?'<div class="ml-crm-details">'+sections+'</div>':'<div class="ml-empty">No additional profile details have been provided yet.</div>';
+  }
+
   async function adminCrmProfile(id){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><p>Loading CRM profile…</p></div>';
     try{
       var d=await adminRequest('/admin/users/'+encodeURIComponent(id)+'/profile','GET'),u=d.user;
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>CRM profile</h3><button onclick="window.__ML_ADMIN_CRM()">← Directory</button></div><div class="ml-profile-card"><div class="ml-profile-row ml-crm-profile-head">'+(u.profile_photo_url?'<img class="ml-crm-profile-photo" src="'+adminSafe(u.profile_photo_url)+'" alt="'+adminSafe(u.full_name)+' profile photo" onerror="this.style.display=\'none\'">':'<div class="ml-crm-profile-placeholder">♙</div>')+'<div class="copy"><b>'+adminSafe(u.full_name)+'</b><span>'+adminSafe(u.phone)+' · '+adminSafe(u.email||'No email')+'</span><small>'+adminSafe((u.roles||[]).join(', '))+' · '+adminSafe(u.status)+'</small><small>Orders: '+adminSafe(u.orders_count)+' · Support tickets: '+adminSafe(u.support_tickets)+'</small></div></div></div><div class="ml-section-head"><h3>Internal CRM notes</h3></div><div class="ml-profile-card" style="padding:14px"><textarea id="ml-admin-crm-note" class="inp" rows="3" maxlength="4000" placeholder="Add a private note for authorised MarketLink staff…"></textarea><button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CRM_NOTE(\''+adminSafe(u.id)+'\')">Save private note</button></div>'+
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>CRM profile</h3><button onclick="window.__ML_ADMIN_CRM()">← Directory</button></div><div class="ml-profile-card"><div class="ml-profile-row ml-crm-profile-head">'+(u.profile_photo_url?'<img class="ml-crm-profile-photo" src="'+adminSafe(u.profile_photo_url)+'" alt="'+adminSafe(u.full_name)+' profile photo" onerror="this.style.display=\'none\'">':'<div class="ml-crm-profile-placeholder">♙</div>')+'<div class="copy"><b>'+adminSafe(u.full_name)+'</b><span>'+adminSafe(u.phone)+' · '+adminSafe(u.email||'No email')+'</span><small>'+adminSafe((u.roles||[]).join(', '))+' · '+adminSafe(u.status)+'</small><small>Orders: '+adminSafe(u.orders_count)+' · Support tickets: '+adminSafe(u.support_tickets)+'</small></div></div></div>'+adminCrmDetails(d)+'<div class="ml-section-head"><h3>Internal CRM notes</h3></div><div class="ml-profile-card" style="padding:14px"><textarea id="ml-admin-crm-note" class="inp" rows="3" maxlength="4000" placeholder="Add a private note for authorised MarketLink staff…"></textarea><button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CRM_NOTE(\''+adminSafe(u.id)+'\')">Save private note</button></div>'+
       ((d.notes||[]).length?'<div class="ml-profile-card">'+d.notes.map(function(n){return '<div class="ml-profile-row"><div class="copy"><b>'+adminSafe(n.author_name||'Admin')+'</b><span>'+adminSafe(n.note)+'</span><small>'+adminFormatDate(n.created_at)+'</small></div></div>';}).join('')+'</div>':'<div class="ml-empty">No internal notes recorded.</div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>CRM profile unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
   }
@@ -379,6 +406,11 @@
       '@media(prefers-reduced-motion:reduce){#ml-admin-workspace *{transition:none!important;scroll-behavior:auto!important}}',
       '/* Admin responsive shell, explicit theme and reliable page scrolling */',
       'CRM profile photos and directory avatars',
+      'CRM full profile detail sections',
+      '.ml-crm-details{display:grid;gap:14px;margin:14px 0 22px}.ml-crm-detail-section{background:#fff;border:1px solid #e2eaf0;border-radius:16px;padding:16px;box-shadow:0 5px 18px rgba(24,51,71,.035)}.ml-crm-detail-section h4{margin:0 0 13px;color:#18354a;font-size:13px;font-weight:800;letter-spacing:.02em}.ml-crm-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ml-crm-detail-field{min-width:0;border-bottom:1px solid #edf1f4;padding:0 0 9px}.ml-crm-detail-field small{display:block;color:#718392;font-size:10px;margin-bottom:5px;text-transform:uppercase;letter-spacing:.055em}.ml-crm-detail-field b{display:block;color:#21394b;font-size:12px;font-weight:650;overflow-wrap:anywhere;white-space:pre-wrap}',
+      '#ml-admin-workspace.ml-admin-dark .ml-crm-detail-section{background:#122433;border-color:#2b4354}#ml-admin-workspace.ml-admin-dark .ml-crm-detail-section h4,#ml-admin-workspace.ml-admin-dark .ml-crm-detail-field b{color:#edf4f8}#ml-admin-workspace.ml-admin-dark .ml-crm-detail-field{border-color:#2b4354}#ml-admin-workspace.ml-admin-dark .ml-crm-detail-field small{color:#9aafbd}',
+      '@media(max-width:520px){.ml-crm-detail-grid{grid-template-columns:minmax(0,1fr);gap:9px}.ml-crm-detail-section{padding:13px}}',
+      
       '.ml-crm-user-row{display:flex!important;align-items:center;gap:13px;padding:13px!important}.ml-crm-avatar,.ml-crm-avatar-fallback{width:48px;height:48px;flex:0 0 48px;border-radius:50%;object-fit:cover;border:2px solid #dce8ed;background:#eaf2f5}.ml-crm-avatar-fallback{display:grid;place-items:center;color:#537184;font-size:20px}.ml-crm-profile-head{align-items:center;gap:16px;padding:18px!important}.ml-crm-profile-photo,.ml-crm-profile-placeholder{width:88px;height:88px;flex:0 0 88px;object-fit:cover;border-radius:22px;border:3px solid #e5edf2;background:#edf3f6}.ml-crm-profile-placeholder{display:grid;place-items:center;font-size:30px;color:#5e7788}',
       '#ml-admin-workspace.ml-admin-dark .ml-crm-avatar,#ml-admin-workspace.ml-admin-dark .ml-crm-avatar-fallback,#ml-admin-workspace.ml-admin-dark .ml-crm-profile-photo,#ml-admin-workspace.ml-admin-dark .ml-crm-profile-placeholder{border-color:#344c5d;background:#1b3040;color:#dce8ef}',
       '@media(max-width:520px){.ml-crm-profile-photo,.ml-crm-profile-placeholder{width:68px;height:68px;flex-basis:68px;border-radius:18px}.ml-crm-avatar,.ml-crm-avatar-fallback{width:42px;height:42px;flex-basis:42px}}',
