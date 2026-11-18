@@ -1,7 +1,7 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
-// v42: premium JS uses network-first delivery and startup has a forced fresh-bundle retry.
+// v43: vendor and rider onboarding now offer separate device-file and camera pickers.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v46';
+const CACHE_NAME = 'marketlink-shell-v47';
 const APP_SHELL = [
   './',
   './index.html',
