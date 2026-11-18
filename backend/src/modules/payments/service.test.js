@@ -73,6 +73,19 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(clientQuery.mock.calls.some(([sql])=>/UPDATE orders SET payment_status='confirmed'/i.test(sql))).toBe(true);
  });
 
+ test('DAHA Wallet refuses checkout when available balance is insufficient without writing a payment or debit',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending',payment_method:'wallet'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'100.00'}]})
+   .mockResolvedValueOnce({rows:[{amount:'0.00'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  await expect(initiatePayment({orderId:payment.order_id,method:'wallet',amount:145,customerId:'customer-id'}))
+   .rejects.toMatchObject({statusCode:400,code:'INSUFFICIENT_WALLET_BALANCE'});
+  expect(clientQuery.mock.calls.some(([sql])=>/INSERT INTO payments|UPDATE wallets SET balance=balance-|INSERT INTO transactions/i.test(sql))).toBe(false);
+ });
+
  test('rejects DAHA Wallet payment when the saved order selected Cash on Delivery',async()=>{
   const clientQuery=jest.fn().mockResolvedValueOnce({rows:[{
    id:payment.order_id,customer_id:'customer-id',total:'145.00',
