@@ -41,6 +41,27 @@
   ].join('');
   (document.head || document.documentElement).appendChild(style);
 
+  // The API login response is { user: { id, fullName, phone, roles }, accessToken, refreshToken }.
+  // The legacy Admin handler expects those user fields at the top level. Normalize
+  // only inside this Admin-only deployment; the customer frontend remains untouched.
+  function normalizeAdminAuthResponse() {
+    var auth = window.ML_API && window.ML_API.auth;
+    if (!auth || typeof auth.login !== 'function' || auth.login.__mlAdminResponseNormalized) return;
+    var originalLogin = auth.login;
+    var normalizedLogin = async function () {
+      var response = await originalLogin.apply(this, arguments);
+      if (response && response.user && typeof response.user === 'object') {
+        return Object.assign({}, response.user, {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken
+        });
+      }
+      return response;
+    };
+    normalizedLogin.__mlAdminResponseNormalized = true;
+    auth.login = normalizedLogin;
+  }
+
   function buildAdminLogin() {
     var screen = document.getElementById('scr-admin-login');
     if (!screen || screen.getAttribute('data-ml-admin-redesigned') === '1') return;
@@ -83,6 +104,7 @@
 
   function installAdminGuards() {
     buildAdminLogin();
+    normalizeAdminAuthResponse();
     window.goOnboard = openAdmin;
     window.goAuth = openAdmin;
     window.__mlRouteAfterSplash = openAdmin;
@@ -141,6 +163,7 @@
   }
 
   installAdminGuards();
+  normalizeAdminAuthResponse();
   enablePinAutofillAndSubmit();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
