@@ -2681,7 +2681,7 @@
   }
 
   // Admin DAHA withdrawal actions. These deliberately call the protected backend;
-  // payout initiation remains blocked server-side until Modem Pay credentials and
+  // payout initiation remains blocked server-side until configured payout-provider credentials and
   // webhook verification are configured.
   async function approveDahaWithdrawal(withdrawalId){
     var id=String(withdrawalId||'').trim();
@@ -2695,7 +2695,7 @@
       var data=result&&result.data||{};
       var status=String(data.status||'').toLowerCase();
       if(status==='payout_pending'){
-        toast('Transfer request recorded. The wallet remains reserved until Modem Pay confirms the payout.','success');
+        toast('Transfer request recorded. The wallet remains reserved until the payout provider confirms the payout.','success');
       }else{
         toast(result&&result.message||'The payout request was processed. Verify its provider status before considering it settled.','success');
       }
