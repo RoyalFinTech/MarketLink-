@@ -104,11 +104,12 @@ async function listPendingForAdmin({ page = 1, limit = 20 } = {}) {
   const off = (page - 1) * limit;
   const { rows } = await query(
     `SELECT w.*, u.full_name, u.phone, u.email,
-            CASE WHEN v.user_id IS NOT NULL THEN 'vendor' WHEN r.user_id IS NOT NULL THEN 'rider' ELSE 'other' END AS user_type
+            CASE WHEN v.user_id IS NOT NULL THEN 'vendor' WHEN r.user_id IS NOT NULL THEN 'rider' WHEN a.user_id IS NOT NULL THEN 'affiliate' ELSE 'customer / other' END AS user_type
      FROM withdrawals w
      JOIN users u ON u.id = w.user_id
      LEFT JOIN vendors v ON v.user_id = w.user_id
      LEFT JOIN riders  r ON r.user_id = w.user_id
+     LEFT JOIN affiliates a ON a.user_id = w.user_id
      WHERE w.status IN ('processing','payout_pending')
      ORDER BY w.created_at ASC LIMIT $1 OFFSET $2`,
     [limit, off]);
