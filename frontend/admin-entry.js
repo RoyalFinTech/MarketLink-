@@ -475,9 +475,9 @@
       root.innerHTML='<div class="ml-empty"><b>Access management unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_ACCESS()">Retry</button></div>';
     }
   }
-  async function adminGrantRole(id,name){
+  async function adminGrantRole(id){
     if(!id)return;
-    if(!window.confirm('Grant the Admin role to '+String(name||'this account')+'? The account will be able to sign in to the MarketLink Admin Portal using its existing phone number and PIN.'))return;
+    if(!window.confirm('Grant the Admin role to this account? The account will be able to sign in to the MarketLink Admin Portal using its existing phone number and PIN.'))return;
     try{
       var result=await adminRequest('/admin/users/'+encodeURIComponent(id)+'/roles','POST',{role:'admin'});
       if(window.toast)window.toast(result.alreadyAssigned?'This account already has administrator access.':'Administrator access granted. Ask the user to sign in again to refresh their role.','success');
