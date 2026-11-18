@@ -5,7 +5,7 @@ jest.mock('../../config/db', () => ({
   withTransaction: jest.fn(),
 }));
 const db = require('../../config/db');
-const { listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage } = require('./service');
+const { listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage, getAffiliateDirectory } = require('./service');
 
 describe('Admin customer chat', () => {
   const client = { query: jest.fn() };
@@ -26,6 +26,32 @@ describe('Admin customer chat', () => {
     expect(db.query.mock.calls[0][0]).toMatch(/FROM conversations/i);
     expect(db.query.mock.calls[0][0]).toMatch(/last_message/i);
     expect(db.query.mock.calls[1][1]).toEqual(['%Awa%']);
+  });
+
+  test('uses bound pagination parameters when the chat inbox has no search filter', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ total: 0 }] });
+
+    const result = await listAdminConversations({ page: 1, limit: 30 });
+
+    expect(result).toMatchObject({ items: [], total: 0, page: 1, limit: 30 });
+    expect(db.query.mock.calls[0][0]).toMatch(/LIMIT \$1 OFFSET \$2/i);
+    expect(db.query.mock.calls[0][1]).toEqual([30, 0]);
+    expect(db.query.mock.calls[1][1]).toEqual([]);
+  });
+
+  test('uses bound pagination parameters in the affiliate directory without a search filter', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ total: 0 }] });
+
+    const result = await getAffiliateDirectory({ page: 1, limit: 50 });
+
+    expect(result).toMatchObject({ items: [], total: 0, page: 1, limit: 50 });
+    expect(db.query.mock.calls[0][0]).toMatch(/LIMIT \$1 OFFSET \$2/i);
+    expect(db.query.mock.calls[0][1]).toEqual([50, 0]);
+    expect(db.query.mock.calls[1][1]).toEqual([]);
   });
 
   test('returns conversation participants and messages in chronological order', async () => {
