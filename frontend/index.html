@@ -6148,7 +6148,7 @@ function marketlinkUploadChoice(id,target,accept,title,filename,icon,role,captur
   var cameraId=id+'-camera';
   return '<div style="background:var(--sfl);border:1.5px dashed rgba(148,163,184,.45);border-radius:12px;padding:13px;margin-bottom:10px;">'+
     '<input id="'+id+'" type="file" accept="'+accept+'" style="display:none;" onchange="'+handler+'(this,\''+target+'\')">'+
-    '<input id="'+cameraId+'" type="file" accept="image/jpeg,image/png,image/webp" capture="'+(captureFacing||'environment')+'" style="display:none;" onchange="'+handler+'(this,\''+target+'\')">'+
+    '<input id="'+cameraId+'" type="file" accept="image/jpeg,image/png" capture="'+(captureFacing||'environment')+'" style="display:none;" onchange="'+handler+'(this,\''+target+'\')">'+
     '<div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;"><span style="font-size:23px;">'+icon+'</span><div style="min-width:0;flex:1;"><div style="color:var(--tx);font-size:12px;font-weight:700;">'+title+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;overflow-wrap:anywhere;">'+sanitizeText(filename||'No file selected')+'</div></div></div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
     '<button type="button" class="btn btn-s" style="flex:1;min-width:130px;" onclick="document.getElementById(\''+id+'\').click()">📁 Choose from device</button>'+
