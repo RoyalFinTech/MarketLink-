@@ -6536,6 +6536,30 @@ function aiQuickAction(action){
   var inp=G('ai-inp');
   if(inp){ inp.value=map[action]||action; sendAI(); }
 }
+// Apply trusted navigation intents returned by the backend. This only changes
+// the visible app section; protected actions still require the user's normal role/auth.
+function applyMarketLinkAiNavigation(nav){
+  if(!nav||!nav.topic)return;
+  var roles=(S.roles||[]).map(function(r){return String(r).toLowerCase();});
+  var topic=nav.topic;
+  if(topic==='orders'||topic==='products'){
+    if(typeof switchTab==='function')switchTab(topic==='orders'?'orders':'home');
+  }else if(topic==='wallet'){
+    if(typeof window.ML_Premium!=='undefined'&&window.ML_Premium.openProfilePage)window.ML_Premium.openProfilePage('wallet');
+  }else if(topic==='account'){
+    if(typeof switchTab==='function')switchTab('profile');
+  }else if(topic==='support'){
+    if(typeof window.ML_Premium!=='undefined'&&window.ML_Premium.openProfilePage)window.ML_Premium.openProfilePage('help');
+  }else if(topic==='vendor'&&roles.indexOf('vendor')>=0){
+    if(typeof switchTab==='function')switchTab('vendordash');
+  }else if(topic==='rider'&&roles.indexOf('rider')>=0){
+    if(typeof switchTab==='function')switchTab('riderdash');
+  }else{
+    return;
+  }
+  closeSheet('sh-ai');
+  if(typeof toast==='function')toast('Opening that section for you.','success');
+}
 // Session context: remembers last topic discussed this session for more natural follow-ups
 S.aiContext={lastTopic:null};
 
@@ -6556,7 +6580,7 @@ function sendAI(){
     msgs.appendChild(tid); msgs.scrollTop=msgs.scrollHeight;
   }
   setTimeout(async function(){
-    var reply=null, suggestions=null;
+    var reply=null, suggestions=null, navigationToApply=null;
     // MarketLink Assistant: try the real backend (knowledge-base-backed, no external AI key needed)
     // first. If it's unreachable or errors, fall back to the local AI_KB matching below —
     // same "graceful degrade" pattern the rest of ML_API already uses.
@@ -6575,7 +6599,7 @@ function sendAI(){
           // Navigation and safety responses are authoritative even without a KB entry.
           // Do not let the local fallback overwrite a safe refusal or natural-language route guide.
           reply=res.data.answer;
-          if(res.data.navigation) S.aiContext.lastTopic=res.data.navigation.topic||null;
+          if(res.data.navigation){S.aiContext.lastTopic=res.data.navigation.topic||null;navigationToApply=res.data.navigation;}
         }
       }
     }catch(e){ /* fall through to local matching below */ }
@@ -6624,6 +6648,7 @@ function sendAI(){
     S.aiMsgs.push({role:'ai',text:reply,suggestions:suggestions});
     renderAI();
     if(S.aiSettings.voiceReply || S.aiSettings.autoRead) speakText(reply);
+    if(navigationToApply){setTimeout(function(){applyMarketLinkAiNavigation(navigationToApply);},450);}
   },850);
 }
 
