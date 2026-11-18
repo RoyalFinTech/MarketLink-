@@ -167,3 +167,5 @@ assert.match(html, /Take photo/, 'Onboarding must expose a camera option');
 assert.match(html, /marketlinkUploadChoice\('va-shop-file','photoFile'/, 'Vendor shop logo must offer device and camera selection');
 assert.match(html, /marketlinkUploadChoice\('ra-profile-input','profilePhotoFile'/, 'Rider profile photo must offer device and camera selection');
 assert.match(html, /var cameraId=id\+'-camera'/, 'Camera capture must be a separate input, not a restriction on the device picker');
+
+assert.match(html, /accept="image\/jpeg,image\/png" capture=/, 'Camera capture must use formats accepted by identity and profile-photo validators');
