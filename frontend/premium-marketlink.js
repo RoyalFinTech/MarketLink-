@@ -2680,6 +2680,49 @@
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Revenue report unavailable</b><span>'+esc(e.error||e.message||'Could not load the live finance report.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.ML_Premium.refreshAdminRevenue()">Retry</button></div>';}
   }
 
+  // Admin DAHA withdrawal actions. These deliberately call the protected backend;
+  // payout initiation remains blocked server-side until Modem Pay credentials and
+  // webhook verification are configured.
+  async function approveDahaWithdrawal(withdrawalId){
+    var id=String(withdrawalId||'').trim();
+    if(!id){toast('A valid withdrawal record is required.','error');return;}
+    if(!ML_API.admin||typeof ML_API.admin.approveWithdrawal!=='function'){
+      toast('The secure Admin payout endpoint is unavailable. No payout was sent.','error');return;
+    }
+    if(!window.confirm('Approve this DAHA withdrawal? This requests a real mobile-money transfer through Modem Pay. Do not continue until the recipient details and amount have been checked.'))return;
+    try{
+      var result=await ML_API.admin.approveWithdrawal(id);
+      var data=result&&result.data||{};
+      var status=String(data.status||'').toLowerCase();
+      if(status==='payout_pending'){
+        toast('Transfer request recorded. The wallet remains reserved until Modem Pay confirms the payout.','success');
+      }else{
+        toast(result&&result.message||'The payout request was processed. Verify its provider status before considering it settled.','success');
+      }
+      await renderLiveAdminPayouts();
+    }catch(e){
+      toast(e&& (e.error||e.message)||'Payout approval was not completed. Check the provider status before retrying.','error');
+      await renderLiveAdminPayouts();
+    }
+  }
+
+  async function rejectDahaWithdrawal(withdrawalId){
+    var id=String(withdrawalId||'').trim();
+    if(!id){toast('A valid withdrawal record is required.','error');return;}
+    if(!ML_API.admin||typeof ML_API.admin.rejectWithdrawal!=='function'){
+      toast('The secure Admin rejection endpoint is unavailable. No record was changed.','error');return;
+    }
+    if(!window.confirm('Reject this withdrawal request? This is only allowed before a payout has entered provider processing.'))return;
+    try{
+      var result=await ML_API.admin.rejectWithdrawal(id);
+      toast(result&&result.message||'Withdrawal request rejected. No money was sent.','success');
+      await renderLiveAdminPayouts();
+    }catch(e){
+      toast(e&&(e.error||e.message)||'The withdrawal could not be rejected. Refresh and check its current status.','error');
+      await renderLiveAdminPayouts();
+    }
+  }
+
   async function renderLiveAdminPayouts(){
     var root=G('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live payouts</div><div class="ml-hero-sub">Loading pending withdrawals from the production database…</div></div>';
