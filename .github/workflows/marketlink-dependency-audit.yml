@@ -1,4 +1,4 @@
-name: MarketLink dependency security audit
+name: MarketLink dependency security audit (post-patch verification)
 
 on:
   push:
