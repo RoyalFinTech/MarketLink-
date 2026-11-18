@@ -188,7 +188,13 @@ assert.match(premiumJs, /gamcelLegacy\?\!\/\^\\d\{7\}\$\//, 'Admin login must pr
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
-assert.match(premiumJs, /ml-daha-deposit-number[\s\S]*?maxlength="9"/, 'DAHA mobile-money deposit must request the full nine-digit number');
+assert.match(premiumJs, /ml-daha-deposit-number[\s\S]*?maxlength="7"/, 'DAHA mobile-money deposit must collect seven subscriber digits after a selected network prefix');
+assert.match(premiumJs, /id="ml-daha-deposit-prefix"[\s\S]*?Africell \(87\)[\s\S]*?QCell \(83\)[\s\S]*?Comium \(86\)/, 'DAHA deposits must provide the supported Gambian mobile network prefixes');
+assert.match(premiumJs, /depositPrefix\+depositDigits/, 'DAHA deposits must compose the full national number before calling the backend');
+assert.match(premiumJs, /id="ml-daha-payout-number"[\s\S]*?maxlength="7"/, 'Saved vendor/rider payout profiles must collect seven subscriber digits');
+assert.match(premiumJs, /id="ml-daha-withdraw-number"[\s\S]*?maxlength="7"/, 'Withdrawal requests must collect seven subscriber digits');
+assert.match(premiumJs, /payoutPrefix\+payoutDigits/, 'Saved payout profiles must compose the full nine-digit national number');
+assert.match(premiumJs, /prefix\+subscriber/, 'Withdrawal requests must compose the full nine-digit national number');
 assert.match(premiumJs, /id="ml-checkout-mobile-number"[\s\S]*?maxlength="9"/, 'Direct customer checkout must request the full nine-digit Gambian mobile number');
 assert.match(premiumJs, /Enter the complete 9-digit Gambian mobile-money number/, 'Direct customer checkout must validate the national nine-digit number');
 assert.match(premiumJs, /\^\(87\|86\|83\)\\d\{7\}\$/, 'DAHA mobile-money input must validate its two-digit network prefix plus seven digits');
