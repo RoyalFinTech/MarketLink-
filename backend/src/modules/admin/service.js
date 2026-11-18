@@ -314,7 +314,7 @@ async function getAffiliateDirectory({page=1,limit=50,search}={}) {
     FROM affiliates a JOIN users u ON u.id=a.user_id
     LEFT JOIN wallets w ON w.user_id=a.user_id
     ${whereSql}
-    ORDER BY a.created_at DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,[...params,limit_,offset]);
+    ORDER BY a.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,[...params,limit_,offset]);
   const {rows:[count]}=await query(`SELECT count(*)::int AS total FROM affiliates a JOIN users u ON u.id=a.user_id ${whereSql}`,params);
   return {items:rows,total:Number(count.total||0),page:page_,limit:limit_,totalPages:Math.ceil(Number(count.total||0)/limit_)};
 }
@@ -511,7 +511,7 @@ async function listAdminConversations({page=1,limit=30,search}={}) {
        WHERE conversation_id=c.id ORDER BY created_at DESC LIMIT 1) lm ON TRUE
      ${whereSql}
      ORDER BY COALESCE(lm.created_at,c.created_at) DESC
-     LIMIT ${params.length+1} OFFSET ${params.length+2}`,
+     LIMIT $${params.length+1} OFFSET $${params.length+2}`,
     [...params,limit_,offset]
   );
   const {rows:[count]}=await query(
