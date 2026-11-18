@@ -1,7 +1,7 @@
 'use strict';
 const svc = require('./service');
 const w = fn => async(req,res,next) => { try { await fn(req,res); } catch(e) { next(e); } };
-exports.place        = w(async(req,res) => res.status(201).json({ success:true, data: await svc.placeOrder({ customerId:req.user.id, ...req.body }) }));
+exports.place        = w(async(req,res) => res.status(201).json({ success:true, data: await svc.placeOrder({ ...req.body, customerId:req.user.id }) }));
 exports.getById      = w(async(req,res) => res.json({ success:true, data: await svc.getById(req.params.id,req.user.id,req.user.roles) }));
 exports.myOrders     = w(async(req,res) => res.json({ success:true, data: await svc.listForCustomer(req.user.id,req.query) }));
 exports.vendorOrders = w(async(req,res) => res.json({ success:true, data: await svc.listForVendor(req.user.id,req.query) }));
