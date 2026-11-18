@@ -147,3 +147,32 @@ describe('order creation ownership safeguards', () => {
     expect(clientQuery.mock.calls[0][1]).toEqual(['foreign-address','customer-1']);
   });
 });
+
+describe('customer order cancellation permissions', () => {
+  let clientQuery;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clientQuery = jest.fn();
+    withTransaction.mockImplementation(callback => callback({ query: clientQuery }));
+  });
+
+  test('allows a customer to cancel their own pending order', async () => {
+    const order = { id:'order-1', status:'pending', payment_status:'pending', customer_id:'customer-1', vendor_id:'vendor-1', rider_id:null };
+    query.mockResolvedValueOnce({ rows:[order] });
+    clientQuery.mockResolvedValueOnce({ rows:[{...order,status:'cancelled'}] }).mockResolvedValue({ rows:[] });
+    await expect(updateStatus('order-1','cancelled','customer-1',['customer'],'Customer requested cancellation')).resolves.toMatchObject({status:'cancelled'});
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status/i.test(sql))).toBe(true);
+  });
+
+  test('does not allow a customer to cancel another customer order', async () => {
+    query.mockResolvedValueOnce({ rows:[{ id:'order-2', status:'pending', payment_status:'pending', customer_id:'customer-2', vendor_id:'vendor-1', rider_id:null }] });
+    await expect(updateStatus('order-2','cancelled','customer-1',['customer'])).rejects.toMatchObject({code:'FORBIDDEN',statusCode:403});
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  test('does not allow a customer to cancel after preparation has started', async () => {
+    query.mockResolvedValueOnce({ rows:[{ id:'order-3', status:'preparing', payment_status:'pending', customer_id:'customer-1', vendor_id:'vendor-1', rider_id:null }] });
+    await expect(updateStatus('order-3','cancelled','customer-1',['customer'])).rejects.toMatchObject({code:'INVALID_STATUS_TRANSITION',statusCode:400});
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+});
