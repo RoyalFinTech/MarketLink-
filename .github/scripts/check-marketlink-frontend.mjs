@@ -293,4 +293,14 @@ assert.match(refundService, /INSERT INTO admin_action_logs/, 'Refunds must be au
 assert.match(refundTests, /rejects duplicate refund requests without a second wallet credit/, 'Refund tests must prove duplicate requests do not double-credit wallets');
 assert.match(refundTests, /rejects partial refunds until refund reconciliation supports them/, 'Refund tests must prove unsupported partial refunds are blocked');
 
+const withdrawalService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/withdrawals/service.js'), 'utf8');
+const withdrawalTests = fs.readFileSync(path.join(root, '..', 'backend/src/modules/withdrawals/service.test.js'), 'utf8');
+assert.match(withdrawalService, /const MIN_WITHDRAWAL = 50/, 'DAHA withdrawals must preserve the GMD 50 minimum');
+assert.match(withdrawalService, /\^\(87\|86\|83\)\\d\{7\}\$/, 'Wave and AfriMoney payout accounts must remain nine national digits');
+assert.match(withdrawalService, /marketlink-withdrawal-/, 'Withdrawal retries must use a stable provider idempotency key');
+assert.match(withdrawalService, /SELECT \* FROM withdrawals WHERE id=\$1 FOR UPDATE/, 'Admin payout processing must lock the withdrawal record');
+assert.match(withdrawalService, /UPDATE wallets SET balance=balance-\$1/, 'Customer funds must only be debited after verified payout completion');
+assert.match(withdrawalTests, /clamps customer withdrawal history pagination/, 'Customer withdrawal history must clamp pagination');
+
+
 
