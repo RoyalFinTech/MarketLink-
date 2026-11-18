@@ -237,11 +237,10 @@
         syncAdminPhoneFromSelection();
       }
     }, true);
-    document.addEventListener('input', function (event) {
-      if (event.target && event.target.id === 'admin-national') syncAdminPhoneFromSelection();
-    }, true);
     document.addEventListener('change', function (event) {
-      if (event.target && (event.target.id === 'admin-national' || event.target.id === 'admin-operator')) {
+      var national = document.getElementById('admin-national');
+      if (event.target && (event.target.id === 'admin-national' || event.target.id === 'admin-operator') &&
+          national && String(national.value || '').replace(/\\D/g, '').length === 7) {
         syncAdminPhoneFromSelection();
       }
     }, true);
