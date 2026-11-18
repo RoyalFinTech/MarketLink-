@@ -92,6 +92,7 @@ describe('Admin customer chat', () => {
     expect(result.conversation.id).toBe('conversation-1');
     expect(result.messages.map(message => message.id)).toEqual(['message-1', 'message-2']);
     expect(db.query.mock.calls[1][1]).toEqual(['conversation-1', 'user-a', 'user-b', 20]);
+    expect(db.query.mock.calls[1][0]).toMatch(/sender_role\.name IN \('admin','super_admin'\)/i);
   });
 
   test('sends an audited reply and notifies both participants', async () => {
@@ -106,8 +107,22 @@ describe('Admin customer chat', () => {
     expect(result).toMatchObject({ id: 'message-1' });
     expect(client.query).toHaveBeenCalledTimes(4);
     expect(client.query.mock.calls[2][0]).toMatch(/INSERT INTO notifications/i);
-    expect(client.query.mock.calls[2][1]).toEqual(['user-a', 'user-b', 'conversation-1']);
+    expect(client.query.mock.calls[2][1]).toEqual([['user-a', 'user-b'], 'conversation-1']);
     expect(client.query.mock.calls[3][0]).toMatch(/chat\.admin_reply_sent/);
+  });
+
+  test('notifies only the customer when an Admin is a participant in a direct chat', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [{ id: 'conversation-1', participant_a: 'admin-1', participant_b: 'customer-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'message-2', body: 'We have received your message.' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await sendAdminConversationMessage('conversation-1', 'We have received your message.', { id: 'admin-1', role: 'admin' });
+
+    expect(client.query.mock.calls[2][1]).toEqual([['customer-1'], 'conversation-1']);
+    expect(client.query.mock.calls[3][1][3]).toContain('customer-1');
+    expect(client.query.mock.calls[3][1][3]).not.toContain('admin-1');
   });
 
   test('rejects blank or oversized replies before opening a transaction', async () => {
