@@ -115,7 +115,7 @@ assert.doesNotMatch(html, /Modem Pay|Royal Wallet/i, 'Customer-facing HTML must 
 assert.match(html, /premium-canonical-r14/, 'Production shell version marker must be current');
 assert.match(html, /marketlink-premium-canonical-r48/, 'Premium JS URL must be revised');
 assert.match(html, /marketlink-premium-canonical-r36/, 'Premium CSS URL must be revised');
-assert.match(serviceWorker, /marketlink-shell-v52/, 'PWA cache must be bumped');
+assert.match(serviceWorker, /marketlink-shell-v53/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
@@ -139,7 +139,7 @@ assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'),
 assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.css'), 'utf8'), /@media\(min-width:821px\)\{\s*#app\{width:100%!important;max-width:none!important/, 'Desktop app must not remain trapped in the legacy 430px mobile frame');
 assert.doesNotMatch(html, /marketLinkRoles\.indexOf\('vendor'\)>-1\?'vendor':marketLinkRoles\.indexOf\('rider'\)>-1\?'rider'/, 'Role claims must not silently redirect users into legacy role dashboards');
 assert.match(fs.readFileSync(path.join(root, 'MarketLink (7).html'), 'utf8'), /ml_release=20261106-premium-r34/, 'Legacy HTML shortcut must force the current canonical app release');
-assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v52/, 'PWA shell cache must be invalidated for the current release');
+assert.match(fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8'), /marketlink-shell-v53/, 'PWA shell cache must be invalidated for the current release');
 assert.match(premiumJs, /id='ml-global-refresh'/, 'Desktop app-wide refresh control is missing');
 assert.ok(premiumJs.includes("if(tab==='vendordash')") && premiumJs.includes('return loadVendorLiveData()'), 'Vendor refresh must reload backend data');
 assert.ok(premiumJs.includes("if(tab==='riderdash')") && premiumJs.includes('return loadRiderLiveData()'), 'Rider refresh must reload backend data');
@@ -158,7 +158,7 @@ assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), 
 
 assert.match(html, /function retryPremiumBundle\(\)[\s\S]*?ml_retry=/, 'Premium startup must force a fresh bundle request when the entry point is missing');
 assert.match(html, /var bootDetail=window\.__ML_PREMIUM_BOOT_ERROR\|\|window\.__ML_PREMIUM_SCRIPT_ERROR/, 'Premium retry diagnostic must include captured script execution errors');
-assert.match(html, /Release: premium-r49 · Cache: shell-v52/, 'Premium startup diagnostic must identify the deployed release and cache versions');
+assert.match(html, /Release: premium-r50 · Cache: shell-v53/, 'Premium startup diagnostic must identify the deployed release and cache versions');
 assert.match(serviceWorker, /isPremiumExecutable[\s\S]*?fetch\(request\)/, 'Premium JavaScript must use network-first delivery to prevent stale bundle cache from masking releases');
 
 assert.match(html, /function marketlinkUploadChoice\(/, 'Vendor and rider onboarding must use the shared device/camera upload control');
