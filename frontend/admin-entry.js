@@ -466,7 +466,7 @@
         (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
           var roles=Array.isArray(x.roles)?x.roles:[];
           var hasAdmin=roles.indexOf('admin')>=0||roles.indexOf('super_admin')>=0;
-          var action=hasAdmin?'<span class="ml-access-assigned">Admin access already active</span>':(canGrant?'<button type="button" class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_GRANT_ROLE(\\''+adminSafe(x.id)+'\\')">Grant Admin role</button>':'<span style="font-size:11px;color:var(--mu)">No admin access</span>');
+          var action=hasAdmin?'<span class="ml-access-assigned">Admin access already active</span>':(canGrant?'<button type="button" class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_GRANT_ROLE(\''+adminSafe(x.id)+'\')">Grant Admin role</button>':'<span style="font-size:11px;color:var(--mu)">No admin access</span>');
           return '<div class="ml-profile-row" style="align-items:center;gap:12px"><div class="copy" style="min-width:0;flex:1"><b>'+adminSafe(x.full_name||'MarketLink user')+'</b><span>'+adminSafe(x.phone||'No phone')+' · '+adminSafe(x.email||'No email')+'</span><small>'+adminSafe(roles.join(', ')||'No role')+' · '+adminSafe(x.status||'active')+'</small>'+action+'</div></div>';
         }).join('')+'</div>':'<div class="ml-empty"><b>No active accounts found</b><span>Try a different name, phone number or email.</span></div>')+'</div>';
       var search=document.getElementById('ml-admin-access-search');
