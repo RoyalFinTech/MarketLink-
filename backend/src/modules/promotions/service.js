@@ -38,10 +38,15 @@ async function adminReview(id,adminId,input) {
     if(!existing)throw new AppError('Promotion request not found.',404,'PROMOTION_NOT_FOUND');
     const status=input.status||existing.status;
     const paymentStatus=input.paymentStatus||existing.payment_status;
-    const note=input.adminNotes===undefined?null:String(input.adminNotes||'').trim()||null;
-    if(paymentStatus==='paid'&&existing.payment_status!=='paid'&&!note) {
-      throw new AppError('Record the provider transaction or company-statement reference before marking this promotion as paid.',400,'PROMOTION_PAYMENT_REFERENCE_REQUIRED');
+    const adminNote=input.adminNotes===undefined?null:String(input.adminNotes||'').trim()||null;
+    const paymentReference=String(input.paymentReference||'').trim();
+    if(paymentStatus==='paid'&&existing.payment_status!=='paid'&&!/^[A-Za-z0-9._:/-]{4,160}$/.test(paymentReference)) {
+      throw new AppError('Enter a valid provider transaction or company-statement reference before recording payment.',400,'PROMOTION_PAYMENT_REFERENCE_REQUIRED');
     }
+    const note=paymentReference
+      ? ['Payment reference recorded after Admin statement check: '+paymentReference,adminNote].filter(Boolean).join(' | ').slice(0,2000)
+      : adminNote;
+    if(status==='published'&&existing.status!=='approved')throw new AppError('Approve the promotion before publishing it.',409,'PROMOTION_APPROVAL_REQUIRED');
     if(status==='published'&&paymentStatus!=='paid')throw new AppError('Confirm payment before publishing a promotion.',409,'PROMOTION_PAYMENT_REQUIRED');
     if(status==='published'&&!existing.banner_url)throw new AppError('Add or request a valid banner image before publishing.',409,'PROMOTION_BANNER_REQUIRED');
     const startsAt=input.startsAt===undefined?existing.starts_at:input.startsAt;
@@ -59,10 +64,10 @@ async function adminReview(id,adminId,input) {
     await client.query(
       `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
        VALUES($1,COALESCE((SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id
-         WHERE ur.user_id=$1 AND r.name IN ('admin','super_admin') LIMIT 1),'admin'),
+         WHERE ur.user_id=$1 AND r.name IN ('admin','super_admin','moderator') LIMIT 1),'admin'),
          'promotion.reviewed','vendor_promotion_request',$2,$3::jsonb,$4::jsonb)`,
       [adminId,id,JSON.stringify({status:existing.status,paymentStatus:existing.payment_status}),
-       JSON.stringify({status:updated.status,paymentStatus:updated.payment_status,note})]
+       JSON.stringify({status:updated.status,paymentStatus:updated.payment_status,note,paymentReference:paymentReference||null})]
     );
     return updated;
   });
