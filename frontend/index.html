@@ -6252,7 +6252,7 @@ function renderVApp(){
       marketlinkVendorCategoryOptions(cats,f.cat)+'</select><span aria-hidden="true">▾</span></div>'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">Account phone (sign-in): <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
       '<label class="ml-role-field-label" for="va-phone">WhatsApp / contact phone <span>*</span></label>'+
-      '<div class="ml-country-phone"><span>🇬🇲 +220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="7-digit phone number" id="va-phone" maxlength="7" value="'+sanitizeText(String(f.whatsappNumber||'').replace(/^\\+?220/,''))+'" required></div>'+
+      '<div class="ml-country-phone"><span>🇬🇲 +220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9-digit number including network prefix" id="va-phone" maxlength="9" value="'+sanitizeText(String(f.whatsappNumber||'').replace(/^\\+?220/,''))+'" required></div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin:0 0 8px;" onclick="marketlinkCaptureGPS(\'vendor\')">📍 Save shop GPS location (optional)</button><div id="va-gps-status" style="color:var(--mu);font-size:11px;margin:0 0 10px;line-height:1.5;">GPS helps customers and riders navigate to your shop. You can enter your address without GPS.</div>' +
       '<input class="inp" type="email" id="va-email" placeholder="Business email (optional)" value="'+sanitizeText(f.email||'')+'" autocomplete="email">'+
       '<input class="inp" id="va-regno" placeholder="Business registration / permit number (optional)" value="'+sanitizeText(f.registrationNo||'')+'">'+
@@ -6300,7 +6300,7 @@ function vAppNext(){
     S.vForm.sname=(G('va-sname')&&G('va-sname').value.trim())||'';
     S.vForm.saddr=(G('va-saddr')&&G('va-saddr').value.trim())||'';
     S.vForm.cat=(G('va-cat')&&G('va-cat').value)||'';
-    S.vForm.whatsappNumber='+220'+String((G('va-phone')&&G('va-phone').value)||'').replace(/\D/g,'').slice(0,7);
+    S.vForm.whatsappNumber='+220'+String((G('va-phone')&&G('va-phone').value)||'').replace(/\D/g,'').slice(0,9);
     S.vForm.email=(G('va-email')&&G('va-email').value.trim())||'';
     S.vForm.registrationNo=(G('va-regno')&&G('va-regno').value.trim())||'';
     S.vForm.services=(G('va-services')&&G('va-services').value.trim())||'';
@@ -6309,8 +6309,8 @@ function vAppNext(){
     S.vForm.closeTime=(G('va-close-time')&&G('va-close-time').value)||'';
     S.vForm.hours=[S.vForm.workingDays.join(', '),S.vForm.openTime&&S.vForm.closeTime?(S.vForm.openTime+' - '+S.vForm.closeTime):''].filter(Boolean).join(' | ');
     S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
-    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!/^\+220\d{7}$/.test(S.vForm.whatsappNumber)){
-      toast('Complete the required business details and enter a valid 7-digit Gambian contact number.','error');return;
+    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!/^\+220(?:87|83|86)\d{7}$/.test(S.vForm.whatsappNumber)){
+      toast('Complete the required business details and enter a valid 9-digit Gambian contact number including its network prefix.','error');return;
     }
   }
   S.vStep++; renderVApp();
@@ -6361,7 +6361,7 @@ function renderRApp(){
       '<label style="display:block;color:var(--tx);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Full name (from your MarketLink account)</label><input class="inp" placeholder="Full Name" id="ra-fname" value="'+sanitizeText(f.fname||'')+'" autocomplete="name" readonly aria-readonly="true">'+
       '<div style="font-size:11px;color:var(--mu);margin:0 0 8px;line-height:1.5;">MarketLink account phone: <b style="color:var(--tx);">'+sanitizeText(S.profilePhone||(S.user&&S.user.phone)||'')+'</b> (linked automatically)</div>'+
       '<label class="ml-role-field-label" for="ra-phone">WhatsApp / contact phone <span>*</span></label>'+
-      '<div class="ml-country-phone"><span>🇬🇲 +220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="7-digit phone number" id="ra-phone" maxlength="7" value="'+sanitizeText(String(f.whatsappNumber||'').replace(/^\\+?220/,''))+'" required></div>'+
+      '<div class="ml-country-phone"><span>🇬🇲 +220</span><input class="inp ml-role-field" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9-digit number including network prefix" id="ra-phone" maxlength="9" value="'+sanitizeText(String(f.whatsappNumber||'').replace(/^\\+?220/,''))+'" required></div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin:0 0 8px;" onclick="marketlinkCaptureGPS(\'rider\')">📍 Allow phone GPS</button><div id="ra-gps-status" style="color:var(--mu);font-size:11px;margin:0 0 10px;line-height:1.5;">We will ask before sharing live GPS during an assigned delivery.</div>' +
       '<input class="inp" placeholder="Residential address (area, town, landmark)" id="ra-addr" value="'+sanitizeText(f.addr||'')+'">'+
       '<input class="inp" placeholder="Emergency contact number" id="ra-emg" type="tel" inputmode="tel" value="'+sanitizeText(f.emergency||'')+'">';
@@ -6392,10 +6392,10 @@ function renderRApp(){
 function rAppNext(){
   if(S.rStep===0){
     S.rForm.fname=(G('ra-fname')&&G('ra-fname').value.trim())||'';
-    S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\D/g,'').slice(0,7);
+    S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\D/g,'').slice(0,9);
     S.rForm.addr=(G('ra-addr')&&G('ra-addr').value.trim())||'';
     S.rForm.emergency=(G('ra-emg')&&G('ra-emg').value.trim())||'';
-    if(!/^\+220\d{7}$/.test(S.rForm.whatsappNumber)){toast('Enter a valid 7-digit Gambian WhatsApp/contact number.','error');return;}
+    if(!/^\+220(?:87|83|86)\d{7}$/.test(S.rForm.whatsappNumber)){toast('Enter a valid 9-digit Gambian WhatsApp/contact number including its network prefix.','error');return;}
   } else if(S.rStep===1){
     S.rForm.plate=(G('ra-plate')&&G('ra-plate').value.trim())||'';
     S.rForm.licence=(G('ra-lic')&&G('ra-lic').value.trim())||'';
@@ -7663,7 +7663,7 @@ window.addEventListener('unhandledrejection',function(e){
   function decorateOnboardingPhone(id,target,fieldKey,replaceParent){
     var inp=document.getElementById(id);if(!inp||inp.dataset.mlPlainPhone==='1')return;
     inp.addEventListener('input',function(){
-      var digits=String(inp.value||'').replace(/\D/g,'').slice(0,7);
+      var digits=String(inp.value||'').replace(/\D/g,'').slice(0,9);
       inp.value=digits;
       if(window.S){
         var obj=(target==='va'||target==='ra')?S[target==='va'?'vForm':'rForm']:S.rForm;
@@ -7691,7 +7691,7 @@ window.addEventListener('unhandledrejection',function(e){
       var shopUrl=null;
       if(f.photoFile){var shop=await ML_API.uploads.upload(f.photoFile,'vendor-logo');shopUrl=shop&&shop.url||null;}
       var phone=window.PhoneUtil?window.PhoneUtil.normalize(f.phone,'GM').e164:f.phone;
-      await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:phone,description:f.sname,idDocumentUrl:idFile&&idFile.url,shopPhotoUrl:shopUrl});
+      await ML_API.vendors.register({businessName:f.bname,businessCategory:f.cat,businessAddress:f.saddr,phone:phone,whatsappNumber:f.whatsappNumber||null,description:f.sname,idDocumentUrl:idFile&&idFile.url,shopPhotoUrl:shopUrl});
       closeSheet('sh-vapp');toast('Vendor application submitted. Admin will review your documents.','success');S._vendorLiveLoaded=false;renderProfile();
     }catch(e){toast(e.error||e.message||'Could not submit the vendor application.','error');}
   }
@@ -7708,7 +7708,7 @@ window.addEventListener('unhandledrejection',function(e){
       if(f.vehiclePhotoFile){var vehicle=await ML_API.uploads.upload(f.vehiclePhotoFile,'rider-photo');vehicleUrl=vehicle&&vehicle.url||null;}
       var emergency=f.emergency;
       if(emergency&&window.PhoneUtil)emergency=window.PhoneUtil.normalize(emergency,'GM').e164;
-      await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,emergencyContact:emergency,address:f.addr,idDocumentUrl:idFile&&idFile.url,licenseDocumentUrl:licenseFile&&licenseFile.url,vehiclePhotoUrl:vehicleUrl});
+      await ML_API.riders.register({vehicleType:'motorbike',plateNumber:f.plate,licenseNumber:f.licence,mobileNumber:f.whatsappNumber||null,whatsappNumber:f.whatsappNumber||null,emergencyContact:emergency,address:f.addr,idDocumentUrl:idFile&&idFile.url,licenseDocumentUrl:licenseFile&&licenseFile.url,vehiclePhotoUrl:vehicleUrl});
       closeSheet('sh-rapp');toast('Rider application submitted. Admin will review your documents.','success');S._riderLiveLoaded=false;renderProfile();
     }catch(e){toast(e.error||e.message||'Could not submit the rider application.','error');}
   }
