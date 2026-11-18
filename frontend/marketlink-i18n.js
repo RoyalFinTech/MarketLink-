@@ -235,7 +235,7 @@
     '4-digit PIN':'PIN nimero 4','Sign In':'Donkoto','Sign in to your account':'I kontoo la donkoto',
     'Signing in…':'A be donkoto la…','Enter your phone number':'I telefɔni nimero dɔɔ la','Enter your 4-digit PIN':'I PIN nimero 4 dɔɔ la',
     'Login failed. Please try again.':'Donkoto ma se. A ye a laati kɔfɛ.','Phone number is required.':'Telefɔni nimero be ka kan.','Please check your Gambian mobile number.':'I ye Gambiya telefɔni nimero laati kɔfɛ.',
-    'Mobile network':'Telefɔni network','Choose your network':'I ye network ta','Local number':'Telefɔni nimero','Use your 7-digit local number':'I ye i la telefɔni nimero 7-digit la',
+    'Mobile network':'Telefɔni network','Choose your network':'I ye network ta','Local number':'Telefɔni nimero','Use your 7-digit local number':'Network prefix + 7 digits = 9-digit number',
     'Africell':'Africell','Comium':'Comium','QCell':'QCell','Gamcel':'Gamcel','Your Local Marketplace':'I la lokal marse',
     'Welcome back 👋':'I be kɛlɛŋ, a ni ce!','New here? ':'Jankaroo be? ','Create account':'Kontoo daɲaa',
     'Join MarketLink today':'Bi MarketLink la jɛŋ','Admin Portal':'Admin la soodoo','Language':'Kanŋo',
