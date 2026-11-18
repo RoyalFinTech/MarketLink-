@@ -208,6 +208,14 @@ assert.match(html, /maxlength="9"[^>]*id="rphone"/, 'New customer registration m
 assert.match(html, /Enter the full 9-digit Gambian mobile number/, 'Customer registration must reject legacy seven-digit numbers');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/service.js'), 'utf8'), /canonicalRegistrationPhone/, 'Backend must enforce nine-digit Gambian numbers for new registrations');
 
+assert.match(premiumJs, /function flattenMarketLinkCategoryTree/, 'Customer category rendering must flatten the live parent/child category tree');
+assert.match(premiumJs, /flattenMarketLinkCategoryTree\(liveCategories\)/, 'Home and category browsing must expose nested live categories');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/service.js'), 'utf8'), /WITH RECURSIVE category_branch/, 'Selecting a parent category must include products in its active child categories');
+assert.match(html, /marketlinkLoadVendorCategories/, 'Vendor onboarding must load categories from the live MarketLink category service');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Vendor backend must validate the independently supplied WhatsApp contact number');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Rider backend must validate the independently supplied WhatsApp contact number');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.js'), 'utf8'), /PROFILE_IMAGE_MIN_DIMENSION = 512/, 'Backend profile photo validation must preserve the minimum image dimensions');
+assert.match(premiumJs, /id="ml-daha-withdraw-number"/, 'Withdrawal must retain a manually entered payout destination independent of account sign-in phone');
 assert.match(premiumJs, /Cancel order/, 'Customers must see the cancellation action for eligible pending or accepted orders');
 assert.match(premiumJs, /ML_API\.orders\.cancel\(id,'Cancelled by customer\.'/,'Customer cancellation must call the authenticated order API');
 
