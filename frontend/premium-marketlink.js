@@ -403,10 +403,10 @@
     if(button){button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='Signing in…';}
     try{
       adminAuthErr('');
-      var loginResponse=await Promise.race([
-        ML_API.auth.login(phone,pin),
-        new Promise(function(_,reject){window.setTimeout(function(){reject({error:'The sign-in request timed out. Please check your connection and try again.'});},25000);})
-      ]);
+      // Respect the API client's 120-second login timeout so a sleeping
+      // Render backend has time to wake. The button remains visibly busy and
+      // the API client returns a clear timeout/network error if it cannot.
+      var loginResponse=await ML_API.auth.login(phone,pin);
 
       // Normalize the authenticated user across the direct API result and
       // older nested controller envelopes. Roles always come from the server.
