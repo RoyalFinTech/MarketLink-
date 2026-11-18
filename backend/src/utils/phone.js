@@ -112,7 +112,7 @@ function normalizePhone(raw, defaultCountryIso) {
     const e164 = '+220' + migrated;
     // The 2026 migration may be newer than libphonenumber metadata.
     // Enforce the national nine-digit structure without guessing a carrier prefix.
-    if (m.length !== 9) throw new Error('Please check your Gambian mobile number.');
+    if (migrated.length !== 9) throw new Error('Please check your Gambian mobile number.');
     return { e164, countryIso: 'GM', national: migrated, operator: detectGambianOperator(migrated) };
   }
 
