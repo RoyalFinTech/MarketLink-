@@ -463,18 +463,18 @@ async function listCodCashRemittances({page=1,limit=30,status='submitted'}={}){
   const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||30,1),100),offset=(page_-1)*limit_;
   const allowed=['submitted','verified','rejected','all'];
   const filter=allowed.includes(String(status))?String(status):'submitted';
-  const params=filter==='all'?[limit_,offset]:[filter,limit_,offset];
-  const where=filter==='all'?'':'WHERE r.status=$1';
-  const {rows}=await query(
-    `SELECT r.id,r.payment_id,r.order_id,r.rider_id,r.amount,r.currency,r.deposit_method,
+  const selectSql=`SELECT r.id,r.payment_id,r.order_id,r.rider_id,r.amount,r.currency,r.deposit_method,
             r.provider_reference,r.proof_url,r.status,r.submitted_at,r.reviewed_at,r.review_note,
             o.order_number,o.total,o.status AS order_status,o.payment_status,
             rider.full_name AS rider_name,v.business_name AS vendor_name
      FROM cod_cash_remittances r JOIN orders o ON o.id=r.order_id
      JOIN users rider ON rider.id=r.rider_id
-     LEFT JOIN vendors v ON v.user_id=o.vendor_id
-     ${where} ORDER BY r.submitted_at ASC LIMIT ${params.length-1} OFFSET ${params.length}`,
-    params);
+     LEFT JOIN vendors v ON v.user_id=o.vendor_id`;
+  // Keep each placeholder layout explicit. This avoids dynamically numbered
+  // LIMIT/OFFSET placeholders drifting from the selected status filter.
+  const {rows}=filter==='all'
+    ? await query(selectSql+` ORDER BY r.submitted_at ASC LIMIT $1 OFFSET $2`,[limit_,offset])
+    : await query(selectSql+` WHERE r.status=$1 ORDER BY r.submitted_at ASC LIMIT $2 OFFSET $3`,[filter,limit_,offset]);
   return rows;
 }
 
