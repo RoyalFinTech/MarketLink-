@@ -6,6 +6,7 @@ const wrap = fn => async (req,res,next) => { try { await fn(req,res); } catch(e)
 const actor = req => ({ id: req.user.id, role: (req.user.roles||[]).includes('super_admin') ? 'super_admin' : ((req.user.roles||[])[0] || 'admin') });
 exports.dashboard  = wrap(async (req,res) => res.json({ success:true, data: await svc.getDashboard() }));
 exports.users      = wrap(async (req,res) => res.json({ success:true, data: await svc.getUsers(req.query) }));
+exports.grantAdminRole = wrap(async (req,res) => res.json({ success:true, data: await svc.grantAdminRole(req.params.id, actor(req)) }));
 exports.suspend    = wrap(async (req,res) => {
   if (!req.body.reason?.trim()) throw new AppError('Reason required.',400,'VALIDATION_ERROR');
   res.json({ success:true, data: await svc.suspendUser(req.params.id, req.body.reason, actor(req)) });
