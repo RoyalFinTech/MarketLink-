@@ -123,13 +123,14 @@
     var busy = false;
     function maybeSubmit() {
       var value = String(pin.value || '');
-      if (busy || !/^\\d{4}$/.test(value)) return;
+      if (busy || !/^\d{4}$/.test(value)) return;
       busy = true;
       Promise.resolve().then(function () {
         if (typeof window.doAdminLogin === 'function') window.doAdminLogin();
         window.setTimeout(function () {
           var button = document.getElementById('admin-lbtn');
           if (button && !button.disabled) busy = false;
+          else window.setTimeout(function () { busy = false; }, 12000);
         }, 1200);
       });
     }
