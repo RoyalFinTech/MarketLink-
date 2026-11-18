@@ -589,6 +589,34 @@
   window.__ML_ADMIN_AI_SAVE=adminAiSaveDraft;
   window.__ML_ADMIN_AI_TEST=adminAiTest;
 
+
+  async function adminAffiliateDirectory(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">PARTNER NETWORK</div><h3>Affiliate partners</h3><p>Loading affiliate accounts and settled rewards…</p></div>';
+    try{
+      var data=await adminRequest('/admin/affiliates?page=1&limit=100','GET');
+      var rows=Array.isArray(data.items)?data.items:(Array.isArray(data)?data:[]);
+      var totals=rows.reduce(function(a,x){a.clicks+=Number(x.total_clicks||0);a.orders+=Number(x.delivered_orders||0);a.earned+=Number(x.settled_commission||0);a.wallet+=Number(x.wallet_balance||0);return a;},{clicks:0,orders:0,earned:0,wallet:0});
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">PARTNER NETWORK · FINANCE</div><h3>Affiliate partners</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_AFFILIATES()">↻ Refresh</button></div>'+
+      '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px"><b>Affiliate programme guide:</b> The current reward is 2% of eligible discounted merchandise, funded from MarketLink’s 5% platform commission. It is not added to the customer’s bill. Rewards are credited to the affiliate’s DAHA Wallet only after successful delivery and confirmed payment. Withdrawals remain subject to the normal payout review and minimum withdrawal rules.</div>'+
+      '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Affiliate accounts</div><div class="ml-stat-value">'+Number(data.total||rows.length)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Tracked clicks (listed)</div><div class="ml-stat-value">'+totals.clicks+'</div></div><div class="ml-stat"><div class="ml-stat-label">Delivered referred orders</div><div class="ml-stat-value">'+totals.orders+'</div></div><div class="ml-stat"><div class="ml-stat-label">Settled affiliate rewards</div><div class="ml-stat-value">D '+totals.earned.toFixed(2)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Affiliate wallet balances</div><div class="ml-stat-value">D '+totals.wallet.toFixed(2)+'</div></div></div>'+
+      (rows.length?'<div class="ml-profile-card" style="margin-top:14px">'+rows.map(function(x){
+        var name=adminSafe(x.full_name||'Affiliate partner'),code=adminSafe(x.affiliate_code||'');
+        return '<div class="ml-profile-row"><div class="ico">🔗</div><div class="copy"><b>'+name+'</b><span>Code: '+code+' · '+adminSafe(x.phone||x.email||'No contact details')+'</span><small>'+Number(x.total_clicks||0)+' clicks · '+Number(x.delivered_orders||0)+' delivered orders · Rate '+Number(x.commission_pct||0)+'%</small><small>Settled rewards D '+Number(x.settled_commission||0).toFixed(2)+' · Wallet D '+Number(x.wallet_balance||0).toFixed(2)+' · Account '+adminSafe(x.status||'active')+'</small><button class="ml-btn ml-btn-secondary" style="margin-top:7px;font-size:10px;padding:6px 9px" onclick="window.__ML_ADMIN_AFFILIATE_COPY(&quot;'+code+'&quot;)">Copy referral link</button></div></div>';
+      }).join('')+'</div>':'<div class="ml-empty"><b>No affiliate accounts yet</b><span>Affiliate users will appear here after they activate the programme from their MarketLink profile. No commissions have been generated from orders yet.</span></div>')+
+      '<div class="ml-wallet-note" style="margin-top:12px;padding:12px;border-radius:12px">Admin control: use the DAHA ledger and Withdrawals pages to inspect actual wallet credits and payout requests. This directory is a reporting view; it does not manually create, approve or pay commissions.</div></div>';
+    }catch(e){
+      root.innerHTML='<div class="ml-empty"><b>Affiliate directory unavailable</b><span>'+adminSafe(e.error||e.message||'Could not load affiliate records.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.__ML_ADMIN_AFFILIATES()">Retry</button></div>';
+    }
+  }
+  window.__ML_ADMIN_AFFILIATES=adminAffiliateDirectory;
+  window.__ML_ADMIN_AFFILIATE_COPY=function(code){
+    if(!code)return;
+    var link='https://marketlink-gambia-frontend.onrender.com/?ref='+encodeURIComponent(code);
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(link).then(function(){if(window.toast)window.toast('Affiliate link copied.','success');}).catch(function(){window.prompt('Copy affiliate link:',link);});}
+    else window.prompt('Copy affiliate link:',link);
+  };
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
@@ -601,6 +629,7 @@
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
       promotions: adminPromotionsView,
+      affiliates: adminAffiliateDirectory,
       analytics: function () { if (api.refreshAdminAnalytics) api.refreshAdminAnalytics(); },
       revenue: function () { if (api.refreshAdminRevenue) api.refreshAdminRevenue(); },
       payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
@@ -663,6 +692,7 @@
       '<button data-ml-admin-route="vendors"><span>🏪</span>Vendor approvals</button>' +
       '<button data-ml-admin-route="riders"><span>🛵</span>Rider approvals</button>' +
       '<button data-ml-admin-route="promotions"><span>🎯</span>Promotions</button>' +
+      '<button data-ml-admin-route="affiliates"><span>🔗</span>Affiliate partners</button>' +
       '<div class="ml-admin-side-label">📈 INSIGHTS & FINANCE</div>' +
       '<button data-ml-admin-route="analytics"><span>📊</span>Analytics</button>' +
       '<button data-ml-admin-route="revenue"><span>💹</span>Revenue reports</button>' +
