@@ -481,26 +481,34 @@
     }
   }
   async function loadAdminDashboard(){
-    if(!apiOk()){toast('Admin session requires backend sign-in.','error');return;}
+    var root=G('adash-body');
+    if(!root)return;
+    if(!apiOk()){
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Admin session required</b><span>Sign in again to load the live control center.</span></div></div>';
+      toast('Admin session requires backend sign-in.','error');
+      return;
+    }
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">MarketLink Operations</div><div class="ml-hero-title">Opening Admin control center…</div><div class="ml-hero-sub">Your account is authenticated. Loading live platform information.</div><div class="ml-loading" role="status" aria-live="polite">Connecting to production records…</div></div>';
     try{
       var r=await ML_API.admin.dashboard(),d=r.data||{},s=d.stats||{},p=d.pendingApprovals||{};
       var orders=Array.isArray(d.recentOrders)?d.recentOrders:[],vendors=Array.isArray(d.topVendors)?d.topVendors:[];
       var codPayments=[],codRemittances=[],codQueueErrorMessage=null,remittanceQueueErrorMessage=null;
-      try{
-        var codResponse=await ML_API.payments.pendingCod({page:1,limit:30});
-        codPayments=normalizeProducts(codResponse&&codResponse.data);
-      }catch(codQueueError){codPayments=[];codQueueErrorMessage=codQueueError.error||codQueueError.message||'The COD payment queue could not be loaded.';}
-      try{
-        var remittanceResponse=await ML_API.payments.codRemittances({page:1,limit:50,status:'submitted'});
-        codRemittances=normalizeProducts(remittanceResponse&&remittanceResponse.data);
-      }catch(remittanceQueueError){codRemittances=[];remittanceQueueErrorMessage=remittanceQueueError.error||remittanceQueueError.message||'The rider cash deposit queue could not be loaded.';}
+      var queueResults=await Promise.all([
+        ML_API.payments.pendingCod({page:1,limit:30}).then(function(response){return {kind:'cod',data:response&&response.data};}).catch(function(error){return {kind:'cod-error',error:error};}),
+        ML_API.payments.codRemittances({page:1,limit:50,status:'submitted'}).then(function(response){return {kind:'remittance',data:response&&response.data};}).catch(function(error){return {kind:'remittance-error',error:error};})
+      ]);
+      queueResults.forEach(function(result){
+        if(result.kind==='cod')codPayments=normalizeProducts(result.data);
+        else if(result.kind==='remittance')codRemittances=normalizeProducts(result.data);
+        else if(result.kind==='cod-error')codQueueErrorMessage=result.error.error||result.error.message||'The COD payment queue could not be loaded.';
+        else if(result.kind==='remittance-error')remittanceQueueErrorMessage=result.error.error||result.error.message||'The rider cash deposit queue could not be loaded.';
+      });
       var codRemittanceHtml='<div class="ml-section-head"><h3>Rider cash deposit verification</h3><button onclick="window.ML_Premium.adminRefresh()">Refresh</button></div>'+
         '<div class="ml-wallet-note" style="margin:8px 0 12px;padding:12px;border-radius:12px">Compare each submitted receipt reference against the official MarketLink Wave or AfriMoney collection account statement before verifying. Verification confirms the payment and starts the existing order settlement.</div>'+
         (remittanceQueueErrorMessage?'<div class="ml-empty"><b>Cash deposit queue unavailable</b><span>'+esc(remittanceQueueErrorMessage)+'</span></div>':(codRemittances.length?'<div class="ml-profile-card">'+codRemittances.map(function(r){
           var proof=r.proof_url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:5px 8px;margin-top:4px" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(r.proof_url)+'&quot;,&quot;COD deposit receipt&quot;)">View receipt ↗</button>':'<span>Receipt not attached</span>';
           return '<div class="ml-profile-row"><div class="ico">🏦</div><div class="copy"><b>'+esc(r.order_number||r.order_id)+' · '+money(r.amount||0)+'</b><span>'+esc(r.rider_name||'Rider')+' · '+esc(String(r.deposit_method||'wave').toUpperCase())+' · Ref: '+esc(r.provider_reference||'—')+'</span><small>'+esc(r.vendor_name||'Vendor')+' · '+esc(r.status||'submitted')+' · '+proof+'</small></div><div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="ml-btn ml-btn-primary" style="font-size:10px;padding:7px" onclick="window.ML_Premium.reviewCodRemittance(\''+esc(r.id)+'\',\'verified\')">Verify deposit</button><button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:7px" onclick="window.ML_Premium.reviewCodRemittance(\''+esc(r.id)+'\',\'rejected\')">Reject</button></div></div>';
         }).join('')+'</div>':'<div class="ml-empty"><b>No rider cash deposits awaiting verification</b><span>Submitted Wave or AfriMoney references will appear here after riders complete cash-on-delivery jobs.</span></div>'));
-      var root=G('adash-body');if(!root)return;
       root.innerHTML='<div class="ml-premium-home" style="padding-top:18px"><div class="ml-home-top"><div><div class="ml-eyebrow">MarketLink Operations</div><div class="ml-hero-title">Admin control center</div><div class="ml-hero-sub">Live platform metrics from the production database. No preview records are shown.</div></div><div class="ml-live-dot">Backend connected</div><button class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.reviewPromotions()">🎫 Promotion requests</button></div>'+
       '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Active customers</div><div class="ml-stat-value">'+Number(s.activeCustomers||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Approved vendors</div><div class="ml-stat-value">'+Number(s.approvedVendors||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Online riders</div><div class="ml-stat-value">'+Number(s.onlineRiders||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">30d revenue</div><div class="ml-stat-value">'+money(s.revenue30d||0)+'</div></div></div>'+
       '<div class="ml-promo-strip"><div class="ml-promo"><strong>Vendor approvals</strong><span>'+Number(p.pending_vendors||0)+' pending applications require review.</span><button class="ml-btn ml-btn-secondary" style="margin-top:9px" onclick="window.ML_Premium.adminApprovals(\'vendor\')">Review vendors</button></div><div class="ml-promo"><strong>Rider approvals</strong><span>'+Number(p.pending_riders||0)+' pending rider applications require review.</span><button class="ml-btn ml-btn-secondary" style="margin-top:9px" onclick="window.ML_Premium.adminApprovals(\'rider\')">Review riders</button></div><div class="ml-promo"><strong>Support</strong><span>'+Number(p.open_tickets||0)+' open support tickets in the production database.</span></div></div>'+
@@ -525,7 +533,11 @@
             '<div class="ml-section-head"><h3>Top vendors</h3></div>'+
       (vendors.length?'<div class="ml-profile-card">'+vendors.map(function(v){return '<div class="ml-profile-row"><div class="ico">🏪</div><div class="copy"><b>'+esc(v.business_name||'Vendor')+'</b><span>'+Number(v.total_sales||0)+' sales · '+money(v.total_revenue||0)+'</span></div><span style="color:#FFD778">★ '+Number(v.rating_avg||0).toFixed(1)+'</span></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No approved vendors yet</b><span>Vendor performance will appear here after real vendors are approved.</span></div>')+
       '<div style="display:flex;gap:8px;margin-top:14px"><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="window.ML_Premium.adminUsers()">Users</button><button class="ml-btn ml-btn-secondary" style="flex:1" onclick="adminLogout()">Sign out</button></div></div>';
-    }catch(e){toast(e.error||'Could not load the admin dashboard.','error');}
+    }catch(e){
+      var message=e&&(e.error||e.message)||'Could not load the Admin dashboard.';
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Admin dashboard could not finish loading</b><span>'+esc(message)+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.adminRefresh()">Retry dashboard</button></div></div>';
+      toast(message,'error');
+    }
   }
   async function confirmCodPayment(paymentId,paymentState){
     if(!apiOk()){toast('Admin session required.','error');return;}
