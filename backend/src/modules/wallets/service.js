@@ -89,8 +89,9 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
   if (modemPay.isH2H() && !['wave', 'afrimoney', 'qmoney'].includes(method)) {
     throw new AppError('Choose Wave, AfriMoney or QMoney for direct mobile-money deposits.', 400, 'UNSUPPORTED_METHOD');
   }
-  if (modemPay.isH2H() && !/^\d{7}$/.test(String(accountNumber || '').replace(/\D/g, ''))) {
-    throw new AppError('Enter the 7-digit mobile-money number without +220.', 400, 'INVALID_ACCOUNT_NUMBER');
+  const nationalAccountNumber = String(accountNumber || '').replace(/\D/g, '');
+  if (modemPay.isH2H() && !/^(87|86|83)\d{7}$/.test(nationalAccountNumber)) {
+    throw new AppError('Enter the full 9-digit Gambian mobile-money number beginning 87, 86 or 83.', 400, 'INVALID_ACCOUNT_NUMBER');
   }
 
   const wallet = await ensureWallet(userId);
@@ -114,7 +115,7 @@ async function initiateDeposit(userId, { amount, method = 'modempay', accountNum
       cancelUrl: process.env.MODEM_PAY_CANCEL_URL,
       callbackUrl: process.env.MODEM_PAY_CALLBACK_URL,
       network: method === 'modempay' ? undefined : method,
-      accountNumber: accountNumber ? String(accountNumber).replace(/\D/g, '') : undefined,
+      accountNumber: modemPay.isH2H() && nationalAccountNumber ? nationalAccountNumber.slice(2) : (accountNumber ? String(accountNumber).replace(/\D/g, '') : undefined),
       idempotencyKey,
     });
   } catch (err) {
