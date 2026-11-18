@@ -2180,7 +2180,6 @@
         emergencyContact:emergencyPhone||undefined,
         address:String(f.addr).trim(),
         deliveryZone:f.deliveryZone||undefined,
-        whatsappNumber:f.whatsappNumber||undefined,
         latitude:f.latitude==null?undefined:f.latitude,
         longitude:f.longitude==null?undefined:f.longitude,
         profilePhotoUrl:riderPhoto&&riderPhoto.url,
