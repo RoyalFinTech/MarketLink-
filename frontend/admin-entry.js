@@ -123,7 +123,111 @@
     return false;
   }
 
-  function installAdminGuards() {
+
+  // Premium responsive Admin workspace. This runs only on the dedicated Admin site.
+  function adminNavigate(key) {
+    var api = window.ML_Premium || {};
+    var routes = {
+      overview: function () { if (api.adminRefresh) api.adminRefresh(); },
+      vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
+      riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
+      promotions: function () { if (api.reviewPromotions) api.reviewPromotions(); },
+      analytics: function () { if (api.refreshAdminAnalytics) api.refreshAdminAnalytics(); },
+      revenue: function () { if (api.refreshAdminRevenue) api.refreshAdminRevenue(); },
+      payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
+      reconciliation: function () { if (api.refreshFinancialReconciliation) api.refreshFinancialReconciliation(); },
+      ledger: function () { if (api.refreshAdminTransactions) api.refreshAdminTransactions(1); },
+      exceptions: function () { if (api.refreshAdminFailedPayments) api.refreshAdminFailedPayments(1); },
+      users: function () { if (api.adminUsers) api.adminUsers(); },
+      ai: function () { if (typeof window.adminGoTo === 'function') window.adminGoTo('ai'); }
+    };
+    if (routes[key]) routes[key]();
+    document.querySelectorAll('[data-ml-admin-route]').forEach(function (el) {
+      var active = el.getAttribute('data-ml-admin-route') === key;
+      el.classList.toggle('is-active', active);
+      el.setAttribute('aria-current', active ? 'page' : 'false');
+    });
+    var drawer = document.getElementById('ml-admin-drawer');
+    if (drawer) drawer.classList.remove('is-open');
+  }
+
+  function ensureAdminWorkspace() {
+    var tab = document.getElementById('tab-admindash');
+    var body = document.getElementById('adash-body');
+    if (!tab || !body || tab.getAttribute('data-ml-admin-workspace') === '1') return;
+    tab.setAttribute('data-ml-admin-workspace', '1');
+    tab.style.cssText = 'height:auto;min-height:100vh;overflow:visible;background:#f3f6fa;';
+    var shell = document.createElement('div');
+    shell.id = 'ml-admin-workspace';
+    shell.innerHTML =
+      '<aside class="ml-admin-sidebar"><div class="ml-admin-side-brand"><img src="./assets/marketlink-logo.png" alt="MarketLink"><div><b>MARKETLINK</b><span>ADMINISTRATION</span></div></div>' +
+      '<div class="ml-admin-side-label">WORKSPACE</div>' +
+      '<nav class="ml-admin-nav" aria-label="Admin navigation">' +
+      '<button data-ml-admin-route="overview" class="is-active"><span>⌂</span>Overview</button>' +
+      '<button data-ml-admin-route="vendors"><span>▣</span>Vendor approvals</button>' +
+      '<button data-ml-admin-route="riders"><span>♧</span>Rider approvals</button>' +
+      '<button data-ml-admin-route="promotions"><span>✦</span>Promotions</button>' +
+      '<div class="ml-admin-side-label">INSIGHTS & FINANCE</div>' +
+      '<button data-ml-admin-route="analytics"><span>▥</span>Analytics</button>' +
+      '<button data-ml-admin-route="revenue"><span>↗</span>Revenue reports</button>' +
+      '<button data-ml-admin-route="payouts"><span>⇄</span>Withdrawals</button>' +
+      '<button data-ml-admin-route="reconciliation"><span>◎</span>Reconciliation</button>' +
+      '<button data-ml-admin-route="ledger"><span>≡</span>DAHA ledger</button>' +
+      '<button data-ml-admin-route="exceptions"><span>⚠</span>Payment exceptions</button>' +
+      '<div class="ml-admin-side-label">MANAGEMENT</div>' +
+      '<button data-ml-admin-route="users"><span>♙</span>Users & CRM</button>' +
+      '<button data-ml-admin-route="ai"><span>✧</span>AI operations</button>' +
+      '</nav><div class="ml-admin-side-foot"><span class="ml-admin-secure-dot"></span> Protected operations<br><small>Powered by Royal FinTech</small></div></aside>' +
+      '<div class="ml-admin-main"><header class="ml-admin-topbar"><button id="ml-admin-menu" class="ml-admin-menu" aria-label="Open navigation">☰</button><div class="ml-admin-crumb"><span>MarketLink</span><b>/ Admin workspace</b></div><div class="ml-admin-top-actions"><span class="ml-admin-live"><i></i> Production</span><button class="ml-admin-refresh" id="ml-admin-refresh">↻ <span>Refresh</span></button><button class="ml-admin-signout" id="ml-admin-signout">Sign out</button></div></header>' +
+      '<div class="ml-admin-pagehead"><div><div class="ml-admin-overline">ROYAL FINTECH · OPERATIONS</div><h1>Administration</h1><p>Monitor and manage the MarketLink marketplace.</p></div><div class="ml-admin-date" id="ml-admin-date"></div></div>' +
+      '<main class="ml-admin-content" id="ml-admin-content"></main></div>' +
+      '<div class="ml-admin-mobilebar"><button data-ml-admin-route="overview" class="is-active"><b>⌂</b><span>Home</span></button><button data-ml-admin-route="vendors"><b>▣</b><span>Vendors</span></button><button data-ml-admin-route="analytics"><b>▥</b><span>Insights</span></button><button data-ml-admin-route="payouts"><b>⇄</b><span>Finance</span></button><button id="ml-admin-more"><b>☰</b><span>More</span></button></div>' +
+      '<div id="ml-admin-drawer" class="ml-admin-drawer"><div class="ml-admin-drawer-head"><b>Admin navigation</b><button id="ml-admin-drawer-close" aria-label="Close navigation">×</button></div><div class="ml-admin-drawer-links"></div></div>';
+    tab.insertBefore(shell, body);
+    document.getElementById('ml-admin-content').appendChild(body);
+    body.style.cssText = 'height:auto;min-height:55vh;overflow:visible;';
+    var nav = shell.querySelector('.ml-admin-nav');
+    var drawerLinks = shell.querySelector('.ml-admin-drawer-links');
+    drawerLinks.innerHTML = nav.innerHTML;
+    shell.addEventListener('click', function (event) {
+      var route = event.target.closest('[data-ml-admin-route]');
+      if (route) { adminNavigate(route.getAttribute('data-ml-admin-route')); return; }
+      if (event.target.closest('#ml-admin-menu') || event.target.closest('#ml-admin-more')) {
+        document.getElementById('ml-admin-drawer').classList.add('is-open');
+      }
+      if (event.target.closest('#ml-admin-drawer-close')) {
+        document.getElementById('ml-admin-drawer').classList.remove('is-open');
+      }
+      if (event.target.closest('#ml-admin-refresh')) adminNavigate('overview');
+      if (event.target.closest('#ml-admin-signout') && typeof window.adminLogout === 'function') window.adminLogout();
+    });
+    var date = document.getElementById('ml-admin-date');
+    if (date) date.textContent = new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).format(new Date());
+    adminNavigate('overview');
+  }
+
+  function installAdminWorkspaceStyles() {
+    if (document.getElementById('ml-admin-workspace-style')) return;
+    var css = document.createElement('style');
+    css.id = 'ml-admin-workspace-style';
+    css.textContent = [
+      '#scr-app:has(#ml-admin-workspace){background:#f3f6fa!important;color:#14283a!important;min-height:100vh}',
+      '#ml-admin-workspace{--ink:#14283a;--muted:#718397;--line:#e2e9f0;--gold:#d6a43b;--teal:#147b78;display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh;background:#f3f6fa;color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif}',
+      '.ml-admin-sidebar{position:sticky;top:0;height:100vh;overflow:auto;background:#102638;color:#eaf1f5;padding:24px 16px;box-sizing:border-box;display:flex;flex-direction:column;z-index:20}',
+      '.ml-admin-side-brand{display:flex;align-items:center;gap:11px;padding:4px 8px 26px;border-bottom:1px solid rgba(255,255,255,.1)}.ml-admin-side-brand img{width:45px;height:45px;object-fit:contain}.ml-admin-side-brand b{display:block;font-size:14px;letter-spacing:.12em}.ml-admin-side-brand span{display:block;color:#8fa8b8;font-size:9px;letter-spacing:.16em;margin-top:4px}',
+      '.ml-admin-side-label{padding:22px 10px 8px;color:#7793a5;font-size:9px;font-weight:800;letter-spacing:.16em}.ml-admin-nav{display:grid;gap:4px}.ml-admin-nav button,.ml-admin-drawer-links button{border:0;background:transparent;color:#c0cfda;border-radius:10px;padding:11px 12px;text-align:left;font-size:12px;font-weight:650;display:flex;align-items:center;gap:12px;cursor:pointer}.ml-admin-nav button span,.ml-admin-drawer-links button span{width:20px;color:#e1b75b;font-size:17px;text-align:center}.ml-admin-nav button:hover,.ml-admin-nav button.is-active,.ml-admin-drawer-links button.is-active{background:rgba(255,255,255,.1);color:#fff}.ml-admin-side-foot{margin-top:auto;padding:18px 10px 4px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:#a9bfcd;line-height:1.8}.ml-admin-side-foot small{color:#7995a7}.ml-admin-secure-dot{display:inline-block;width:7px;height:7px;background:#2ac58c;border-radius:50%;margin-right:6px}',
+      '.ml-admin-main{min-width:0}.ml-admin-topbar{height:70px;display:flex;align-items:center;gap:18px;padding:0 34px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}.ml-admin-crumb{font-size:12px;color:#91a0af;flex:1}.ml-admin-crumb b{color:#344c60;margin-left:7px}.ml-admin-top-actions{display:flex;align-items:center;gap:14px}.ml-admin-live{font-size:10px;color:#16836e;font-weight:800}.ml-admin-live i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#21b77b;margin-right:6px}.ml-admin-refresh,.ml-admin-signout{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 13px;color:#284255;font-size:11px;font-weight:750}.ml-admin-signout{background:#fff8ec;border-color:#f1dfbd;color:#88601b}.ml-admin-menu{display:none}',
+      '.ml-admin-pagehead{display:flex;align-items:flex-end;justify-content:space-between;padding:30px 36px 20px}.ml-admin-overline{font-size:9px;letter-spacing:.18em;color:#16817b;font-weight:850}.ml-admin-pagehead h1{font-size:27px;letter-spacing:-.04em;margin:7px 0;color:#14283a}.ml-admin-pagehead p{margin:0;color:#788b9b;font-size:12px}.ml-admin-date{font-size:11px;color:#718397}.ml-admin-content{padding:0 36px 42px;min-width:0}.ml-admin-content .ml-premium-home{max-width:none!important;padding:0!important}.ml-admin-content .ml-home-top{background:linear-gradient(120deg,#102d42,#145c62)!important;border-radius:18px!important;padding:26px!important;margin-bottom:18px!important}.ml-admin-content .ml-hero-title{font-size:25px!important}.ml-admin-content .ml-hero-sub{max-width:620px}.ml-admin-content .ml-live-dot{color:#a7f0d3}.ml-admin-content .ml-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}.ml-admin-content .ml-stat,.ml-admin-content .ml-promo,.ml-admin-content .ml-profile-card{border:1px solid #e0e8ef!important;border-radius:16px!important;box-shadow:0 5px 20px rgba(28,57,78,.045)!important}.ml-admin-content .ml-stat{background:#fff!important;padding:19px!important}.ml-admin-content .ml-stat-label{color:#718397!important}.ml-admin-content .ml-stat-value{color:#14283a!important;font-size:25px!important}.ml-admin-content .ml-promo{background:#fff!important;color:#14283a!important;padding:18px!important}.ml-admin-content .ml-promo strong{color:#14283a!important}.ml-admin-content .ml-promo span{color:#718397!important}.ml-admin-content .ml-section-head{margin-top:22px!important}.ml-admin-content .ml-section-head h3{color:#193449!important}.ml-admin-content .ml-profile-row{border-bottom-color:#edf1f5!important}.ml-admin-content .ml-profile-row .copy b{color:#203b50!important}.ml-admin-content .ml-profile-row .copy span,.ml-admin-content .ml-profile-row .copy small{color:#718397!important}.ml-admin-content .ml-wallet-note{background:#fff!important;border:1px solid #e5ebf1!important;color:#607488!important}.ml-admin-content .ml-empty{background:#fff!important;border:1px dashed #dce5ec!important;color:#617487!important}.ml-admin-content .ml-empty b{color:#243e52!important}',
+      '.ml-admin-mobilebar,.ml-admin-drawer{display:none}',
+      '@media(max-width:1050px){#ml-admin-workspace{grid-template-columns:218px minmax(0,1fr)}.ml-admin-content{padding:0 22px 36px}.ml-admin-pagehead{padding:25px 22px 18px}.ml-admin-topbar{padding:0 22px}.ml-admin-content .ml-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}',
+      '@media(max-width:720px){#ml-admin-workspace{display:block;padding-bottom:76px}.ml-admin-sidebar{display:none}.ml-admin-topbar{height:58px;padding:0 14px;gap:10px}.ml-admin-menu{display:inline-flex;border:1px solid #e2e9f0;background:#fff;border-radius:9px;width:38px;height:36px;align-items:center;justify-content:center;color:#17364b;font-size:17px}.ml-admin-crumb{font-size:10px}.ml-admin-top-actions{gap:7px}.ml-admin-live{font-size:9px}.ml-admin-refresh,.ml-admin-signout{padding:8px 9px;font-size:10px}.ml-admin-refresh span{display:none}.ml-admin-pagehead{padding:20px 16px 15px;align-items:flex-start}.ml-admin-pagehead h1{font-size:23px}.ml-admin-date{font-size:9px}.ml-admin-content{padding:0 14px 28px}.ml-admin-content .ml-home-top{padding:20px!important;display:block!important}.ml-admin-content .ml-hero-title{font-size:23px!important;max-width:260px}.ml-admin-content .ml-hero-sub{font-size:12px!important;line-height:1.55}.ml-admin-content .ml-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}.ml-admin-content .ml-stat{padding:15px!important;min-width:0}.ml-admin-content .ml-stat-value{font-size:22px!important}.ml-admin-content .ml-promo-strip{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}.ml-admin-content .ml-section-head{gap:10px;align-items:center}.ml-admin-content .ml-section-head h3{font-size:14px}.ml-admin-mobilebar{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.97);border-top:1px solid #dfe7ed;padding:7px 5px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -5px 20px rgba(22,46,64,.08)}.ml-admin-mobilebar button{border:0;background:transparent;color:#738597;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:700}.ml-admin-mobilebar button b{font-size:18px;font-weight:500}.ml-admin-mobilebar button.is-active{color:#147b78}.ml-admin-drawer{display:block;position:fixed;inset:0;z-index:60;background:rgba(7,20,31,.45);pointer-events:none;opacity:0;transition:opacity .2s}.ml-admin-drawer.is-open{opacity:1;pointer-events:auto}.ml-admin-drawer-links{position:absolute;left:0;top:0;bottom:0;width:min(82vw,330px);overflow:auto;background:#102638;padding:18px 14px 30px;transform:translateX(-102%);transition:transform .22s}.ml-admin-drawer.is-open .ml-admin-drawer-links{transform:translateX(0)}.ml-admin-drawer-head{position:absolute;left:0;top:0;width:min(82vw,330px);height:58px;box-sizing:border-box;background:#102638;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:0 17px;z-index:1}.ml-admin-drawer-head button{border:0;background:transparent;color:#fff;font-size:26px}.ml-admin-drawer-links{padding-top:68px}.ml-admin-drawer-links .ml-admin-side-label{display:none}}',
+      '@media(prefers-color-scheme:dark){#ml-admin-workspace{background:#0b1722;color:#eaf2f7}#ml-admin-workspace .ml-admin-main{background:#0b1722}#ml-admin-workspace .ml-admin-topbar{background:#102232;border-color:#263d4d}#ml-admin-workspace .ml-admin-crumb,#ml-admin-workspace .ml-admin-date{color:#9aafbd}#ml-admin-workspace .ml-admin-crumb b,#ml-admin-workspace .ml-admin-pagehead h1{color:#f0f5f8}#ml-admin-workspace .ml-admin-pagehead p{color:#a1b4c1}#ml-admin-workspace .ml-admin-refresh,#ml-admin-workspace .ml-admin-menu{background:#172b3a;border-color:#30495b;color:#edf4f7}#ml-admin-workspace .ml-admin-signout{background:#342d20;border-color:#65512c;color:#f3d28b}#ml-admin-workspace .ml-admin-content .ml-stat,#ml-admin-workspace .ml-admin-content .ml-promo,#ml-admin-workspace .ml-admin-content .ml-profile-card,#ml-admin-workspace .ml-admin-content .ml-wallet-note,#ml-admin-workspace .ml-admin-content .ml-empty{background:#122433!important;border-color:#2b4354!important;color:#c4d2dc!important}#ml-admin-workspace .ml-admin-content .ml-stat-label,#ml-admin-workspace .ml-admin-content .ml-promo span,#ml-admin-workspace .ml-admin-content .ml-profile-row .copy span,#ml-admin-workspace .ml-admin-content .ml-profile-row .copy small{color:#a0b2bf!important}#ml-admin-workspace .ml-admin-content .ml-stat-value,#ml-admin-workspace .ml-admin-content .ml-promo strong,#ml-admin-workspace .ml-admin-content .ml-section-head h3,#ml-admin-workspace .ml-admin-content .ml-profile-row .copy b{color:#edf4f8!important}#ml-admin-workspace .ml-admin-mobilebar{background:rgba(15,32,46,.98);border-color:#2b4354}#ml-admin-workspace .ml-admin-mobilebar button{color:#9db0bd}#ml-admin-workspace .ml-admin-mobilebar button.is-active{color:#63d0c2}}',
+      '@media(prefers-reduced-motion:reduce){#ml-admin-workspace *{transition:none!important;scroll-behavior:auto!important}}'
+    ].join('');
+    document.head.appendChild(css);
+  }
+
+  function installAdminGuards() {\n    installAdminWorkspaceStyles();\n    if (document.getElementById('scr-app') && document.getElementById('scr-app').classList.contains('active')) ensureAdminWorkspace();
     buildAdminLogin();
     normalizeAdminAuthResponse();
     window.goOnboard = openAdmin;
