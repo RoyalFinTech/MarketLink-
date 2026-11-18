@@ -130,6 +130,9 @@ router.post('/support-tickets/:id/replies', authenticate, authorize(...ADMIN), [
   param('id').isUUID(), body('body').trim().notEmpty().isLength({max:4000}),
 ], validate, ctrl.replySupportTicket);
 
+router.post('/conversations', authenticate, authorize(...ADMIN), [
+  body('participantUserId').isUUID(),
+], validate, ctrl.startConversation);
 router.get('/conversations', authenticate, authorize(...ADMIN), [
   query('page').optional().isInt({min:1}),
   query('limit').optional().isInt({min:1,max:100}),
