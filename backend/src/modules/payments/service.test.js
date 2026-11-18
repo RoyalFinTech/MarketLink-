@@ -52,9 +52,9 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
 
- test('order checkout rejects methods outside Cash on Delivery and DAHA Wallet',async()=>{
-  await expect(initiatePayment({orderId:payment.order_id,method:'wave',amount:145,customerId:'customer-id'}))
-   .rejects.toMatchObject({statusCode:400,code:'UNSUPPORTED_METHOD'});
+ test('mobile-money method is recognized but blocked until Modem Pay and webhook are configured',async()=>{
+  await expect(initiatePayment({orderId:payment.order_id,method:'wave',amount:145,customerId:'customer-id',accountNumber:'871234567'}))
+   .rejects.toMatchObject({statusCode:503,code:'PROVIDER_UNAVAILABLE'});
   expect(withTransaction).not.toHaveBeenCalled();
  });
 
