@@ -750,7 +750,9 @@ async function refund(paymentId,{amount,reason},actor){
     const paymentAmount=Number(payment.amount);
     if(!Number.isFinite(refundAmount)||refundAmount<=0||refundAmount>paymentAmount+0.01)
       throw new AppError('Enter a valid refund amount not exceeding the payment amount.',400,'INVALID_AMOUNT');
-    const fullRefund=Math.abs(refundAmount-paymentAmount)<=0.01;
+    if(Math.abs(refundAmount-paymentAmount)>0.01)
+      throw new AppError('Partial refunds are not enabled yet. Process a full refund so the customer ledger and revenue reconciliation remain consistent.',409,'PARTIAL_REFUND_NOT_SUPPORTED');
+    const fullRefund=true;
     if(payment.method!=='cod'&&payment.method!=='wallet'){
       const provider=PROVIDERS[payment.method];
       if(!provider||typeof provider.refund!=='function')
