@@ -423,7 +423,7 @@ const KNOWLEDGE_BASE = [
     roles: ['all'],
     keywords: ['Africell phone number', 'QCell number', 'Comium number', 'Gamcel number', 'network dropdown', 'seven digit phone', 'Gambia phone format'],
     question: 'How do I enter my Gambian phone number?',
-    answer: 'Choose the mobile network shown on your SIM card, then enter the seven digits printed as your subscriber number. Africell adds 87, QCell adds 83, and Comium adds 86 automatically. The Gamcel option uses the legacy seven-digit format without an added prefix and currently accepts numbers beginning with 9. Check the selected network before continuing. Never share your PIN or one-time verification code with anyone.',
+    answer: 'A full Gambian mobile number is nine digits (not including +220). For Africell, QCell and Comium, select the correct network: MarketLink adds its two-digit prefix (87, 83 or 86), and you enter the remaining seven subscriber digits. The screen shows that these seven digits plus the selected prefix make nine digits total. The legacy Gamcel option is retained separately while its current migrated prefix format is being confirmed. Never share your MarketLink PIN or a provider one-time code with anyone.',
   },
   {
     id: 'vendor-product-upload-simple',
@@ -479,7 +479,7 @@ const KNOWLEDGE_BASE = [
     roles: ['customer', 'vendor', 'rider'],
     keywords: ['Africell', 'QCell', 'Comium', 'Gamcel', 'phone network', 'seven digit phone', 'phone number format', 'login phone'],
     question: 'How do I enter my Gambian phone number?',
-    answer: 'Choose your mobile network from the list: Africell, QCell, Comium or Gamcel. Enter only the seven digits requested in the number box; MarketLink adds the selected network prefix where applicable. Check the network and digits before continuing. For Gamcel, follow the on-screen instruction because the legacy number format does not use the new operator prefix. Your number is used for sign-in and account verification.',
+    answer: 'Your Gambian mobile number is nine digits in the new numbering format. When you select Africell, QCell or Comium, MarketLink automatically adds the network prefix (87, 83 or 86), so the number box asks for the remaining seven subscriber digits. Together they make the full nine-digit number. The legacy Gamcel option is handled separately until its current format is confirmed. Your number is used for sign-in and account verification.',
   },
   {
     id: 'vendor-document-upload-help',
