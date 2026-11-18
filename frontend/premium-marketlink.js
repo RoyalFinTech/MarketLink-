@@ -2802,7 +2802,20 @@
           var retryAction=item[0]==='pendingSettlement'&&x.id
             ?'<button type="button" class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.retryFinancialSettlement(&quot;'+esc(x.id)+'&quot;,&quot;'+esc(ref)+'&quot;)">Retry settlement</button>'
             :'';
-          return '<div class="ml-profile-row"><div class="ico">⚠️</div><div class="copy"><b>'+esc(ref)+'</b><span>'+esc(String(status).replace(/_/g,' '))+(detail.length?' · '+esc(detail.join(' · ')):'')+'</span>'+retryAction+'</div><strong>'+esc(amount)+'</strong></div>';
+          var codActions='';
+          if(item[0]==='codRemittancesNeedingAttention'&&x.remittance_id){
+            var receiptAction=x.proof_url
+              ?'<button type="button" class="ml-btn ml-btn-secondary" style="margin:8px 6px 0 0" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(x.proof_url)+'&quot;,&quot;COD deposit receipt&quot;)">View rider receipt</button>'
+              :'<span style="display:block;margin-top:8px;color:#b45309">Receipt attachment missing</span>';
+            var remittanceStatus=String(x.remittance_status||'').toLowerCase();
+            var reviewActions=remittanceStatus==='submitted'
+              ?'<button type="button" class="ml-btn ml-btn-primary" style="margin:8px 6px 0 0" onclick="window.ML_Premium.reviewCodRemittance(&quot;'+esc(x.remittance_id)+'&quot;,\'verified\')">Verify deposit</button><button type="button" class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.reviewCodRemittance(&quot;'+esc(x.remittance_id)+'&quot;,\'rejected\')">Reject with reason</button>'
+              :remittanceStatus==='verified'&&x.payment_id
+                ?'<button type="button" class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.ML_Premium.confirmCodPayment(&quot;'+esc(x.payment_id)+'&quot;,&quot;'+esc(x.payment_record_status||'pending')+'&quot;)">Complete verified payment settlement</button>'
+                :'';
+            codActions=receiptAction+reviewActions;
+          }
+          return '<div class="ml-profile-row"><div class="ico">⚠️</div><div class="copy"><b>'+esc(ref)+'</b><span>'+esc(String(status).replace(/_/g,' '))+(detail.length?' · '+esc(detail.join(' · ')):'')+'</span>'+retryAction+codActions+'</div><strong>'+esc(amount)+'</strong></div>';
         }).join('')+'</div>':'<div class="ml-empty"><b>No matching records</b><span>This check found no records requiring attention.</span></div>';
         return '<div class="ml-section-head" style="margin-top:18px"><h3>'+esc(item[1])+'</h3><strong>'+rows.length+'</strong></div>'+html;
       }).join('');
