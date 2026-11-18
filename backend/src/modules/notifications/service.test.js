@@ -1,6 +1,7 @@
 jest.mock('../../config/db',()=>({query:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
-const {sendSms}=require('./service');
+const {query}=require('../../config/db');
+const {sendSms,createCampaign}=require('./service');
 describe('SMS provider adapter',()=>{
  const oldEnv={...process.env},oldFetch=global.fetch;
  beforeEach(()=>{jest.clearAllMocks();global.fetch=jest.fn();['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_API_KEY','TWILIO_API_SECRET','TWILIO_FROM_NUMBER','TWILIO_MESSAGING_SERVICE_SID','AFRICASTALKING_API_KEY','AFRICASTALKING_USERNAME'].forEach(k=>delete process.env[k]);});
@@ -31,5 +32,27 @@ describe('SMS provider adapter',()=>{
  });
  test('rejects unsupported providers',async()=>{
   process.env.SMS_PROVIDER='bad';expect(await sendSms({to:'+220871234567',message:'Test'})).toMatchObject({sent:false,reason:'UNSUPPORTED_SMS_PROVIDER'});expect(global.fetch).not.toHaveBeenCalled();
+ });
+});
+
+
+describe('Admin campaign individual recipient safeguards',()=>{
+ const recipientId='22222222-2222-4222-8222-222222222222';
+ beforeEach(()=>jest.clearAllMocks());
+ test('allows only active customer, vendor or rider accounts for individual campaigns',async()=>{
+  query
+   .mockResolvedValueOnce({rows:[{id:recipientId}]})
+   .mockResolvedValueOnce({rows:[{id:'campaign-1',audience:'selected'}]})
+   .mockResolvedValueOnce({rows:[]});
+  await createCampaign({title:'Service update',body:'A message',audience:'selected',channels:{},createdBy:'admin-1',recipientIds:[recipientId]});
+  expect(query.mock.calls[0][0]).toMatch(/r\.name IN \('customer','vendor','rider'\)/);
+  expect(query.mock.calls[1][0]).toMatch(/INSERT INTO notification_campaigns/);
+ });
+ test('rejects active staff or other non-marketplace accounts as selected recipients',async()=>{
+  query.mockResolvedValueOnce({rows:[]});
+  await expect(createCampaign({title:'Service update',body:'A message',audience:'selected',channels:{},createdBy:'admin-1',recipientIds:[recipientId]}))
+   .rejects.toMatchObject({code:'INVALID_CAMPAIGN_RECIPIENTS',status:400});
+  expect(query).toHaveBeenCalledTimes(1);
+  expect(query.mock.calls[0][0]).toMatch(/r\.name IN \('customer','vendor','rider'\)/);
  });
 });
