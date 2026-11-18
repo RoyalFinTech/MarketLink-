@@ -1,6 +1,6 @@
 // src/modules/admin/service.js
 'use strict';
-const { query } = require('../../config/db');
+const { query, withTransaction } = require('../../config/db');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -251,6 +251,70 @@ async function retryFinancialSettlement(orderId, actor, reason) {
     [JSON.stringify({ reason, result }), audit.id]
   ).catch(() => null);
   return result;
+}
+
+
+async function listSupportTickets({page=1,limit=25,status,priority,category,search}={}){
+ const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||25,1),100),offset=(page_-1)*limit_;
+ const where=['1=1'],params=[];
+ if(status){params.push(status);where.push('t.status= getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
++params.length);}
+ if(priority){params.push(priority);where.push('t.priority= getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length);}
+ if(category){params.push(category);where.push('t.category= getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length);}
+ if(search){params.push('%'+search+'%');where.push('(t.ticket_number ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length+' OR t.subject ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length+' OR t.description ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length+' OR u.full_name ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length+' OR u.phone ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
++params.length+')');}
+ const sql=where.join(' AND ');
+ const {rows}=await query("SELECT t.id,t.ticket_number,t.category,t.subject,t.description,t.priority,t.status,t.order_id,t.against_user,t.assigned_to,t.created_at,t.updated_at,t.resolved_at,t.closed_at,u.full_name AS requester_name,u.phone AS requester_phone,u.email AS requester_email,a.full_name AS assignee_name,(SELECT count(*)::int FROM support_ticket_replies r WHERE r.ticket_id=t.id) AS reply_count FROM support_tickets t JOIN users u ON u.id=t.raised_by LEFT JOIN users a ON a.id=t.assigned_to WHERE "+sql+" ORDER BY CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,t.created_at ASC LIMIT $"+(params.length+1)+" OFFSET $"+(params.length+2),[...params,limit_,offset]);
+ const {rows:[count]}=await query("SELECT count(*)::int AS total FROM support_tickets t JOIN users u ON u.id=t.raised_by WHERE "+sql,params);
+ return {items:rows,total:count.total,page:page_,limit:limit_,totalPages:Math.ceil(count.total/limit_)};
+}
+async function getSupportTicket(ticketId){
+ const {rows:[ticket]}=await query("SELECT t.*,u.full_name AS requester_name,u.phone AS requester_phone,u.email AS requester_email,a.full_name AS assignee_name FROM support_tickets t JOIN users u ON u.id=t.raised_by LEFT JOIN users a ON a.id=t.assigned_to WHERE t.id=$1",[ticketId]);
+ if(!ticket){const e=new Error('Support ticket not found.');e.status=404;e.code='TICKET_NOT_FOUND';throw e;}
+ const {rows:replies}=await query("SELECT r.id,r.sender_id,r.body,r.created_at,u.full_name AS sender_name FROM support_ticket_replies r JOIN users u ON u.id=r.sender_id WHERE r.ticket_id=$1 ORDER BY r.created_at ASC",[ticketId]);
+ return {ticket,replies};
+}
+async function updateSupportTicket(ticketId,patch,actor){
+ if(patch.status&&!['open','pending','escalated','resolved','closed'].includes(patch.status)){const e=new Error('Invalid support ticket status.');e.status=400;e.code='INVALID_TICKET_STATUS';throw e;}
+ if(patch.priority&&!['low','medium','high'].includes(patch.priority)){const e=new Error('Invalid support ticket priority.');e.status=400;e.code='INVALID_TICKET_PRIORITY';throw e;}
+ if(patch.assignedTo){const {rows:[admin]}=await query('SELECT user_id FROM admins WHERE user_id=$1',[patch.assignedTo]);if(!admin){const e=new Error('The selected assignee is not an administrator.');e.status=400;e.code='INVALID_TICKET_ASSIGNEE';throw e;}}
+ const {rows:[ticket]}=await query("UPDATE support_tickets SET status=COALESCE($2,status),priority=COALESCE($3,priority),assigned_to=CASE WHEN $4::boolean THEN $5::uuid ELSE assigned_to END,resolved_at=CASE WHEN $2 IN ('resolved','closed') THEN COALESCE(resolved_at,now()) WHEN $2 IS NOT NULL THEN NULL ELSE resolved_at END,closed_at=CASE WHEN $2='closed' THEN COALESCE(closed_at,now()) WHEN $2 IS NOT NULL THEN NULL ELSE closed_at END,updated_at=now() WHERE id=$1 RETURNING *",[ticketId,patch.status||null,patch.priority||null,Object.prototype.hasOwnProperty.call(patch,'assignedTo'),patch.assignedTo||null]);
+ if(!ticket){const e=new Error('Support ticket not found.');e.status=404;e.code='TICKET_NOT_FOUND';throw e;}
+ await query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES($1,$2,'support.ticket_updated','support_ticket',$3,$4)",[actor.id,actor.role||'admin',ticketId,JSON.stringify({status:ticket.status,priority:ticket.priority,assignedTo:ticket.assigned_to})]);
+ return ticket;
+}
+async function replySupportTicket(ticketId,body,actor){
+ return withTransaction(async client=>{
+  const {rows:[ticket]}=await client.query('SELECT id,raised_by,status FROM support_tickets WHERE id=$1 FOR UPDATE',[ticketId]);
+  if(!ticket){const e=new Error('Support ticket not found.');e.status=404;e.code='TICKET_NOT_FOUND';throw e;}
+  const {rows:[reply]}=await client.query('INSERT INTO support_ticket_replies(ticket_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,ticket_id,sender_id,body,created_at',[ticketId,actor.id,body]);
+  await client.query("UPDATE support_tickets SET status=CASE WHEN status='open' THEN 'pending' ELSE status END,updated_at=now() WHERE id=$1",[ticketId]);
+  await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id,channel_inapp) VALUES($1,'support_ticket_reply','Support ticket updated',$2,'support_ticket',$3,TRUE)",[ticket.raised_by,'An administrator replied to your support request.',ticketId]);
+  await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES($1,$2,'support.ticket_replied','support_ticket',$3,$4)",[actor.id,actor.role||'admin',ticketId,JSON.stringify({replyId:reply.id})]);
+  return reply;
+ });
+}
+async function getCrmProfile(userId){
+ const {rows:[user]}=await query("SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,array_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL) AS roles,(SELECT count(*)::int FROM support_tickets st WHERE st.raised_by=u.id) AS support_tickets,(SELECT count(*)::int FROM orders o WHERE o.customer_id=u.id) AS orders_count FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id",[userId]);
+ if(!user){const e=new Error('CRM user not found.');e.status=404;e.code='USER_NOT_FOUND';throw e;}
+ const [customer,vendor,rider,notes]=await Promise.all([
+  query('SELECT * FROM customers WHERE user_id=$1',[userId]),query('SELECT * FROM vendors WHERE user_id=$1',[userId]),query('SELECT * FROM riders WHERE user_id=$1',[userId]),
+  query("SELECT n.id,n.note,n.created_at,a.full_name AS author_name FROM admin_crm_notes n JOIN users a ON a.id=n.author_id WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 50",[userId])
+ ]);
+ return {user,customer:customer.rows[0]||null,vendor:vendor.rows[0]||null,rider:rider.rows[0]||null,notes:notes.rows};
+}
+async function addCrmNote(userId,note,actor){
+ const {rows:[exists]}=await query('SELECT id FROM users WHERE id=$1',[userId]);
+ if(!exists){const e=new Error('CRM user not found.');e.status=404;e.code='USER_NOT_FOUND';throw e;}
+ const {rows:[created]}=await query('INSERT INTO admin_crm_notes(user_id,author_id,note) VALUES($1,$2,$3) RETURNING *',[userId,actor.id,note]);
+ await query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES($1,$2,'crm.note_added','user',$3,$4)",[actor.id,actor.role||'admin',userId,JSON.stringify({noteId:created.id})]);
+ return created;
 }
 
 module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
