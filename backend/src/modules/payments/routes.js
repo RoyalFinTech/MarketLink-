@@ -8,7 +8,7 @@ const ctrl = require('./controller');
 const ADMIN = ['admin','super_admin'];
 router.get('/methods', authenticate, authorize('customer','vendor','rider'), ctrl.methods);
 router.post('/initiate', authenticate, authorize('customer'),
-  [body('orderId').isUUID(), body('method').isIn(['cod','wallet','wave','afrimoney','qmoney','modempay']), body('amount').isFloat({min:0}), body('accountNumber').optional({checkFalsy:true}).matches(/^\d{9}$/)],
+  [body('orderId').isUUID(), body('method').isIn(['cod','wallet','wave','afrimoney','qmoney','modempay']), body('amount').isFloat({min:0}), body('accountNumber').optional({checkFalsy:true}).isString().isLength({max:20}).matches(/^\d+$/).withMessage('Enter the mobile-money number using digits only. The active Modem Pay mode validates its own required number format.')],
   validate, ctrl.initiate);
 router.post('/:id/continue', authenticate,
   [param('id').isUUID(), body('action').isIn(['confirm','pin']), body('pin').optional({checkFalsy:true}).matches(/^\d{4,8}$/)],
