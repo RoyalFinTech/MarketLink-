@@ -9,7 +9,7 @@ const PHRASE_ALIASES = [
   [/\b(na|e be|e dey)\b/g, 'is'],
   [/\b(abi|or what)\b/g, 'or'],
   [/\b(abeg|abeg pls|pls|please)\b/g, 'please'],
-  [/\b(i wan|i want make|i wan make)\b/g, 'i want to'],
+  [/\b(i wan make|i want make|i wan)\b/g, 'i want to'],
   [/\b(make i|how i go|how i fit)\b/g, 'how can i'],
   [/\b(una|u|ur)\b/g, 'you'],
   [/\b(me sef|my sef)\b/g, 'me'],
