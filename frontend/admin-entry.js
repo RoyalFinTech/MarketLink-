@@ -541,6 +541,7 @@
 
   var adminCampaignSelectedRecipients = {};
   async function adminCampaignView(){
+    adminCampaignSelectedRecipients={};
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><h3>Communications centre</h3><p>Loading campaign history…</p></div>';
     try{
@@ -557,7 +558,7 @@
     target.innerHTML='<small>Searching the secure directory…</small>';
     try{
       var result=await adminRequest('/admin/users?search='+encodeURIComponent(term)+'&status=active&page=1&limit=25','GET');
-      var users=result.items||[];
+      var users=(result.items||[]).filter(function(person){return (person.roles||[]).some(function(role){return ['customer','vendor','rider'].includes(role);});});
       target.innerHTML=users.length?users.map(function(person){
         var id=String(person.id||''),checked=!!adminCampaignSelectedRecipients[id];
         return '<label style="display:flex;align-items:center;gap:9px;padding:9px 4px;border-bottom:1px solid var(--bd);font-size:12px"><input type="checkbox" '+(checked?'checked':'')+' onchange="window.__ML_ADMIN_CAMPAIGN_SELECT(\''+adminSafe(id)+'\',this.checked)"><span style="min-width:0"><b>'+adminSafe(person.full_name||'MarketLink user')+'</b><br><small>'+adminSafe(person.phone||'No phone')+' · '+adminSafe((person.roles||[]).join(', '))+'</small></span></label>';
@@ -575,6 +576,10 @@
   function adminCampaignAudienceChange(){
     var audience=document.getElementById('ml-campaign-audience'),picker=document.getElementById('ml-campaign-recipient-picker');
     if(picker)picker.style.display=audience&&audience.value==='selected'?'block':'none';
+    if(!audience||audience.value!=='selected'){
+      adminCampaignSelectedRecipients={};
+      var count=document.getElementById('ml-campaign-recipient-count');if(count)count.textContent='0 selected (maximum 100)';
+    }
   }
   window.__ML_ADMIN_CAMPAIGN_SEARCH=adminCampaignSearchRecipients;
   window.__ML_ADMIN_CAMPAIGN_SELECT=adminCampaignSelectRecipient;
