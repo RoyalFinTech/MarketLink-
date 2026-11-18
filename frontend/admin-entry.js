@@ -550,6 +550,7 @@
     if (mounted) {
       var mountedContent = mounted.querySelector('#ml-admin-content');
       if (mountedContent && body.parentNode !== mountedContent) mountedContent.appendChild(body);
+      applyAdminTheme();
       tab.setAttribute('data-ml-admin-workspace', '1');
       tab.style.cssText = 'display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
       body.style.cssText = 'display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
@@ -632,10 +633,14 @@
     var css = document.createElement('style');
     css.id = 'ml-admin-workspace-style';
     css.textContent = [
-      '#tab-admindash{display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}',
+      'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;max-width:none!important;height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
+      'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
+      'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
+      'body:has(#ml-admin-workspace) #scr-admin-login{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+      '#tab-admindash{display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}',
       '#tab-admindash>#ml-admin-workspace{display:grid!important;min-height:100vh!important;height:auto!important;overflow:visible!important}',
       '#tab-admindash #ml-admin-content,#tab-admindash #adash-body{display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
-      '#scr-app:has(#ml-admin-workspace),body:has(#ml-admin-workspace),html:has(#ml-admin-workspace){height:auto!important;min-height:100vh!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important}',
+      '#scr-app:has(#ml-admin-workspace),body:has(#ml-admin-workspace),html:has(#ml-admin-workspace){width:100%!important;max-width:none!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important}',
       '#scr-app:has(#ml-admin-workspace){background:#f3f6fa!important;color:#14283a!important;min-height:100vh!important;height:auto!important;overflow:visible!important}',
       '#ml-admin-workspace{--ink:#14283a;--muted:#718397;--line:#e2e9f0;--gold:#d6a43b;--teal:#147b78;display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh;background:#f3f6fa;color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif}',
       '.ml-admin-sidebar{position:sticky;top:0;height:100vh;overflow:auto;background:#102638;color:#eaf1f5;padding:24px 16px;box-sizing:border-box;display:flex;flex-direction:column;z-index:20}',
@@ -660,7 +665,7 @@
       '@media(max-width:520px){.ml-crm-profile-photo,.ml-crm-profile-placeholder{width:68px;height:68px;flex-basis:68px;border-radius:18px}.ml-crm-avatar,.ml-crm-avatar-fallback{width:42px;height:42px;flex-basis:42px}}',
       
       'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace),#scr-app:has(#ml-admin-workspace),#tab-admindash:has(#ml-admin-workspace){height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain}',
-      '#scr-app:has(#ml-admin-workspace){position:relative!important;overflow:visible!important}',
+      '#scr-app:has(#ml-admin-workspace){position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;overflow:visible!important}',
       '#ml-admin-workspace{min-height:100dvh!important;height:auto!important;overflow:visible!important}',
       '.ml-admin-main{min-height:100dvh!important;height:auto!important;overflow:visible!important}',
       '.ml-admin-content{min-height:55vh;overflow:visible!important;padding-bottom:calc(40px + env(safe-area-inset-bottom))!important}',
