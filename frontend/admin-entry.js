@@ -161,7 +161,7 @@
       var national = document.getElementById('admin-national');
       var hidden = document.getElementById('admin-staffid');
       if (operator && national && hidden) {
-        var digits = String(national.value || '').replace(/\\D/g, '');
+        var digits = String(national.value || '').replace(/\D/g, '');
         if (digits.length !== 7) {
           var err = document.getElementById('admin-auth-err');
           if (err) { err.textContent = 'Enter all 7 digits of your Gambian mobile number.'; err.style.display = 'block'; }
