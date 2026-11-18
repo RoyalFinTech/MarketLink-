@@ -126,22 +126,89 @@ async function reinstateUser(userId, actor) {
 
 async function getAnalytics({ period='30d' }) {
   const days = period==='7d'?7:period==='90d'?90:30;
-  const [dailyRevenue, ordersByStatus, topCategories, signups] = await Promise.all([
-    query(`SELECT date_trunc('day',placed_at) AS day, count(*) AS orders, coalesce(sum(total),0) AS revenue
-           FROM orders
-           WHERE placed_at>=now()-($1||' days')::INTERVAL
-             AND status='delivered' AND payment_status='confirmed'
-           GROUP BY 1 ORDER BY 1`, [days]),
-    query(`SELECT status, count(*) FROM orders WHERE placed_at>=now()-($1||' days')::INTERVAL GROUP BY status`, [days]),
-    query(`SELECT c.name, count(DISTINCT p.id) AS products, count(DISTINCT o.id) AS orders
+  const [dailyRevenue, ordersByStatus, topCategories, signups, comparison] = await Promise.all([
+    query(`WITH calendar AS (
+             SELECT generate_series(
+               date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day'),
+               date_trunc('day',now()),INTERVAL '1 day'
+             ) AS day
+           )
+           SELECT calendar.day,
+                  count(o.id)::int AS orders,
+                  coalesce(sum(o.total),0) AS revenue,
+                  coalesce(sum(o.platform_fee),0) AS platform_gross_commission,
+                  coalesce(sum(o.affiliate_commission_amount),0) AS affiliate_commission,
+                  coalesce(sum(o.platform_net_fee),0) AS platform_net_revenue
+           FROM calendar
+           LEFT JOIN orders o ON o.placed_at>=calendar.day
+             AND o.placed_at<calendar.day+INTERVAL '1 day'
+             AND o.status='delivered' AND o.payment_status='confirmed'
+           GROUP BY calendar.day ORDER BY calendar.day`, [days]),
+    query(`SELECT status, count(*)::int AS count
+           FROM orders WHERE placed_at>=now()-($1::int*INTERVAL '1 day')
+           GROUP BY status ORDER BY count DESC`, [days]),
+    query(`SELECT c.name, count(DISTINCT p.id)::int AS products,
+                  count(DISTINCT o.id)::int AS orders
            FROM categories c LEFT JOIN products p ON p.category_id=c.id
            LEFT JOIN order_items oi ON oi.product_id=p.id
-           LEFT JOIN orders o ON o.id=oi.order_id AND o.status='delivered' AND o.payment_status='confirmed'
-           WHERE c.deleted_at IS NULL GROUP BY c.id,c.name ORDER BY orders DESC LIMIT 10`, []),
-    query(`SELECT date_trunc('day',created_at) AS day, count(*) AS users
-           FROM users WHERE created_at>=now()-($1||' days')::INTERVAL GROUP BY 1 ORDER BY 1`, [days]),
+           LEFT JOIN orders o ON o.id=oi.order_id AND o.placed_at>=now()-($1::int*INTERVAL '1 day')
+             AND o.status='delivered' AND o.payment_status='confirmed'
+           WHERE c.deleted_at IS NULL GROUP BY c.id,c.name
+           ORDER BY orders DESC,products DESC LIMIT 8`, [days]),
+    query(`SELECT date_trunc('day',created_at) AS day, count(*)::int AS users
+           FROM users WHERE created_at>=now()-($1::int*INTERVAL '1 day')
+           GROUP BY 1 ORDER BY 1`, [days]),
+    query(`SELECT
+             coalesce(sum(total) FILTER (WHERE placed_at>=date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+               AND status='delivered' AND payment_status='confirmed'),0) AS current_gmv,
+             coalesce(sum(total) FILTER (WHERE placed_at>=date_trunc('day',now())-((2*$1::int-1)*INTERVAL '1 day')
+               AND placed_at<date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+               AND status='delivered' AND payment_status='confirmed'),0) AS previous_gmv,
+             coalesce(sum(platform_net_fee) FILTER (WHERE placed_at>=date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+               AND status='delivered' AND payment_status='confirmed'),0) AS current_net,
+             coalesce(sum(platform_net_fee) FILTER (WHERE placed_at>=date_trunc('day',now())-((2*$1::int-1)*INTERVAL '1 day')
+               AND placed_at<date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+               AND status='delivered' AND payment_status='confirmed'),0) AS previous_net
+           FROM orders
+           WHERE placed_at>=date_trunc('day',now())-((2*$1::int-1)*INTERVAL '1 day')
+             AND placed_at<date_trunc('day',now())+INTERVAL '1 day'`, [days]),
   ]);
-  return { period, dailyRevenue: dailyRevenue.rows, ordersByStatus: ordersByStatus.rows, topCategories: topCategories.rows, signups: signups.rows };
+  const currentGmv=Number(comparison.rows[0].current_gmv||0);
+  const previousGmv=Number(comparison.rows[0].previous_gmv||0);
+  const currentNet=Number(comparison.rows[0].current_net||0);
+  const previousNet=Number(comparison.rows[0].previous_net||0);
+  const change=(current,previous)=>previous>0?Number(((current-previous)/previous*100).toFixed(1)):null;
+  const trend={
+    currentGmv,previousGmv,gmvChangePct:change(currentGmv,previousGmv),
+    currentPlatformNet:currentNet,previousPlatformNet:previousNet,
+    platformNetChangePct:change(currentNet,previousNet),
+  };
+  const totalOrders=ordersByStatus.rows.reduce((sum,row)=>sum+Number(row.count||0),0);
+  const deliveredOrders=dailyRevenue.rows.reduce((sum,row)=>sum+Number(row.orders||0),0);
+  const totalSignups=signups.rows.reduce((sum,row)=>sum+Number(row.users||0),0);
+  const topCategory=topCategories.rows.find(row=>Number(row.orders)>0);
+  const insights=[];
+  if(deliveredOrders===0){
+    insights.push({type:'attention',title:'No confirmed completed sales yet',detail:'There are no delivered orders with confirmed payment in this period. Revenue charts correctly remain at zero; complete a real test order after payment credentials are configured.',recommendation:'Prioritise one controlled customer order and verify its payment, delivery and settlement records end to end.'});
+  } else if(trend.gmvChangePct!==null){
+    insights.push({type:trend.gmvChangePct>=0?'positive':'attention',title:trend.gmvChangePct>=0?'Marketplace sales are up':'Marketplace sales are down',detail:'Confirmed GMV is '+Math.abs(trend.gmvChangePct)+'% '+(trend.gmvChangePct>=0?'higher':'lower')+' than the preceding '+days+'-day period.',recommendation:trend.gmvChangePct>=0?'Identify the vendors and categories contributing to growth and maintain their stock and rider coverage.':'Review vendor availability, product visibility, pricing and delivery completion to identify the cause of the decline.'});
+  } else {
+    insights.push({type:'info',title:'Sales baseline established',detail:'Confirmed GMV is recorded, but the preceding period had no confirmed sales for a percentage comparison.',recommendation:'Use this period as the baseline and compare the next reporting period.'});
+  }
+  if(totalOrders>deliveredOrders){
+    const unfinished=totalOrders-deliveredOrders;
+    insights.push({type:'attention',title:'Orders still need operational follow-up',detail:unfinished+' orders in the selected period are not counted as confirmed delivered sales.',recommendation:'Review the order-status breakdown and follow up on stuck, cancelled or awaiting-rider orders.'});
+  }
+  if(topCategory){
+    insights.push({type:'positive',title:'Leading sales category: '+topCategory.name,detail:Number(topCategory.orders)+' confirmed delivered orders are attributed to this category.',recommendation:'Check stock availability and vendor coverage in this category before increasing promotions.'});
+  }
+  insights.push({type:'info',title:'Customer acquisition',detail:totalSignups+' new user registrations were recorded in the selected period.',recommendation:totalSignups>0?'Track how many new registrations become first-time buyers; registrations alone are not revenue.':'Review acquisition channels and marketplace visibility once the customer experience is ready.'});
+  return {
+    period,days,dailyRevenue:dailyRevenue.rows,ordersByStatus:ordersByStatus.rows,
+    topCategories:topCategories.rows,signups:signups.rows,trend,
+    totals:{orders:totalOrders,deliveredOrders,signups:totalSignups},
+    insights:{summary:deliveredOrders===0?'The selected period has no confirmed delivered sales. Operational and customer activity should be reviewed before drawing revenue conclusions.':'The summary is based on delivered orders with confirmed payments, with GMV and MarketLink net commission tracked separately.',items:insights,method:'Automated, rules-based analysis of live MarketLink records; no external AI model or estimated revenue is used.'}
+  };
 }
 
 async function getSystemSettings() {
