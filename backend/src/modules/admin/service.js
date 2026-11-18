@@ -254,21 +254,14 @@ async function retryFinancialSettlement(orderId, actor, reason) {
 }
 
 
+
 async function listSupportTickets({page=1,limit=25,status,priority,category,search}={}){
  const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||25,1),100),offset=(page_-1)*limit_;
  const where=['1=1'],params=[];
- if(status){params.push(status);where.push('t.status= getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
-+params.length);}
- if(priority){params.push(priority);where.push('t.priority= getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length);}
- if(category){params.push(category);where.push('t.category= getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length);}
- if(search){params.push('%'+search+'%');where.push('(t.ticket_number ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length+' OR t.subject ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length+' OR t.description ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length+' OR u.full_name ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length+' OR u.phone ILIKE  getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
-+params.length+')');}
+ if(status){params.push(status);where.push('t.status=$'+params.length);}
+ if(priority){params.push(priority);where.push('t.priority=$'+params.length);}
+ if(category){params.push(category);where.push('t.category=$'+params.length);}
+ if(search){params.push('%'+search+'%');const p='$'+params.length;where.push('(t.ticket_number ILIKE '+p+' OR t.subject ILIKE '+p+' OR t.description ILIKE '+p+' OR u.full_name ILIKE '+p+' OR u.phone ILIKE '+p+')');}
  const sql=where.join(' AND ');
  const {rows}=await query("SELECT t.id,t.ticket_number,t.category,t.subject,t.description,t.priority,t.status,t.order_id,t.against_user,t.assigned_to,t.created_at,t.updated_at,t.resolved_at,t.closed_at,u.full_name AS requester_name,u.phone AS requester_phone,u.email AS requester_email,a.full_name AS assignee_name,(SELECT count(*)::int FROM support_ticket_replies r WHERE r.ticket_id=t.id) AS reply_count FROM support_tickets t JOIN users u ON u.id=t.raised_by LEFT JOIN users a ON a.id=t.assigned_to WHERE "+sql+" ORDER BY CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,t.created_at ASC LIMIT $"+(params.length+1)+" OFFSET $"+(params.length+2),[...params,limit_,offset]);
  const {rows:[count]}=await query("SELECT count(*)::int AS total FROM support_tickets t JOIN users u ON u.id=t.raised_by WHERE "+sql,params);
@@ -317,4 +310,4 @@ async function addCrmNote(userId,note,actor){
  return created;
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement };
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote };
