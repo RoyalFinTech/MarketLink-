@@ -1,0 +1,58 @@
+name: MarketLink dependency security audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - ".github/workflows/marketlink-dependency-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Capture complete dependency audit
+        run: npm audit --json > audit-all.json || true
+      - name: Capture production dependency audit
+        run: npm audit --omit=dev --json > audit-production.json || true
+      - name: Summarize security findings
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          for (const file of ['audit-all.json', 'audit-production.json']) {
+            let report = {};
+            try { report = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+            const meta = report.metadata?.vulnerabilities || {};
+            console.log('\n' + file + ': ' + JSON.stringify(meta));
+            for (const [name, item] of Object.entries(report.vulnerabilities || {})) {
+              console.log(JSON.stringify({
+                package: name,
+                severity: item.severity,
+                direct: item.isDirect,
+                range: item.range,
+                fixAvailable: item.fixAvailable,
+                advisories: (item.via || []).filter(v => typeof v === 'object').map(v => ({
+                  title: v.title,
+                  url: v.url,
+                  range: v.range
+                }))
+              }));
+            }
+          }
+          NODE
