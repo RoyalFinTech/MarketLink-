@@ -11,8 +11,8 @@ const { updateStatus, placeOrder } = require('./service');
 
 describe('order payment method validation',()=>{
  beforeEach(()=>jest.clearAllMocks());
- test('accepts only Cash on Delivery or DAHA Wallet methods at order creation',async()=>{
-  await expect(placeOrder({customerId:'customer-1',vendorId:'vendor-1',items:[{productId:'product-1',quantity:1}],paymentMethod:'wave'}))
+ test('rejects unknown payment methods at order creation',async()=>{
+  await expect(placeOrder({customerId:'customer-1',vendorId:'vendor-1',items:[{productId:'product-1',quantity:1}],paymentMethod:'unsupported-provider'}))
    .rejects.toMatchObject({statusCode:400,code:'UNSUPPORTED_PAYMENT_METHOD'});
   expect(withTransaction).not.toHaveBeenCalled();
  });
