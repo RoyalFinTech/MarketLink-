@@ -591,14 +591,14 @@
       if (mountedContent && body.parentNode !== mountedContent) mountedContent.appendChild(body);
       applyAdminTheme();
       tab.setAttribute('data-ml-admin-workspace', '1');
-      tab.style.cssText = 'display:block!important;position:relative!important;inset:auto!important;width:100vw!important;min-width:100vw!important;max-width:100vw!important;box-sizing:border-box!important;margin:0!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
-      body.style.cssText = 'display:block!important;width:100%!important;max-width:none!important;box-sizing:border-box!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
+      tab.style.cssText = 'display:block!important;position:relative!important;inset:auto!important;float:none!important;clear:both!important;left:0!important;right:auto!important;transform:none!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:0!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
+      body.style.cssText = 'display:block!important;position:relative!important;left:auto!important;right:auto!important;transform:none!important;float:none!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:clamp(14px,2.4vw,30px)!important;box-sizing:border-box!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;overflow-x:hidden!important;';
       return;
     }
     // Recover from a stale marker left by an interrupted/older mount.
     tab.removeAttribute('data-ml-admin-workspace');
     tab.setAttribute('data-ml-admin-workspace', '1');
-    tab.style.cssText = 'display:block!important;position:relative!important;inset:auto!important;width:100vw!important;min-width:100vw!important;max-width:100vw!important;box-sizing:border-box!important;margin:0!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
+    tab.style.cssText = 'display:block!important;position:relative!important;inset:auto!important;float:none!important;clear:both!important;left:0!important;right:auto!important;transform:none!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:0!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
     var shell = document.createElement('div');
     shell.id = 'ml-admin-workspace';
     shell.innerHTML =
@@ -631,7 +631,7 @@
       '<div id="ml-admin-drawer" class="ml-admin-drawer"><div class="ml-admin-drawer-panel"><div class="ml-admin-drawer-head"><button type="button" class="ml-admin-drawer-brand" id="ml-admin-drawer-brand" aria-label="Close menu"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia" onerror="this.onerror=null;this.src=\'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png\';"><span><b>MARKETLINK</b><small>ADMINISTRATION</small></span></button><button id="ml-admin-drawer-close" aria-label="Close navigation">✖️</button></div><div class="ml-admin-theme-row"><span>🎨 Appearance</span><button type="button" id="ml-admin-theme-toggle" aria-pressed="false"><span class="ml-admin-theme-icon">☀</span><span class="ml-admin-theme-label">Daylight</span><i></i></button></div><div class="ml-admin-drawer-links"></div><div class="ml-admin-drawer-foot">Protected administrator access<br><b>Royal FinTech Company</b></div></div></div>';
     tab.insertBefore(shell, body);
     document.getElementById('ml-admin-content').appendChild(body);
-    body.style.cssText = 'display:block!important;width:100%!important;max-width:none!important;box-sizing:border-box!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
+    body.style.cssText = 'display:block!important;position:relative!important;left:auto!important;right:auto!important;transform:none!important;float:none!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:clamp(14px,2.4vw,30px)!important;box-sizing:border-box!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;overflow-x:hidden!important;';
     var nav = shell.querySelector('.ml-admin-nav');
     var drawerLinks = shell.querySelector('.ml-admin-drawer-links');
     drawerLinks.innerHTML = nav.innerHTML;
@@ -680,9 +680,9 @@
     css.textContent = [
       'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;max-width:none!important;height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
       'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
-      'body:has(#ml-admin-workspace) #app,body:has(#ml-admin-workspace) #scr-app,body:has(#ml-admin-workspace) #tab-admindash{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin-left:0!important;margin-right:0!important;left:auto!important;right:auto!important;transform:none!important}',
-      'body:has(#ml-admin-workspace) .ml-admin-main{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;grid-column:2!important}',
-      '@media(max-width:900px){#ml-admin-workspace{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;grid-template-columns:minmax(0,1fr)!important}#ml-admin-workspace .ml-admin-sidebar{display:none!important}#ml-admin-workspace .ml-admin-main{width:100%!important;max-width:100%!important;grid-column:1!important}}',
+      'body:has(#ml-admin-workspace) #app,body:has(#ml-admin-workspace) #scr-app,body:has(#ml-admin-workspace) #tab-admindash{display:block!important;position:relative!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;left:auto!important;right:auto!important;transform:none!important;float:none!important}',
+      'body:has(#ml-admin-workspace) .ml-admin-main{display:block!important;position:relative!important;left:auto!important;right:auto!important;transform:none!important;float:none!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;grid-column:1/-1!important}',
+      '#tab-admindash>#ml-admin-workspace{display:grid!important;grid-template-columns:252px minmax(0,1fr)!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;box-sizing:border-box!important}',
       'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
       'body:has(#ml-admin-workspace) #scr-admin-login:not(.active){display:none!important;visibility:hidden!important;pointer-events:none!important}',
       '#tab-admindash{display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}',
