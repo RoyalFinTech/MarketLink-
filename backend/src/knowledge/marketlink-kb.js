@@ -423,7 +423,7 @@ const KNOWLEDGE_BASE = [
     roles: ['all'],
     keywords: ['Africell phone number', 'QCell number', 'Comium number', 'Gamcel number', 'network dropdown', 'seven digit phone', 'Gambia phone format'],
     question: 'How do I enter my Gambian phone number?',
-    answer: 'A full Gambian mobile number is nine digits (not including +220). For Africell, QCell and Comium, select the correct network: MarketLink adds its two-digit prefix (87, 83 or 86), and you enter the remaining seven subscriber digits. The screen shows that these seven digits plus the selected prefix make nine digits total. The legacy Gamcel option is retained separately while its current migrated prefix format is being confirmed. Never share your MarketLink PIN or a provider one-time code with anyone.',
+    answer: 'A full Gambian mobile number is nine digits (not including +220). For Africell, QCell and Comium, select the correct network: MarketLink adds its two-digit prefix (87, 83 or 86), and you enter the remaining seven subscriber digits. The screen shows that these seven digits plus the selected prefix make nine digits total. Gamcel remains on its existing 7-digit 9XX XXXX format in the current phase. PURA has designated 89 9XX XXXX for Phase 2, but the migration date has not yet been set. Never share your MarketLink PIN or a provider one-time code with anyone.',
   },
   {
     id: 'vendor-product-upload-simple',
@@ -479,7 +479,7 @@ const KNOWLEDGE_BASE = [
     roles: ['customer', 'vendor', 'rider'],
     keywords: ['Africell', 'QCell', 'Comium', 'Gamcel', 'phone network', 'seven digit phone', 'phone number format', 'login phone'],
     question: 'How do I enter my Gambian phone number?',
-    answer: 'Your Gambian mobile number is nine digits in the new numbering format. When you select Africell, QCell or Comium, MarketLink automatically adds the network prefix (87, 83 or 86), so the number box asks for the remaining seven subscriber digits. Together they make the full nine-digit number. The legacy Gamcel option is handled separately until its current format is confirmed. Your number is used for sign-in and account verification.',
+    answer: 'Your Gambian mobile number is nine digits in the new numbering format. When you select Africell, QCell or Comium, MarketLink automatically adds the network prefix (87, 83 or 86), so the number box asks for the remaining seven subscriber digits. Together they make the full nine-digit number. Gamcel continues using its existing 7-digit number in the current phase. PURA has designated the 89 prefix for Phase 2, but has not yet set the migration date. Your number is used for sign-in and account verification.',
   },
   {
     id: 'vendor-document-upload-help',
