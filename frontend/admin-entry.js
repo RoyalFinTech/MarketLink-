@@ -125,10 +125,36 @@
 
 
   // Premium responsive Admin workspace. This runs only on the dedicated Admin site.
+
+  function adminSafe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  async function adminAuditView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Admin audit trail</h3><p>Loading recent activity…</p></div>';
+    try{
+      var r=await ML_API.admin.auditLogs({page:1,limit:50}),rows=Array.isArray(r.data)?r.data:(r.data&&r.data.items)||[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Admin audit trail</h3><button onclick="window.__ML_ADMIN_AUDIT()">Refresh</button></div>'+
+      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">🛡️</div><div class="copy"><b>'+adminSafe(x.action||'Admin action')+'</b><span>'+adminSafe(x.actor_name||x.actor_id||'Administrator')+' · '+adminSafe(x.entity_type||'system')+'</span><small>'+adminSafe(x.created_at?new Date(x.created_at).toLocaleString():'')+'</small></div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No audit entries</b><span>No administrative activity was returned.</span></div>')+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Audit trail unavailable</b><span>'+adminSafe(e.error||e.message||'Could not load audit records.')+'</span></div>';}
+  }
+  async function adminSettingsView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>System settings</h3><p>Loading protected settings…</p></div>';
+    try{
+      var r=await ML_API.admin.settings(),rows=Array.isArray(r.data)?r.data:[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>System settings</h3><span>Read-only inspection</span></div>'+
+      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){var k=String(x.key||''),secret=/secret|token|password|api.?key|private/i.test(k),v=secret?'•••••••• (protected)':(typeof x.value==='string'?x.value:JSON.stringify(x.value));return '<div class="ml-profile-row"><div class="copy"><b>'+adminSafe(k)+'</b><span>'+adminSafe(x.category||'general')+' · '+adminSafe(v||'Not set')+'</span></div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No settings returned</b><span>The production settings table returned no rows.</span></div>')+
+      '<div class="ml-wallet-note" style="margin-top:12px;padding:12px;border-radius:12px">Sensitive values are masked. Provider secrets must remain in backend environment variables.</div></div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Settings unavailable</b><span>'+adminSafe(e.error||e.message||'Your account may require super-admin permission.')+'</span></div>';}
+  }
+  window.__ML_ADMIN_AUDIT=adminAuditView;
+  window.__ML_ADMIN_SETTINGS=adminSettingsView;
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
       overview: function () { if (api.adminRefresh) api.adminRefresh(); },
+      audit: adminAuditView,
+      settings: adminSettingsView,
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
       promotions: function () { if (typeof window.adminGoTo === 'function') window.adminGoTo('promotions'); },
@@ -175,6 +201,8 @@
       '<button data-ml-admin-route="ledger"><span>≡</span>DAHA ledger</button>' +
       '<button data-ml-admin-route="exceptions"><span>⚠</span>Payment exceptions</button>' +
       '<div class="ml-admin-side-label">MANAGEMENT</div>' +
+      '<button data-ml-admin-route="audit"><span>◷</span>Audit trail</button>' +
+      '<button data-ml-admin-route="settings"><span>⚙</span>System settings</button>' +
       '<button data-ml-admin-route="users"><span>♙</span>Users & CRM</button>' +
       '<button data-ml-admin-route="ai"><span>✧</span>AI operations</button>' +
       '</nav><div class="ml-admin-side-foot"><span class="ml-admin-secure-dot"></span> Protected operations<br><small>Powered by Royal FinTech</small></div></aside>' +
