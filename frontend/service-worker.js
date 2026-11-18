@@ -1,7 +1,7 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
 // v43: vendor and rider onboarding now offer separate device-file and camera pickers.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v51';
+const CACHE_NAME = 'marketlink-shell-v52';
 const APP_SHELL = [
   './',
   './index.html',
@@ -27,7 +27,7 @@ self.addEventListener('install', event => {
     // update. Cache the document and each critical bundle independently.
     const critical = ['./', './index.html',
       './premium-marketlink.css?v=marketlink-premium-canonical-r36',
-      './premium-marketlink.js?v=marketlink-premium-canonical-r44'];
+      './premium-marketlink.js?v=marketlink-premium-canonical-r48'];
     for (const url of critical) {
       try { await cache.add(url); }
       catch (error) { console.warn('[MarketLink PWA] Critical shell asset will use network:', url, error); }
