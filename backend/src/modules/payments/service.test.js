@@ -1,11 +1,12 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
-jest.mock('../../integrations/modempay',()=>({isConfigured:jest.fn(()=>false),isWebhookConfigured:jest.fn(()=>false),isH2H:jest.fn(()=>false)}));
+jest.mock('../../integrations/modempay',()=>({isConfigured:jest.fn(()=>false),isWebhookConfigured:jest.fn(()=>false),isH2H:jest.fn(()=>false),isH2HApproved:jest.fn(()=>false),createPaymentIntent:jest.fn()}));
 jest.mock('../orders/service',()=>({settleOrderFinancials:jest.fn()}));
 jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
+const modemPay=require('../../integrations/modempay');
 const {confirmPayment,listPendingCodPayments,initiatePayment,submitCodCashRemittance}=require('./service');
 
 const payment={
@@ -55,6 +56,32 @@ describe('Pay on Delivery reconciliation',()=>{
  test('mobile-money method is recognized but blocked until Modem Pay and webhook are configured',async()=>{
   await expect(initiatePayment({orderId:payment.order_id,method:'wave',amount:145,customerId:'customer-id',accountNumber:'871234567'}))
    .rejects.toMatchObject({statusCode:503,code:'PROVIDER_UNAVAILABLE'});
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+
+ test('validates the full nine-digit national number and sends seven subscriber digits to Modem Pay H2H',async()=>{
+  modemPay.isConfigured.mockReturnValue(true);
+  modemPay.isWebhookConfigured.mockReturnValue(true);
+  modemPay.isH2H.mockReturnValue(true);
+  modemPay.isH2HApproved.mockReturnValue(true);
+  modemPay.createPaymentIntent.mockResolvedValue({reference:'provider-ref-1',status:'pending',nextStep:{}});
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[{id:'payment-new',status:'pending',amount:'145.00'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  query.mockResolvedValueOnce({rows:[{id:'payment-new',status:'pending',amount:'145.00'}]});
+  await initiatePayment({orderId:payment.order_id,method:'wave',amount:145,customerId:'customer-id',accountNumber:'871234567'});
+  expect(modemPay.createPaymentIntent).toHaveBeenCalledWith(expect.objectContaining({network:'wave',accountNumber:'1234567'}));
+ });
+
+ test('rejects a seven-digit customer mobile number for direct H2H checkout',async()=>{
+  modemPay.isConfigured.mockReturnValue(true);
+  modemPay.isWebhookConfigured.mockReturnValue(true);
+  modemPay.isH2H.mockReturnValue(true);
+  modemPay.isH2HApproved.mockReturnValue(true);
+  await expect(initiatePayment({orderId:payment.order_id,method:'wave',amount:145,customerId:'customer-id',accountNumber:'1234567'}))
+   .rejects.toMatchObject({statusCode:400,code:'INVALID_ACCOUNT_NUMBER'});
   expect(withTransaction).not.toHaveBeenCalled();
  });
 
