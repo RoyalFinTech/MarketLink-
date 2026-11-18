@@ -6321,6 +6321,12 @@ function vendorAppFileSelected(input,key){
 }
 function vAppNext(){
   if(S.vStep===0){
+    var liveCategorySelect=G('va-cat');
+    if(liveCategorySelect&&liveCategorySelect.dataset.loaded!=='1'){
+      marketlinkLoadVendorCategories();
+      toast('Please wait for the live MarketLink categories to load before continuing.','info');
+      return;
+    }
     S.vForm.bname=(G('va-bname')&&G('va-bname').value.trim())||'';
     S.vForm.sname=(G('va-sname')&&G('va-sname').value.trim())||'';
     S.vForm.saddr=(G('va-saddr')&&G('va-saddr').value.trim())||'';
