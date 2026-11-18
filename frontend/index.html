@@ -2114,6 +2114,16 @@ function injectLogos(){
     advanced=true;
     timers.forEach(function(t){clearTimeout(t);});
     try{
+      // Dedicated Admin host uses exactly one branded splash, then its own
+      // login screen. It must never enter customer onboarding/auth routing.
+      if(String(window.location.hostname||'').toLowerCase()==='marketlink-gambia-admin.onrender.com'){
+        var adminSplash=document.getElementById('scr-splash');
+        var adminLogin=document.getElementById('scr-admin-login');
+        document.querySelectorAll('.screen.active').forEach(function(screen){screen.classList.remove('active');});
+        if(adminSplash){adminSplash.style.display='none';adminSplash.setAttribute('aria-hidden','true');}
+        if(adminLogin){adminLogin.style.display='block';adminLogin.style.visibility='visible';adminLogin.style.pointerEvents='auto';adminLogin.removeAttribute('aria-hidden');adminLogin.classList.add('active');}
+        return;
+      }
       if(typeof window.goOnboard==='function'){window.goOnboard();return;}
       var splash=document.getElementById('scr-splash'), onboard=document.getElementById('scr-onboard');
       if(splash)splash.classList.remove('active');
