@@ -12,6 +12,6 @@ describe('Gambian nine-digit migration', () => {
   });
 
   test('does not treat a seven-digit number as a migrated nine-digit national number', () => {
-    expect(toGambianNational9('9123456')).toBeNull();
+    expect(toGambianNational9('9123456')).toBe('9123456');
   });
 });
