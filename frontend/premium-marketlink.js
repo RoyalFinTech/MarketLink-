@@ -24,8 +24,11 @@
   }
   function normalizeProducts(d){return Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:[]);}
   function liveProductId(id){return id==null?'':String(id);}
-  function livePaymentOptions(){
-    return [['Cash on Delivery','cod'],['DAHA Wallet','wallet']];
+  function livePaymentOptions(capabilities){
+    var options=[['Cash on Delivery','cod'],['DAHA Wallet','wallet']];
+    if(capabilities&&capabilities.directMobileMoney)options.push(['Wave','wave'],['AfriMoney','afrimoney'],['QMoney','qmoney']);
+    else if(capabilities&&capabilities.hostedCheckout)options.push(['Secure mobile-money checkout','modempay']);
+    return options;
   }
   function normalizePaymentChoice(label){
     if(label==='Cash on Delivery'||label==='Pay on Delivery')return 'cod';
@@ -318,9 +321,14 @@
     }
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
     var payLabel=S.selPay||'Cash on Delivery',payMethod=normalizePaymentChoice(payLabel);
-    if(payMethod!=='cod'&&payMethod!=='wallet'){toast('Choose Cash on Delivery or DAHA Wallet.','warning');return;}
+    var activePaymentCaps=S.paymentCapabilities||{configured:false,directMobileMoney:false,hostedCheckout:false};
+    var allowedPayment=livePaymentOptions(activePaymentCaps).some(function(option){return option[1]===payMethod;});
+    if(!allowedPayment){toast('Choose an enabled payment method. Refresh the cart if payment options have changed.','warning');return;}
     var accountNumber='';
-    var activePaymentCaps=S.paymentCapabilities||{configured:false,directMobileMoney:false};
+    if(activePaymentCaps.directMobileMoney&&['wave','afrimoney','qmoney'].indexOf(payMethod)>=0){
+      accountNumber=String(G('ml-checkout-mobile-number')&&G('ml-checkout-mobile-number').value||'').replace(/\\D/g,'');
+      if(!/^(87|83|86)\\d{7}$/.test(accountNumber)){toast('Enter the complete 9-digit Gambian mobile-money number, including its 87, 83 or 86 prefix.','error');if(G('ml-checkout-mobile-number'))G('ml-checkout-mobile-number').focus();return;}
+    }
     var cartSnapshot=Object.assign({},S.cart||{}),cartItemsSnapshot=Object.assign({},CART_ITEMS||{});
     var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
     var placeBtn=document.querySelector('#cart-body button[data-ml-place-order]');
@@ -1204,14 +1212,17 @@
       // provider state looking ready for a new payment attempt.
       S.paymentCapabilities={configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
     }
-    if(['Cash on Delivery','Pay on Delivery','DAHA Wallet'].indexOf(S.selPay)<0)S.selPay='Cash on Delivery';
+    var paymentOptions=livePaymentOptions(S.paymentCapabilities);
+    if(!paymentOptions.some(function(opt){return opt[0]===S.selPay;}))S.selPay='Cash on Delivery';
     var chosenPaymentLabel=S.selPay||'Cash on Delivery';
-    var paymentHtml=livePaymentOptions().map(function(opt){
-      var selected=chosenPaymentLabel===opt[0],isCod=opt[1]==='cod';
-      var subText=isCod?'Pay the rider in cash when your order arrives. After delivery, the rider submits the deposit reference for MarketLink verification.': 'Pay securely using your available DAHA Wallet balance. If the balance is insufficient, add funds to your wallet first.';
-      return '<button type="button" class="ml-profile-row ml-payment-option" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\''+esc(opt[0])+'\')"><div class="ico">'+(isCod?'💵':'👛')+'</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+esc(subText)+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';
+    var paymentHtml=paymentOptions.map(function(opt){
+      var selected=chosenPaymentLabel===opt[0],isCod=opt[1]==='cod',isWallet=opt[1]==='wallet';
+      var subText=isCod?'Pay the rider in cash when your order arrives. After delivery, the rider submits the deposit reference for MarketLink verification.':isWallet?'Pay securely using your available DAHA Wallet balance. If the balance is insufficient, add funds to your wallet first.':opt[1]==='modempay'?'Continue to the secure hosted payment page and choose an enabled method.':'Pay securely with '+opt[0]+'. Enter your full nine-digit Gambian mobile number below.';
+      return '<button type="button" class="ml-profile-row ml-payment-option" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\''+esc(opt[0])+'\')"><div class="ico">'+(isCod?'💵':isWallet?'👛':'📱')+'</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+esc(subText)+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';
     }).join('');
-    var mobileMoneyInputHtml='';
+    var selectedMethod=normalizePaymentChoice(chosenPaymentLabel);
+    var mobileMoneyInputHtml=S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&['wave','afrimoney','qmoney'].indexOf(selectedMethod)>=0
+      ?'<div style="margin-top:12px"><label class="ml-field-label" for="ml-checkout-mobile-number">Your '+esc(chosenPaymentLabel)+' number (9 digits)</label><input id="ml-checkout-mobile-number" class="ml-daha-input" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="Enter all 9 digits, including 87, 83 or 86"><small class="ml-daha-copy">Enter the complete Gambian number without +220. The selected network is sent separately.</small></div>':'';
     var itemsHtml=ids.map(function(id){var p=CART_ITEMS[id],qty=Number(S.cart[id]||0);return '<div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>'+esc(p.name)+'</b><span>'+money(p.price)+' × '+qty+' · '+esc(p.vendorName||'Vendor')+'</span></div><strong style="color:#FFD778">'+money(Number(p.price||0)*qty)+'</strong></div>';}).join('');
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Your cart</h3><button onclick="window.ML_Premium.refreshCart()">Refresh</button></div><div class="ml-profile-card"><div class="ml-section-head"><h3>Items</h3><span style="color:#91A4B4;font-size:10px">'+vendorIds.length+' vendor'+(vendorIds.length===1?'':'s')+'</span></div>'+itemsHtml+'</div>'+
       (vendorIds.length>1?'<div class="ml-empty" style="margin-top:10px"><b>Multiple vendors in cart</b><span>MarketLink currently requires one vendor per checkout. Remove items from other vendors.</span></div>':'')+
@@ -1224,9 +1235,10 @@
   }
   function selectAddress(id){S.delivAddressId=String(id);S.deliveryAddressId=String(id);renderLiveCart();}
   function selectPayment(label){
-    var method=normalizePaymentChoice(label);
-    if(method!=='cod'&&method!=='wallet'){toast('Choose Cash on Delivery or DAHA Wallet.','warning');return;}
-    S.selPay=method==='cod'?'Cash on Delivery':'DAHA Wallet';renderLiveCart();
+    var method=normalizePaymentChoice(label),allowed=livePaymentOptions(S.paymentCapabilities).some(function(option){return option[1]===method;});
+    if(!allowed){toast('That payment method is not currently enabled.','warning');return;}
+    S.selPay=method==='cod'?'Cash on Delivery':method==='wallet'?'DAHA Wallet':method==='modempay'?'Secure mobile-money checkout':method==='afrimoney'?'AfriMoney':method==='qmoney'?'QMoney':'Wave';
+    renderLiveCart();
   }
   function setCoupon(){var el=G('ml-cart-coupon'),code=el&&el.value.trim().toUpperCase();S.appliedCoupon=code?{code:code}:null;toast(code?'Coupon will be validated securely at order placement.':'Coupon removed.','info');renderLiveCart();}
   function manageAddresses(){switchTab('profile');renderAddresses();}
