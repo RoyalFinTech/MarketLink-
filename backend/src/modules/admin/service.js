@@ -297,7 +297,19 @@ async function getCrmProfile(userId){
  const {rows:[user]}=await query("SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,c.profile_photo_url,array_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL) AS roles,(SELECT count(*)::int FROM support_tickets st WHERE st.raised_by=u.id) AS support_tickets,(SELECT count(*)::int FROM orders o WHERE o.customer_id=u.id) AS orders_count FROM users u LEFT JOIN customers c ON c.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id,c.profile_photo_url",[userId]);
  if(!user){const e=new Error('CRM user not found.');e.status=404;e.code='USER_NOT_FOUND';throw e;}
  const [customer,vendor,rider,notes]=await Promise.all([
-  query('SELECT * FROM customers WHERE user_id=$1',[userId]),query('SELECT * FROM vendors WHERE user_id=$1',[userId]),query('SELECT * FROM riders WHERE user_id=$1',[userId]),
+  // Return only CRM-safe profile fields. Identity numbers and raw KYC document URLs
+  // remain in the protected verification workflow, not the general CRM profile.
+  query(`SELECT display_name,bio,date_of_birth,gender,profile_photo_url,reward_points,created_at,updated_at
+         FROM customers WHERE user_id=$1`,[userId]),
+  query(`SELECT business_name,business_category,business_category_group,business_address,phone,email,whatsapp_number,
+                description,logo_url,banner_url,services_offered,working_days,opening_time,closing_time,
+                return_policy,min_order_value,delivery_time_min,delivery_time_max,is_open,vacation_mode,
+                commission_pct,rating_avg,rating_count,total_sales,total_revenue,kyc_status,created_at,updated_at
+         FROM vendors WHERE user_id=$1`,[userId]),
+  query(`SELECT full_name,email,address,mobile_number,whatsapp_number,vehicle_type,plate_number,
+                emergency_contact,delivery_zone,kyc_status,is_online,location_sharing_enabled,
+                rating_avg,rating_count,total_deliveries,total_earnings,acceptance_rate,created_at,updated_at
+         FROM riders WHERE user_id=$1`,[userId]),
   query("SELECT n.id,n.note,n.created_at,a.full_name AS author_name FROM admin_crm_notes n JOIN users a ON a.id=n.author_id WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 50",[userId])
  ]);
  return {user,customer:customer.rows[0]||null,vendor:vendor.rows[0]||null,rider:rider.rows[0]||null,notes:notes.rows};
