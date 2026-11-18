@@ -198,3 +198,6 @@ assert.match(html, /maxlength="9"[^>]*id="lphone"/, 'Customer login must accept 
 assert.match(html, /maxlength="9"[^>]*id="rphone"/, 'New customer registration must accept nine national digits');
 assert.match(html, /Enter the full 9-digit Gambian mobile number/, 'Customer registration must reject legacy seven-digit numbers');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/service.js'), 'utf8'), /canonicalRegistrationPhone/, 'Backend must enforce nine-digit Gambian numbers for new registrations');
+
+assert.match(premiumJs, /Cancel order/, 'Customers must see the cancellation action for eligible pending or accepted orders');
+assert.match(premiumJs, /ML_API\.orders\.cancel\(id,'Cancelled by customer\.'/,'Customer cancellation must call the authenticated order API');
