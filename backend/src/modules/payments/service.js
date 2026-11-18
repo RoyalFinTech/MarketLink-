@@ -112,8 +112,8 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
 }
 
 async function initiatePayment({ orderId, method, amount, currency='GMD', customerId, accountNumber }) {
-  if (!['cod','wallet'].includes(String(method || '').toLowerCase())) {
-    throw new AppError('Choose Cash on Delivery or DAHA Wallet.', 400, 'UNSUPPORTED_METHOD');
+  if (!['cod','wallet','wave','afrimoney','qmoney','modempay'].includes(String(method || '').toLowerCase())) {
+    throw new AppError('Choose Cash on Delivery, DAHA Wallet, Wave, AfriMoney or QMoney.', 400, 'UNSUPPORTED_METHOD');
   }
   method = String(method).toLowerCase();
   const requestedAmount = Number(amount);
