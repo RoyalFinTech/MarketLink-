@@ -107,7 +107,7 @@ describe('Pay on Delivery reconciliation',()=>{
  });
  test('refuses to confirm COD before the order is delivered',async()=>{
   query.mockImplementation(async(sql)=>{
-   if(sql.startsWith('SELECT * FROM payments WHERE id = $1'))return{rows:[payment]};
+   if(sql.includes('FROM payments p JOIN orders o WHERE p.id=$1'))return{rows:[{...payment,customer_id:deliveredOrder.customer_id}]};
    if(sql.includes('SELECT status FROM cod_cash_remittances'))return{rows:[{status:'verified'}]};
    if(sql.startsWith('SELECT status FROM orders'))return{rows:[{status:'preparing'}]};
    return{rows:[]};
