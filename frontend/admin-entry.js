@@ -413,6 +413,17 @@
   window.__ML_ADMIN_CHAT=adminChatView;
   window.__ML_ADMIN_CHAT_OPEN=adminChatOpen;
   window.__ML_ADMIN_CHAT_SEND=adminChatSend;
+  async function adminStartChat(userId){
+    try{
+      var result=await adminRequest('/admin/conversations','POST',{participantUserId:userId});
+      var conversation=result&&result.conversation;
+      if(!conversation||!conversation.id)throw new Error('MarketLink did not return a conversation reference.');
+      await adminNavigate('chat');
+      await adminChatOpen(conversation.id);
+      if(window.toast)window.toast('Direct chat opened. You can now send a message.','success');
+    }catch(e){if(window.toast)window.toast(e.message||'Could not start a direct chat.','error');}
+  }
+  window.__ML_ADMIN_START_CHAT=adminStartChat;
 
   async function adminCrmView(){
     var root=document.getElementById('adash-body');if(!root)return;
@@ -508,7 +519,9 @@
     root.innerHTML='<div class="ml-premium-home"><p>Loading CRM profile…</p></div>';
     try{
       var d=await adminRequest('/admin/users/'+encodeURIComponent(id)+'/profile','GET'),u=d.user;
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>CRM profile</h3><button onclick="window.__ML_ADMIN_CRM()">← Directory</button></div><div class="ml-profile-card"><div class="ml-profile-row ml-crm-profile-head">'+(u.profile_photo_url?'<img class="ml-crm-profile-photo" src="'+adminSafe(u.profile_photo_url)+'" alt="'+adminSafe(u.full_name)+' profile photo" onerror="this.style.display=\'none\'">':'<div class="ml-crm-profile-placeholder">♙</div>')+'<div class="copy"><b>'+adminSafe(u.full_name)+'</b><span>'+adminSafe(u.phone)+' · '+adminSafe(u.email||'No email')+'</span><small>'+adminSafe((u.roles||[]).join(', '))+' · '+adminSafe(u.status)+'</small><small>Orders: '+adminSafe(u.orders_count)+' · Support tickets: '+adminSafe(u.support_tickets)+'</small></div></div></div>'+adminCrmDetails(d)+'<div class="ml-section-head"><h3>Internal CRM notes</h3></div><div class="ml-profile-card" style="padding:14px"><textarea id="ml-admin-crm-note" class="inp" rows="3" maxlength="4000" placeholder="Add a private note for authorised MarketLink staff…"></textarea><button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CRM_NOTE(\''+adminSafe(u.id)+'\')">Save private note</button></div>'+
+      var canStartChat=(u.roles||[]).some(function(role){return ['customer','vendor','rider'].indexOf(role)>=0;});
+      var startChatButton=canStartChat?'<button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_START_CHAT(\''+adminSafe(u.id)+'\')">Start direct chat</button>':'';
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>CRM profile</h3><div style="display:flex;gap:8px;flex-wrap:wrap">'+startChatButton+'<button onclick="window.__ML_ADMIN_CRM()">← Directory</button></div></div><div class="ml-profile-card"><div class="ml-profile-row ml-crm-profile-head">'+(u.profile_photo_url?'<img class="ml-crm-profile-photo" src="'+adminSafe(u.profile_photo_url)+'" alt="'+adminSafe(u.full_name)+' profile photo" onerror="this.style.display=\'none\'">':'<div class="ml-crm-profile-placeholder">♙</div>')+'<div class="copy"><b>'+adminSafe(u.full_name)+'</b><span>'+adminSafe(u.phone)+' · '+adminSafe(u.email||'No email')+'</span><small>'+adminSafe((u.roles||[]).join(', '))+' · '+adminSafe(u.status)+'</small><small>Orders: '+adminSafe(u.orders_count)+' · Support tickets: '+adminSafe(u.support_tickets)+'</small></div></div></div>'+adminCrmDetails(d)+'<div class="ml-section-head"><h3>Internal CRM notes</h3></div><div class="ml-profile-card" style="padding:14px"><textarea id="ml-admin-crm-note" class="inp" rows="3" maxlength="4000" placeholder="Add a private note for authorised MarketLink staff…"></textarea><button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CRM_NOTE(\''+adminSafe(u.id)+'\')">Save private note</button></div>'+
       ((d.notes||[]).length?'<div class="ml-profile-card">'+d.notes.map(function(n){return '<div class="ml-profile-row"><div class="copy"><b>'+adminSafe(n.author_name||'Admin')+'</b><span>'+adminSafe(n.note)+'</span><small>'+adminFormatDate(n.created_at)+'</small></div></div>';}).join('')+'</div>':'<div class="ml-empty">No internal notes recorded.</div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>CRM profile unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
   }
@@ -689,7 +702,7 @@
       users: function () { if (api.adminUsers) api.adminUsers(); },
       ai: adminAiTrainingView
     };
-    if (routes[key]) routes[key]();
+    var pendingRoute = routes[key] ? routes[key]() : null;
     document.querySelectorAll('[data-ml-admin-route]').forEach(function (el) {
       var active = el.getAttribute('data-ml-admin-route') === key;
       el.classList.toggle('is-active', active);
@@ -697,6 +710,7 @@
     });
     var drawer = document.getElementById('ml-admin-drawer');
     if (drawer) drawer.classList.remove('is-open');
+    return pendingRoute;
   }
 
   function applyAdminTheme(){
