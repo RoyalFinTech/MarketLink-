@@ -500,7 +500,11 @@ async function listAdminConversations({page=1,limit=30,search}={}) {
        lm.body AS last_message,lm.created_at AS last_message_at,lm.sender_id AS last_sender_id,
        (SELECT count(*)::int FROM messages unread
         WHERE unread.conversation_id=c.id AND unread.read_at IS NULL
-          AND unread.sender_id IN (c.participant_a,c.participant_b)) AS unread_messages
+          AND unread.sender_id IN (c.participant_a,c.participant_b)
+          AND NOT EXISTS (
+            SELECT 1 FROM user_roles unread_ur JOIN roles unread_role ON unread_role.id=unread_ur.role_id
+            WHERE unread_ur.user_id=unread.sender_id AND unread_role.name IN ('admin','super_admin')
+          )) AS unread_messages
      FROM conversations c
      JOIN users ua ON ua.id=c.participant_a
      JOIN users ub ON ub.id=c.participant_b
@@ -571,7 +575,11 @@ async function getAdminConversationMessages(conversationId,{limit=100}={}) {
   const {rows}=await query(
     `SELECT m.id,m.conversation_id,m.sender_id,m.body,m.attachment_url,m.status,m.created_at,m.read_at,
        u.full_name AS sender_name,
-       CASE WHEN m.sender_id=$2 THEN 'participant_a'
+       CASE WHEN EXISTS (
+              SELECT 1 FROM user_roles sender_ur JOIN roles sender_role ON sender_role.id=sender_ur.role_id
+              WHERE sender_ur.user_id=m.sender_id AND sender_role.name IN ('admin','super_admin')
+            ) THEN 'admin'
+            WHEN m.sender_id=$2 THEN 'participant_a'
             WHEN m.sender_id=$3 THEN 'participant_b' ELSE 'admin' END AS sender_type
      FROM messages m JOIN users u ON u.id=m.sender_id
      WHERE m.conversation_id=$1 ORDER BY m.created_at DESC LIMIT $4`,
@@ -593,16 +601,21 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
        VALUES($1,$2,$3,'sent') RETURNING id,conversation_id,sender_id,body,status,created_at`,
       [conversationId,actor.id,text]
     );
-    await client.query(
-      `INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id)
-       VALUES($1,'chat_message','MarketLink support replied','An administrator replied in your MarketLink conversation.','conversation',$3),
-             ($2,'chat_message','MarketLink support replied','An administrator replied in your MarketLink conversation.','conversation',$3)`,
-      [conversation.participant_a,conversation.participant_b,conversationId]
-    );
+    const recipientIds=[conversation.participant_a,conversation.participant_b]
+      .filter(userId=>String(userId)!==String(actor.id));
+    if(recipientIds.length){
+      await client.query(
+        `INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id)
+         SELECT recipient_id,'chat_message','MarketLink support replied',
+           'An administrator replied in your MarketLink conversation.','conversation',$2
+         FROM unnest($1::uuid[]) AS recipient_id`,
+        [recipientIds,conversationId]
+      );
+    }
     await client.query(
       `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
        VALUES($1,$2,'chat.admin_reply_sent','conversation',$3,$4)`,
-      [actor.id,actor.role||'admin',conversationId,JSON.stringify({messageId:message.id,recipientIds:[conversation.participant_a,conversation.participant_b]})]
+      [actor.id,actor.role||'admin',conversationId,JSON.stringify({messageId:message.id,recipientIds})]
     );
     return message;
   });
