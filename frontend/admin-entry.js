@@ -263,7 +263,7 @@
     if(term.length<2){target.innerHTML='<small>Enter at least two characters to search.</small>';return;}
     target.innerHTML='<small>Searching the secure directory…</small>';
     try{
-      var result=await adminRequest('/admin/users?search='+encodeURIComponent(term)+'&page=1&limit=25','GET');
+      var result=await adminRequest('/admin/users?search='+encodeURIComponent(term)+'&status=active&page=1&limit=25','GET');
       var users=result.items||[];
       target.innerHTML=users.length?users.map(function(person){
         var id=String(person.id||''),checked=!!adminCampaignSelectedRecipients[id];
