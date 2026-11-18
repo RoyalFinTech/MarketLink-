@@ -414,7 +414,22 @@
         throw {error:'Your MarketLink account signed in, but its administrator role could not be confirmed. Please contact support with code ADMIN_ROLE_RESPONSE.'};
       }
       AdminSession.start(phone);
-      showScreen('scr-app');G('bnav').style.display='none';G('fab').classList.remove('fab-visible');
+      // The dedicated Admin entry script initially forces its login screen
+      // visible with inline styles. Explicitly retire that screen after auth
+      // so its phone controls cannot remain as a floating overlay.
+      var adminLoginScreen=G('scr-admin-login');
+      if(adminLoginScreen){
+        adminLoginScreen.classList.remove('active');
+        adminLoginScreen.style.setProperty('display','none','important');
+        adminLoginScreen.style.setProperty('visibility','hidden','important');
+        adminLoginScreen.style.setProperty('pointer-events','none','important');
+        adminLoginScreen.setAttribute('aria-hidden','true');
+      }
+      showScreen('scr-app');
+      var appScreen=G('scr-app'),appRoot=G('app');
+      if(appRoot){appRoot.style.setProperty('height','auto','important');appRoot.style.setProperty('min-height','100dvh','important');appRoot.style.setProperty('overflow','visible','important');}
+      if(appScreen){appScreen.style.setProperty('position','relative','important');appScreen.style.setProperty('inset','auto','important');appScreen.style.setProperty('height','auto','important');appScreen.style.setProperty('min-height','100dvh','important');appScreen.style.setProperty('overflow','visible','important');}
+      G('bnav').style.display='none';G('fab').classList.remove('fab-visible');
       switchTab('admindash');toast('Welcome to the Admin Portal ✓');
     }catch(e){adminAuthErr(e.error||'Admin sign-in failed.');}
   }
