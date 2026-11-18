@@ -12,6 +12,8 @@ const SA    = ['super_admin'];
 
 router.get('/dashboard',   authenticate, authorize(...ADMIN), ctrl.dashboard);
 router.get('/users',       authenticate, authorize(...ADMIN), ctrl.users);
+router.post('/users/:id/roles', authenticate, authorize(...SA),
+  [param('id').isUUID(), body('role').equals('admin')], validate, ctrl.grantAdminRole);
 router.post('/users/:id/suspend', authenticate, authorize(...ADMIN),
   [param('id').isUUID(), body('reason').trim().notEmpty()], validate, ctrl.suspend);
 router.post('/users/:id/reinstate', authenticate, authorize(...ADMIN),
