@@ -204,7 +204,7 @@ assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js')
 
 const riderRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/routes.js'), 'utf8');
 const vendorRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/routes.js'), 'utf8');
-assert.match(html, /maxlength="\'+\(selected===\'GAMCEL\'?\'9\':\'7\'\)\+\'"/, 'Network selector must request nine digits for Gamcel and seven subscriber digits after the two-digit prefix for other networks');
-assert.match(html, /if\(op===\'GAMCEL\'\)\{if\(n.length!==9\)/, 'Gamcel network selector must validate nine national digits');
-assert.match(riderRoutes, /\\+220\\d\{9\}/, 'Rider Gambian contacts must require nine national digits');
-assert.match(vendorRoutes, /\\+220\\d\{9\}/, 'Vendor Gambian contacts must require nine national digits');
+assert.ok(html.includes("maxlength=\"'+(selected==='GAMCEL'?'9':'7')+'\""), 'Network selector must request nine digits for Gamcel and seven subscriber digits after the two-digit prefix for other networks');
+assert.ok(html.includes("if(op==='GAMCEL'){if(n.length!==9)"), 'Gamcel network selector must validate nine national digits');
+assert.ok(riderRoutes.includes('/^\\+220\\d{9}$/'), 'Rider Gambian contacts must require nine national digits');
+assert.ok(vendorRoutes.includes('/^\\+220\\d{9}$/'), 'Vendor Gambian contacts must require nine national digits');
