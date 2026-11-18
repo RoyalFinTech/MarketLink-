@@ -377,7 +377,24 @@
   }
   async function liveAdminLogin(){
     var idEl=G('admin-staffid'),pinEl=G('admin-password');
+    var operatorEl=G('admin-operator'),nationalEl=G('admin-national');
     var phone=(idEl&&idEl.value||'').trim(),pin=(pinEl&&pinEl.value||'').trim();
+    // Derive the Admin API identity from the visible controls at submit time.
+    // This deliberately avoids relying on a separate event bridge to sync a hidden field.
+    if(operatorEl&&nationalEl){
+      var national=String(nationalEl.value||'').replace(/\D/g,'');
+      var networkRules={
+        AFRICELL:{prefix:'87',legacy:/^(2|7|40|41)/},
+        QCELL:{prefix:'83',legacy:/^(3|5)/},
+        COMIUM:{prefix:'86',legacy:/^(6|8)/},
+        GAMCEL:{prefix:'',legacy:/^9/}
+      };
+      var networkRule=networkRules[operatorEl.value];
+      if(national.length!==7){adminAuthErr('Enter all 7 digits of your Gambian mobile number.');nationalEl.focus();return;}
+      if(!networkRule||!networkRule.legacy.test(national)){adminAuthErr('The number does not match the selected network. Check the number and network, then try again.');nationalEl.focus();return;}
+      phone=networkRule.prefix+national;
+      if(idEl)idEl.value=phone;
+    }
     if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
     if(!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
     if(!/^\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
