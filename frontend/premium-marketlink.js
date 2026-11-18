@@ -1019,7 +1019,10 @@
       var gpsHtml='';
       if(freshGps){
         var mapUrl='https://www.google.com/maps?q='+encodeURIComponent(liveLat.toFixed(6)+','+liveLng.toFixed(6));
-        gpsHtml='<div class="ml-tracking-location"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Live rider location</b><span>Last shared '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>Location shared for this delivery only.</small></div><a class="ml-btn ml-btn-secondary ml-tracking-map-link" href="'+mapUrl+'" target="_blank" rel="noopener noreferrer">Open map ↗</a></div>';
+        var mapDelta=0.008;
+        var mapBounds=[liveLng-mapDelta,liveLat-mapDelta,liveLng+mapDelta,liveLat+mapDelta].map(function(value){return Number(value).toFixed(6);}).join(',');
+        var mapEmbedUrl='https://www.openstreetmap.org/export/embed.html?bbox='+encodeURIComponent(mapBounds)+'&layer=mapnik&marker='+encodeURIComponent(liveLat.toFixed(6)+','+liveLng.toFixed(6));
+        gpsHtml='<div class="ml-tracking-location"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Live rider location</b><span>Last shared '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>Location shared for this delivery only.</small></div><a class="ml-btn ml-btn-secondary ml-tracking-map-link" href="'+mapUrl+'" target="_blank" rel="noopener noreferrer">Open directions ↗</a></div><div class="ml-tracking-map-frame"><iframe title="Live rider location map" src="'+mapEmbedUrl+'" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:240px;border:0;border-radius:14px" allowfullscreen></iframe></div>';
       }else if(validLiveCoordinates&&latestPing&&latestPing.recorded_at&&!terminal){
         gpsHtml='<div class="ml-tracking-location is-stale"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Last rider location</b><span>Last update '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>This location is older than 15 minutes, so it is not shown as live.</small></div></div>';
       }else if(!terminal&&o.rider_name){
