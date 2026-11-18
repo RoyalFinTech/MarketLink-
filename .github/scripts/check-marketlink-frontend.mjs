@@ -160,3 +160,10 @@ assert.match(html, /function retryPremiumBundle\(\)[\s\S]*?ml_retry=/, 'Premium 
 assert.match(html, /var bootDetail=window\.__ML_PREMIUM_BOOT_ERROR\|\|window\.__ML_PREMIUM_SCRIPT_ERROR/, 'Premium retry diagnostic must include captured script execution errors');
 assert.match(html, /Release: premium-r44 · Cache: shell-v46/, 'Premium startup diagnostic must identify the deployed release and cache versions');
 assert.match(serviceWorker, /isPremiumExecutable[\s\S]*?fetch\(request\)/, 'Premium JavaScript must use network-first delivery to prevent stale bundle cache from masking releases');
+
+assert.match(html, /function marketlinkUploadChoice\\(/, 'Vendor and rider onboarding must use the shared device/camera upload control');
+assert.match(html, /Choose from device/, 'Onboarding must expose a device file picker');
+assert.match(html, /Take photo/, 'Onboarding must expose a camera option');
+assert.match(html, /marketlinkUploadChoice\\('va-shop-file','photoFile'/, 'Vendor shop logo must offer device and camera selection');
+assert.match(html, /marketlinkUploadChoice\\('ra-profile-input','profilePhotoFile'/, 'Rider profile photo must offer device and camera selection');
+assert.match(html, /var cameraId=id\\+'-camera'/, 'Camera capture must be a separate input, not a restriction on the device picker');
