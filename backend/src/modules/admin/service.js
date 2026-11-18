@@ -128,11 +128,15 @@ async function getAnalytics({ period='30d' }) {
   const days = period==='7d'?7:period==='90d'?90:30;
   const [dailyRevenue, ordersByStatus, topCategories, signups] = await Promise.all([
     query(`SELECT date_trunc('day',placed_at) AS day, count(*) AS orders, coalesce(sum(total),0) AS revenue
-           FROM orders WHERE placed_at>=now()-($1||' days')::INTERVAL GROUP BY 1 ORDER BY 1`, [days]),
+           FROM orders
+           WHERE placed_at>=now()-($1||' days')::INTERVAL
+             AND status='delivered' AND payment_status='confirmed'
+           GROUP BY 1 ORDER BY 1`, [days]),
     query(`SELECT status, count(*) FROM orders WHERE placed_at>=now()-($1||' days')::INTERVAL GROUP BY status`, [days]),
     query(`SELECT c.name, count(p.id) AS products, count(DISTINCT o.id) AS orders
            FROM categories c LEFT JOIN products p ON p.category_id=c.id
-           LEFT JOIN order_items oi ON oi.product_id=p.id LEFT JOIN orders o ON o.id=oi.order_id
+           LEFT JOIN order_items oi ON oi.product_id=p.id
+           LEFT JOIN orders o ON o.id=oi.order_id AND o.status='delivered' AND o.payment_status='confirmed'
            WHERE c.deleted_at IS NULL GROUP BY c.id,c.name ORDER BY orders DESC LIMIT 10`, []),
     query(`SELECT date_trunc('day',created_at) AS day, count(*) AS users
            FROM users WHERE created_at>=now()-($1||' days')::INTERVAL GROUP BY 1 ORDER BY 1`, [days]),
@@ -193,9 +197,11 @@ async function getReports({ type, startDate, endDate }) {
   }
   if (type==='vendors') {
     const { rows } = await query(
-      `SELECT v.business_name, count(DISTINCT o.id) AS orders, sum(o.total) AS revenue,
+      `SELECT v.business_name, count(DISTINCT o.id) AS orders, coalesce(sum(o.total),0) AS revenue,
               v.rating_avg, v.kyc_status
-       FROM vendors v LEFT JOIN orders o ON o.vendor_id=v.user_id AND o.placed_at BETWEEN $1 AND $2
+       FROM vendors v LEFT JOIN orders o ON o.vendor_id=v.user_id
+         AND o.placed_at BETWEEN $1 AND $2
+         AND o.status='delivered' AND o.payment_status='confirmed'
        GROUP BY v.user_id, v.business_name, v.rating_avg, v.kyc_status
        ORDER BY revenue DESC NULLS LAST LIMIT 50`, [start, end]);
     return rows;
