@@ -2,7 +2,7 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, maxPrice, sort='newest', includeAllStatuses=false }) {
-  const off = (page-1) * Math.min(limit,100), conds = includeAllStatuses ? [] : ["p.status='active'"], params = []; let pi = 1;
+  const off = (page-1) * Math.min(limit,100), conds = includeAllStatuses ? [] : ["p.status='active'", "v.kyc_status='approved'"], params = []; let pi = 1;
   if (includeAllStatuses && !vendorId) throw new AppError('Vendor ownership is required to view unpublished products.',403,'FORBIDDEN');
   if (search)     { conds.push(`to_tsvector('english', p.name||' '||coalesce(p.description,'')) @@ plainto_tsquery('english',$${pi++})`); params.push(search); }
   if (categoryId) {
@@ -29,7 +29,7 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
   return { items: d.rows, total: parseInt(c.rows[0].count), page, limit, totalPages: Math.ceil(parseInt(c.rows[0].count)/limit) };
 }
 async function getById(id) {
-  const { rows } = await query(`SELECT p.*,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL WHERE p.id=$1`, [id]);
+  const { rows } = await query(`SELECT p.*,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL WHERE p.id=$1 AND p.status='active' AND v.kyc_status='approved'`, [id]);
   if (!rows.length) throw new AppError('Product not found.',404,'PRODUCT_NOT_FOUND');
   return rows[0];
 }
