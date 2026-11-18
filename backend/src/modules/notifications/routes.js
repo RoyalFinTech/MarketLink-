@@ -28,4 +28,22 @@ router.post('/send', authenticate, authorize('admin', 'super_admin'), [
   body('referenceId').optional({ nullable: true }).isUUID(),
   body('data').optional().isObject()
 ], validate, ctrl.sendToUser);
+
+// Admin-only campaign management. Campaigns are drafted first; sending requires a separate explicit action.
+router.get('/admin/campaigns', authenticate, authorize('admin','super_admin'), [
+  query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})
+], validate, ctrl.listCampaigns);
+router.post('/admin/campaigns', authenticate, authorize('admin','super_admin'), [
+  body('title').trim().notEmpty().isLength({max:200}),
+  body('body').optional({nullable:true}).isString().isLength({max:4000}),
+  body('audience').isIn(['all','customers','vendors','riders','admins']),
+  body('channels').isObject(),
+  body('channels.email').optional().isBoolean(),
+  body('channels.sms').optional().isBoolean(),
+  body('channels.push').optional().isBoolean(),
+], validate, ctrl.createCampaign);
+router.post('/admin/campaigns/:id/send', authenticate, authorize('admin','super_admin'), [
+  param('id').isUUID()
+], validate, ctrl.sendCampaign);
+
 module.exports = router;
