@@ -29,6 +29,7 @@ Do not ask the user to paste secrets into chat. Do not switch to live-money mode
 - [x] Production SQL was checked against the live schema. The current production period has no order or signup activity and category records have no products/orders, so charts must show empty states rather than fabricated values.
 - [x] Promotion workflow now requires a transaction/company-statement reference to mark payment paid, requires approval + paid status + a banner before publication, and writes the review/payment reference into the Admin audit log.
 - [x] Automated tests cover analytics period/trend insights and promotion payment/publish guards.
+- [x] Admin customer-chat inbox added with protected conversation search, message history, Admin replies, participant notifications and an audit-log record for each reply. Live schema/query shape checked; production currently has zero conversations/messages, so there are no real threads to exercise.
 - [ ] Authenticated browser walkthrough of every Admin navigation page — implementation is deployed, but a signed-in browser session has not yet been exercised in this run.
 
 ## Verification rules
