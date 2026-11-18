@@ -276,14 +276,67 @@
     return data.data;
   }
   function adminFormatDate(value){return value?new Date(value).toLocaleString():'—';}
+  async function adminCrmView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Customer relationship management</h3><p>Loading the protected customer, vendor and rider directory…</p></div>';
+    try{
+      var term=String((document.getElementById('ml-admin-crm-search')||{}).value||'').trim();
+      var role=String((document.getElementById('ml-admin-crm-role')||{}).value||'').trim();
+      var status=String((document.getElementById('ml-admin-crm-status')||{}).value||'').trim();
+      var params=new URLSearchParams({page:'1',limit:'50'});
+      if(term)params.set('search',term);
+      if(role)params.set('role',role);
+      if(status)params.set('status',status);
+      var data=await adminRequest('/admin/users?'+params.toString(),'GET');
+      var rows=Array.isArray(data.items)?data.items:[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>CRM directory</h3><p style="margin:5px 0;color:var(--mu)">Protected customer, vendor and rider records</p></div><button onclick="window.__ML_ADMIN_CRM()">Refresh</button></div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin:12px 0"><label class="ml-admin-label" for="ml-admin-crm-search">Search name, phone or email</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ml-admin-crm-search" class="inp" maxlength="200" value="'+adminSafe(term)+'" placeholder="Search MarketLink users" style="flex:1;min-width:180px"><select id="ml-admin-crm-role" class="inp" style="flex:0 1 150px"><option value="">All roles</option><option value="customer">Customers</option><option value="vendor">Vendors</option><option value="rider">Riders</option><option value="admin">Admins</option><option value="super_admin">Super admins</option></select><select id="ml-admin-crm-status" class="inp" style="flex:0 1 130px"><option value="">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button type="button" class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CRM()">Search</button></div></div>'+
+        '<div class="ml-section-head"><h3>People and accounts</h3><span>'+adminSafe(data.total||rows.length)+' records</span></div>'+
+        (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){var photo=x.profile_photo_url?'<img class="ml-crm-avatar" src="'+adminSafe(x.profile_photo_url)+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'"><span class="ml-crm-avatar-fallback" style="display:none">♙</span>':'<span class="ml-crm-avatar-fallback">♙</span>';return '<button type="button" class="ml-profile-row ml-crm-user-row" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer" onclick="window.__ML_ADMIN_CRM_PROFILE(\''+adminSafe(x.id)+'\')">'+photo+'<div class="copy"><b>'+adminSafe(x.full_name||'MarketLink user')+'</b><span>'+adminSafe(x.phone||'No phone')+' · '+adminSafe(x.email||'No email')+'</span><small>'+adminSafe((x.roles||[]).join(', ')||'No role')+' · '+adminSafe(x.status||'unknown')+' · Joined '+adminFormatDate(x.created_at)+'</small></div><span aria-hidden="true">›</span></button>';}).join('')+'</div>':'<div class="ml-empty"><b>No matching accounts</b><span>Try another name, phone number, email, role or status.</span></div>')+'</div>';
+      var roleSelect=document.getElementById('ml-admin-crm-role'),statusSelect=document.getElementById('ml-admin-crm-status');
+      if(roleSelect)roleSelect.value=role;
+      if(statusSelect)statusSelect.value=status;
+      var searchInput=document.getElementById('ml-admin-crm-search');
+      if(searchInput)searchInput.addEventListener('keydown',function(event){if(event.key==='Enter')window.__ML_ADMIN_CRM();});
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>CRM directory unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CRM()">Retry</button></div>';}
+  }
   async function adminSupportQueue(){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><h3>Customer support desk</h3><p>Loading the live support queue…</p></div>';
     try{
-      var data=await adminRequest('/admin/support-tickets?page=1&limit=50','GET'),rows=data.items||[];
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Support desk</h3><button onclick="window.__ML_ADMIN_SUPPORT()">Refresh</button></div><div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Open tickets</div><div class="ml-stat-value">'+adminSafe(rows.filter(function(x){return x.status==='open';}).length)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Escalated</div><div class="ml-stat-value">'+adminSafe(rows.filter(function(x){return x.status==='escalated';}).length)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Total matches</div><div class="ml-stat-value">'+adminSafe(data.total||0)+'</div></div></div>'+
-      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){var photo=x.profile_photo_url?'<img class="ml-crm-avatar" src="'+adminSafe(x.profile_photo_url)+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'"><span class="ml-crm-avatar-fallback" style="display:none">♙</span>':'<span class="ml-crm-avatar-fallback">♙</span>';return '<button type="button" class="ml-profile-row ml-crm-user-row" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer" onclick="window.__ML_ADMIN_CRM_PROFILE(\''+adminSafe(x.id)+'\')">'+photo+'<div class="copy"><b>'+adminSafe(x.full_name||'MarketLink user')+'</b><span>'+adminSafe(x.phone)+' · '+adminSafe((x.roles||[]).join(', '))+'</span><small>'+adminSafe(x.status)+' · Joined '+adminFormatDate(x.created_at)+'</small></div></button>';}).join('')+'</div>':'<div class="ml-empty"><b>No matching profiles</b><span>Try another name, phone number or email.</span></div>')+'</div>';
-    }catch(e){root.innerHTML='<div class="ml-empty"><b>CRM unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
+      var status=String((document.getElementById('ml-admin-support-status')||{}).value||'').trim();
+      var term=String((document.getElementById('ml-admin-support-search')||{}).value||'').trim();
+      var params=new URLSearchParams({page:'1',limit:'50'});
+      if(status)params.set('status',status);
+      if(term)params.set('search',term);
+      var data=await adminRequest('/admin/support-tickets?'+params.toString(),'GET'),rows=Array.isArray(data.items)?data.items:[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>Support desk</h3><p style="margin:5px 0;color:var(--mu)">Review and respond to customer, vendor and rider requests</p></div><button onclick="window.__ML_ADMIN_SUPPORT()">Refresh</button></div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin:12px 0"><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="ml-admin-support-status" class="inp" style="flex:0 1 160px"><option value="">All statuses</option><option value="open">Open</option><option value="pending">Pending</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select><input id="ml-admin-support-search" class="inp" maxlength="200" value="'+adminSafe(term)+'" placeholder="Search ticket, subject, name or phone" style="flex:1;min-width:180px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_SUPPORT()">Filter</button></div></div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Open</div><div class="ml-stat-value">'+rows.filter(function(x){return x.status==='open';}).length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Escalated</div><div class="ml-stat-value">'+rows.filter(function(x){return x.status==='escalated';}).length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Total matches</div><div class="ml-stat-value">'+adminSafe(data.total||0)+'</div></div></div>'+
+        (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer" onclick="window.__ML_ADMIN_TICKET(\''+adminSafe(x.id)+'\')"><div class="ico">🎧</div><div class="copy"><b>'+adminSafe(x.ticket_number||'Support ticket')+' · '+adminSafe(x.subject||'No subject')+'</b><span>'+adminSafe(x.requester_name||'MarketLink user')+' · '+adminSafe(x.requester_phone||'No phone')+'</span><small>'+adminSafe(x.category||'general')+' · '+adminSafe(x.priority||'normal')+' priority · '+adminSafe(x.status||'open')+' · '+adminFormatDate(x.created_at)+'</small></div><span>›</span></button>';}).join('')+'</div>':'<div class="ml-empty"><b>No support tickets found</b><span>There are no tickets matching these filters.</span></div>')+'</div>';
+      var statusSelect=document.getElementById('ml-admin-support-status');if(statusSelect)statusSelect.value=status;
+      var searchInput=document.getElementById('ml-admin-support-search');if(searchInput)searchInput.addEventListener('keydown',function(event){if(event.key==='Enter')window.__ML_ADMIN_SUPPORT();});
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Support queue unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_SUPPORT()">Retry</button></div>';}
+  }
+  async function adminTicketDetail(id){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><p>Loading support conversation…</p></div>';
+    try{
+      var data=await adminRequest('/admin/support-tickets/'+encodeURIComponent(id),'GET'),t=data.ticket||{},replies=Array.isArray(data.replies)?data.replies:[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Support conversation</h3><button onclick="window.__ML_ADMIN_SUPPORT()">← Support queue</button></div><div class="ml-profile-card" style="padding:16px"><h3 style="margin:0 0 8px">'+adminSafe(t.ticket_number||'Support ticket')+' · '+adminSafe(t.subject||'No subject')+'</h3><p style="color:var(--mu);font-size:12px">'+adminSafe(t.requester_name||'MarketLink user')+' · '+adminSafe(t.requester_phone||'')+' · '+adminSafe(t.requester_email||'')+'</p><p style="font-size:12px;line-height:1.7;white-space:pre-wrap">'+adminSafe(t.description||'')+'</p><div style="display:flex;gap:8px;flex-wrap:wrap"><label class="ml-admin-label">Status<select id="ml-admin-ticket-status" class="inp"><option value="open">Open</option><option value="pending">Pending</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label><label class="ml-admin-label">Priority<select id="ml-admin-ticket-priority" class="inp"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label></div><button class="ml-btn ml-btn-secondary" style="margin-top:10px" onclick="window.__ML_ADMIN_TICKET_SAVE(\''+adminSafe(t.id)+'\')">Save ticket status</button></div><div class="ml-section-head"><h3>Conversation</h3></div><div class="ml-profile-card">'+(replies.length?replies.map(function(r){return '<div class="ml-profile-row"><div class="copy"><b>'+adminSafe(r.sender_name||'Participant')+'</b><span style="white-space:pre-wrap">'+adminSafe(r.body)+'</span><small>'+adminFormatDate(r.created_at)+'</small></div></div>';}).join(''):'<div class="ml-empty">No replies yet.</div>')+'</div><div class="ml-profile-card" style="padding:14px"><label class="ml-admin-label" for="ml-admin-ticket-reply">Reply to requester</label><textarea id="ml-admin-ticket-reply" class="inp" rows="4" maxlength="4000" placeholder="Write a helpful response…"></textarea><button class="ml-btn ml-btn-primary" style="margin-top:9px" onclick="window.__ML_ADMIN_TICKET_REPLY(\''+adminSafe(t.id)+'\')">Send reply</button></div></div>';
+      var st=document.getElementById('ml-admin-ticket-status'),pr=document.getElementById('ml-admin-ticket-priority');if(st)st.value=t.status||'open';if(pr)pr.value=t.priority||'medium';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Support ticket unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
+  }
+  async function adminTicketSave(id){
+    var status=document.getElementById('ml-admin-ticket-status'),priority=document.getElementById('ml-admin-ticket-priority');
+    try{await adminRequest('/admin/support-tickets/'+encodeURIComponent(id),'PATCH',{status:status&&status.value,priority:priority&&priority.value});if(window.toast)window.toast('Support ticket updated.','success');await adminTicketDetail(id);}
+    catch(e){if(window.toast)window.toast(e.message,'error');}
+  }
+  async function adminTicketReply(id){
+    var field=document.getElementById('ml-admin-ticket-reply'),body=String(field&&field.value||'').trim();
+    if(!body){if(window.toast)window.toast('Write a reply before sending.','error');return;}
+    try{await adminRequest('/admin/support-tickets/'+encodeURIComponent(id)+'/replies','POST',{body:body});if(window.toast)window.toast('Reply sent to the requester.','success');await adminTicketDetail(id);}
+    catch(e){if(window.toast)window.toast(e.message,'error');}
   }
   function adminCrmFieldLabel(key){
     return String(key||'').replace(/_/g,' ').replace(/\b\w/g,function(ch){return ch.toUpperCase();});
