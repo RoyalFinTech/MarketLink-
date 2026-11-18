@@ -53,6 +53,26 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
 
+ test('DAHA Wallet checkout debits the authenticated customer wallet and confirms payment atomically',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending',payment_method:'wallet'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'200.00'}]})
+   .mockResolvedValueOnce({rows:[{amount:'0.00'}]})
+   .mockResolvedValueOnce({rows:[{...payment,id:'wallet-payment',method:'wallet',status:'confirmed'}]})
+   .mockResolvedValueOnce({rows:[{balance:'55.00'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const result=await initiatePayment({orderId:payment.order_id,method:'wallet',amount:145,customerId:'customer-id'});
+  expect(result).toMatchObject({action:'wallet_paid',status:'confirmed',walletBalance:55,payment:{method:'wallet',status:'confirmed'}});
+  expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets SET balance=balance-\$1/i.test(sql))).toBe(true);
+  expect(clientQuery.mock.calls.some(([sql])=>/INSERT INTO transactions.*'debit','purchase'/i.test(sql))).toBe(true);
+  expect(clientQuery.mock.calls.some(([sql])=>/UPDATE orders SET payment_status='confirmed'/i.test(sql))).toBe(true);
+ });
+
  test('rejects DAHA Wallet payment when the saved order selected Cash on Delivery',async()=>{
   const clientQuery=jest.fn().mockResolvedValueOnce({rows:[{
    id:payment.order_id,customer_id:'customer-id',total:'145.00',
@@ -91,7 +111,7 @@ describe('Pay on Delivery reconciliation',()=>{
   modemPay.isH2HApproved.mockReturnValue(true);
   modemPay.createPaymentIntent.mockResolvedValue({reference:'provider-ref-1',status:'pending',nextStep:{}});
   const clientQuery=jest.fn()
-   .mockResolvedValueOnce({rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending',payment_method:'wave'}]})
    .mockResolvedValueOnce({rows:[]})
    .mockResolvedValueOnce({rows:[{id:'payment-new',status:'pending',amount:'145.00'}]});
   withTransaction.mockImplementation(async work=>work({query:clientQuery}));
