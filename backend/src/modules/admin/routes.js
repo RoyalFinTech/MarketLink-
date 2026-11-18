@@ -24,6 +24,9 @@ router.put('/settings/:key', authenticate, authorize(...SA),
 router.get('/audit-logs',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
   validate, ctrl.auditLogs);
+router.get('/affiliates', authenticate, authorize(...ADMIN),
+  [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100}), query('search').optional().isString().isLength({max:120})],
+  validate, ctrl.affiliates);
 router.get('/reports',     authenticate, authorize(...ADMIN),
   [query('type').isIn(['revenue','vendors','riders']).withMessage('type must be revenue, vendors, or riders')],
   validate, ctrl.reports);
