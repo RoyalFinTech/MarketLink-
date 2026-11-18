@@ -1197,6 +1197,7 @@
         }
       }catch(storageError){}
       renderPremiumProfile();
+      if(typeof renderPremiumHome==='function')renderPremiumHome();
       toast('Your profile photo has been saved and verified.','success');
       if(oldPhoto&&oldPhoto!==uploadedUrl){
         try{await ML_API.uploads.deleteByUrl(oldPhoto);}catch(cleanupError){}
@@ -1300,6 +1301,7 @@
       if(typeof window.mlRefreshDashboardAvatar==='function')window.mlRefreshDashboardAvatar(null,S.profileName||S.user&&S.user.name||'');
       try{localStorage.removeItem('ml_profile_photo_preview');localStorage.removeItem('ml_profile_photo_preview_url');localStorage.removeItem('ml_profile_photo_url');}catch(storageError){}
       renderPremiumProfile();
+      if(typeof renderPremiumHome==='function')renderPremiumHome();
       toast('Your profile photo has been removed.','success');
     }catch(e){toast(e.error||'Could not remove your profile photo. Please try again.','error');}
   }
