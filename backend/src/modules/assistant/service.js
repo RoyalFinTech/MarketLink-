@@ -5,6 +5,7 @@ const knowledgeService = require('./knowledgeService');
 const responseBuilder = require('./responseBuilder');
 const conversationContext = require('./conversationContext');
 const liveData = require('./liveData');
+const languageLayer = require('./languageLayer');
 
 const VALID_ROLES = ['customer', 'vendor', 'rider', 'admin'];
 
@@ -26,21 +27,44 @@ async function ask({ question, userRoles, claimedRole, user, sessionId }) {
 
   const role = resolveRole(userRoles, claimedRole);
   const context = sessionId ? conversationContext.get(sessionId) : null;
+  const understoodQuestion = languageLayer.normalizeQuestion(trimmed);
+
+  // Safety boundary applies before live-data and knowledge lookups.
+  if (languageLayer.isUnsafe(trimmed)) {
+    return finish({ assistantName: 'MarketLink Assistant', question: trimmed, role: role || 'guest', sessionId: sessionId || null },
+      languageLayer.safeBoundaryReply(), null, null, sessionId, role, 'safety', 'high');
+  }
+
+  // Explicit navigation requests receive a concise role-aware guide instead
+  // of a weak keyword match or an unrelated FAQ.
+  const navigation = languageLayer.detectIntent(trimmed);
+  if (navigation) {
+    const navAnswer = navigation.id === 'open_vendor_orders' && role !== 'vendor'
+      ? 'That workspace is available to approved vendor accounts. If you want to sell on MarketLink, open Profile and choose Become a Vendor to start the application.'
+      : navigation.id === 'open_rider_deliveries' && role !== 'rider'
+        ? 'Delivery jobs are available to approved rider accounts. Open Profile and choose Become a Rider to start the application.'
+        : navigation.answer;
+    const result = { assistantName: 'MarketLink Assistant', question: trimmed, role: role || 'guest', sessionId: sessionId || null,
+      answer: navAnswer, source: 'navigation', confidence: 'high', matchedEntryId: null, relatedQuestions: [],
+      navigation: { intent: navigation.id, topic: navigation.topic } };
+    if (sessionId) conversationContext.record(sessionId, { question: understoodQuestion, answer: navAnswer, entryId: null, category: navigation.topic, role });
+    return result;
+  }
 
   const base = { assistantName: 'MarketLink Assistant', question: trimmed, role: role || 'guest', sessionId: sessionId || null };
 
   // 1) Live-account-data intents (wallet balance, order status) always win —
   //    these must come from real backend data, never from KB text, and
   //    never from the small-talk/greeting path either.
-  const live = await liveData.tryResolve(trimmed, user || null);
+  const live = await liveData.tryResolve(understoodQuestion, user || null);
   if (live.handled) {
     const result = { ...base, answer: live.answer, source: 'live_data', confidence: 'high', matchedEntryId: null, relatedQuestions: [] };
-    if (sessionId) conversationContext.record(sessionId, { question: trimmed, answer: live.answer, entryId: null, category: 'live', role });
+    if (sessionId) conversationContext.record(sessionId, { question: understoodQuestion, answer: live.answer, entryId: null, category: 'live', role });
     return result;
   }
 
   // 2) Small talk — greetings, thanks, "okay", confusion/tell-me-more.
-  const smallTalk = responseBuilder.classifySmallTalk(trimmed);
+  const smallTalk = responseBuilder.classifySmallTalk(understoodQuestion);
   if (smallTalk === 'greeting') return finish(base, responseBuilder.pick(responseBuilder.GREETING_REPLIES), null, null, sessionId, role);
   if (smallTalk === 'thanks')   return finish(base, responseBuilder.pick(responseBuilder.THANKS_REPLIES), null, null, sessionId, role);
   if (smallTalk === 'okay')     return finish(base, responseBuilder.pick(responseBuilder.OKAY_REPLIES), null, null, sessionId, role);
@@ -58,10 +82,10 @@ async function ask({ question, userRoles, claimedRole, user, sessionId }) {
 
   // 3) Knowledge-base search, with a lightweight context-assisted retry for
   //    short follow-ups like "Can I cancel it?" that don't stand alone well.
-  let match = await knowledgeService.search(trimmed, role);
+  let match = await knowledgeService.search(understoodQuestion, role);
   if (!match && context && context.turns.length) {
     const lastQuestion = context.turns[context.turns.length - 1].question;
-    match = await knowledgeService.search(`${lastQuestion} ${trimmed}`, role);
+    match = await knowledgeService.search(`${lastQuestion} ${understoodQuestion}`, role);
   }
 
   if (!match) {
