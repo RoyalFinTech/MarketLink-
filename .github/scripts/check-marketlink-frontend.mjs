@@ -241,6 +241,7 @@ const productService = fs.readFileSync(path.join(root, '..', 'backend/src/module
 assert.match(productService, /conds = includeAllStatuses \? \[\] : \["p\.status='active'", "v\.kyc_status='approved'"\]/, 'Public product catalog must exclude products from vendors awaiting approval');
 assert.match(productService, /WHERE p\.id=\$1 AND p\.status='active' AND v\.kyc_status='approved'/, 'Public product detail lookup must exclude products from vendors awaiting approval');
 assert.match(productService, /SELECT count\(\*\) FROM products p LEFT JOIN vendors v ON v\.user_id=p\.vendor_id/, 'Product count query must join vendors when applying approved-vendor visibility filters');
+assert.match(productService, /WHERE id=\$\$\{pi\}/, 'Recursive category filtering must bind category IDs as SQL parameters in both list and count queries');
 const orderService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/orders/service.js'), 'utf8');
 assert.match(orderService, /JOIN vendors v ON v\.user_id=p\.vendor_id WHERE p\.id=\$1 FOR UPDATE OF p/, 'Checkout must lock the product row while checking vendor approval');
 assert.match(orderService, /p\.vendor_kyc_status!=='approved'/, 'Checkout must reject products from unapproved vendors even if a client knows the product ID');
