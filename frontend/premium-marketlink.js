@@ -2689,7 +2689,7 @@
     if(!ML_API.admin||typeof ML_API.admin.approveWithdrawal!=='function'){
       toast('The secure Admin payout endpoint is unavailable. No payout was sent.','error');return;
     }
-    if(!window.confirm('Approve this DAHA withdrawal? This requests a real mobile-money transfer through Modem Pay. Do not continue until the recipient details and amount have been checked.'))return;
+    if(!window.confirm('Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
     try{
       var result=await ML_API.admin.approveWithdrawal(id);
       var data=result&&result.data||{};
