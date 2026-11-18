@@ -169,3 +169,6 @@ assert.match(html, /marketlinkUploadChoice\('ra-profile-input','profilePhotoFile
 assert.match(html, /var cameraId=id\+'-camera'/, 'Camera capture must be a separate input, not a restriction on the device picker');
 
 assert.match(html, /accept="image\/jpeg,image\/png" capture=/, 'Camera capture must use formats accepted by identity and profile-photo validators');
+
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /Cash deposit queue unavailable/, 'Admin must distinguish cash-deposit API errors from an empty queue');
+assert.match(fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8'), /COD payment queue unavailable/, 'Admin must distinguish COD payment API errors from an empty queue');
