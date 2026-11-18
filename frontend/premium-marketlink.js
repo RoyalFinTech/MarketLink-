@@ -434,10 +434,28 @@
         await ML_API.auth.logout();
         throw {error:'Your MarketLink account signed in, but its administrator role could not be confirmed. Please contact support with code ADMIN_ROLE_RESPONSE.'};
       }
-      AdminSession.start(phone);
-      // The dedicated Admin entry script initially forces its login screen
-      // visible with inline styles. Explicitly retire that screen after auth
-      // so its phone controls cannot remain as a floating overlay.
+      // Hydrate the shared application session before routing. The legacy
+      // Admin login did this; the premium login previously omitted it, leaving
+      // S.user/S.roles empty even though the backend had issued valid tokens.
+      // Admin workspace guards and dashboard APIs rely on this in-memory state.
+      if (typeof S !== 'undefined') {
+        S.user = user;
+        S.roles = roles;
+        S.profileName = user.fullName || user.full_name || user.name || '';
+        S.profilePhone = user.phone || phone;
+      }
+      AdminSession.start(user.id || phone);
+      // Route to the authenticated app first. Only retire the login screen
+      // after the app screen has been activated, so transition errors remain
+      // recoverable and cannot be written into a hidden login panel.
+      showScreen('scr-app');
+      var appScreen=G('scr-app');
+      if(appScreen){
+        appScreen.classList.add('active');
+        appScreen.style.setProperty('display','block','important');
+        appScreen.style.setProperty('visibility','visible','important');
+        appScreen.style.setProperty('pointer-events','auto','important');
+      }
       var adminLoginScreen=G('scr-admin-login');
       if(adminLoginScreen){
         adminLoginScreen.classList.remove('active');
@@ -446,7 +464,6 @@
         adminLoginScreen.style.setProperty('pointer-events','none','important');
         adminLoginScreen.setAttribute('aria-hidden','true');
       }
-      showScreen('scr-app');
       var appScreen=G('scr-app'),appRoot=G('app');
       if(appRoot){appRoot.style.setProperty('height','auto','important');appRoot.style.setProperty('min-height','100dvh','important');appRoot.style.setProperty('overflow','visible','important');}
       if(appScreen){appScreen.style.setProperty('position','relative','important');appScreen.style.setProperty('inset','auto','important');appScreen.style.setProperty('height','auto','important');appScreen.style.setProperty('min-height','100dvh','important');appScreen.style.setProperty('overflow','visible','important');}
