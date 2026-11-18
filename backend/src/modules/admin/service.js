@@ -51,11 +51,13 @@ async function getUsers({ page=1, limit=20, search, role, status }) {
   if (role)   { conds.push(`r.name=$${pi++}`);   params.push(role); }
   const join = role ? 'JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id' : 'LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id';
   const { rows } = await query(
-    `SELECT DISTINCT u.id, u.full_name, u.phone, u.email, u.status, u.created_at, u.last_login_at, c.profile_photo_url,
+    `SELECT DISTINCT u.id, u.full_name, u.phone, u.email, u.status, u.created_at, u.last_login_at,
+            COALESCE(c.profile_photo_url,v.logo_url) AS profile_photo_url,
             array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles
-     FROM users u LEFT JOIN customers c ON c.user_id=u.id ${join}
+     FROM users u LEFT JOIN customers c ON c.user_id=u.id
+     LEFT JOIN vendors v ON v.user_id=u.id ${join}
      WHERE ${conds.join(' AND ')}
-     GROUP BY u.id,c.profile_photo_url
+     GROUP BY u.id,c.profile_photo_url,v.logo_url
      ORDER BY u.created_at DESC LIMIT $${pi} OFFSET $${pi+1}`,
     [...params, limit_, offset]);
   const { rows:[c] } = await query(`SELECT count(DISTINCT u.id) FROM users u ${join} WHERE ${conds.join(' AND ')}`, params);
@@ -294,7 +296,7 @@ async function replySupportTicket(ticketId,body,actor){
  });
 }
 async function getCrmProfile(userId){
- const {rows:[user]}=await query("SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,c.profile_photo_url,array_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL) AS roles,(SELECT count(*)::int FROM support_tickets st WHERE st.raised_by=u.id) AS support_tickets,(SELECT count(*)::int FROM orders o WHERE o.customer_id=u.id) AS orders_count FROM users u LEFT JOIN customers c ON c.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id,c.profile_photo_url",[userId]);
+ const {rows:[user]}=await query("SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,COALESCE(c.profile_photo_url,v.logo_url) AS profile_photo_url,array_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL) AS roles,(SELECT count(*)::int FROM support_tickets st WHERE st.raised_by=u.id) AS support_tickets,(SELECT count(*)::int FROM orders o WHERE o.customer_id=u.id) AS orders_count FROM users u LEFT JOIN customers c ON c.user_id=u.id LEFT JOIN vendors v ON v.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id,c.profile_photo_url,v.logo_url",[userId]);
  if(!user){const e=new Error('CRM user not found.');e.status=404;e.code='USER_NOT_FOUND';throw e;}
  const [customer,vendor,rider,notes]=await Promise.all([
   // Return only CRM-safe profile fields. Identity numbers and raw KYC document URLs
