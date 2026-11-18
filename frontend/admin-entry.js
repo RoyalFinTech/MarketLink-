@@ -16,8 +16,10 @@
       document.querySelectorAll('.screen.active').forEach(function (screen) {
         screen.classList.remove('active');
       });
-      adminLoginNow.style.display = 'block';
-      adminLoginNow.style.visibility = 'visible';
+      adminLoginNow.style.setProperty('display', 'block', 'important');
+      adminLoginNow.style.setProperty('visibility', 'visible', 'important');
+      adminLoginNow.style.setProperty('pointer-events', 'auto', 'important');
+      adminLoginNow.removeAttribute('aria-hidden');
       adminLoginNow.classList.add('active');
     }
   } catch (adminVisibilityError) {
@@ -262,6 +264,10 @@
       document.querySelectorAll('.screen.active').forEach(function (screen) {
         screen.classList.remove('active');
       });
+      login.style.setProperty('display', 'block', 'important');
+      login.style.setProperty('visibility', 'visible', 'important');
+      login.style.setProperty('pointer-events', 'auto', 'important');
+      login.removeAttribute('aria-hidden');
       login.classList.add('active');
       return true;
     }
@@ -636,7 +642,7 @@
       'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;max-width:none!important;height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
       'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
       'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
-      'body:has(#ml-admin-workspace) #scr-admin-login{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+      'body:has(#ml-admin-workspace) #scr-admin-login:not(.active){display:none!important;visibility:hidden!important;pointer-events:none!important}',
       '#tab-admindash{display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}',
       '#tab-admindash>#ml-admin-workspace{display:grid!important;min-height:100vh!important;height:auto!important;overflow:visible!important}',
       '#tab-admindash #ml-admin-content,#tab-admindash #adash-body{display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
@@ -712,7 +718,7 @@
         'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;min-width:0!important;height:auto!important;min-height:100%!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
         'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
         'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
-        'body:has(#ml-admin-workspace) #scr-admin-login{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+        'body:has(#ml-admin-workspace) #scr-admin-login:not(.active){display:none!important;visibility:hidden!important;pointer-events:none!important}',
         'body:has(#ml-admin-workspace) #tab-admindash{display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
         'body:has(#ml-admin-workspace) #tab-admindash,#tab-admindash>#ml-admin-workspace,#ml-admin-workspace,.ml-admin-main,.ml-admin-content,#adash-body{box-sizing:border-box;max-height:none!important;overflow:visible!important;overflow-y:visible!important}',
         '#ml-admin-workspace{width:100%!important;min-width:0!important;min-height:100dvh!important;height:auto!important}',
