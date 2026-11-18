@@ -6143,6 +6143,18 @@ function marketlinkCaptureGPS(kind){
     toast(kind==='vendor'?'Shop GPS saved.':'GPS permission granted. Live delivery sharing will be requested for an assigned delivery.','success');
   },function(err){toast(err&&err.code===1?'Location permission was denied. Enable it in browser settings or enter the address manually.':'Could not read GPS. Check location services and try again.','error');},{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
 }
+function marketlinkUploadChoice(id,target,accept,title,filename,icon,role,captureFacing){
+  var handler=role==='vendor'?'vendorAppFileSelected':'raDocsSelected';
+  var cameraId=id+'-camera';
+  return '<div style="background:var(--sfl);border:1.5px dashed rgba(148,163,184,.45);border-radius:12px;padding:13px;margin-bottom:10px;">'+
+    '<input id="'+id+'" type="file" accept="'+accept+'" style="display:none;" onchange="'+handler+'(this,\''+target+'\')">'+
+    '<input id="'+cameraId+'" type="file" accept="image/jpeg,image/png,image/webp" capture="'+(captureFacing||'environment')+'" style="display:none;" onchange="'+handler+'(this,\''+target+'\')">'+
+    '<div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;"><span style="font-size:23px;">'+icon+'</span><div style="min-width:0;flex:1;"><div style="color:var(--tx);font-size:12px;font-weight:700;">'+title+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;overflow-wrap:anywhere;">'+sanitizeText(filename||'No file selected')+'</div></div></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+    '<button type="button" class="btn btn-s" style="flex:1;min-width:130px;" onclick="document.getElementById(\''+id+'\').click()">📁 Choose from device</button>'+
+    '<button type="button" class="btn btn-s" style="flex:1;min-width:110px;" onclick="document.getElementById(\''+cameraId+'\').click()">📷 Take photo</button>'+
+    '</div><div style="color:var(--mu);font-size:10px;line-height:1.4;margin-top:7px;">Choose an existing file from your phone, tablet or computer, or use a camera when available.</div></div>';
+}
 function renderVApp(){
   var el=G('vapp-body'); if(!el) return;
   var steps=['Business Info','Documents','Review'];
@@ -6173,10 +6185,8 @@ function renderVApp(){
       '<textarea class="inp" id="va-description" rows="3" placeholder="About your business, experience and service area (optional)" style="display:block;width:100%;box-sizing:border-box;min-height:76px;max-height:120px;resize:vertical;line-height:1.45;">'+sanitizeText(f.description||'')+'</textarea>';
   } else if(step===1){
     body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin-bottom:12px;">Upload real files here. Admin uses these to review your shop; choosing a file does not submit it until you send the application.</div>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:11px;cursor:pointer;"><input id="va-id-file" type="file" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'idDocFile\')">'+
-      '<div style="font-size:25px;margin-top:8px;">📄</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">National ID or Passport</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.idDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:14px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input id="va-shop-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="vendorAppFileSelected(this,\'photoFile\')">'+
-      '<div style="font-size:25px;margin-top:8px;">📷</div><div style="color:var(--tx);font-size:12px;font-weight:600;margin-top:4px;">Shop photograph / logo (optional)</div><div style="color:var(--mu);font-size:11px;margin-top:3px;">'+sanitizeText(f.photoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
+      marketlinkUploadChoice('va-id-file','idDocFile','image/jpeg,image/png,application/pdf','National ID or Passport',f.idDocName||'JPG, PNG or PDF · up to 10 MB','🪪','vendor','environment')+
+      marketlinkUploadChoice('va-shop-file','photoFile','image/jpeg,image/png,image/webp','Shop photograph / logo (optional)',f.photoName||'JPG, PNG or WebP · up to 5 MB','🏪','vendor','environment');
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;margin-bottom:14px;">'+
       [['Business',f.bname],['Shop',f.sname],['Address',f.saddr],['Category',f.cat],['Marketplace category',marketlinkVendorCategoryGroup(f.cat)],['Account phone',f.phone],['WhatsApp',f.whatsappNumber||'Not added'],['Shop GPS',f.latitude!=null?f.latitude+', '+f.longitude:'Not shared'],['Email',f.email||'—'],['Registration',f.registrationNo||'—'],['Products / services',f.services||'—'],['Opening hours',f.hours||'—'],['About',f.description||'—'],['ID document',f.idDocName||'Not attached'],['Shop photo',f.photoName||'Not attached']].map(function(r){
@@ -6279,17 +6289,11 @@ function renderRApp(){
       '<input class="inp" placeholder="Residential address (area, town, landmark)" id="ra-addr" value="'+sanitizeText(f.addr||'')+'">'+
       '<input class="inp" placeholder="Emergency contact number" id="ra-emg" type="tel" inputmode="tel" value="'+sanitizeText(f.emergency||'')+'">';
   } else if(step===1){
-    body='<label style="display:block;color:var(--mu);font-size:11px;font-weight:700;margin:0 0 5px 2px;">Vehicle type</label>'+
-      '<select id="ra-vehicle-type" style="width:100%;box-sizing:border-box;padding:12px 13px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.1);background:var(--sfl);color:var(--tx);font-size:13px;outline:none;margin-bottom:11px;">'+
-      [['motorbike','Motorbike'],['tricycle','Tricycle / Keke'],['bicycle','Bicycle'],['car','Car'],['van','Van'],['truck','Truck / pickup'],['other','Other vehicle']].map(function(v){return '<option value="'+v[0]+'"'+((f.vehicleType||'motorbike')===v[0]?' selected':'')+'>'+v[1]+'</option>';}).join('')+'</select>'+
-      '<input class="inp" placeholder="Plate Number (e.g. BJL 1234 A)" id="ra-plate" value="'+sanitizeText(f.plate||'')+'">'+
-      '<input class="inp" placeholder="Driver\'s Licence Number" id="ra-lic" value="'+sanitizeText(f.licence||'')+'">'+
-      '<input class="inp" placeholder="Delivery zone / preferred area" id="ra-zone" value="'+sanitizeText(f.deliveryZone||'')+'">'+
-      '<div style="font-size:12px;line-height:1.5;color:var(--mu);margin:3px 0 12px;">Upload clear, genuine documents so the team can verify your identity and vehicle. Your application stays pending until reviewed.</div>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-id-input" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'idDocFile\')"><div style="font-size:22px;margin-top:6px;">🪪</div><div style="color:var(--tx);font-size:12px;font-weight:600;">National ID / Passport</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.idDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-lic-input" accept="image/jpeg,image/png,application/pdf" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'licenseDocFile\')"><div style="font-size:22px;margin-top:6px;">📄</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Driver’s licence / permit</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.licenseDocName||'Choose a JPG, PNG or PDF')+'</div></label>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;margin-bottom:9px;cursor:pointer;"><input type="file" id="ra-profile-input" accept="image/jpeg,image/png" capture="user" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'profilePhotoFile\')"><div style="font-size:22px;margin-top:6px;">📷</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Rider profile photo (required)</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.profilePhotoName||'Take a photo or choose a JPG or PNG image')+'</div></label>'+
-      '<label style="display:block;background:var(--sfl);border-radius:11px;padding:12px;border:1.5px dashed rgba(255,255,255,0.1);text-align:center;cursor:pointer;"><input type="file" id="ra-vehicle-input" accept="image/jpeg,image/png,image/webp" style="display:block;width:100%;font-size:11px;color:var(--mu);" onchange="raDocsSelected(this,\'vehiclePhotoFile\')"><div style="font-size:22px;margin-top:6px;">🛵</div><div style="color:var(--tx);font-size:12px;font-weight:600;">Vehicle photo (optional)</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(f.vehiclePhotoName||'Choose a JPG, PNG or WebP image')+'</div></label>';
+    body='<div style="font-size:12px;line-height:1.5;color:var(--mu);margin:3px 0 12px;">Upload each document from your device or take a fresh photo. PDF is accepted for identity and driving documents.</div>'+
+      marketlinkUploadChoice('ra-id-input','idDocFile','image/jpeg,image/png,application/pdf','National ID / Passport',f.idDocName||'JPG, PNG or PDF · up to 10 MB','🪪','rider','environment')+
+      marketlinkUploadChoice('ra-lic-input','licenseDocFile','image/jpeg,image/png,application/pdf','Driver’s licence / permit',f.licenseDocName||'JPG, PNG or PDF · up to 10 MB','📄','rider','environment')+
+      marketlinkUploadChoice('ra-profile-input','profilePhotoFile','image/jpeg,image/png','Rider profile photo (required)',f.profilePhotoName||'JPG or PNG · up to 5 MB','🤳','rider','user')+
+      marketlinkUploadChoice('ra-vehicle-input','vehiclePhotoFile','image/jpeg,image/png,image/webp','Vehicle photo (optional)',f.vehiclePhotoName||'JPG, PNG or WebP · up to 5 MB','🛵','rider','environment');
   } else {
     body='<div style="background:var(--sfl);border-radius:11px;padding:13px;">'+
       [['Name',f.fname],['Account phone',f.phone],['WhatsApp',f.whatsappNumber||'Not added'],['Address',f.addr],['GPS',f.latitude!=null?f.latitude+', '+f.longitude:'Not shared'],['Plate',f.plate],['Licence',f.licence],['Emergency',f.emergency],['Rider photo',f.profilePhotoName||'Not attached'],['Vehicle photo',f.vehiclePhotoName||'Not attached']].map(function(r){
@@ -7765,7 +7769,7 @@ window.addEventListener('unhandledrejection',function(e){
     var root=premiumRoot();
     if(!root)return;
     var safe=String(message||'Unknown startup error').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
-    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r44 · Cache: shell-v46</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>MarketLink premium startup diagnostic</b><span style="display:block;margin:10px 0;overflow-wrap:anywhere">'+safe+'</span><small style="display:block;opacity:.75;margin:8px 0">Release: premium-r44 · Cache: shell-v47</small><button type="button" class="ml-btn ml-btn-primary" id="ml-premium-diagnostic-retry">Retry premium dashboard</button></div></div>';
     var button=document.getElementById('ml-premium-diagnostic-retry');
     if(button)button.addEventListener('click',function(){
       button.disabled=true;button.textContent='Retrying…';
