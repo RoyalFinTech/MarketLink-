@@ -164,6 +164,14 @@ describe('customer order cancellation permissions', () => {
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status/i.test(sql))).toBe(true);
   });
 
+  test('blocks cancellation while a non-COD payment attempt is still pending', async () => {
+    query.mockResolvedValueOnce({ rows:[{ id:'order-pending', status:'pending', payment_status:'pending', payment_method:'wave', customer_id:'customer-1', vendor_id:'vendor-1', rider_id:null }] });
+    query.mockResolvedValueOnce({ rows:[{ id:'payment-pending' }] });
+    await expect(updateStatus('order-pending','cancelled','customer-1',['customer']))
+      .rejects.toMatchObject({code:'PAYMENT_ATTEMPT_PENDING',statusCode:409});
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
   test('does not allow a customer to cancel another customer order', async () => {
     query.mockResolvedValueOnce({ rows:[{ id:'order-2', status:'pending', payment_status:'pending', customer_id:'customer-2', vendor_id:'vendor-1', rider_id:null }] });
     await expect(updateStatus('order-2','cancelled','customer-1',['customer'])).rejects.toMatchObject({code:'FORBIDDEN',statusCode:403});

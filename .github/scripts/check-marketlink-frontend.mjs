@@ -204,3 +204,6 @@ assert.match(premiumJs, /ML_API\.orders\.cancel\(id,'Cancelled by customer\.'/,'
 
 assert.match(premiumJs, /pendingForThisOrder/, 'Checkout failures must preserve orders with a real pending payment attempt');
 assert.match(premiumJs, /Payment could not be completed; order cancelled and stock released/, 'Failed checkout attempts must cancel the unconfirmed order to release inventory');
+
+assert.match(premiumJs, /payment_attempt_pending/, 'Order tracking must respect pending mobile-money attempts before showing cancellation');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/orders/service.js'), 'utf8'), /PAYMENT_ATTEMPT_PENDING/, 'Backend must block cancellation while a mobile-money payment is pending');

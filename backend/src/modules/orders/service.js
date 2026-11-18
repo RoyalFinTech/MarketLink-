@@ -97,6 +97,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
 async function getById(id, userId, roles) {
   const { rows } = await query(`
     SELECT o.*,
+      EXISTS(SELECT 1 FROM payments pending_payment WHERE pending_payment.order_id=o.id AND pending_payment.method<>'cod' AND pending_payment.status='pending') AS payment_attempt_pending,
       u.full_name AS customer_name,
       v.business_name AS vendor_name,
       COALESCE(json_agg(json_build_object(
@@ -321,6 +322,10 @@ async function updateStatus(orderId,status,userId,roles,note){
   const order=await _loadOrderForMutation(orderId);
   _assertTransitionAllowed(order,status,userId,roles);
   if(order.status===status)return order;
+  if(status==='cancelled'&&order.payment_method&&order.payment_method!=='cod'&&order.payment_status!=='confirmed'){
+    const {rows:[pendingPayment]}=await query("SELECT id FROM payments WHERE order_id=$1 AND method<>'cod' AND status='pending' LIMIT 1",[orderId]);
+    if(pendingPayment)throw new AppError('A mobile-money payment is still processing. Check its status before cancelling this order.',409,'PAYMENT_ATTEMPT_PENDING');
+  }
   if(status==='cancelled'&&order.payment_status==='confirmed'){
     throw new AppError('This order has a confirmed payment and cannot be cancelled until a supported refund is processed.',409,'PAYMENT_REFUND_REQUIRED');
   }
