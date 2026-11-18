@@ -36,7 +36,9 @@ router.get('/admin/campaigns', authenticate, authorize('admin','super_admin'), [
 router.post('/admin/campaigns', authenticate, authorize('admin','super_admin'), [
   body('title').trim().notEmpty().isLength({max:200}),
   body('body').optional({nullable:true}).isString().isLength({max:4000}),
-  body('audience').isIn(['all','customers','vendors','riders','admins']),
+  body('audience').isIn(['all','customers','vendors','riders','admins','selected']),
+  body('recipientIds').optional().isArray({min:1,max:100}),
+  body('recipientIds.*').optional().isUUID(),
   body('channels').isObject(),
   body('channels.email').optional().isBoolean(),
   body('channels.sms').optional().isBoolean(),
