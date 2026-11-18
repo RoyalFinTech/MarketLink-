@@ -107,22 +107,36 @@
   ].join('');
   (document.head || document.documentElement).appendChild(style);
 
-  // The API login response is { user: { id, fullName, phone, roles }, accessToken, refreshToken }.
-  // The legacy Admin handler expects those user fields at the top level. Normalize
-  // only inside this Admin-only deployment; the customer frontend remains untouched.
+  // The auth controller wraps login data as { success, data: { user, roles/tokens } }.
+  // Some shared API-client versions unwrap one level while others return the envelope.
+  // Normalize all supported shapes only in this isolated Admin deployment.
   function normalizeAdminAuthResponse() {
     var auth = window.ML_API && window.ML_API.auth;
     if (!auth || typeof auth.login !== 'function' || auth.login.__mlAdminResponseNormalized) return;
     var originalLogin = auth.login;
     var normalizedLogin = async function () {
       var response = await originalLogin.apply(this, arguments);
-      if (response && response.user && typeof response.user === 'object') {
-        return Object.assign({}, response.user, {
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken
-        });
+      var payload = response;
+      var user = null;
+      for (var depth = 0; depth < 4 && payload && typeof payload === 'object'; depth++) {
+        if (payload.user && typeof payload.user === 'object') {
+          user = payload.user;
+          break;
+        }
+        if (payload.data && typeof payload.data === 'object') {
+          payload = payload.data;
+          continue;
+        }
+        break;
       }
-      return response;
+      if (!user && payload && typeof payload === 'object' && Array.isArray(payload.roles)) user = payload;
+      if (!user) return response;
+      var roles = Array.isArray(user.roles) ? user.roles :
+        (payload && Array.isArray(payload.roles) ? payload.roles :
+        (response && Array.isArray(response.roles) ? response.roles : []));
+      var accessToken = (payload && payload.accessToken) || (response && response.accessToken) || null;
+      var refreshToken = (payload && payload.refreshToken) || (response && response.refreshToken) || null;
+      return Object.assign({}, user, { roles: roles, accessToken: accessToken, refreshToken: refreshToken });
     };
     normalizedLogin.__mlAdminResponseNormalized = true;
     auth.login = normalizedLogin;
