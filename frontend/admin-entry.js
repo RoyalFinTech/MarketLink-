@@ -197,7 +197,7 @@
     var national = document.getElementById('admin-national');
     var hidden = document.getElementById('admin-staffid');
     if (!operator || !national || !hidden) return false;
-    var digits = String(national.value || '').replace(/\\D/g, '');
+    var digits = String(national.value || '').replace(/\D/g, '');
     var err = document.getElementById('admin-auth-err');
     if (digits.length !== 7) {
       if (err) { err.textContent = 'Enter the 7 digits after the selected network prefix (9 digits total).'; err.style.display = 'block'; }
