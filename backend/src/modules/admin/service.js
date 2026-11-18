@@ -524,6 +524,38 @@ async function listAdminConversations({page=1,limit=30,search}={}) {
   return {items:rows,total,page:page_,limit:limit_,totalPages:Math.ceil(total/limit_)};
 }
 
+async function startAdminConversation(participantUserId,actor){
+  const targetId=String(participantUserId||'').trim();
+  if(!targetId||targetId===String(actor&&actor.id||'')){
+    throw new (require('../../middleware/errorHandler').AppError)('Choose a different customer, vendor or rider account.',400,'INVALID_CHAT_PARTICIPANT');
+  }
+  return withTransaction(async client=>{
+    const {rows:[participant]}=await client.query(
+      'SELECT id,full_name,phone,status FROM users WHERE id=$1 FOR SHARE',[targetId]
+    );
+    if(!participant)throw new (require('../../middleware/errorHandler').AppError)('The selected MarketLink account was not found.',404,'USER_NOT_FOUND');
+    if(participant.status!=='active')throw new (require('../../middleware/errorHandler').AppError)('Direct chat can only be started with an active account.',409,'USER_NOT_ACTIVE');
+    const {rows:roles}=await client.query(
+      'SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1',[targetId]
+    );
+    if(!roles.some(row=>['customer','vendor','rider'].includes(row.name))){
+      throw new (require('../../middleware/errorHandler').AppError)('Direct chat is available for customer, vendor and rider accounts only.',403,'CHAT_ROLE_NOT_ALLOWED');
+    }
+    const actorId=String(actor.id);
+    const a=actorId<targetId?actorId:targetId,b=actorId<targetId?targetId:actorId;
+    const {rows:[conversation]}=await client.query(
+      'INSERT INTO conversations(participant_a,participant_b) VALUES($1,$2) ON CONFLICT (participant_a,participant_b) WHERE order_id IS NULL DO UPDATE SET participant_a=EXCLUDED.participant_a RETURNING *',
+      [a,b]
+    );
+    await client.query(
+      `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES($1,$2,'chat.admin_conversation_started','conversation',$3,$4)`,
+      [actor.id,actor.role||'admin',conversation.id,JSON.stringify({participantUserId:targetId,participantName:participant.full_name})]
+    );
+    return {conversation,participant};
+  });
+}
+
 async function getAdminConversationMessages(conversationId,{limit=100}={}) {
   const {rows:[conversation]}=await query(
     `SELECT c.id,c.order_id,c.created_at,
@@ -576,4 +608,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
