@@ -201,3 +201,6 @@ assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/ser
 
 assert.match(premiumJs, /Cancel order/, 'Customers must see the cancellation action for eligible pending or accepted orders');
 assert.match(premiumJs, /ML_API\.orders\.cancel\(id,'Cancelled by customer\.'/,'Customer cancellation must call the authenticated order API');
+
+assert.match(premiumJs, /pendingForThisOrder/, 'Checkout failures must preserve orders with a real pending payment attempt');
+assert.match(premiumJs, /Payment could not be completed; order cancelled and stock released/, 'Failed checkout attempts must cancel the unconfirmed order to release inventory');
