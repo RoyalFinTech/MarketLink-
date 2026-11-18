@@ -581,7 +581,7 @@
     if(target)target.textContent='Asking the live MarketLink Assistant…';
     try{
       var result=await adminRequest('/assistant/ask','POST',{question:question,role:role});
-      if(target)target.innerHTML='<div class="ml-wallet-note"><b>🤖 Assistant response</b><p style="white-space:pre-wrap">'+adminSafe(result.answer||result.reply||result.message||JSON.stringify(result))+'</p><small>Production assistant response · '+adminSafe(role)+' context</small></div>';
+      if(target)target.innerHTML='<div class="ml-wallet-note"><b>🤖 Assistant response</b><p style="white-space:pre-wrap">'+adminSafe(result.answer||result.reply||result.message||JSON.stringify(result))+'</p><small>Source: '+adminSafe(result.source||'unknown')+' · Confidence: '+adminSafe(result.confidence||'not rated')+' · Matched knowledge ID: '+adminSafe(result.matchedEntryId||'none')+' · '+adminSafe(role)+' context</small>'+(result.relatedQuestions&&result.relatedQuestions.length?'<p><b>Related questions</b><br>'+result.relatedQuestions.map(adminSafe).join('<br>')+'</p>':'')+'</div>';
     }catch(e){if(target)target.innerHTML='<div class="ml-empty"><b>Test failed</b><span>'+adminSafe(e.message)+'</span></div>';}
   }
   window.__ML_ADMIN_AI=adminAiTrainingView;
