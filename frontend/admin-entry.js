@@ -10,7 +10,7 @@
   style.id = 'ml-admin-isolation-style';
   style.textContent = [
     '#scr-splash,#scr-onboard,#scr-auth,#scr-returning{display:none!important;visibility:hidden!important;pointer-events:none!important}',
-    '#scr-admin-login,#scr-app{visibility:visible}',
+    '#scr-admin-login,#scr-app{visibility:visible}',\n    '#scr-admin-login.active~#ml-live-promo-ticker,#ml-live-promo-ticker,#ml-install-prompt{display:none!important}',
     /* Admin portal: light by default, and follows the device appearance in dark mode. */
     '#scr-admin-login{background:#f4f7fb!important;color:#152536!important;overflow-y:auto!important;height:auto!important;min-height:100%!important;padding-bottom:28px!important;color-scheme:light}',
     '#scr-admin-login .ml-admin-hero{position:relative;overflow:hidden;padding:34px 22px 28px;text-align:center;background:linear-gradient(145deg,#ffffff 0%,#eaf2f8 62%,#fff7e6 100%);border-bottom:1px solid rgba(16,48,68,.12)}',
