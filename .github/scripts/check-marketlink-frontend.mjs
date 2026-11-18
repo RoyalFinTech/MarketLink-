@@ -119,7 +119,8 @@ assert.match(serviceWorker, /marketlink-shell-v61/, 'PWA cache must be bumped');
 
 const premiumJs = fs.readFileSync(path.join(root, 'premium-marketlink.js'), 'utf8');
 assert.ok(premiumJs.includes("if(label==='DAHA Wallet')return 'wallet';"), 'DAHA Wallet must route through the backend wallet payment method');
-assert.ok(premiumJs.includes("method!=='cod'&&method!=='wallet'"), 'DAHA Wallet must remain selectable when mobile-money checkout is not configured');
+assert.match(premiumJs, /var options=\[\['Cash on Delivery','cod'\],\['DAHA Wallet','wallet'\]\]/, 'Cash on Delivery and DAHA Wallet must always remain available independently of external payment credentials');
+assert.match(premiumJs, /capabilities&&capabilities\.directMobileMoney\)options\.push\(\['Wave','wave'\],\['AfriMoney','afrimoney'\],\['QMoney','qmoney'\]\)/, 'Direct mobile-money methods must only appear when the backend explicitly enables them');
 assert.ok(premiumJs.includes('startRiderAvailabilityLocationSharing'), 'Rider online mode must support opt-in nearby availability location');
 assert.ok(premiumJs.includes('resumeRiderAvailabilityLocationSharing'), 'Rider availability location must resume safely after dashboard refresh');
 assert.ok(premiumJs.includes('await ML_API.delivery.decline(String(id))'), 'Rider decline must call the backend and free the delivery assignment');
