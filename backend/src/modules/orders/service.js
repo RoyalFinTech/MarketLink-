@@ -26,8 +26,13 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     const lockedProductIds = new Set();
     for (const item of items) {
       const qty = Number(item.quantity);
-      const { rows:[p] } = await client.query('SELECT id,vendor_id,name,price,status FROM products WHERE id=$1 FOR UPDATE',[item.productId]);
-      if (!p || p.status!=='active') throw new AppError(`Product ${item.productId} unavailable.`,400,'PRODUCT_UNAVAILABLE');
+      const { rows:[p] } = await client.query(
+        'SELECT p.id,p.vendor_id,p.name,p.price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1 FOR UPDATE OF p',
+        [item.productId]
+      );
+      if (!p || p.status!=='active' || p.vendor_kyc_status!=='approved') {
+        throw new AppError(`Product ${item.productId} unavailable.`,400,'PRODUCT_UNAVAILABLE');
+      }
       if (p.vendor_id !== vendorId) throw new AppError(`Product ${item.productId} does not belong to the selected vendor.`,400,'VENDOR_MISMATCH');
       const { rows:[inv] } = await client.query('SELECT quantity FROM inventory WHERE product_id=$1 AND variant_id IS NULL FOR UPDATE',[item.productId]);
       if (inv && inv.quantity < qty) throw new AppError(`Insufficient stock for ${item.productId}.`,400,'INSUFFICIENT_STOCK');
