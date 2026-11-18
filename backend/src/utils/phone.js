@@ -28,13 +28,14 @@
 //       7-digit prefixes belong to which carrier)
 //     - Whether a "9xx, no prefix added" range is still accurate/labeled
 //       "Gamcel" under the 2026 plan
-//   This module keeps the structural behavior (9xx unchanged, no prefix)
-//   since nothing found contradicts it, but does NOT assert "Gamcel" as
-//   a confirmed brand — it's reported as an unattributed legacy range.
+//   The application enforces nine national digits for new Gambian contact
+//   numbers but does not guess a carrier when a prefix is not verified.
+//   Legacy seven-digit records remain parseable for existing account lookup;
+//   new registration explicitly rejects that legacy shape.
 //   This should be re-verified against the actual PURA PDF (human-read
 //   or OCR'd) before being treated as fully authoritative.
 // ═══════════════════════════════════════════════════════════════════════
-const { parsePhoneNumberFromString, isValidPhoneNumber } = require('libphonenumber-js');
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
 const GAMBIA_OPERATOR_PREFIXES = {
   AFRICELL: { newPrefix: '87', legacyPrefixes: ['2', '7', '40', '41'] },
@@ -45,9 +46,8 @@ const GAMBIA_OPERATOR_PREFIXES = {
 const GAMBIA_NEW_PREFIXES = { '87': 'AFRICELL', '83': 'QCELL', '86': 'COMIUM' };
 
 /**
- * Detect the Gambian operator for a national number, in either legacy
- * 7-digit or migrated 9-digit form. Never guesses — returns null rather
- * than inventing an operator prefix for an unrecognized range.
+ * Detect a carrier only when its prefix mapping is known. Unknown nine-digit
+ * prefixes remain valid in national-length format but have no inferred carrier.
  */
 function detectGambianOperator(national) {
   const digits = String(national || '').replace(/\D/g, '');
@@ -64,10 +64,9 @@ function detectGambianOperator(national) {
 }
 
 /**
- * Migrate a Gambian national number (legacy 7-digit or already-correct
- * 9-digit) to its canonical 9-digit post-migration form. Returns null if
- * the number can't be confidently mapped — callers must surface this as
- * "please check your Gambian mobile number", never silently guess.
+ * Preserve complete nine-digit Gambian national numbers as supplied. Legacy
+ * seven-digit ranges may still be normalized for existing-account lookup;
+ * registration applies the stricter nine-digit rule separately.
  */
 function toGambianNational9(national) {
   const digits = String(national || '').replace(/\D/g, '');
