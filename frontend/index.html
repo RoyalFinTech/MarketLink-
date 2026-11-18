@@ -2398,7 +2398,7 @@ function renderAuth(){
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="9-digit Gambian number" id="lphone" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9)" style="flex:1;"></div>'+
+      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="9-digit Gambian number" id="lphone" oninput="this.value=this.value.replace(/\D/g,String()).slice(0,9)" style="flex:1;"></div>'+
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:8px;">4-digit PIN</label>'+
       '<div class="pinr" id="pin-row"></div>'+
       '<button class="btn btn-p" onclick="doLogin()" id="lbtn">Sign In</button>'+
