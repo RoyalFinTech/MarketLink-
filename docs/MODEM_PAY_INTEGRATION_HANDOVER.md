@@ -33,7 +33,7 @@ Enter secrets directly in Render's Environment page. Never paste production secr
 | `MODEM_PAY_H2H_APPROVED` | Must be `true` only after Modem Pay confirms H2H partner activation | No |
 | `MODEM_PAY_BASE_URL` | Optional override; code resolves the proper `/v1` or `/h2h/v1` suffix | No, but must be HTTPS in production |
 | `MODEM_PAY_WEBHOOK_SECRET` | Dashboard-level webhook signing secret for global webhook | Yes |
-| `MODEM_PAY_SECRET_HASH` | SHA-256 hash of the API secret for a per-payment `callback_url` webhook, as documented by Modem Pay | Yes |
+| `MODEM_PAY_SECRET_HASH` | Modem Pay webhook signing secret hash used by its published HMAC-SHA512 webhook examples | Yes |
 | `MODEM_PAY_CALLBACK_URL` | Optional callback endpoint for individual payment intents; use the deployed backend callback URL | No |
 | `MODEM_PAY_RETURN_URL` | Customer return destination for hosted checkout | No |
 | `MODEM_PAY_CANCEL_URL` | Customer cancellation destination for hosted checkout | No |
