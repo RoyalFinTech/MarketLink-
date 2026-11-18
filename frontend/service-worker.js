@@ -6,7 +6,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './premium-marketlink.css?v=marketlink-premium-canonical-r36',
-  './premium-marketlink.js?v=marketlink-premium-canonical-r52',
+  './premium-marketlink.js?v=marketlink-premium-canonical-r54',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
   './assets/marketlink-logo.png',
@@ -27,7 +27,7 @@ self.addEventListener('install', event => {
     // update. Cache the document and each critical bundle independently.
     const critical = ['./', './index.html',
       './premium-marketlink.css?v=marketlink-premium-canonical-r36',
-      './premium-marketlink.js?v=marketlink-premium-canonical-r48'];
+      './premium-marketlink.js?v=marketlink-premium-canonical-r54'];
     for (const url of critical) {
       try { await cache.add(url); }
       catch (error) { console.warn('[MarketLink PWA] Critical shell asset will use network:', url, error); }
