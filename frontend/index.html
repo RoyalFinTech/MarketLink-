@@ -2323,15 +2323,22 @@ async function doAdminLogin(){
   if(!pin){ adminAuthErr('Enter your PIN'); return; }
   var btn=G('admin-lbtn'); if(btn){ btn.disabled=true; btn.textContent='Verifying…'; }
   try{
-    var data=await ML_API.auth.login(phone,pin);
-    var roles=data.roles||[];
-    if(roles.indexOf('admin')<0 && roles.indexOf('super_admin')<0 && roles.indexOf('moderator')<0){
+    var loginResponse=await ML_API.auth.login(phone,pin);
+    // API responses may be returned as {user,...}, {data:{user,...}} or
+    // the full controller envelope {success:true,data:{user,...}}.
+    // Resolve the authenticated server user before checking administrator roles.
+    var authPayload=loginResponse;
+    if(authPayload&&authPayload.data&&authPayload.data.data&&authPayload.data.data.user)authPayload=authPayload.data.data;
+    else if(authPayload&&authPayload.data&&authPayload.data.user)authPayload=authPayload.data;
+    var authUser=authPayload&&authPayload.user?authPayload.user:authPayload;
+    var roles=Array.isArray(authUser&&authUser.roles)?authUser.roles.map(function(r){return String(r).toLowerCase();}):[];
+    if(!roles.some(function(r){return r==='admin'||r==='super_admin'||r==='moderator';})){
       await ML_API.auth.logout();
-      throw {code:'FORBIDDEN',error:'This account is not authorised for the Admin Portal.'};
+      throw {code:'FORBIDDEN',error:'This signed-in account does not have an approved Admin Portal role. Please contact MarketLink support. Reference: ADMIN_ROLE_REQUIRED.'};
     }
-    S.user={name:data.fullName||data.full_name,phone:data.phone,id:data.id,accountStatus:'Active'};
+    S.user={name:authUser.fullName||authUser.full_name||authUser.name,phone:authUser.phone||phone,id:authUser.id,accountStatus:'Active'};
     S.roles=roles;
-    AdminSession.start(data.id);
+    AdminSession.start(authUser.id||phone);
     showScreen('scr-app');
     G('bnav').style.display='none';
     G('fab').classList.remove('fab-visible');
