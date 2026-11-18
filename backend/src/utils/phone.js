@@ -53,9 +53,7 @@ function detectGambianOperator(national) {
   const digits = String(national || '').replace(/\D/g, '');
   if (digits.length === 9) {
     const prefix2 = digits.slice(0, 2);
-    if (GAMBIA_NEW_PREFIXES[prefix2]) return GAMBIA_NEW_PREFIXES[prefix2];
-    if (digits[0] === '9') return 'UNATTRIBUTED_9';
-    return null;
+    return GAMBIA_NEW_PREFIXES[prefix2] || (digits[0] === '9' ? 'UNATTRIBUTED_9' : null);
   }
   if (digits.length === 7) {
     for (const [op, cfg] of Object.entries(GAMBIA_OPERATOR_PREFIXES)) {
@@ -73,11 +71,7 @@ function detectGambianOperator(national) {
  */
 function toGambianNational9(national) {
   const digits = String(national || '').replace(/\D/g, '');
-  if (digits.length === 9) {
-    const prefix2 = digits.slice(0, 2);
-    if (GAMBIA_NEW_PREFIXES[prefix2] || digits[0] === '9') return digits;
-    return null;
-  }
+  if (digits.length === 9) return digits;
   if (digits.length === 7) {
     const operator = detectGambianOperator(digits);
     if (!operator) return null;
@@ -118,7 +112,9 @@ function normalizePhone(raw, defaultCountryIso) {
     const migrated = toGambianNational9(national);
     if (!migrated) throw new Error('Please check your Gambian mobile number.');
     const e164 = '+220' + migrated;
-    if (!isValidPhoneNumber(e164)) throw new Error('Please check your Gambian mobile number.');
+    // The 2026 Gambian migration may be newer than libphonenumber metadata.
+    // Enforce the national nine-digit structure without guessing a carrier prefix.
+    if (m.length !== 9) throw new Error('Please check your Gambian mobile number.');
     return { e164, countryIso: 'GM', national: migrated, operator: detectGambianOperator(migrated) };
   }
 
