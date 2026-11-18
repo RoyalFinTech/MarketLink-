@@ -383,12 +383,13 @@
     if(!/^\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
     try{
       var loginResponse=await ML_API.auth.login(phone,pin);
-      // The API response is { user: { roles: [...] }, accessToken, refreshToken }.
-      // Some older Admin-only builds returned the envelope one level deeper.
-      var user=loginResponse&&loginResponse.data&&loginResponse.data.user
-        ?loginResponse.data.user
-        :(loginResponse&&loginResponse.user?loginResponse.user:loginResponse);
-      var roles=Array.isArray(user&&user.roles)?user.roles:[];
+      // Normalize the authenticated user across the direct API result and
+      // older nested controller envelopes. Roles always come from the server.
+      var authPayload=loginResponse;
+      if(authPayload&&authPayload.data&&authPayload.data.data&&authPayload.data.data.user)authPayload=authPayload.data.data;
+      else if(authPayload&&authPayload.data&&authPayload.data.user)authPayload=authPayload.data;
+      var user=authPayload&&authPayload.user?authPayload.user:authPayload;
+      var roles=Array.isArray(user&&user.roles)?user.roles.map(function(r){return String(r).toLowerCase();}):[];
       if(!roles.some(function(r){return r==='admin'||r==='super_admin';})){
         // Keep the authenticated session intact for diagnostics; do not silently
         // discard a valid customer session just because role data was nested.
