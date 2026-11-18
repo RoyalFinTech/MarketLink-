@@ -1011,6 +1011,8 @@
       }else if(!terminal&&o.rider_name){
         gpsHtml='<div class="ml-tracking-location is-pending"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Rider location</b><span>Waiting for a location update for this delivery.</span><small>The order timeline will continue to refresh even when GPS is unavailable.</small></div></div>';
       }
+      var canCustomerCancel=['pending','accepted'].indexOf(current)>-1&&String(o.payment_status||'pending').toLowerCase()!=='confirmed';
+      var cancelAction=canCustomerCancel?'<button type="button" class="ml-btn ml-btn-secondary" id="ml-cancel-order">Cancel order</button>':'';
       var statusClass=current==='delivered'?'delivered':closed?'closed':'active';
       var closedNotice=closed?'<div class="ml-tracking-issue '+(current==='cancelled'?'cancelled':'failed')+'"><b>'+esc(mlOrderStatusLabel(current))+'</b><span>'+(current==='cancelled'?'This order was cancelled. Contact support if you need help with a payment or refund.':current==='refunded'?'The order is marked as refunded. Check payment history for the confirmed refund record.':'The order could not be completed. Contact MarketLink support for assistance.')+'</span></div>':'';
       var timeline=history.length?'<div class="ml-tracking-history"><h4>Latest order updates</h4>'+history.slice().reverse().slice(0,8).map(function(ev){return '<div class="ml-tracking-history-row"><span class="ml-tracking-history-dot"></span><div><b>'+esc(mlOrderStatusLabel(ev.status))+'</b><small>'+esc(mlTrackingTime(ev.changed_at))+'</small>'+(ev.note?'<p>'+esc(ev.note)+'</p>':'')+'</div></div>';}).join('')+'</div>':'';
@@ -1022,10 +1024,23 @@
         '<section class="ml-tracking-info-grid"><div class="ml-live-order-card"><div class="ml-section-head"><h3>Delivery details</h3></div>'+(deliveryDetails||'<p class="ml-tracking-empty">Rider and delivery estimate will appear here when they are assigned by the live delivery system.</p>')+gpsHtml+'</div>'+
         '<div class="ml-live-order-card"><div class="ml-section-head"><h3>Order summary</h3></div><div class="ml-tracking-meta-row"><span>Vendor</span><b>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</b></div><div class="ml-tracking-meta-row"><span>Payment</span><b>'+esc(paymentMethodLabel(o.payment_method)||'Not listed')+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</b></div><div class="ml-tracking-meta-row"><span>Total</span><b>'+money(o.total||0)+'</b></div><div class="ml-tracking-items">'+(items.length?items.map(function(it){return '<div><span>'+esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1)+'</span><b>'+money(it.total||it.line_total||Number(it.price||it.unit_price||0)*Number(it.qty||it.quantity||1))+'</b></div>';}).join(''):'<span>Item details unavailable</span>')+'</div></div></section>'+
         timeline+
-        '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order statuses refresh every 10 seconds. Rider location appears only when a recent GPS ping is recorded for this delivery.</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||id))+'\')">Refresh now ↻</button></div></div>';
+        '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order statuses refresh every 10 seconds. Rider location appears only when a recent GPS ping is recorded for this delivery.</span>'+cancelAction+'<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||id))+'\')">Refresh now ↻</button></div></div>';
+      var cancelButton=G('ml-cancel-order');
+      if(cancelButton)cancelButton.addEventListener('click',function(){cancelCustomerOrder(id);});
       if(terminal)stopCustomerOrderDetailPolling();else startCustomerOrderDetailPolling(id);
     }catch(e){
       if(!silent)root.innerHTML='<div class="ml-empty"><b>Could not open this order</b><span>'+esc(e.error||e.message||'The order may no longer be available.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Back to order history</button></div>';
+    }
+  }
+  async function cancelCustomerOrder(id){
+    if(!window.confirm('Cancel this order? You can cancel only while it is pending or accepted and before preparation starts.'))return;
+    try{
+      await ML_API.orders.cancel(id,'Cancelled by customer.');
+      toast('Your order has been cancelled.','success');
+      await openOrderDetail(id,false);
+    }catch(e){
+      toast(e.error||e.message||'Could not cancel this order. Please contact MarketLink support.','error');
+      await openOrderDetail(id,true);
     }
   }
   function renderPremiumHome(){
