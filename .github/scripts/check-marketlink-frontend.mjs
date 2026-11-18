@@ -225,3 +225,8 @@ assert.match(premiumJs, /Payment could not be completed; order cancelled and sto
 
 assert.match(premiumJs, /payment_attempt_pending/, 'Order tracking must respect pending mobile-money attempts before showing cancellation');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/orders/service.js'), 'utf8'), /PAYMENT_ATTEMPT_PENDING/, 'Backend must block cancellation while a mobile-money payment is pending');
+
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/routes.js'), 'utf8'), /router\.get\('\/mine', authenticate, authorize\('vendor'\), ctrl\.listMine\)/, 'Vendor-only product list must require an authenticated vendor role');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/controller.js'), 'utf8'), /includeAllStatuses:true, vendorId:req\.user\.id/, 'Vendor product list must scope unpublished listings to the authenticated owner');
+assert.match(fs.readFileSync(path.join(root, '..', 'frontend/index.html'), 'utf8'), /ML_API\.products\.mine\(\{page:1,limit:100,sort:'newest'\}\)/, 'Vendor dashboard must load its own pending and published products');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/service.js'), 'utf8'), /p\.status,p\.rating_avg/, 'Product list must return publication status for the vendor dashboard');
