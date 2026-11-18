@@ -105,4 +105,32 @@ router.post('/knowledge/teach', authenticate, authorize(...ADMIN),
   [body('statement').trim().notEmpty().isLength({ max: 2000 }), body('save').optional().isBoolean()],
   validate, knowledgeCtrl.teach);
 
+
+// ── Admin support desk and CRM ─────────────────────────────────────
+router.get('/support-tickets', authenticate, authorize(...ADMIN), [
+  query('page').optional().isInt({min:1}),
+  query('limit').optional().isInt({min:1,max:100}),
+  query('status').optional().isIn(['open','pending','escalated','resolved','closed']),
+  query('priority').optional().isIn(['low','medium','high']),
+  query('category').optional().isIn(['complaint','feedback','vendor_report','rider_report','appeal']),
+  query('search').optional().isString().isLength({max:200}),
+], validate, ctrl.supportTickets);
+router.get('/support-tickets/:id', authenticate, authorize(...ADMIN),
+  [param('id').isUUID()], validate, ctrl.supportTicket);
+router.patch('/support-tickets/:id', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(),
+  body('status').optional().isIn(['open','pending','escalated','resolved','closed']),
+  body('priority').optional().isIn(['low','medium','high']),
+  body('assignedTo').optional({nullable:true}).isUUID(),
+], validate, ctrl.updateSupportTicket);
+router.post('/support-tickets/:id/replies', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(), body('body').trim().notEmpty().isLength({max:4000}),
+], validate, ctrl.replySupportTicket);
+
+router.get('/users/:id/profile', authenticate, authorize(...ADMIN),
+  [param('id').isUUID()], validate, ctrl.crmProfile);
+router.post('/users/:id/notes', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(), body('note').trim().notEmpty().isLength({max:4000}),
+], validate, ctrl.addCrmNote);
+
 module.exports = router;
