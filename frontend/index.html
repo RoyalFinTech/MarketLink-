@@ -2155,7 +2155,17 @@ function injectLogos(){
 // ═══════════════════════════════════════════════════════════
 // SCREEN NAVIGATION
 // ═══════════════════════════════════════════════════════════
+function applySavedTheme(){
+  var savedTheme='';
+  try{savedTheme=localStorage.getItem('ml_theme')||'';}catch(e){}
+  var daylight=savedTheme!=='dark';
+  document.body.classList.toggle('lm',daylight);
+  var appRoot=G('app');if(appRoot)appRoot.classList.toggle('lm',daylight);
+  if(typeof S==='object'&&S)S.dark=!daylight;
+  if(!savedTheme){try{localStorage.setItem('ml_theme','light');}catch(e){}}
+}
 function showScreen(id){
+  applySavedTheme();
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   G(id).classList.add('active');
 }
