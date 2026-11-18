@@ -1,7 +1,7 @@
 // src/modules/notifications/routes.js
 'use strict';
 const router = require('express').Router();
-const { body, query } = require('express-validator');
+const { body, query, param } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
