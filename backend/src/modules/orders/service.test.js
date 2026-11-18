@@ -7,7 +7,7 @@ jest.mock('../../utils/logger', () => ({
 }));
 
 const { query, withTransaction } = require('../../config/db');
-const { updateStatus, placeOrder } = require('./service');
+const { updateStatus, placeOrder, listForCustomer, listForVendor } = require('./service');
 
 describe('order payment method validation',()=>{
  beforeEach(()=>jest.clearAllMocks());
@@ -16,6 +16,26 @@ describe('order payment method validation',()=>{
    .rejects.toMatchObject({statusCode:400,code:'UNSUPPORTED_PAYMENT_METHOD'});
   expect(withTransaction).not.toHaveBeenCalled();
  });
+});
+
+describe('order history pagination', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('clamps customer order history to a safe page size', async () => {
+    query.mockResolvedValueOnce({ rows: [] });
+    await listForCustomer('customer-1', { page:'3', limit:'500', status:'delivered' });
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toContain('LIMIT 3 OFFSET 4');
+    expect(params).toEqual(['customer-1','delivered',100,200]);
+  });
+
+  test('clamps vendor order history pagination independently of query strings', async () => {
+    query.mockResolvedValueOnce({ rows: [] });
+    await listForVendor('vendor-1', { page:'2', limit:'9999', status:'accepted' });
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toContain('LIMIT 3 OFFSET 4');
+    expect(params).toEqual(['vendor-1','accepted',100,100]);
+  });
 });
 
 describe('order status concurrency', () => {
