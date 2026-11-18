@@ -85,6 +85,12 @@
     '#scr-admin-login .ml-admin-kicker{margin:0 0 17px;color:#176b70;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}',
     '#scr-admin-login .ml-admin-label{display:block;margin:0 0 7px;color:#344b5d;font-size:12px;font-weight:750}',
     '#scr-admin-login #ml-admin-phone-slot{min-height:54px;margin-bottom:17px;border:1px solid #cbd8e2;border-radius:13px;overflow:hidden;background:#fff}',
+    '#scr-admin-login .ml-admin-phone{display:grid;grid-template-columns:auto minmax(0,1fr);min-height:54px;background:#fff}',
+    '#scr-admin-login .ml-admin-country{display:flex;align-items:center;gap:7px;padding:0 11px;background:#eef4f8;color:#18384d;font-size:13px;font-weight:800;white-space:nowrap}',
+    '#scr-admin-login #admin-operator{grid-column:2;grid-row:1;width:100%;min-width:0;height:52px;padding:0 9px;border:0;border-bottom:1px solid #e6edf2;background:#fff;color:#18384d;font-size:12px;font-weight:750}',
+    '#scr-admin-login #admin-national{grid-column:1/-1;width:100%;height:48px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;border-radius:0;background:#fff;color:#142b3d;-webkit-text-fill-color:#142b3d;padding:12px 14px;font-size:16px;letter-spacing:.08em}',
+    '#scr-admin-login #admin-national::placeholder{color:#8495a3;-webkit-text-fill-color:#8495a3;opacity:1}',
+
     '#scr-admin-login #ml-admin-phone-slot .ml-gm-phone{margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important}',
     '#scr-admin-login #ml-admin-phone-slot .ml-gm-phone>span{background:#eef4f8!important;color:#18384d!important}',
     '#scr-admin-login #ml-admin-phone-slot .ml-gm-phone select,#scr-admin-login #ml-admin-phone-slot .ml-gm-phone input{background:#fff!important;color:#18384d!important;-webkit-text-fill-color:#18384d!important;color-scheme:light!important}',
@@ -136,7 +142,7 @@
         '<p class="ml-admin-kicker">Administrator sign in</p>' +
         '<div id="admin-auth-err" role="alert" aria-live="polite" style="display:none"></div>' +
         '<label class="ml-admin-label" for="admin-national">Gambian mobile number</label>' +
-        '<div id="ml-admin-phone-slot"><input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" id="admin-staffid" placeholder="7-digit mobile number"></div>' +
+        '<div id="ml-admin-phone-slot"><div class="ml-admin-phone"><span class="ml-admin-country"><b>🇬🇲</b> +220</span><select id="admin-operator" aria-label="Mobile network"><option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel</option></select><input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="admin-national" placeholder="7-digit number" aria-label="Seven-digit mobile number"></div><input type="hidden" id="admin-staffid" value=""></div>' +
         '<label class="ml-admin-label" for="admin-password">4-digit security PIN</label>' +
         '<input class="inp" type="password" id="admin-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" autocapitalize="off" spellcheck="false" placeholder="Enter your PIN" aria-label="Four digit administrator PIN" onkeydown="if(event.key===\'Enter\')doAdminLogin()">' +
         '<button class="btn" type="button" id="admin-lbtn" onclick="doAdminLogin()">Sign in securely</button>' +
@@ -144,6 +150,35 @@
         '<p class="ml-admin-footer">MarketLink Gambia · Royal FinTech Company</p>' +
       '</section>';
     screen.setAttribute('data-ml-admin-redesigned', '1');
+  }
+
+  function installAdminPhoneSubmit() {
+    if (window.__ML_ADMIN_PHONE_SUBMIT || typeof window.doAdminLogin !== 'function') return;
+    var original = window.doAdminLogin;
+    window.doAdminLogin = function () {
+      var operator = document.getElementById('admin-operator');
+      var national = document.getElementById('admin-national');
+      var hidden = document.getElementById('admin-staffid');
+      if (operator && national && hidden) {
+        var digits = String(national.value || '').replace(/\\D/g, '');
+        if (digits.length !== 7) {
+          var err = document.getElementById('admin-auth-err');
+          if (err) { err.textContent = 'Enter all 7 digits of your Gambian mobile number.'; err.style.display = 'block'; }
+          national.focus();
+          return;
+        }
+        var prefixes = { AFRICELL: '87', QCELL: '83', COMIUM: '86', GAMCEL: '' };
+        if (operator.value === 'GAMCEL' && digits.charAt(0) !== '9') {
+          var gamcelErr = document.getElementById('admin-auth-err');
+          if (gamcelErr) { gamcelErr.textContent = 'Gamcel numbers must start with 9. Please check the number.'; gamcelErr.style.display = 'block'; }
+          national.focus();
+          return;
+        }
+        hidden.value = (prefixes[operator.value] || '') + digits;
+      }
+      return original.apply(this, arguments);
+    };
+    window.__ML_ADMIN_PHONE_SUBMIT = true;
   }
 
   function openAdmin() {
@@ -627,6 +662,7 @@
   try {
     installAdminGuards();
     normalizeAdminAuthResponse();
+    installAdminPhoneSubmit();
     enablePinAutofillAndSubmit();
   } catch (bootError) {
     showAdminBootDiagnostic(bootError);
