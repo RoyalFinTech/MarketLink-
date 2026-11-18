@@ -407,17 +407,27 @@
       // This separates a sleeping/unreachable backend from an auth failure.
       var apiBase=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com'); while(apiBase.endsWith('/'))apiBase=apiBase.slice(0,-1);
       var healthController=typeof AbortController==='function'?new AbortController():null;
-      var healthTimer=healthController?window.setTimeout(function(){healthController.abort();},45000):null;
+      var healthTimer=null,healthDeadlineTimer=null;
       try{
         adminAuthErr('Waking the MarketLink server and checking the secure connection…');
+        var healthDeadline=new Promise(function(_,reject){
+          healthDeadlineTimer=window.setTimeout(function(){
+            if(healthController)healthController.abort();
+            reject(new Error('The MarketLink server did not become ready within 120 seconds. Please retry.'));
+          },120000);
+        });
+        if(healthController)healthTimer=window.setTimeout(function(){healthController.abort();},120000);
         var healthResponse=await Promise.race([
           fetch(apiBase+'/health',{method:'GET',cache:'no-store',signal:healthController?healthController.signal:undefined}),
-          new Promise(function(_,reject){window.setTimeout(function(){reject(new Error('The MarketLink server did not become ready within 45 seconds. Please retry.'));},45000);})
+          healthDeadline
         ]);
         if(!healthResponse.ok)throw new Error('The MarketLink server health check failed (HTTP '+healthResponse.status+'). Please retry.');
       }catch(healthError){
         throw {error:healthError&&healthError.message||'Could not connect to the MarketLink server. Check your connection and retry.'};
-      }finally{if(healthTimer!==null)window.clearTimeout(healthTimer);}
+      }finally{
+        if(healthTimer!==null)window.clearTimeout(healthTimer);
+        if(healthDeadlineTimer!==null)window.clearTimeout(healthDeadlineTimer);
+      }
       adminAuthErr('Server connected. Verifying your administrator account…');
       var loginResponse=await ML_API.auth.login(phone,pin);
 
