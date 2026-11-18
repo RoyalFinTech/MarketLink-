@@ -4,7 +4,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { query } = require('../../config/db');
+const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
@@ -304,35 +304,50 @@ async function isCodRemittanceProof(fileId) {
   return Boolean(reference && reference.in_use);
 }
 async function deleteFile(fileId, requesterId, roles) {
-  const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL',[fileId]);
-  if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
-  const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
-  if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to delete this file.',403,'FORBIDDEN');
-  if(await isCodRemittanceProof(fileId)) throw new AppError('This receipt is attached to a cash remittance and must be retained for payment audit records.',409,'FILE_IN_USE');
-  if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
-  else {
-    await storageDelete(f.file_url);
-    await query('UPDATE file_uploads SET deleted_at=now(), content_bytes=NULL WHERE id=$1',[fileId]);
-  }
-  return {deleted:true,id:fileId};
+  return withTransaction(async(client)=>{
+    const {rows:[f]}=await client.query(
+      'SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL FOR UPDATE',[fileId]);
+    if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
+    const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
+    if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to delete this file.',403,'FORBIDDEN');
+    const {rows:[reference]}=await client.query(
+      "SELECT EXISTS(SELECT 1 FROM cod_cash_remittances WHERE proof_url LIKE '%' || $1 || '/content') AS in_use",
+      [String(fileId)]);
+    if(reference && reference.in_use) throw new AppError('This receipt is attached to a cash remittance and must be retained for payment audit records.',409,'FILE_IN_USE');
+    if(f.storage_backend==='database') {
+      await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
+    } else {
+      // Keep the file row locked until the storage object has been removed so
+      // a remittance cannot attach a receipt while its object is disappearing.
+      await storageDelete(f.file_url);
+      await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
+    }
+    return {deleted:true,id:fileId};
+  });
 }
 async function deleteFileByUrl(url, requesterId) {
-  const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE file_url=$1 AND uploaded_by=$2 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1',[url,requesterId]);
-  if(!f) return {deleted:false,reason:'NOT_OWNED_OR_NOT_FOUND'};
-  if(await isCodRemittanceProof(f.id)) return {deleted:false,reason:'STILL_IN_USE'};
-  const {rows:[refs]}=await query(
-    'SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, ' +
-    'EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1) AS rider_ref, ' +
-    'EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1) AS vendor_ref',
-    [url]
-  );
-  if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref)) return {deleted:false,reason:'STILL_IN_USE'};
-  if(f.storage_backend==='database') await query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
-  else {
-    await storageDelete(f.file_url);
-    await query('UPDATE file_uploads SET deleted_at=now(), content_bytes=NULL WHERE id=$1',[f.id]);
-  }
-  return {deleted:true,id:f.id};
+  return withTransaction(async(client)=>{
+    const {rows:[f]}=await client.query(
+      'SELECT * FROM file_uploads WHERE file_url=$1 AND uploaded_by=$2 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE',
+      [url,requesterId]);
+    if(!f) return {deleted:false,reason:'NOT_OWNED_OR_NOT_FOUND'};
+    const {rows:[reference]}=await client.query(
+      "SELECT EXISTS(SELECT 1 FROM cod_cash_remittances WHERE proof_url LIKE '%' || $1 || '/content') AS in_use",
+      [String(f.id)]);
+    if(reference && reference.in_use) return {deleted:false,reason:'STILL_IN_USE'};
+    const {rows:[refs]}=await client.query(
+      'SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, ' +
+      'EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1) AS rider_ref, ' +
+      'EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1) AS vendor_ref',
+      [url]);
+    if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref)) return {deleted:false,reason:'STILL_IN_USE'};
+    if(f.storage_backend==='database') await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
+    else {
+      await storageDelete(f.file_url);
+      await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
+    }
+    return {deleted:true,id:f.id};
+  });
 }
 async function removeProfilePhoto(requesterId) {
   const {rows:[customer]}=await query('SELECT profile_photo_url FROM customers WHERE user_id=$1',[requesterId]);
