@@ -2086,8 +2086,8 @@
     if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.whatsappNumber){
       toast('Complete the business name, shop name, address, category and customer WhatsApp number first.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
-    if(!/^\+220\d{7}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,''))){
-      toast('Enter the 7-digit Gambian contact number after +220.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
+    if(!/^\+220(?:87|83|86)\d{7}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,''))){
+      toast('Enter the full 9-digit Gambian contact number after +220, including its 87, 83 or 86 prefix.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
     var btn=document.querySelector('#vapp-body .btn-p'),uploaded=[];
