@@ -88,7 +88,12 @@
     '#scr-admin-login .ml-admin-security strong{display:block;color:#755719;font-size:11px;margin-bottom:2px}',
     '#scr-admin-login #admin-auth-err{margin:0 0 14px!important;border-radius:11px!important;font-size:12px!important}',
     '#scr-admin-login .ml-admin-footer{margin:17px auto 0;text-align:center;color:#718393;font-size:10px;line-height:1.5}',
-    '@media(max-width:480px){#scr-admin-login .ml-admin-hero{padding:26px 18px 23px}#scr-admin-login .ml-admin-title{font-size:21px}#scr-admin-login .ml-admin-card{margin-top:18px;padding:19px 15px}}'
+    '@media(max-width:480px){#scr-admin-login .ml-admin-hero{padding:26px 18px 23px}#scr-admin-login .ml-admin-title{font-size:21px}#scr-admin-login .ml-admin-card{margin-top:18px;padding:19px 15px}}',
+    /* Admin-only dashboard viewport: the shared shell's inline overflow:hidden was clipping the live control center. */
+    '#scr-app{height:auto!important;min-height:100dvh!important;overflow:visible!important}',
+    '#tab-admindash{height:auto!important;min-height:100dvh!important;overflow:visible!important;overscroll-behavior-y:contain!important}',
+    '#tab-admindash #adash-body{height:auto!important;min-height:100dvh!important;overflow:visible!important}',
+    '#tab-admindash .ml-premium-home{min-height:100dvh!important;overflow:visible!important}'
   ].join('');
   (document.head || document.documentElement).appendChild(style);
 
