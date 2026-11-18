@@ -53,6 +53,10 @@
     '#scr-admin-login.active{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;min-height:100dvh!important}',
     'html:has(#scr-admin-login.active),body:has(#scr-admin-login.active){height:auto!important;min-height:100%!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;touch-action:pan-y!important}',
     '#scr-admin-login.active{height:auto!important;max-height:none!important;overflow:visible!important;touch-action:pan-y!important;padding-bottom:calc(32px + env(safe-area-inset-bottom))!important}',
+    /* Keep the login page scrollable even while its authentication request is pending. */
+    'html:has(#scr-admin-login.active),body:has(#scr-admin-login.active),body:has(#scr-admin-login.active) #app{height:auto!important;min-height:100%!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important;touch-action:pan-y!important}',
+    'body:has(#scr-admin-login.active) #scr-admin-login,body:has(#scr-admin-login.active) #scr-admin-login *{touch-action:pan-y!important}',
+    '#scr-admin-login.active #admin-auth-err{position:relative!important;z-index:1!important;max-height:none!important;overflow:visible!important;white-space:normal!important}',
     '#scr-admin-login.active #admin-auth-err{display:block;min-height:0;max-width:100%;overflow-wrap:anywhere}',
     '#scr-admin-login.active #admin-lbtn[aria-busy=true]{opacity:1!important;filter:none!important;cursor:progress!important;min-height:54px!important}',
     '#scr-admin-login.active #admin-lbtn:disabled{opacity:1!important;-webkit-text-fill-color:#fff!important;color:#fff!important;background:#173d52!important}',
