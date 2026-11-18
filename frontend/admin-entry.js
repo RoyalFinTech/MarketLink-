@@ -376,6 +376,44 @@
     return data.data;
   }
   function adminFormatDate(value){return value?new Date(value).toLocaleString():'—';}
+  var adminChatSelectedId=null;
+  async function adminChatView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Customer chat inbox</h3><p>Loading customer and vendor conversations…</p></div>';
+    try{
+      var term=String((document.getElementById('ml-admin-chat-search')||{}).value||'').trim();
+      var params=new URLSearchParams({page:'1',limit:'50'});if(term)params.set('search',term);
+      var data=await adminRequest('/admin/conversations?'+params.toString(),'GET'),rows=Array.isArray(data.items)?data.items:[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>Customer chat inbox</h3><p style="margin:5px 0;color:var(--mu)">Protected conversations between MarketLink customers and vendors</p></div><button onclick="window.__ML_ADMIN_CHAT()">Refresh</button></div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin:12px 0"><label class="ml-admin-label" for="ml-admin-chat-search">Search participant, phone, vendor or order</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ml-admin-chat-search" class="inp" maxlength="120" value="'+adminSafe(term)+'" placeholder="Search conversations" style="flex:1;min-width:180px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CHAT()">Search</button></div></div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Conversations</div><div class="ml-stat-value">'+Number(data.total||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Unread messages</div><div class="ml-stat-value">'+rows.reduce(function(sum,x){return sum+Number(x.unread_messages||0);},0)+'</div></div></div>'+
+        (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){var title=[x.participant_a_name,x.participant_b_name].filter(Boolean).join(' ↔ ');return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer" onclick="window.__ML_ADMIN_CHAT_OPEN(\''+adminSafe(x.id)+'\')"><div class="ico">💬</div><div class="copy"><b>'+adminSafe(title||'MarketLink conversation')+'</b><span>'+adminSafe(x.vendor_name||'Customer / vendor chat')+(x.order_number?' · Order '+adminSafe(x.order_number):'')+'</span><small>'+adminSafe(x.last_message||'No messages yet')+' · '+adminFormatDate(x.last_message_at||x.created_at)+'</small></div>'+(Number(x.unread_messages||0)?'<strong style="color:#D9A441">'+Number(x.unread_messages)+' new</strong>':'<span>›</span>')+'</button>';}).join('')+'</div>':'<div class="ml-empty"><b>No conversations yet</b><span>Customer and vendor chats will appear here when a conversation is started.</span></div>')+'</div>';
+      var input=document.getElementById('ml-admin-chat-search');if(input)input.addEventListener('keydown',function(e){if(e.key==='Enter')window.__ML_ADMIN_CHAT();});
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Chat inbox unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CHAT()">Retry</button></div>';}
+  }
+  async function adminChatOpen(id){
+    adminChatSelectedId=String(id||'');var root=document.getElementById('adash-body');if(!root||!adminChatSelectedId)return;
+    root.innerHTML='<div class="ml-premium-home"><p>Loading conversation…</p></div>';
+    try{
+      var data=await adminRequest('/admin/conversations/'+encodeURIComponent(adminChatSelectedId)+'/messages?limit=100','GET');
+      var c=data.conversation||{},messages=Array.isArray(data.messages)?data.messages:[];
+      var people=[c.participant_a_name,c.participant_b_name].filter(Boolean).join(' ↔ ');
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>Conversation</h3><p style="margin:5px 0;color:var(--mu)">'+adminSafe(people||'MarketLink chat')+' · '+adminSafe(c.vendor_name||'Marketplace')+(c.order_number?' · Order '+adminSafe(c.order_number):'')+'</p></div><button onclick="window.__ML_ADMIN_CHAT()">← Inbox</button></div>'+
+        '<div class="ml-profile-card" style="padding:12px;max-height:55vh;overflow:auto">'+(messages.length?messages.map(function(m){var own=m.sender_type==='admin';return '<div style="display:flex;justify-content:'+(own?'flex-end':'flex-start')+';margin:8px 0"><div style="max-width:88%;padding:10px 12px;border-radius:13px;background:'+(own?'rgba(217,164,65,.18)':'rgba(148,163,184,.12)')+';border:1px solid '+(own?'rgba(217,164,65,.35)':'var(--bd,rgba(148,163,184,.2))')+'"><b style="display:block;font-size:11px;margin-bottom:4px">'+adminSafe(own?'MarketLink Admin':m.sender_name||'Participant')+'</b><div style="font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere">'+adminSafe(m.body||'')+'</div><small style="display:block;margin-top:5px;color:var(--mu)">'+adminFormatDate(m.created_at)+(own?' · Sent':'')+'</small></div></div>';}).join(''):'<div class="ml-empty">No messages in this conversation yet.</div>')+'</div>'+
+        '<div class="ml-profile-card" style="padding:14px;margin-top:12px"><label class="ml-admin-label" for="ml-admin-chat-reply">Reply to both conversation participants</label><textarea id="ml-admin-chat-reply" class="inp" rows="3" maxlength="4000" placeholder="Write a clear, helpful reply…"></textarea><button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CHAT_SEND(\''+adminSafe(c.id)+'\')">Send Admin reply</button><p style="font-size:11px;color:var(--mu);margin:8px 0 0">Your reply is sent under your Admin account and both participants receive an in-app notification. The action is recorded in the Admin audit log.</p></div></div>';
+      var box=root.querySelector('.ml-profile-card[style*="max-height"]');if(box)box.scrollTop=box.scrollHeight;
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Conversation unavailable</b><span>'+adminSafe(e.message)+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CHAT()">Back to inbox</button></div>';}
+  }
+  async function adminChatSend(id){
+    var field=document.getElementById('ml-admin-chat-reply'),body=String(field&&field.value||'').trim();
+    if(!body){if(window.toast)window.toast('Write a reply before sending.','error');return;}
+    try{await adminRequest('/admin/conversations/'+encodeURIComponent(id)+'/messages','POST',{body:body});if(window.toast)window.toast('Admin reply sent to both participants.','success');await adminChatOpen(id);}
+    catch(e){if(window.toast)window.toast(e.message,'error');}
+  }
+  window.__ML_ADMIN_CHAT=adminChatView;
+  window.__ML_ADMIN_CHAT_OPEN=adminChatOpen;
+  window.__ML_ADMIN_CHAT_SEND=adminChatSend;
+
   async function adminCrmView(){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><h3>Customer relationship management</h3><p>Loading the protected customer, vendor and rider directory…</p></div>';
@@ -634,6 +672,7 @@
       overview: function () { if (api.adminRefresh) api.adminRefresh(); },
       audit: adminAuditView,
       support: adminSupportQueue,
+      chat: adminChatView,
       communications: adminCampaignView,
       crm: adminCrmView,
       settings: adminSettingsView,
@@ -714,6 +753,7 @@
       '<div class="ml-admin-side-label">🛠️ MANAGEMENT</div>' +
       '<button data-ml-admin-route="audit"><span>🕵️</span>Audit trail</button>' +
       '<button data-ml-admin-route="support"><span>🎧</span>Support desk</button>' +
+      '<button data-ml-admin-route="chat"><span>💬</span>Customer chat</button>' +
       '<button data-ml-admin-route="communications"><span>📨</span>Communications</button>' +
       '<button data-ml-admin-route="crm"><span>👥</span>CRM directory</button>' +
       '<button data-ml-admin-route="settings"><span>⚙️</span>System settings</button>' +
