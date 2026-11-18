@@ -34,11 +34,10 @@ describe('customer payment refunds',()=>{
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO admin_action_logs")&&sql.includes('payment.refunded'))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO notifications")&&sql.includes('payment_refunded'))).toBe(true);
  });
- test('records a partial refund as partially_refunded and credits only the requested amount',async()=>{
-  const result=await refund(paymentId,{amount:20,reason:'Partial adjustment'},actor);
-  expect(result.status).toBe('partially_refunded');
-  const credit=tx.mock.calls.find(([sql])=>sql.includes('INSERT INTO transactions'));
-  expect(credit[1]).toEqual([walletId,20,45,paymentId,'Partial adjustment']);
+ test('rejects partial refunds until refund reconciliation supports them',async()=>{
+  await expect(refund(paymentId,{amount:20,reason:'Partial adjustment'},actor))
+   .rejects.toMatchObject({statusCode:409,code:'PARTIAL_REFUND_NOT_SUPPORTED'});
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
  });
  test('rejects duplicate refund requests without a second wallet credit',async()=>{
   tx.mockImplementation(async(sql)=>{
