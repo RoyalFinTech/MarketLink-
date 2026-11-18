@@ -240,7 +240,11 @@
       window.showScreen = function (id) {
         if (id === 'scr-onboard' || id === 'scr-auth' ||
             id === 'scr-splash' || id === 'scr-returning') return openAdmin();
-        return originalShowScreen.apply(this, arguments);
+        var result = originalShowScreen.apply(this, arguments);
+        if (id === 'scr-app') {
+          window.setTimeout(function () { installAdminWorkspaceStyles(); ensureAdminWorkspace(); }, 0);
+        }
+        return result;
       };
       window.__ML_ADMIN_SHOWSCREEN_GUARD = true;
     }
