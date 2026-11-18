@@ -230,3 +230,9 @@ assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/controller.js'), 'utf8'), /includeAllStatuses:true, vendorId:req\.user\.id/, 'Vendor product list must scope unpublished listings to the authenticated owner');
 assert.match(fs.readFileSync(path.join(root, '..', 'frontend/index.html'), 'utf8'), /ML_API\.products\.mine\(\{page:1,limit:100,sort:'newest'\}\)/, 'Vendor dashboard must load its own pending and published products');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/service.js'), 'utf8'), /p\.status,p\.rating_avg/, 'Product list must return publication status for the vendor dashboard');
+
+const authService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/service.js'), 'utf8');
+assert.match(authService, /const types=\['customer'\]/, 'Public registration must always create a customer role only; vendor/rider roles come from their application workflows');
+assert.doesNotMatch(authService, /Array\.isArray\(userType\).*userType/, 'Client-supplied userType must never grant privileged roles during public registration');
+assert.match(premiumJs, /openstreetmap\.org\/export\/embed\.html/, 'Customer order tracking must render an in-page live rider map when a fresh GPS ping exists');
+assert.match(premiumJs, /title="Live rider location map"/, 'Live rider map must have an accessible title');
