@@ -1,0 +1,52 @@
+name: MarketLink safe dependency patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/marketlink-safe-dependency-patch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply non-breaking dependency security fixes
+        run: npm audit fix
+      - name: Run backend test suite
+        run: npm test -- --runInBand
+      - name: Parse critical payment and settlement modules
+        run: |
+          node --check src/modules/payments/service.js
+          node --check src/modules/payments/controller.js
+          node --check src/modules/payments/routes.js
+          node --check src/modules/orders/service.js
+          node --check src/modules/withdrawals/service.js
+      - name: Commit verified dependency lockfile updates
+        working-directory: .
+        run: |
+          if git diff --quiet -- backend/package.json backend/package-lock.json; then
+            echo "No dependency changes were needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/package.json backend/package-lock.json
+          git commit -m "Patch vulnerable backend dependencies"
+          git push origin HEAD:main
