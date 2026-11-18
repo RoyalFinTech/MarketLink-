@@ -124,3 +124,26 @@ describe('order financial settlement safeguards', () => {
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
   });
 });
+
+
+describe('order creation ownership safeguards', () => {
+  let clientQuery;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clientQuery = jest.fn();
+    withTransaction.mockImplementation(callback => callback({ query: clientQuery }));
+  });
+
+  test('rejects a delivery address that belongs to another customer', async () => {
+    clientQuery.mockResolvedValueOnce({ rows: [] });
+    await expect(placeOrder({
+      customerId:'customer-1',
+      vendorId:'vendor-1',
+      items:[{productId:'product-1',quantity:1}],
+      paymentMethod:'cod',
+      deliveryAddressId:'foreign-address'
+    })).rejects.toMatchObject({code:'DELIVERY_ADDRESS_FORBIDDEN',statusCode:403});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls[0][1]).toEqual(['foreign-address','customer-1']);
+  });
+});
