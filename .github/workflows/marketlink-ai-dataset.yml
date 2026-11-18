@@ -19,5 +19,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Compile training scripts
+        run: python -m py_compile ai-training/scripts/validate_dataset.py ai-training/scripts/train_lora.py
       - name: Validate synthetic training examples
         run: python ai-training/scripts/validate_dataset.py
