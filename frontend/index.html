@@ -2350,8 +2350,7 @@ function renderAuth(){
       '<section class="ml-auth-role-return" aria-label="Returning vendor or rider access"><div class="ml-auth-role-return-title">Already a vendor or rider?</div><div class="ml-auth-role-return-copy">Use your existing MarketLink phone number and 4-digit PIN to return to your dashboard.</div><div class="ml-auth-role-return-actions"><button type="button" onclick="openRoleAccess(\'vendor\')">🏪 Vendor dashboard</button><button type="button" onclick="openRoleAccess(\'rider\')">🛵 Rider dashboard</button></div></section>'+
       '<div style="text-align:center;margin-top:16px;"><span style="color:var(--mu);font-size:13px;">New here? </span>'+
       '<span onclick="S.authMode=\'register\';renderAuth();" style="color:var(--pr);font-size:13px;font-weight:600;cursor:pointer;">Create account</span></div>'+
-      '<div onclick="openAdminLogin()" style="text-align:center;margin-top:22px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px;-webkit-tap-highlight-color:transparent;">'+
-      '<span style="font-size:13px;">🛡️</span><span style="color:var(--mu);font-size:12px;font-weight:600;">Admin Portal</span></div>'+
+      
       '<div style="text-align:center;margin-top:10px;color:rgba(255,255,255,0.2);font-size:10px;">Powered by <span style="color:#F5A623;font-weight:700;">Royal FinTech</span></div>';
     renderPinRow('pin-row',S.pin);
   } else if(S.authMode==='register'){
