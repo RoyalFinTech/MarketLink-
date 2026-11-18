@@ -151,7 +151,7 @@
         '<p class="ml-admin-kicker">Administrator sign in</p>' +
         '<div id="admin-auth-err" role="alert" aria-live="polite" style="display:none"></div>' +
         '<label class="ml-admin-label" for="admin-national">Gambian mobile number</label>' +
-        '<div id="ml-admin-phone-slot"><div class="ml-admin-phone"><span class="ml-admin-country"><b>🇬🇲</b> +220</span><select id="admin-operator" aria-label="Mobile network"><option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel</option></select><input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="admin-national" placeholder="7 digits after prefix" aria-label="Seven digits after network prefix; nine digits total"></div><input type="hidden" id="admin-staffid" value=""></div>' +
+        '<div id="ml-admin-phone-slot"><div class="ml-admin-phone"><span class="ml-admin-country"><b>🇬🇲</b> +220</span><select id="admin-operator" aria-label="Mobile network"><option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel (legacy 7 digits)</option></select><input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="admin-national" placeholder="7 digits after prefix; Gamcel legacy" aria-label="Seven digits after prefix for migrated networks; Gamcel remains seven digits in Phase 1"></div><input type="hidden" id="admin-staffid" value=""></div>' +
         '<label class="ml-admin-label" for="admin-password">4-digit security PIN</label>' +
         '<input class="inp" type="password" id="admin-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" autocapitalize="off" spellcheck="false" placeholder="Enter your PIN" aria-label="Four digit administrator PIN" onkeydown="if(event.key===\'Enter\')doAdminLogin()">' +
         '<button class="btn" type="button" id="admin-lbtn" onclick="doAdminLogin()">Sign in securely</button>' +
@@ -172,7 +172,7 @@
         var digits = String(national.value || '').replace(/\D/g, '');
         if (digits.length !== 7) {
           var err = document.getElementById('admin-auth-err');
-          if (err) { err.textContent = 'Enter the 7 digits after the selected network prefix (9 digits total).'; err.style.display = 'block'; }
+          if (err) { err.textContent = 'Enter 7 digits after the network prefix, or the existing 7-digit Gamcel number.'; err.style.display = 'block'; }
           national.focus();
           return;
         }
