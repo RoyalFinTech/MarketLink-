@@ -38,7 +38,9 @@ Enter secrets directly in Render's Environment page. Never paste production secr
 | `MODEM_PAY_RETURN_URL` | Customer return destination for hosted checkout | No |
 | `MODEM_PAY_CANCEL_URL` | Customer cancellation destination for hosted checkout | No |
 
-Use one webhook signing arrangement at a time and configure the corresponding secret. The backend webhook endpoint is under `/api/v1/payments/webhook/modempay` on the production backend.
+Use one webhook signing arrangement at a time and configure the corresponding secret. The backend webhook endpoint is `https://marketlink-gambia.onrender.com/api/v1/payments/webhook/modempay`. The handler expects the `x-modem-signature` header and verifies HMAC-SHA512 with a timing-safe comparison. It accepts the exact raw JSON body and the canonical `JSON.stringify(parsedBody)` form used in Modem Pay's Node example.
+
+The current rider COD deposit workflow is manual: MarketLink publishes the official Wave/AfriMoney collection account numbers and names, riders upload a receipt and enter the provider reference, and Admin manually matches it against the company account statement. The `WAVE_API_KEY` and `AFRIMONEY_API_KEY` placeholders are not wired into this workflow; do not assume setting them enables automatic provider verification. Configure `MARKETLINK_COD_WAVE_ACCOUNT_NUMBER`, `MARKETLINK_COD_WAVE_ACCOUNT_NAME`, `MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER`, and `MARKETLINK_COD_AFRIMONEY_ACCOUNT_NAME` for the rider instructions.
 
 ## Implemented safeguards
 
