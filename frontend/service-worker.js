@@ -1,12 +1,12 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
 // v43: vendor and rider onboarding now offer separate device-file and camera pickers.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v55';
+const CACHE_NAME = 'marketlink-shell-v56';
 const APP_SHELL = [
   './',
   './index.html',
   './premium-marketlink.css?v=marketlink-premium-canonical-r36',
-  './premium-marketlink.js?v=marketlink-premium-canonical-r50',
+  './premium-marketlink.js?v=marketlink-premium-canonical-r51',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
   './assets/marketlink-logo.png',
