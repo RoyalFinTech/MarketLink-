@@ -27,10 +27,10 @@ describe('Modem Pay configuration and webhook verification', () => {
     expect(modemPay.isWebhookConfigured()).toBe(true);
   });
 
-  test('does not treat a per-payment callback hash as a global merchant webhook secret', () => {
-    process.env.MODEM_PAY_SECRET_HASH = 'callback-signing-secret-hash';
+  test('recognizes MODEM_PAY_SECRET_HASH documented in Modem Pay webhook examples', () => {
+    process.env.MODEM_PAY_SECRET_HASH = 'documented-webhook-secret-hash';
     const modemPay = require('./modempay');
-    expect(modemPay.isWebhookConfigured()).toBe(false);
+    expect(modemPay.isWebhookConfigured()).toBe(true);
   });
 
   test('accepts a callback hash only when H2H per-payment callbacks are configured', () => {
