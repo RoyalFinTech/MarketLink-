@@ -23,7 +23,7 @@ router.get('/deposits/:id', authenticate, authorize(...WALLET_ROLES), [
 router.post('/deposits', authenticate, authorize(...WALLET_ROLES), [
   body('amount').isFloat({ gt: 0 }),
   body('method').optional().isIn(['modempay', 'wave', 'afrimoney', 'qmoney']),
-  body('accountNumber').optional({ checkFalsy: true }).matches(/^\d{7}$/),
+  body('accountNumber').optional({ checkFalsy: true }).matches(/^(87|86|83)\d{7}$/).withMessage('Enter the full 9-digit Gambian mobile number including its network prefix.'),
 ], validate, ctrl.createDeposit);
 router.post('/deposits/:id/continue', authenticate, authorize(...WALLET_ROLES), [
   param('id').isUUID(),
