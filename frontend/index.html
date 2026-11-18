@@ -672,10 +672,10 @@ select[id$="-operator"] option,.ml-gm-phone select option{
     <div id="ml-admin-phone-slot" style="margin-bottom:17px;border:1px solid #cbd8e2;border-radius:13px;overflow:hidden;background:#fff;">
       <div style="display:grid;grid-template-columns:auto minmax(0,1fr);min-height:54px;background:#fff;">
         <span style="display:flex;align-items:center;gap:7px;padding:0 11px;background:#eef4f8;color:#18384d;font-size:13px;font-weight:800;white-space:nowrap;">🇬🇲 +220</span>
-        <select id="admin-operator" aria-label="Mobile network" onchange="var n=document.getElementById('admin-national'),h=document.getElementById('admin-staffid'),p={AFRICELL:'87',QCELL:'83',COMIUM:'86',GAMCEL:''};h.value=(p[this.value]||'')+(n.value||'').replace(/\D/g,'');" style="width:100%;min-width:0;height:52px;padding:0 9px;border:0;border-bottom:1px solid #e6edf2;background:#fff;color:#18384d;font-size:12px;font-weight:750;">
-          <option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel (legacy 7 digits)</option>
+        <select id="admin-operator" aria-label="Mobile network" onchange="var n=document.getElementById('admin-national'),h=document.getElementById('admin-staffid'),op=this.value,max=op==='GAMCEL'?9:7,p={AFRICELL:'87',QCELL:'83',COMIUM:'86',GAMCEL:''};n.maxLength=max;n.value=n.value.replace(/\D/g,'').slice(0,max);h.value='+220'+(op==='GAMCEL'?n.value:(p[op]||'')+n.value);" style="width:100%;min-width:0;height:52px;padding:0 9px;border:0;border-bottom:1px solid #e6edf2;background:#fff;color:#18384d;font-size:12px;font-weight:750;">
+          <option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel (full 9 digits)</option>
         </select>
-        <input id="admin-national" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" placeholder="7 digits after prefix; Gamcel legacy" aria-label="Seven digits after prefix for migrated networks; Gamcel remains seven digits in Phase 1" oninput="this.value=this.value.replace(/\D/g,'').slice(0,7);var p={AFRICELL:'87',QCELL:'83',COMIUM:'86',GAMCEL:''};document.getElementById('admin-staffid').value=(p[document.getElementById('admin-operator').value]||'')+this.value;" onkeydown="if(event.key==='Enter')doAdminLogin()" style="grid-column:1/-1;width:100%;height:48px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;border-radius:0;background:#fff;color:#142b3d;padding:12px 14px;font-size:16px;letter-spacing:.08em;">
+        <input id="admin-national" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="9 digits total; prefix included" aria-label="Nine-digit Gambian mobile number" oninput="var op=document.getElementById('admin-operator').value,max=op==='GAMCEL'?9:7;this.value=this.value.replace(/\D/g,'').slice(0,max);var p={AFRICELL:'87',QCELL:'83',COMIUM:'86',GAMCEL:''};document.getElementById('admin-staffid').value='+220'+(op==='GAMCEL'?this.value:(p[op]||'')+this.value);" onkeydown="if(event.key==='Enter')doAdminLogin()" style="grid-column:1/-1;width:100%;height:48px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;border-radius:0;background:#fff;color:#142b3d;padding:12px 14px;font-size:16px;letter-spacing:.08em;">
       </div>
     </div>
     <input type="hidden" id="admin-staffid" value="">
@@ -6309,7 +6309,7 @@ function vAppNext(){
     S.vForm.closeTime=(G('va-close-time')&&G('va-close-time').value)||'';
     S.vForm.hours=[S.vForm.workingDays.join(', '),S.vForm.openTime&&S.vForm.closeTime?(S.vForm.openTime+' - '+S.vForm.closeTime):''].filter(Boolean).join(' | ');
     S.vForm.description=(G('va-description')&&G('va-description').value.trim())||'';
-    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!/^\+220(?:87|83|86)\d{7}$/.test(S.vForm.whatsappNumber)){
+    if(!S.vForm.bname||!S.vForm.sname||!S.vForm.saddr||!S.vForm.cat||!/^\+220\d{9}$/.test(S.vForm.whatsappNumber)){
       toast('Complete the required business details and enter a valid 9-digit Gambian contact number including its network prefix.','error');return;
     }
   }
@@ -6395,7 +6395,7 @@ function rAppNext(){
     S.rForm.whatsappNumber='+220'+String((G('ra-phone')&&G('ra-phone').value)||'').replace(/\D/g,'').slice(0,9);
     S.rForm.addr=(G('ra-addr')&&G('ra-addr').value.trim())||'';
     S.rForm.emergency=(G('ra-emg')&&G('ra-emg').value.trim())||'';
-    if(!/^\+220(?:87|83|86)\d{7}$/.test(S.rForm.whatsappNumber)){toast('Enter a valid 9-digit Gambian WhatsApp/contact number including its network prefix.','error');return;}
+    if(!/^\+220\d{9}$/.test(S.rForm.whatsappNumber)){toast('Enter a valid 9-digit Gambian WhatsApp/contact number including its network prefix.','error');return;}
   } else if(S.rStep===1){
     S.rForm.plate=(G('ra-plate')&&G('ra-plate').value.trim())||'';
     S.rForm.licence=(G('ra-lic')&&G('ra-lic').value.trim())||'';
@@ -7114,7 +7114,7 @@ window.addEventListener('unhandledrejection',function(e){
   }
   function gm9(n){
     var d=String(n||'').replace(/\D/g,'');
-    if(d.length===9)return NP[d.slice(0,2)]||d[0]==='9'?d:null;
+    if(d.length===9)return d;
     if(d.length!==7)return null;
     var k=null;
     Object.keys(GP).some(function(op){if(GP[op].legacy.some(function(p){return d.indexOf(p)===0;})){k=op;return true;}return false;});
@@ -7131,7 +7131,9 @@ window.addEventListener('unhandledrejection',function(e){
       var m=gm9(n);
       if(!m)throw new Error('Please check your Gambian mobile number.');
       var e='+220'+m,L=lpn();
-      if(L&&L.isValidPhoneNumber&&!L.isValidPhoneNumber(e))throw new Error('Please check your Gambian mobile number.');
+      // New nine-digit prefixes may precede libphonenumber metadata.
+      // Enforce national length without guessing an unverified carrier prefix.
+      if(m.length!==9)throw new Error('Please check your Gambian mobile number.');
       return {e164:e,countryIso:'GM',national:m,operator:detect(m)};
     }
     var L=lpn(),p=null;
@@ -7481,7 +7483,7 @@ window.addEventListener('unhandledrejection',function(e){
     AFRICELL:{label:'Africell (87)',prefix:'87'},
     QCELL:{label:'QCell (83)',prefix:'83'},
     COMIUM:{label:'Comium (86)',prefix:'86'},
-    GAMCEL:{label:'Gamcel (legacy 7 digits)',prefix:''}
+    GAMCEL:{label:'Gamcel (enter full 9 digits)',prefix:''}
   };
   function digits(v){return String(v||'').replace(/\D/g,'');}
   function stateKey(target){return target==='reg'?'regPhone':'loginPhone';}
@@ -7489,7 +7491,7 @@ window.addEventListener('unhandledrejection',function(e){
   function currentNational(target){
     var raw=digits((window.S&&S[stateKey(target)])||'');
     if(raw.indexOf('220')===0&&raw.length>9)raw=raw.slice(3);
-    if(raw.length===9&&operatorsByPrefix(raw.slice(0,2)))return raw.slice(2);
+    if(raw.length===9)return operatorsByPrefix(raw.slice(0,2))?raw.slice(2):raw;
     return raw.slice(-7);
   }
   function operatorsByPrefix(p){return p==='87'?'AFRICELL':p==='83'?'QCELL':p==='86'?'COMIUM':null;}
@@ -7497,22 +7499,23 @@ window.addEventListener('unhandledrejection',function(e){
     var d=digits(raw);
     if(d.indexOf('220')===0&&d.length>9)d=d.slice(3);
     if(operatorsByPrefix(d.slice(0,2)))return operatorsByPrefix(d.slice(0,2));
+    if(d.length===9&&!operatorsByPrefix(d.slice(0,2)))return 'GAMCEL';
     if(d.length===7&&d.charAt(0)==='9')return 'GAMCEL';
     return (window.S&&S[carrierKey(target)])||'AFRICELL';
   }
   function networkMarkup(target,initial){
     var selected=inferCarrier(initial,target);
     var nat=currentNational(target);
-    if(target==='admin'){nat=digits(initial);if(nat.indexOf('220')===0&&nat.length>9)nat=nat.slice(3);if(operatorsByPrefix(nat.slice(0,2)))nat=nat.slice(2);nat=nat.slice(-7);}
+    if(target==='admin'){nat=digits(initial);if(nat.indexOf('220')===0&&nat.length>9)nat=nat.slice(3);if(operatorsByPrefix(nat.slice(0,2)))nat=nat.slice(2);else if(nat.length!==9)nat=nat.slice(-7);}
     var opts=Object.keys(operators).map(function(k){
       return '<option value="'+k+'" '+(k===selected?'selected':'')+'>'+operators[k].label+'</option>';
     }).join('');
-    var guidanceText=selected==='GAMCEL'?'Gamcel is still using its existing 7-digit number in the current migration phase. No new prefix is added; enter the number beginning with 9. PURA has designated 89 for Phase 2, but has not set its migration date.':'Select Africell, QCell or Comium and enter the remaining 7 digits. MarketLink adds the selected two-digit prefix (87, 83 or 86), making 9 digits total.';
+    var guidanceText=selected==='GAMCEL'?'Enter the full 9-digit Gambian number, including its two-digit network prefix. MarketLink will not guess or add a prefix for this network.':'Enter the 7 subscriber digits. MarketLink adds the selected two-digit prefix, making 9 digits total.';
     return '<div class="ml-gm-phone" style="display:grid;grid-template-columns:auto minmax(112px,.9fr) minmax(110px,1fr);align-items:stretch;gap:0;width:100%;margin-bottom:6px;border:1px solid rgba(245,184,61,.5);border-radius:12px;overflow:hidden;background:#071521;min-width:0;box-shadow:0 0 0 1px rgba(245,184,61,.08) inset;">'+
       '<span style="display:flex;align-items:center;padding:0 10px;font-size:13px;color:#fff;white-space:nowrap;background:#0B1F2E;">'+
       '<span style="display:inline-flex;align-items:center;margin-right:7px;">'+gambiaFlagMarkup()+'</span><strong>+220</strong></span>'+
       '<select id="'+target+'-operator" aria-label="Mobile network" style="appearance:auto;color-scheme:dark;max-width:49%;min-width:100px;flex:1 1 125px;height:46px;border:0;border-left:1px solid rgba(148,163,184,.22);border-right:1px solid rgba(148,163,184,.22);outline:none;padding:0 8px;background:#071521;color:#fff;font-weight:700;font-size:12px;">'+opts+'</select>'+
-      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" id="'+target+'-national" aria-label="Seven-digit mobile number" placeholder="e.g. 1234567" value="'+nat.slice(0,7)+'" style="flex:1 1 115px;min-width:110px;width:0;height:46px;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
+      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="'+(selected==='GAMCEL'?'9':'7')+'" id="'+target+'-national" aria-label="'+(selected==='GAMCEL'?'Nine-digit Gambian mobile number':'Seven subscriber digits after network prefix')+'" placeholder="'+(selected==='GAMCEL'?'9 digits including prefix':'e.g. 1234567')+'" value="'+nat.slice(0,selected==='GAMCEL'?9:7)+'" style="flex:1 1 115px;min-width:110px;width:0;height:46px;border:0;border-radius:0;background:#071521;color:#fff;padding:12px 10px;font-size:15px;letter-spacing:.08em;">'+
       '<input type="hidden" id="'+(target==='admin'?'admin-staffid':target==='reg'?'rphone':'lphone')+'" value="">'+
       '</div><div class="ml-phone-guidance"><div class="ml-phone-guidance-title">'+gambiaFlagMarkup()+' <strong>Your Gambian number</strong></div><div>'+guidanceText+'</div><span id="'+target+'-phone-help" class="ml-phone-guidance-help"></span></div>';
   }
@@ -7520,14 +7523,14 @@ window.addEventListener('unhandledrejection',function(e){
     var sel=document.getElementById(target+'-operator'), inp=document.getElementById(target+'-national');
     var op=sel&&operators[sel.value]?sel.value:'AFRICELL';
     var n=digits(inp&&inp.value);
-    if(n.length!==7)throw new Error('Enter the 7 digits after the selected network prefix (9 digits total).');
-    if(op==='GAMCEL'&&n.charAt(0)!=='9')throw new Error('Gamcel numbers must start with 9. Please check the number.');
-    return (operators[op].prefix||'')+n;
+    if(op==='GAMCEL'){if(n.length!==9)throw new Error('Enter the full 9-digit Gambian number, including its network prefix.');return n;}
+    if(n.length!==7)throw new Error('Enter the 7 subscriber digits after the selected two-digit network prefix (9 digits total).');
+    return operators[op].prefix+n;
   }
   function setCarrier(target,op){
     if(window.S)S[carrierKey(target)]=op;
     var help=document.getElementById(target+'-phone-help');
-    if(help)help.textContent=op==='GAMCEL'?'Gamcel uses the 7-digit number without an added prefix.':'Your network prefix ('+operators[op].prefix+') is added automatically.';
+    if(help)help.textContent=op==='GAMCEL'?'Enter all 9 digits, including the network prefix. No prefix is added automatically.':'Your network prefix ('+operators[op].prefix+') is added automatically to the 7 subscriber digits.';
   }
   function decorateOne(id,target){
     var old=document.getElementById(id);if(!old||!old.parentElement||old.dataset.mlCarrierDecorated==='1')return;
@@ -7541,22 +7544,33 @@ window.addEventListener('unhandledrejection',function(e){
     if(!sel||!inp)return;
     old.dataset.mlCarrierDecorated='1';
     if(window.S)S[carrierKey(target)]=sel.value;
+    function syncCarrierInput(){
+      var max=sel.value==='GAMCEL'?9:7;
+      inp.maxLength=max;
+      inp.value=digits(inp.value).slice(0,max);
+      setCarrier(target,sel.value);
+      if(window.S)S[stateKey(target)]=inp.value;
+    }
     setCarrier(target,sel.value);
-    sel.addEventListener('change',function(){setCarrier(target,sel.value);});
+    sel.addEventListener('change',syncCarrierInput);
     inp.addEventListener('input',function(){
       var d=digits(inp.value);
       if(d.length===9&&operatorsByPrefix(d.slice(0,2))){
         sel.value=operatorsByPrefix(d.slice(0,2));d=d.slice(2);
         setCarrier(target,sel.value);
       }
-      inp.value=d.slice(0,7);
+      var max=sel.value==='GAMCEL'?9:7;
+      inp.maxLength=max;
+      inp.value=d.slice(0,max);
       if(window.S)S[stateKey(target)]=inp.value;
     });
     inp.addEventListener('paste',function(){
       setTimeout(function(){
         var d=digits(inp.value);
         if(d.length===9&&operatorsByPrefix(d.slice(0,2))){sel.value=operatorsByPrefix(d.slice(0,2));d=d.slice(2);setCarrier(target,sel.value);}
-        inp.value=d.slice(0,7);
+        var max=sel.value==='GAMCEL'?9:7;
+        inp.maxLength=max;
+        inp.value=d.slice(0,max);
         if(window.S)S[stateKey(target)]=inp.value;
       },0);
     });
@@ -7622,7 +7636,7 @@ window.addEventListener('unhandledrejection',function(e){
     var hidden=document.getElementById('admin-staffid'),sel=document.getElementById('admin-operator'),inp=document.getElementById('admin-national');
     if(!hidden||!sel||!inp)return;
     hidden.dataset.mlCarrierInput='1';hidden.dataset.mlCarrierDecorated='1';
-    function update(){var n=digits(inp.value).slice(0,7);inp.value=n;var op=sel.value;if(op==='GAMCEL'&&n.length===7&&n.charAt(0)!=='9'){inp.setCustomValidity('Gamcel numbers must start with 9.');}else inp.setCustomValidity('');hidden.value=(operators[op].prefix||'')+n;if(window.S)S.adminPhone=hidden.value;}
+    function update(){var op=sel.value,max=op==='GAMCEL'?9:7,n=digits(inp.value).slice(0,max);inp.value=n;inp.maxLength=max;inp.setCustomValidity(n.length===max?'':'Enter '+max+' digits for the selected network.');hidden.value='+220'+(op==='GAMCEL'?n:operators[op].prefix+n);if(window.S)S.adminPhone=hidden.value;}
     sel.addEventListener('change',function(){update();setCarrier('admin',sel.value);});
     inp.addEventListener('input',update);inp.addEventListener('paste',function(){setTimeout(update,0);});update();setCarrier('admin',sel.value);
   }
@@ -7636,8 +7650,9 @@ window.addEventListener('unhandledrejection',function(e){
           var sel=document.getElementById('admin-operator'),inp=document.getElementById('admin-national');
           var adminOperators={AFRICELL:{prefix:'87'},QCELL:{prefix:'83'},COMIUM:{prefix:'86'},GAMCEL:{prefix:''}};
           var op=sel&&adminOperators[sel.value]?sel.value:'AFRICELL',n=String(inp&&inp.value||'').replace(/\D/g,'');
-          if(n.length!==7)throw new Error('Enter the 7 digits after the selected network prefix (9 digits total).');
-          id.value='+220'+(adminOperators[op].prefix||'')+n;
+          var expected=op==='GAMCEL'?9:7;
+          if(n.length!==expected)throw new Error(op==='GAMCEL'?'Enter the full 9-digit Gambian number, including its network prefix.':'Enter the 7 subscriber digits after the selected network prefix.');
+          id.value='+220'+(op==='GAMCEL'?n:adminOperators[op].prefix+n);
         }catch(e){if(typeof window.adminAuthErr==='function')window.adminAuthErr(e.message);return;}
       }
       return oldAdminLogin.apply(this,arguments);
@@ -7921,9 +7936,9 @@ window.addEventListener('unhandledrejection',function(e){
           '<div style="display:grid;grid-template-columns:auto minmax(0,1fr);min-height:54px;background:#fff">'+
             '<span style="display:flex;align-items:center;gap:7px;padding:0 11px;background:#eef4f8;color:#18384d;font-size:13px;font-weight:800;white-space:nowrap">🇬🇲 +220</span>'+
             '<select id="admin-operator" aria-label="Mobile network" style="width:100%;min-width:0;height:52px;padding:0 9px;border:0;border-bottom:1px solid #e6edf2;background:#fff;color:#18384d;font-size:12px;font-weight:750">'+
-              '<option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel</option>'+
+              '<option value="AFRICELL">Africell (87)</option><option value="QCELL">QCell (83)</option><option value="COMIUM">Comium (86)</option><option value="GAMCEL">Gamcel (full 9 digits)</option>'+
             '</select>'+
-            '<input id="admin-national" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" placeholder="7 digits after prefix (9 total)" aria-label="Seven digits after network prefix; nine digits total" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,7);var p={AFRICELL:\'87\',QCELL:\'83\',COMIUM:\'86\',GAMCEL:\'\'};document.getElementById(\'admin-staffid\').value=(p[document.getElementById(\'admin-operator\').value]||\'\')+this.value" onkeydown="if(event.key===\'Enter\')doAdminLogin()" style="grid-column:1/-1;width:100%;height:52px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;background:#fff;color:#142b3d;padding:12px 14px;font-size:17px;letter-spacing:.08em">'+
+            '<input id="admin-national" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="9 digits total; prefix included" aria-label="Nine-digit Gambian mobile number" oninput="var op=document.getElementById(\'admin-operator\').value,max=op===\'GAMCEL\'?9:7;this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,max);var p={AFRICELL:\'87\',QCELL:\'83\',COMIUM:\'86\',GAMCEL:\'\'};document.getElementById(\'admin-staffid\').value=\'+220\'+(op===\'GAMCEL\'?this.value:(p[op]||\'\')+this.value)" onkeydown="if(event.key===\'Enter\')doAdminLogin()" style="grid-column:1/-1;width:100%;height:52px;box-sizing:border-box;border:0;border-top:1px solid #e6edf2;background:#fff;color:#142b3d;padding:12px 14px;font-size:17px;letter-spacing:.08em">'+
           '</div>'+
         '</div>'+
         '<input type="hidden" id="admin-staffid" value="">'+

@@ -34,7 +34,7 @@
 //   This should be re-verified against the actual PURA PDF (human-read
 //   or OCR'd) before being treated as fully authoritative.
 // ═══════════════════════════════════════════════════════════════════════
-const { parsePhoneNumberFromString, isValidPhoneNumber } = require('libphonenumber-js');
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
 const GAMBIA_OPERATOR_PREFIXES = {
   AFRICELL: { newPrefix: '87', legacyPrefixes: ['2', '7', '40', '41'] },
@@ -45,17 +45,14 @@ const GAMBIA_OPERATOR_PREFIXES = {
 const GAMBIA_NEW_PREFIXES = { '87': 'AFRICELL', '83': 'QCELL', '86': 'COMIUM' };
 
 /**
- * Detect the Gambian operator for a national number, in either legacy
- * 7-digit or migrated 9-digit form. Never guesses — returns null rather
- * than inventing an operator prefix for an unrecognized range.
+ * Detect a carrier only when its prefix mapping is known. Unknown nine-digit
+ * prefixes remain valid in national-length format but have no inferred carrier.
  */
 function detectGambianOperator(national) {
   const digits = String(national || '').replace(/\D/g, '');
   if (digits.length === 9) {
     const prefix2 = digits.slice(0, 2);
-    if (GAMBIA_NEW_PREFIXES[prefix2]) return GAMBIA_NEW_PREFIXES[prefix2];
-    if (digits[0] === '9') return 'UNATTRIBUTED_9';
-    return null;
+    return GAMBIA_NEW_PREFIXES[prefix2] || (digits[0] === '9' ? 'UNATTRIBUTED_9' : null);
   }
   if (digits.length === 7) {
     for (const [op, cfg] of Object.entries(GAMBIA_OPERATOR_PREFIXES)) {
@@ -66,18 +63,13 @@ function detectGambianOperator(national) {
 }
 
 /**
- * Migrate a Gambian national number (legacy 7-digit or already-correct
- * 9-digit) to its canonical 9-digit post-migration form. Returns null if
- * the number can't be confidently mapped — callers must surface this as
- * "please check your Gambian mobile number", never silently guess.
+ * Preserve complete nine-digit Gambian national numbers as supplied. Legacy
+ * seven-digit ranges may still be normalized for existing-account lookup;
+ * registration applies the stricter nine-digit rule separately.
  */
 function toGambianNational9(national) {
   const digits = String(national || '').replace(/\D/g, '');
-  if (digits.length === 9) {
-    const prefix2 = digits.slice(0, 2);
-    if (GAMBIA_NEW_PREFIXES[prefix2] || digits[0] === '9') return digits;
-    return null;
-  }
+  if (digits.length === 9) return digits;
   if (digits.length === 7) {
     const operator = detectGambianOperator(digits);
     if (!operator) return null;
@@ -118,7 +110,9 @@ function normalizePhone(raw, defaultCountryIso) {
     const migrated = toGambianNational9(national);
     if (!migrated) throw new Error('Please check your Gambian mobile number.');
     const e164 = '+220' + migrated;
-    if (!isValidPhoneNumber(e164)) throw new Error('Please check your Gambian mobile number.');
+    // The 2026 migration may be newer than libphonenumber metadata.
+    // Enforce the national nine-digit structure without guessing a carrier prefix.
+    if (migrated.length !== 9) throw new Error('Please check your Gambian mobile number.');
     return { e164, countryIso: 'GM', national: migrated, operator: detectGambianOperator(migrated) };
   }
 
