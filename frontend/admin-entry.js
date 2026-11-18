@@ -591,14 +591,14 @@
       if (mountedContent && body.parentNode !== mountedContent) mountedContent.appendChild(body);
       applyAdminTheme();
       tab.setAttribute('data-ml-admin-workspace', '1');
-      tab.style.cssText = 'display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
-      body.style.cssText = 'display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
+      tab.style.cssText = 'display:block!important;position:relative!important;inset:auto!important;width:100vw!important;min-width:100vw!important;max-width:100vw!important;box-sizing:border-box!important;margin:0!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
+      body.style.cssText = 'display:block!important;width:100%!important;max-width:none!important;box-sizing:border-box!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
       return;
     }
     // Recover from a stale marker left by an interrupted/older mount.
     tab.removeAttribute('data-ml-admin-workspace');
     tab.setAttribute('data-ml-admin-workspace', '1');
-    tab.style.cssText = 'display:block!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
+    tab.style.cssText = 'display:block!important;position:relative!important;inset:auto!important;width:100vw!important;min-width:100vw!important;max-width:100vw!important;box-sizing:border-box!important;margin:0!important;height:auto!important;min-height:100vh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;background:#f3f6fa;';
     var shell = document.createElement('div');
     shell.id = 'ml-admin-workspace';
     shell.innerHTML =
@@ -631,7 +631,7 @@
       '<div id="ml-admin-drawer" class="ml-admin-drawer"><div class="ml-admin-drawer-panel"><div class="ml-admin-drawer-head"><button type="button" class="ml-admin-drawer-brand" id="ml-admin-drawer-brand" aria-label="Close menu"><img src="./assets/marketlink-logo.png" alt="MarketLink Gambia" onerror="this.onerror=null;this.src=\'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png\';"><span><b>MARKETLINK</b><small>ADMINISTRATION</small></span></button><button id="ml-admin-drawer-close" aria-label="Close navigation">×</button></div><div class="ml-admin-theme-row"><span>Appearance</span><button type="button" id="ml-admin-theme-toggle" aria-pressed="false"><span class="ml-admin-theme-icon">☀</span><span class="ml-admin-theme-label">Daylight</span><i></i></button></div><div class="ml-admin-drawer-links"></div><div class="ml-admin-drawer-foot">Protected administrator access<br><b>Royal FinTech Company</b></div></div></div>';
     tab.insertBefore(shell, body);
     document.getElementById('ml-admin-content').appendChild(body);
-    body.style.cssText = 'display:block!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
+    body.style.cssText = 'display:block!important;width:100%!important;max-width:none!important;box-sizing:border-box!important;height:auto!important;min-height:55vh!important;max-height:none!important;overflow:visible!important;';
     var nav = shell.querySelector('.ml-admin-nav');
     var drawerLinks = shell.querySelector('.ml-admin-drawer-links');
     drawerLinks.innerHTML = nav.innerHTML;
@@ -755,6 +755,9 @@
       viewportFix.id = 'ml-admin-viewport-fix';
       viewportFix.textContent = [
         'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;min-width:0!important;height:auto!important;min-height:100%!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
+        'body{margin:0!important;width:100%!important;min-width:0!important;max-width:none!important}',
+        '#app,#scr-app,#tab-admindash{width:100vw!important;min-width:100vw!important;max-width:100vw!important;box-sizing:border-box!important;margin-left:0!important;margin-right:0!important}',
+        '#ml-admin-workspace,#ml-admin-workspace .ml-admin-main,#ml-admin-workspace .ml-admin-content{width:100%!important;min-width:0!important;max-width:none!important;box-sizing:border-box!important}',
         'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
         'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
         'body:has(#ml-admin-workspace) #scr-admin-login:not(.active){display:none!important;visibility:hidden!important;pointer-events:none!important}',
