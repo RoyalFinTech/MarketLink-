@@ -267,3 +267,18 @@ assert.match(paymentTests, /DAHA Wallet checkout debits the authenticated custom
 assert.match(paymentTests, /DAHA Wallet refuses checkout when available balance is insufficient/, 'Payment tests must cover insufficient DAHA Wallet funds');
 assert.match(paymentTests, /rejects DAHA Wallet payment when the saved order selected Cash on Delivery/, 'Payment tests must block switching COD orders to DAHA Wallet');
 assert.match(paymentTests, /rejects Cash on Delivery initiation when the saved order selected DAHA Wallet/, 'Payment tests must block switching DAHA Wallet orders to COD');
+
+const adminRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/admin/routes.js'), 'utf8');
+const adminService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/admin/service.js'), 'utf8');
+const adminController = fs.readFileSync(path.join(root, '..', 'backend/src/modules/admin/controller.js'), 'utf8');
+const adminEntry = fs.readFileSync(path.join(root, '..', 'frontend/admin-entry.js'), 'utf8');
+assert.match(adminRoutes, /router\.post\('\/users\/:id\/roles', authenticate, authorize\(\.\.\.SA\)/, 'Only super administrators may grant admin roles');
+assert.match(adminRoutes, /body\('role'\)\.equals\('admin'\)/, 'Role assignment endpoint must only grant the admin role, never super_admin');
+assert.match(adminService, /ADMIN_ROLE_GRANT_FORBIDDEN/, 'Role assignment service must enforce super-admin authorization');
+assert.match(adminService, /user\.admin_role_granted/, 'Administrator role grants must be recorded in the audit trail');
+assert.match(adminService, /ADMIN_ROLE_TARGET_INACTIVE/, 'Suspended accounts must not receive administrator access');
+assert.match(adminController, /canManageAdminRoles/, 'Admin users response must indicate whether the current actor can grant roles');
+assert.match(adminEntry, /data-ml-admin-route="access"/, 'Admin hamburger navigation must include Staff & access management');
+assert.match(adminEntry, /adminAccessManagement/, 'Staff & access page must load MarketLink accounts');
+assert.match(adminEntry, /__ML_ADMIN_GRANT_ROLE/, 'Staff & access page must expose the protected Grant Admin role action');
+
