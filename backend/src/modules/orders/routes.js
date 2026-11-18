@@ -5,7 +5,11 @@ const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
 router.post('/', authenticate, authorize('customer'), [body('vendorId').isUUID(), body('deliveryAddressId').isUUID().withMessage('Select a saved delivery address before placing your order.'), body('items').isArray({min:1}), body('items.*.productId').isUUID(), body('items.*.quantity').isInt({min:1}), body('paymentMethod').notEmpty()], validate, ctrl.place);
-router.get('/my', authenticate, ctrl.myOrders);
+router.get('/my', authenticate, [
+  query('page').optional().isInt({min:1}),
+  query('limit').optional().isInt({min:1,max:100}),
+  query('status').optional().isIn(['pending','accepted','preparing','awaiting_rider','rider_assigned','picked_up','on_the_way','delivered','cancelled']),
+], validate, ctrl.myOrders);
 router.get('/vendor', authenticate, authorize('vendor'), [
   query('page').optional().isInt({min:1}),
   query('limit').optional().isInt({min:1,max:100}),
