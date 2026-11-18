@@ -19,4 +19,16 @@ describe('OTP delivery mode',()=>{
  test('PIN reset keeps development OTP response',async()=>{
   process.env.OTP_DEV_MODE='true';query.mockImplementation(async sql=>{if(sql.startsWith('SELECT id FROM users WHERE phone=$1 AND status'))return{rows:[{id:'user-id'}]};if(sql.startsWith('INSERT INTO otp_verifications'))return{rows:[{id:'otp-id'}]};return{rows:[]};});const r=await requestPinReset('871234567');expect(r.devOtp).toMatch(/^\d{6}$/);expect(notifications.sendSms).not.toHaveBeenCalled();
  });
+
+ test('rejects legacy seven-digit Gambian numbers for new registrations',async()=>{
+  process.env.OTP_DEV_MODE='true';
+  await expect(registerInitiate({fullName:'Test',phone:'9123456'})).rejects.toMatchObject({code:'INVALID_PHONE',statusCode:400});
+  expect(query).not.toHaveBeenCalled();
+ });
+ test('accepts a complete nine-digit Gambian number for new registrations',async()=>{
+  process.env.OTP_DEV_MODE='true';
+  const result=await registerInitiate({fullName:'Test',phone:'871234567'});
+  expect(result.phone).toBe('+220871234567');
+ });
+
 });

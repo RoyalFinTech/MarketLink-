@@ -193,3 +193,8 @@ assert.match(premiumJs, /\^\(87\|86\|83\)\\d\{7\}\$/, 'DAHA mobile-money input m
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/wallets/service.js'), 'utf8'), /nationalAccountNumber\.slice\(2\)/, 'Backend must send the seven subscriber digits to Modem Pay only after validating the full nine-digit national number');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/wallets/routes.js'), 'utf8'), /matches\(\/\^\(87\|86\|83\)\\d\{7\}\$\/\)/, 'Wallet API must validate full nine-digit Gambian mobile numbers');
 
+
+assert.match(html, /maxlength="9"[^>]*id="lphone"/, 'Customer login must accept the full nine-digit Gambian national number');
+assert.match(html, /maxlength="9"[^>]*id="rphone"/, 'New customer registration must accept nine national digits');
+assert.match(html, /Enter the full 9-digit Gambian mobile number/, 'Customer registration must reject legacy seven-digit numbers');
+assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/service.js'), 'utf8'), /canonicalRegistrationPhone/, 'Backend must enforce nine-digit Gambian numbers for new registrations');
