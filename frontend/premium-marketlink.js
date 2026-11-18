@@ -405,7 +405,7 @@
       adminAuthErr('');
       // Wake and verify the production API before sending credentials.
       // This separates a sleeping/unreachable backend from an auth failure.
-      var apiBase=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com').replace(/\\/+$/,'');
+      var apiBase=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com'); while(apiBase.endsWith('/'))apiBase=apiBase.slice(0,-1);
       var healthController=typeof AbortController==='function'?new AbortController():null;
       var healthTimer=healthController?window.setTimeout(function(){healthController.abort();},45000):null;
       try{
