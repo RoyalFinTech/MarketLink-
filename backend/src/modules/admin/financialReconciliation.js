@@ -8,7 +8,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
   const pageSize = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
   const [
     missingCommission, pendingSettlement, amountMismatches, missingRecipients,
-    missingCredits, withdrawalQueue, walletMismatches, duplicateReferences,
+    missingCredits, withdrawalQueue, walletMismatches, codRemittancesNeedingAttention, duplicateReferences,
   ] = await Promise.all([
     query(`SELECT o.id, o.order_number, o.total, o.payment_method, o.payment_status,
                   o.vendor_payout, o.rider_payout, o.affiliate_commission_amount,
@@ -107,6 +107,19 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
            ) latest ON TRUE
            WHERE ABS(COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) > $1
            ORDER BY ABS(COALESCE(w.balance,0)-COALESCE(latest.balance_after,0)) DESC LIMIT $2`, [moneyTolerance, pageSize]),
+    query(`SELECT r.id AS remittance_id,r.payment_id,r.order_id,r.amount,r.currency,
+                  r.deposit_method,r.provider_reference,r.status AS remittance_status,
+                  r.submitted_at,r.reviewed_at,o.order_number,o.status AS order_status,
+                  o.payment_status,p.status AS payment_record_status,
+                  c.status AS commission_status,rider.full_name AS rider_name
+           FROM cod_cash_remittances r
+           JOIN payments p ON p.id=r.payment_id
+           JOIN orders o ON o.id=r.order_id
+           LEFT JOIN commission_records c ON c.order_id=o.id
+           LEFT JOIN users rider ON rider.id=r.rider_id
+           WHERE r.status='submitted'
+              OR (r.status='verified' AND (p.status<>'confirmed' OR COALESCE(c.status,'')<>'paid'))
+           ORDER BY r.submitted_at ASC LIMIT $1`, [pageSize]),
     query(`SELECT 'wallet_transaction_reference' AS kind, reference_type, reference_id,
                   category, count(*) AS duplicate_count, sum(amount) AS amount_total
            FROM transactions
@@ -133,6 +146,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
     missingWalletCredits: missingCredits.rows,
     withdrawalsNeedingAttention: withdrawalQueue.rows,
     walletLedgerMismatches: walletMismatches.rows,
+    codRemittancesNeedingAttention: codRemittancesNeedingAttention.rows,
     duplicateReferences: duplicateReferences.rows,
   };
   const counts = Object.fromEntries(Object.entries(sections).map(([key, rows]) => [key, rows.length]));

@@ -2525,6 +2525,7 @@
       var labels=[
         ['deliveredWithoutCommission','Delivered orders missing commission records'],
         ['pendingSettlement','Delivered orders awaiting settlement'],
+        ['codRemittancesNeedingAttention','Rider cash deposits awaiting verification or settlement'],
         ['amountMismatches','Order / commission amount mismatches'],
         ['missingRecipients','Missing payout recipients'],
         ['missingWalletCredits','Paid commissions with missing wallet credits'],
@@ -2539,10 +2540,14 @@
         var rows=Array.isArray(sections[item[0]])?sections[item[0]]:[];
         var html=rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
           var ref=x.order_number||x.reference||x.id||x.wallet_id||x.commission_id||'Record';
-          var status=x.status||x.provider_status||x.kind||'Review required';
+          var status=x.status||x.remittance_status||x.provider_status||x.kind||'Review required';
           var amount=x.amount!=null?money(x.amount):x.total!=null?money(x.total):x.order_total!=null?money(x.order_total):'';
           var detail=[];
           if(x.payment_status)detail.push('Payment: '+x.payment_status);
+          if(x.payment_record_status)detail.push('Payment record: '+x.payment_record_status);
+          if(x.rider_name)detail.push('Rider: '+x.rider_name);
+          if(x.deposit_method)detail.push('Deposit: '+String(x.deposit_method).toUpperCase());
+          if(x.provider_reference)detail.push('Reference: '+x.provider_reference);
           if(x.commission_status)detail.push('Commission: '+x.commission_status);
           if(x.provider_status)detail.push('Provider: '+x.provider_status);
           if(x.difference!=null)detail.push('Difference: '+money(x.difference));
