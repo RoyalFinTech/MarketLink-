@@ -4,7 +4,7 @@ const crypto = require('crypto');
 
 describe('Modem Pay configuration and webhook verification', () => {
   const original = {};
-  const keys = ['MODEM_PAY_API_KEY','MODEM_PAY_WEBHOOK_SECRET','MODEM_WEBHOOK_SECRET','MODEM_PAY_SECRET_HASH'];
+  const keys = ['MODEM_PAY_API_KEY','MODEM_PAY_API_MODE','MODEM_PAY_CALLBACK_URL','MODEM_PAY_WEBHOOK_SECRET','MODEM_WEBHOOK_SECRET','MODEM_PAY_SECRET_HASH'];
   beforeEach(() => {
     for (const key of keys) { original[key] = process.env[key]; delete process.env[key]; }
     jest.resetModules();
@@ -23,6 +23,20 @@ describe('Modem Pay configuration and webhook verification', () => {
 
   test('recognizes the webhook secret variable documented by Modem Pay', () => {
     process.env.MODEM_WEBHOOK_SECRET = 'test-webhook-secret';
+    const modemPay = require('./modempay');
+    expect(modemPay.isWebhookConfigured()).toBe(true);
+  });
+
+  test('does not treat a per-payment callback hash as a global merchant webhook secret', () => {
+    process.env.MODEM_PAY_SECRET_HASH = 'callback-signing-secret-hash';
+    const modemPay = require('./modempay');
+    expect(modemPay.isWebhookConfigured()).toBe(false);
+  });
+
+  test('accepts a callback hash only when H2H per-payment callbacks are configured', () => {
+    process.env.MODEM_PAY_API_MODE = 'h2h';
+    process.env.MODEM_PAY_CALLBACK_URL = 'https://marketlink-gambia.onrender.com/api/v1/payments/webhook/modempay';
+    process.env.MODEM_PAY_SECRET_HASH = 'callback-signing-secret-hash';
     const modemPay = require('./modempay');
     expect(modemPay.isWebhookConfigured()).toBe(true);
   });
