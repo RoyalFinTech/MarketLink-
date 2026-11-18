@@ -9,7 +9,7 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
   if (categoryId) {
     conds.push(`p.category_id IN (
       WITH RECURSIVE category_branch AS (
-        SELECT id FROM categories WHERE id=${pi} AND deleted_at IS NULL AND is_active=TRUE
+        SELECT id FROM categories WHERE id=$${pi} AND deleted_at IS NULL AND is_active=TRUE
         UNION ALL
         SELECT child.id FROM categories child
         JOIN category_branch parent ON child.parent_id=parent.id
