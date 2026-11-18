@@ -742,10 +742,10 @@ async function refund(paymentId,{amount,reason},actor){
     const {rows:[payment]}=await client.query(
       'SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);
     if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
-    if(payment.status!=='confirmed'&&payment.status!=='partially_refunded')
-      throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');
     if(['processed','requested'].includes(String(payment.refund_status||'none')))
       throw new AppError('A refund has already been processed or is awaiting reconciliation.',409,'ALREADY_REFUNDED');
+    if(payment.status!=='confirmed')
+      throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');
     const refundAmount=amount==null?Number(payment.amount):Number(amount);
     const paymentAmount=Number(payment.amount);
     if(!Number.isFinite(refundAmount)||refundAmount<=0||refundAmount>paymentAmount+0.01)
