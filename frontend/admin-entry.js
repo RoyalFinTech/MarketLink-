@@ -6,6 +6,27 @@
 
   window.__ML_ADMIN_PORTAL_MODE = true;
 
+  // The shared Admin dashboard references AdminSession, but the production
+  // bundle does not define it. Keep this lightweight identity marker local to
+  // the dedicated Admin deployment; authentication remains in ML_API/backend.
+  if (!window.AdminSession) {
+    window.AdminSession = {
+      staffId: null,
+      active: false,
+      startedAt: null,
+      start: function (staffId) {
+        this.staffId = String(staffId || 'Admin');
+        this.active = true;
+        this.startedAt = Date.now();
+      },
+      end: function () {
+        this.staffId = null;
+        this.active = false;
+        this.startedAt = null;
+      }
+    };
+  }
+
   var style = document.createElement('style');
   style.id = 'ml-admin-isolation-style';
   style.textContent = [
