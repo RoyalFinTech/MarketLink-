@@ -240,20 +240,53 @@
   window.__ML_ADMIN_CRM_NOTE=adminCrmAddNote;
 
 
+  var adminCampaignSelectedRecipients = {};
   async function adminCampaignView(){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><h3>Communications centre</h3><p>Loading campaign history…</p></div>';
     try{
       var d=await adminRequest('/notifications/admin/campaigns?page=1&limit=50','GET'),rows=d.items||[];
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Communications centre</h3><button onclick="window.__ML_ADMIN_CAMPAIGNS()">Refresh</button></div><div class="ml-profile-card" style="padding:14px;margin:12px 0"><h3 style="margin:0 0 12px">Create a campaign draft</h3><label class="ml-admin-label" for="ml-campaign-title">Message title</label><input id="ml-campaign-title" class="inp" maxlength="200" placeholder="e.g. MarketLink service update"><label class="ml-admin-label" for="ml-campaign-body" style="margin-top:10px">Message</label><textarea id="ml-campaign-body" class="inp" rows="3" maxlength="4000" placeholder="Write the message for recipients…"></textarea><label class="ml-admin-label" for="ml-campaign-audience" style="margin-top:10px">Audience</label><select id="ml-campaign-audience" class="inp"><option value="all">All active users</option><option value="customers">Customers</option><option value="vendors">Vendors</option><option value="riders">Riders</option><option value="admins">Administrators</option></select><div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0"><label><input type="checkbox" id="ml-campaign-email"> Email</label><label><input type="checkbox" id="ml-campaign-sms"> SMS</label><label><input type="checkbox" id="ml-campaign-push"> Push</label><span style="font-size:11px;color:var(--mu)">In-app delivery is included.</span></div><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CAMPAIGN_CREATE()">Save campaign draft</button></div><div class="ml-section-head"><h3>Campaign history</h3></div>'+
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Communications centre</h3><button onclick="window.__ML_ADMIN_CAMPAIGNS()">Refresh</button></div><div class="ml-profile-card" style="padding:14px;margin:12px 0"><h3 style="margin:0 0 12px">Create a campaign draft</h3><label class="ml-admin-label" for="ml-campaign-title">Message title</label><input id="ml-campaign-title" class="inp" maxlength="200" placeholder="e.g. MarketLink service update"><label class="ml-admin-label" for="ml-campaign-body" style="margin-top:10px">Message</label><textarea id="ml-campaign-body" class="inp" rows="3" maxlength="4000" placeholder="Write the message for recipients…"></textarea><label class="ml-admin-label" for="ml-campaign-audience" style="margin-top:10px">Audience</label><select id="ml-campaign-audience" class="inp" onchange="window.__ML_ADMIN_CAMPAIGN_AUDIENCE_CHANGE()"><option value="all">All active users</option><option value="customers">Customers</option><option value="vendors">Vendors</option><option value="riders">Riders</option><option value="admins">Administrators</option><option value="selected">Select individual people</option></select><div id="ml-campaign-recipient-picker" style="display:none;margin:12px 0;padding:12px;border:1px solid var(--bd);border-radius:12px"><label class="ml-admin-label" for="ml-campaign-recipient-search">Find a customer, vendor or rider</label><div style="display:flex;gap:8px"><input id="ml-campaign-recipient-search" class="inp" maxlength="100" placeholder="Search name, phone or email"><button type="button" class="ml-btn" onclick="window.__ML_ADMIN_CAMPAIGN_SEARCH()">Search</button></div><div id="ml-campaign-recipient-results" style="margin-top:10px"><small>Search the directory, then select recipients below.</small></div><div id="ml-campaign-recipient-count" style="margin-top:8px;font-size:12px;font-weight:700">0 selected (maximum 100)</div></div><div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0"><label><input type="checkbox" id="ml-campaign-email"> Email</label><label><input type="checkbox" id="ml-campaign-sms"> SMS</label><label><input type="checkbox" id="ml-campaign-push"> Push</label><span style="font-size:11px;color:var(--mu)">In-app delivery is included.</span></div><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CAMPAIGN_CREATE()">Save campaign draft</button></div><div class="ml-section-head"><h3>Campaign history</h3></div>'+
       (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">📣</div><div class="copy"><b>'+adminSafe(x.title)+'</b><span>'+adminSafe(x.audience)+' · '+adminSafe(x.status)+'</span><small>Recipients '+adminSafe(x.recipient_count)+' · Sent '+adminSafe(x.sent_count)+' · Failed/partial '+adminSafe(x.failed_count)+' · '+adminFormatDate(x.created_at)+'</small>'+(x.status==='draft'?'<button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CAMPAIGN_SEND(&quot;'+adminSafe(x.id)+'&quot;)">Send campaign</button>':'')+'</div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No campaigns yet</b><span>Drafts and sent campaigns will appear here.</span></div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Communications centre unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
   }
+  async function adminCampaignSearchRecipients(){
+    var input=document.getElementById('ml-campaign-recipient-search'),target=document.getElementById('ml-campaign-recipient-results');
+    if(!input||!target)return;
+    var term=String(input.value||'').trim();
+    if(term.length<2){target.innerHTML='<small>Enter at least two characters to search.</small>';return;}
+    target.innerHTML='<small>Searching the secure directory…</small>';
+    try{
+      var result=await adminRequest('/admin/users?search='+encodeURIComponent(term)+'&page=1&limit=25','GET');
+      var users=result.items||[];
+      target.innerHTML=users.length?users.map(function(person){
+        var id=String(person.id||''),checked=!!adminCampaignSelectedRecipients[id];
+        return '<label style="display:flex;align-items:center;gap:9px;padding:9px 4px;border-bottom:1px solid var(--bd);font-size:12px"><input type="checkbox" '+(checked?'checked':'')+' onchange="window.__ML_ADMIN_CAMPAIGN_SELECT(\''+adminSafe(id)+'\',this.checked)"><span style="min-width:0"><b>'+adminSafe(person.full_name||'MarketLink user')+'</b><br><small>'+adminSafe(person.phone||'No phone')+' · '+adminSafe((person.roles||[]).join(', '))+'</small></span></label>';
+      }).join(''):'<small>No matching active users found.</small>';
+    }catch(error){target.innerHTML='<small>'+adminSafe(error.message||'Directory search failed.')+'</small>';}
+  }
+  function adminCampaignSelectRecipient(id,checked){
+    if(checked){if(Object.keys(adminCampaignSelectedRecipients).length>=100){if(window.toast)window.toast('A campaign can target up to 100 individual recipients.','error');return;}adminCampaignSelectedRecipients[id]=true;}
+    else delete adminCampaignSelectedRecipients[id];
+    var count=document.getElementById('ml-campaign-recipient-count');
+    if(count)count.textContent=Object.keys(adminCampaignSelectedRecipients).length+' selected (maximum 100)';
+    var input=document.querySelector('#ml-campaign-recipient-results input[type="checkbox"][onchange*="'+id+'"]');
+    if(input)input.checked=!!adminCampaignSelectedRecipients[id];
+  }
+  function adminCampaignAudienceChange(){
+    var audience=document.getElementById('ml-campaign-audience'),picker=document.getElementById('ml-campaign-recipient-picker');
+    if(picker)picker.style.display=audience&&audience.value==='selected'?'block':'none';
+  }
+  window.__ML_ADMIN_CAMPAIGN_SEARCH=adminCampaignSearchRecipients;
+  window.__ML_ADMIN_CAMPAIGN_SELECT=adminCampaignSelectRecipient;
+  window.__ML_ADMIN_CAMPAIGN_AUDIENCE_CHANGE=adminCampaignAudienceChange;
   async function adminCampaignCreate(){
     var title=String(document.getElementById('ml-campaign-title').value||'').trim(),body=String(document.getElementById('ml-campaign-body').value||'').trim(),audience=document.getElementById('ml-campaign-audience').value;
     if(!title){if(window.toast)window.toast('Enter a campaign title.','error');return;}
     var channels={email:document.getElementById('ml-campaign-email').checked,sms:document.getElementById('ml-campaign-sms').checked,push:document.getElementById('ml-campaign-push').checked};
-    try{await adminRequest('/notifications/admin/campaigns','POST',{title:title,body:body,audience:audience,channels:channels});if(window.toast)window.toast('Campaign draft saved.','success');await adminCampaignView();}
+    var recipientIds=Object.keys(adminCampaignSelectedRecipients);
+    if(audience==='selected'&&(!recipientIds.length||recipientIds.length>100)){if(window.toast)window.toast('Select between 1 and 100 people for this campaign.','error');return;}
+    try{await adminRequest('/notifications/admin/campaigns','POST',{title:title,body:body,audience:audience,channels:channels,recipientIds:audience==='selected'?recipientIds:[]});if(window.toast)window.toast('Campaign draft saved.','success');await adminCampaignView();}
     catch(e){if(window.toast)window.toast(e.message,'error');}
   }
   async function adminCampaignSend(id){
