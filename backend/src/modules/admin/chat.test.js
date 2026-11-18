@@ -5,7 +5,7 @@ jest.mock('../../config/db', () => ({
   withTransaction: jest.fn(),
 }));
 const db = require('../../config/db');
-const { listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage, getAffiliateDirectory } = require('./service');
+const { listAdminConversations, getAdminConversationMessages, sendAdminConversationMessage, startAdminConversation, getAffiliateDirectory } = require('./service');
 
 describe('Admin customer chat', () => {
   const client = { query: jest.fn() };
@@ -52,6 +52,31 @@ describe('Admin customer chat', () => {
     expect(db.query.mock.calls[0][0]).toMatch(/LIMIT \$1 OFFSET \$2/i);
     expect(db.query.mock.calls[0][1]).toEqual([50, 0]);
     expect(db.query.mock.calls[1][1]).toEqual([]);
+  });
+
+  test('starts an audited direct conversation with an active customer or vendor', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [{ id: 'customer-1', full_name: 'Awa Jallow', phone: '+2207000000', status: 'active' }] })
+      .mockResolvedValueOnce({ rows: [{ name: 'customer' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'conversation-1', participant_a: 'admin-1', participant_b: 'customer-1' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await startAdminConversation('customer-1', { id: 'admin-1', role: 'admin' });
+
+    expect(result.conversation.id).toBe('conversation-1');
+    expect(result.participant.full_name).toBe('Awa Jallow');
+    expect(client.query.mock.calls[2][0]).toMatch(/ON CONFLICT \(participant_a,participant_b\) WHERE order_id IS NULL/i);
+    expect(client.query.mock.calls[3][0]).toMatch(/chat\.admin_conversation_started/);
+  });
+
+  test('does not allow Admin to start a direct chat with staff accounts', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [{ id: 'staff-1', full_name: 'Staff User', status: 'active' }] })
+      .mockResolvedValueOnce({ rows: [{ name: 'admin' }] });
+
+    await expect(startAdminConversation('staff-1', { id: 'admin-1', role: 'admin' }))
+      .rejects.toMatchObject({ code: 'CHAT_ROLE_NOT_ALLOWED' });
+    expect(client.query).toHaveBeenCalledTimes(2);
   });
 
   test('returns conversation participants and messages in chronological order', async () => {
