@@ -857,6 +857,15 @@
     var label=String(name||'Marketplace category');
     return '<span class="'+photoClass+'" role="img" aria-label="'+esc(label)+'" style="'+mlCategoryStyle(label)+'"><span class="ml-category-photo-fallback" aria-hidden="true">'+mlCategoryEmoji(label)+'</span></span>';
   }
+  function flattenMarketLinkCategoryTree(nodes,parentName,out){
+    out=out||[];
+    (Array.isArray(nodes)?nodes:[]).forEach(function(node){
+      if(!node||node.id==null)return;
+      out.push({id:node.id,name:node.name||'Category',parentName:parentName||''});
+      if(Array.isArray(node.children)&&node.children.length)flattenMarketLinkCategoryTree(node.children,node.name||parentName,out);
+    });
+    return out;
+  }
   async function renderLiveCategoriesPage(){
     var root=G('catpage-content');if(!root)return;
     if(S.activeCategoryId){await renderLiveCategoryProducts(S.activeCategoryId,S.activeCategoryName||'Category');return;}
@@ -866,8 +875,10 @@
         var response=await ML_API.categories.getTree();
         liveCategories=Array.isArray(response.data)?response.data:[];
       }
-      var cards=liveCategories.map(function(cat){
-        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'">'+mlCategoryPhotoMarkup(cat.name,'ml-category-photo')+'<span class="ml-category-card-name">'+esc(cat.name||'Category')+'</span></button>';
+      var allCategories=flattenMarketLinkCategoryTree(liveCategories);
+      var cards=allCategories.map(function(cat){
+        var label=cat.parentName?cat.parentName+' · '+cat.name:cat.name;
+        return '<button type="button" class="ml-category-card" data-ml-category-id="'+esc(liveProductId(cat.id))+'" data-ml-category-name="'+esc(cat.name||'Category')+'">'+mlCategoryPhotoMarkup(cat.name,'ml-category-photo')+'<span class="ml-category-card-name">'+esc(label||'Category')+'</span></button>';
       }).join('');
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">FIND YOUR ESSENTIALS</div><h3>Shop by category</h3></div><button type="button" onclick="switchTab(\'home\')">← Home</button></div>'+
         (cards?'<div class="ml-category-grid">'+cards+'</div>':'<div class="ml-empty"><b>No live categories yet</b><span>Categories will appear when published by MarketLink.</span></div>')+'</div>';
@@ -1050,7 +1061,7 @@
   }
   function renderPremiumHome(){
     var root=G('tab-home');if(!root)return;
-    var catHtml=liveCategories.slice(0,12).map(function(c){
+    var catHtml=flattenMarketLinkCategoryTree(liveCategories).slice(0,12).map(function(c){
       return '<button type="button" class="ml-cat" data-ml-category-id="'+esc(liveProductId(c.id))+'" data-ml-category-name="'+esc(c.name||'Category')+'">'+mlCategoryPhotoMarkup(c.name,'ml-cat-photo')+'<span class="ml-cat-name">'+esc(c.name)+'</span></button>';
     }).join('');
     if(!catHtml) catHtml='<div class="ml-empty" style="width:100%;box-sizing:border-box;"><b>Categories are being prepared</b><span>Live categories will appear here as soon as they are published.</span></div>';
