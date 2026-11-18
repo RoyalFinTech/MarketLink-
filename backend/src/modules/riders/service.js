@@ -263,6 +263,9 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
             o.order_number, o.total AS order_total, o.payment_method,
             p.id AS cod_payment_id, p.amount AS cod_payment_amount,
             ccr.status AS cod_remittance_status,
+            ccr.review_note AS cod_remittance_review_note,
+            ccr.provider_reference AS cod_remittance_reference,
+            ccr.deposit_method AS cod_remittance_method,
             v.business_name AS vendor_name,
             (SELECT ra.status FROM rider_assignments ra
              WHERE ra.delivery_id = d.id AND ra.rider_id = d.rider_id
@@ -277,7 +280,10 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
        ORDER BY p.created_at DESC LIMIT 1
      ) p ON TRUE
      LEFT JOIN cod_cash_remittances ccr ON ccr.payment_id=p.id
-     LEFT JOIN rider_earnings re ON re.delivery_id = d.id
+     LEFT JOIN LATERAL (
+       SELECT amount FROM rider_earnings re
+       WHERE re.delivery_id=d.id ORDER BY re.created_at DESC,re.id DESC LIMIT 1
+     ) re ON TRUE
      WHERE ${conditions.join(' AND ')}
      ORDER BY d.created_at DESC
      LIMIT $${pi} OFFSET $${pi+1}`,
