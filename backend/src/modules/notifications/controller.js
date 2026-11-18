@@ -22,5 +22,5 @@ exports.sendToUser = wrap(async (req, res) => {
 
 
 exports.listCampaigns = wrap(async (req,res) => res.json({success:true,data:await svc.listCampaigns(req.query)}));
-exports.createCampaign = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.createCampaign({title:req.body.title,body:req.body.body,audience:req.body.audience,channels:req.body.channels,createdBy:req.user.id})}));
+exports.createCampaign = wrap(async (req,res) => res.status(201).json({success:true,data:await svc.createCampaign({title:req.body.title,body:req.body.body,audience:req.body.audience,channels:req.body.channels,recipientIds:req.body.recipientIds||[],createdBy:req.user.id})}));
 exports.sendCampaign = wrap(async (req,res) => res.json({success:true,data:await svc.sendCampaign(req.params.id,req.user.id)}));
