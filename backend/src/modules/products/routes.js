@@ -5,6 +5,7 @@ const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
 router.get('/', ctrl.list);
+router.get('/mine', authenticate, authorize('vendor'), ctrl.listMine);
 router.get('/:id', ctrl.getById);
 router.post('/', authenticate, authorize('vendor','admin','super_admin'), [
   body('name').trim().notEmpty().isLength({max:200}),
