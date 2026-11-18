@@ -42,7 +42,7 @@ describe('Pay on Delivery reconciliation',()=>{
  });
  test('checkout creates a pending COD payment without treating cash as paid',async()=>{
   transactionQuery.mockImplementation(async(sql)=>{
-   if(sql.startsWith('SELECT id, customer_id, total, payment_status'))return{rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending'}]};
+   if(sql.startsWith('SELECT id, customer_id, total, payment_status'))return{rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending',payment_method:'cod'}]};
    if(sql.startsWith('SELECT * FROM payments WHERE order_id=$1'))return{rows:[]};
    if(sql.startsWith("INSERT INTO payments (order_id, method"))return{rows:[payment]};
    return{rows:[]};
@@ -51,6 +51,31 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(result).toMatchObject({payment:{id:payment.id,status:'pending'},action:'cod_pending'});
   expect(transactionQuery.mock.calls.some(([sql])=>sql.includes("VALUES ($1,'cod',$2,'GMD','pending')"))).toBe(true);
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
+
+ test('rejects DAHA Wallet payment when the saved order selected Cash on Delivery',async()=>{
+  const clientQuery=jest.fn().mockResolvedValueOnce({rows:[{
+   id:payment.order_id,customer_id:'customer-id',total:'145.00',
+   payment_status:'pending',payment_method:'cod'
+  }]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  await expect(initiatePayment({
+   orderId:payment.order_id,method:'wallet',amount:145,customerId:'customer-id'
+  })).rejects.toMatchObject({statusCode:409,code:'PAYMENT_METHOD_MISMATCH'});
+  expect(clientQuery).toHaveBeenCalledTimes(1);
+  expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO payments|INSERT INTO transactions/i.test(sql))).toBe(false);
+ });
+
+ test('rejects Cash on Delivery initiation when the saved order selected DAHA Wallet',async()=>{
+  const clientQuery=jest.fn().mockResolvedValueOnce({rows:[{
+   id:payment.order_id,customer_id:'customer-id',total:'145.00',
+   payment_status:'pending',payment_method:'wallet'
+  }]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  await expect(initiatePayment({
+   orderId:payment.order_id,method:'cod',amount:145,customerId:'customer-id'
+  })).rejects.toMatchObject({statusCode:409,code:'PAYMENT_METHOD_MISMATCH'});
+  expect(clientQuery).toHaveBeenCalledTimes(1);
  });
 
  test('mobile-money method is recognized but blocked until Modem Pay and webhook are configured',async()=>{
