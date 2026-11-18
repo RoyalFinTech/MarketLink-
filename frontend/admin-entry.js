@@ -603,26 +603,26 @@
     shell.id = 'ml-admin-workspace';
     shell.innerHTML =
       '<aside class="ml-admin-sidebar"><div class="ml-admin-side-brand"><img src="./assets/marketlink-logo.png" alt="MarketLink" onerror="this.onerror=null;this.src=\'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png\';"><div><b>MARKETLINK</b><span>ADMINISTRATION</span></div></div>' +
-      '<div class="ml-admin-side-label">WORKSPACE</div>' +
+      '<div class="ml-admin-side-label">🧭 WORKSPACE</div>' +
       '<nav class="ml-admin-nav" aria-label="Admin navigation">' +
-      '<button data-ml-admin-route="overview" class="is-active"><span>⌂</span>Overview</button>' +
-      '<button data-ml-admin-route="vendors"><span>▣</span>Vendor approvals</button>' +
-      '<button data-ml-admin-route="riders"><span>♧</span>Rider approvals</button>' +
-      '<button data-ml-admin-route="promotions"><span>✦</span>Promotions</button>' +
-      '<div class="ml-admin-side-label">INSIGHTS & FINANCE</div>' +
-      '<button data-ml-admin-route="analytics"><span>▥</span>Analytics</button>' +
-      '<button data-ml-admin-route="revenue"><span>↗</span>Revenue reports</button>' +
-      '<button data-ml-admin-route="payouts"><span>⇄</span>Withdrawals</button>' +
-      '<button data-ml-admin-route="reconciliation"><span>◎</span>Reconciliation</button>' +
-      '<button data-ml-admin-route="ledger"><span>≡</span>DAHA ledger</button>' +
-      '<button data-ml-admin-route="exceptions"><span>⚠</span>Payment exceptions</button>' +
-      '<div class="ml-admin-side-label">MANAGEMENT</div>' +
-      '<button data-ml-admin-route="audit"><span>◷</span>Audit trail</button>' +
+      '<button data-ml-admin-route="overview" class="is-active"><span>🏠</span>Overview</button>' +
+      '<button data-ml-admin-route="vendors"><span>🏪</span>Vendor approvals</button>' +
+      '<button data-ml-admin-route="riders"><span>🛵</span>Rider approvals</button>' +
+      '<button data-ml-admin-route="promotions"><span>🎯</span>Promotions</button>' +
+      '<div class="ml-admin-side-label">📈 INSIGHTS & FINANCE</div>' +
+      '<button data-ml-admin-route="analytics"><span>📊</span>Analytics</button>' +
+      '<button data-ml-admin-route="revenue"><span>💹</span>Revenue reports</button>' +
+      '<button data-ml-admin-route="payouts"><span>💸</span>Withdrawals</button>' +
+      '<button data-ml-admin-route="reconciliation"><span>🧾</span>Reconciliation</button>' +
+      '<button data-ml-admin-route="ledger"><span>📒</span>DAHA ledger</button>' +
+      '<button data-ml-admin-route="exceptions"><span>🚨</span>Payment exceptions</button>' +
+      '<div class="ml-admin-side-label">🛠️ MANAGEMENT</div>' +
+      '<button data-ml-admin-route="audit"><span>🕵️</span>Audit trail</button>' +
       '<button data-ml-admin-route="support"><span>🎧</span>Support desk</button>' +
-      '<button data-ml-admin-route="communications"><span>📣</span>Communications</button>' +
-      '<button data-ml-admin-route="crm"><span>♙</span>CRM directory</button>' +
-      '<button data-ml-admin-route="settings"><span>⚙</span>System settings</button>' +
-      '<button data-ml-admin-route="ai"><span>✧</span>AI operations</button>' +
+      '<button data-ml-admin-route="communications"><span>📨</span>Communications</button>' +
+      '<button data-ml-admin-route="crm"><span>👥</span>CRM directory</button>' +
+      '<button data-ml-admin-route="settings"><span>⚙️</span>System settings</button>' +
+      '<button data-ml-admin-route="ai"><span>🤖</span>AI operations</button>' +
       '</nav><div class="ml-admin-side-foot"><span class="ml-admin-secure-dot"></span> Protected operations<br><small>Powered by Royal FinTech</small></div></aside>' +
       '<div class="ml-admin-main"><header class="ml-admin-topbar"><button id="ml-admin-menu" class="ml-admin-menu" aria-label="Open navigation">☰</button><img class="ml-admin-top-logo" src="./assets/marketlink-logo.png" alt="MarketLink Gambia" onerror="this.onerror=null;this.src=\'https://marketlink-gambia-frontend.onrender.com/assets/marketlink-logo.png\';"><div class="ml-admin-crumb"><span>MarketLink</span><b>/ Admin workspace</b></div><div class="ml-admin-top-actions"><span class="ml-admin-live"><i></i> Production</span><button class="ml-admin-refresh" id="ml-admin-refresh">↻ <span>Refresh</span></button><button class="ml-admin-signout" id="ml-admin-signout">Sign out</button></div></header>' +
       '<div class="ml-admin-pagehead"><div><div class="ml-admin-overline">ROYAL FINTECH · OPERATIONS</div><h1>Administration</h1><p>Monitor and manage the MarketLink marketplace.</p></div><div class="ml-admin-date" id="ml-admin-date"></div></div>' +
@@ -680,6 +680,9 @@
     css.textContent = [
       'html:has(#ml-admin-workspace),body:has(#ml-admin-workspace){width:100%!important;max-width:none!important;height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}',
       'body:has(#ml-admin-workspace) #app{display:block!important;position:relative!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;margin:0!important;overflow:visible!important}',
+      'body:has(#ml-admin-workspace) #app,body:has(#ml-admin-workspace) #scr-app,body:has(#ml-admin-workspace) #tab-admindash{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin-left:0!important;margin-right:0!important;left:auto!important;right:auto!important;transform:none!important}',
+      'body:has(#ml-admin-workspace) .ml-admin-main{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;grid-column:2!important}',
+      '@media(max-width:900px){#ml-admin-workspace{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;grid-template-columns:minmax(0,1fr)!important}#ml-admin-workspace .ml-admin-sidebar{display:none!important}#ml-admin-workspace .ml-admin-main{width:100%!important;max-width:100%!important;grid-column:1!important}}',
       'body:has(#ml-admin-workspace) #scr-app{display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important}',
       'body:has(#ml-admin-workspace) #scr-admin-login:not(.active){display:none!important;visibility:hidden!important;pointer-events:none!important}',
       '#tab-admindash{display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-height:none!important;overflow:visible!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}',
