@@ -2398,7 +2398,7 @@ function renderAuth(){
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="lphone" style="flex:1;"></div>'+
+      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="9-digit Gambian number" id="lphone" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9)" style="flex:1;"></div>'+
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:8px;">4-digit PIN</label>'+
       '<div class="pinr" id="pin-row"></div>'+
       '<button class="btn btn-p" onclick="doLogin()" id="lbtn">Sign In</button>'+
@@ -2418,7 +2418,7 @@ function renderAuth(){
       '<label style="color:var(--mu);font-size:11px;font-weight:600;display:block;margin-bottom:5px;">Phone Number</label>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">'+gmfHTML()+
       '<span style="color:var(--mu);font-size:13px;flex-shrink:0;">+220</span>'+
-      '<input class="inp" type="tel" inputmode="tel" placeholder="Phone number" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="S.regPhone=this.value;" style="flex:1;"></div>'+
+      '<input class="inp" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="9-digit Gambian number" id="rphone" value="'+sanitizeText(S.regPhone||'')+'" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9);S.regPhone=this.value;" style="flex:1;"></div>'+
       '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;padding:12px;background:rgba(13,115,119,0.1);border-radius:10px;border:1px solid rgba(13,115,119,0.3);">'+
       '<div id="agree-box" onclick="toggleAgree()" style="width:20px;height:20px;border-radius:5px;border:2px solid '+(S.agreed?'#0D7377':'rgba(255,255,255,0.15)')+';background:'+(S.agreed?'#0D7377':'transparent')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;">'+(S.agreed?'<span style="color:#fff;font-size:12px;font-weight:700;">✓</span>':'')+
       '</div><div style="font-size:12px;color:var(--mu);line-height:1.5;">I agree to the <span onclick="openSheet(\'sh-terms\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Terms & Conditions</span> and <span onclick="openSheet(\'sh-privacy\')" style="color:#0D7377;font-weight:600;cursor:pointer;">Privacy Policy</span></div></div>'+
@@ -2590,7 +2590,7 @@ async function doRegister(){
   var n=G('rname'),p=G('rphone'); if(!n||!p) return;
   S.regName=n.value.trim(); S.regPhone=p.value.trim();
   if(!S.regName){authErr('Enter your full name');return;}
-  if(S.regPhone.length<7){authErr('Enter a valid phone number');return;}
+  if(!/^\d{9}$/.test(S.regPhone)){authErr('Enter the full 9-digit Gambian mobile number, including its network prefix.');p.focus();return;}
   if(!S.agreed){authErr('Please agree to Terms & Privacy Policy');return;}
   var registerBtn=document.querySelector('#scr-auth .btn-p');
   if(registerBtn){registerBtn.textContent='Sending OTP…';registerBtn.disabled=true;}
