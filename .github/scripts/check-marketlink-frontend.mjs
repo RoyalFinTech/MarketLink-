@@ -212,6 +212,7 @@ assert.match(premiumJs, /function flattenMarketLinkCategoryTree/, 'Customer cate
 assert.match(premiumJs, /flattenMarketLinkCategoryTree\(liveCategories\)/, 'Home and category browsing must expose nested live categories');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/service.js'), 'utf8'), /WITH RECURSIVE category_branch/, 'Selecting a parent category must include products in its active child categories');
 assert.match(html, /marketlinkLoadVendorCategories/, 'Vendor onboarding must load categories from the live MarketLink category service');
+assert.match(html, /dataset\.loaded!==\x271\x27/, 'Vendor onboarding must wait for the live category list instead of submitting stale hard-coded options');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Vendor backend must validate the independently supplied WhatsApp contact number');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Rider backend must validate the independently supplied WhatsApp contact number');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.js'), 'utf8'), /PROFILE_IMAGE_MIN_DIMENSION = 512/, 'Backend profile photo validation must preserve the minimum image dimensions');
