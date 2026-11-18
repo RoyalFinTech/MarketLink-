@@ -241,12 +241,39 @@
   window.__ML_ADMIN_CRM_PROFILE=adminCrmProfile;
   window.__ML_ADMIN_CRM_NOTE=adminCrmAddNote;
 
+
+  async function adminCampaignView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Communications centre</h3><p>Loading campaign history…</p></div>';
+    try{
+      var d=await adminRequest('/notifications/admin/campaigns?page=1&limit=50','GET'),rows=d.items||[];
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Communications centre</h3><button onclick="window.__ML_ADMIN_CAMPAIGNS()">Refresh</button></div><div class="ml-profile-card" style="padding:14px;margin:12px 0"><h3 style="margin:0 0 12px">Create a campaign draft</h3><label class="ml-admin-label" for="ml-campaign-title">Message title</label><input id="ml-campaign-title" class="inp" maxlength="200" placeholder="e.g. MarketLink service update"><label class="ml-admin-label" for="ml-campaign-body" style="margin-top:10px">Message</label><textarea id="ml-campaign-body" class="inp" rows="3" maxlength="4000" placeholder="Write the message for recipients…"></textarea><label class="ml-admin-label" for="ml-campaign-audience" style="margin-top:10px">Audience</label><select id="ml-campaign-audience" class="inp"><option value="all">All active users</option><option value="customers">Customers</option><option value="vendors">Vendors</option><option value="riders">Riders</option><option value="admins">Administrators</option></select><div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0"><label><input type="checkbox" id="ml-campaign-email"> Email</label><label><input type="checkbox" id="ml-campaign-sms"> SMS</label><label><input type="checkbox" id="ml-campaign-push"> Push</label><span style="font-size:11px;color:var(--mu)">In-app delivery is included.</span></div><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_CAMPAIGN_CREATE()">Save campaign draft</button></div><div class="ml-section-head"><h3>Campaign history</h3></div>'+
+      (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">📣</div><div class="copy"><b>'+adminSafe(x.title)+'</b><span>'+adminSafe(x.audience)+' · '+adminSafe(x.status)+'</span><small>Recipients '+adminSafe(x.recipient_count)+' · Sent '+adminSafe(x.sent_count)+' · Failed/partial '+adminSafe(x.failed_count)+' · '+adminFormatDate(x.created_at)+'</small>'+(x.status==='draft'?'<button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_CAMPAIGN_SEND(&quot;'+adminSafe(x.id)+'&quot;)">Send campaign</button>':'')+'</div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No campaigns yet</b><span>Drafts and sent campaigns will appear here.</span></div>')+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Communications centre unavailable</b><span>'+adminSafe(e.message)+'</span></div>';}
+  }
+  async function adminCampaignCreate(){
+    var title=String(document.getElementById('ml-campaign-title').value||'').trim(),body=String(document.getElementById('ml-campaign-body').value||'').trim(),audience=document.getElementById('ml-campaign-audience').value;
+    if(!title){if(window.toast)window.toast('Enter a campaign title.','error');return;}
+    var channels={email:document.getElementById('ml-campaign-email').checked,sms:document.getElementById('ml-campaign-sms').checked,push:document.getElementById('ml-campaign-push').checked};
+    try{await adminRequest('/notifications/admin/campaigns','POST',{title:title,body:body,audience:audience,channels:channels});if(window.toast)window.toast('Campaign draft saved.','success');await adminCampaignView();}
+    catch(e){if(window.toast)window.toast(e.message,'error');}
+  }
+  async function adminCampaignSend(id){
+    if(!window.confirm('Send this campaign to the selected audience now? This action will contact real users.'))return;
+    try{var r=await adminRequest('/notifications/admin/campaigns/'+encodeURIComponent(id)+'/send','POST',{});if(window.toast)window.toast('Campaign processed. '+(r.sent_count||0)+' sent; '+(r.failed_count||0)+' failed or partial.','success');await adminCampaignView();}
+    catch(e){if(window.toast)window.toast(e.message,'error');}
+  }
+  window.__ML_ADMIN_CAMPAIGNS=adminCampaignView;
+  window.__ML_ADMIN_CAMPAIGN_CREATE=adminCampaignCreate;
+  window.__ML_ADMIN_CAMPAIGN_SEND=adminCampaignSend;
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
       overview: function () { if (api.adminRefresh) api.adminRefresh(); },
       audit: adminAuditView,
       support: adminSupportQueue,
+      communications: adminCampaignView,
       crm: adminCrmView,
       settings: adminSettingsView,
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
@@ -297,6 +324,7 @@
       '<div class="ml-admin-side-label">MANAGEMENT</div>' +
       '<button data-ml-admin-route="audit"><span>◷</span>Audit trail</button>' +
       '<button data-ml-admin-route="support"><span>🎧</span>Support desk</button>' +
+      '<button data-ml-admin-route="communications"><span>📣</span>Communications</button>' +
       '<button data-ml-admin-route="crm"><span>♙</span>CRM directory</button>' +
       '<button data-ml-admin-route="settings"><span>⚙</span>System settings</button>' +
       '<button data-ml-admin-route="promotions"><span>✦</span>Promotion requests</button>' +
