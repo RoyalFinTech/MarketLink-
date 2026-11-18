@@ -129,8 +129,8 @@ async function getAnalytics({ period='30d' }) {
   const [dailyRevenue, ordersByStatus, topCategories, signups, comparison] = await Promise.all([
     query(`WITH calendar AS (
              SELECT generate_series(
-               date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day'),
-               date_trunc('day',now()),INTERVAL '1 day'
+               date_trunc('day',now())-($1::int*INTERVAL '1 day'),
+               date_trunc('day',now())-INTERVAL '1 day',INTERVAL '1 day'
              ) AS day
            )
            SELECT calendar.day,
@@ -145,33 +145,35 @@ async function getAnalytics({ period='30d' }) {
              AND o.status='delivered' AND o.payment_status='confirmed'
            GROUP BY calendar.day ORDER BY calendar.day`, [days]),
     query(`SELECT status, count(*)::int AS count
-           FROM orders WHERE placed_at>=now()-($1::int*INTERVAL '1 day')
+           FROM orders WHERE placed_at>=date_trunc('day',now())-($1::int*INTERVAL '1 day')
+             AND placed_at<date_trunc('day',now())
            GROUP BY status ORDER BY count DESC`, [days]),
     query(`SELECT c.name, count(DISTINCT p.id)::int AS products,
                   count(DISTINCT o.id)::int AS orders
            FROM categories c LEFT JOIN products p ON p.category_id=c.id
            LEFT JOIN order_items oi ON oi.product_id=p.id
-           LEFT JOIN orders o ON o.id=oi.order_id AND o.placed_at>=now()-($1::int*INTERVAL '1 day')
+           LEFT JOIN orders o ON o.id=oi.order_id AND o.placed_at>=date_trunc('day',now())-($1::int*INTERVAL '1 day') AND o.placed_at<date_trunc('day',now())
              AND o.status='delivered' AND o.payment_status='confirmed'
            WHERE c.deleted_at IS NULL GROUP BY c.id,c.name
            ORDER BY orders DESC,products DESC LIMIT 8`, [days]),
     query(`SELECT date_trunc('day',created_at) AS day, count(*)::int AS users
-           FROM users WHERE created_at>=now()-($1::int*INTERVAL '1 day')
+           FROM users WHERE created_at>=date_trunc('day',now())-($1::int*INTERVAL '1 day')
+             AND created_at<date_trunc('day',now())
            GROUP BY 1 ORDER BY 1`, [days]),
     query(`SELECT
-             coalesce(sum(total) FILTER (WHERE placed_at>=date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+             coalesce(sum(total) FILTER (WHERE placed_at>=date_trunc('day',now())-($1::int*INTERVAL '1 day') AND placed_at<date_trunc('day',now())
                AND status='delivered' AND payment_status='confirmed'),0) AS current_gmv,
-             coalesce(sum(total) FILTER (WHERE placed_at>=date_trunc('day',now())-((2*$1::int-1)*INTERVAL '1 day')
-               AND placed_at<date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+             coalesce(sum(total) FILTER (WHERE placed_at>=date_trunc('day',now())-((2*$1::int)*INTERVAL '1 day')
+               AND placed_at<date_trunc('day',now())-($1::int*INTERVAL '1 day')
                AND status='delivered' AND payment_status='confirmed'),0) AS previous_gmv,
-             coalesce(sum(platform_net_fee) FILTER (WHERE placed_at>=date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+             coalesce(sum(platform_net_fee) FILTER (WHERE placed_at>=date_trunc('day',now())-($1::int*INTERVAL '1 day') AND placed_at<date_trunc('day',now())
                AND status='delivered' AND payment_status='confirmed'),0) AS current_net,
-             coalesce(sum(platform_net_fee) FILTER (WHERE placed_at>=date_trunc('day',now())-((2*$1::int-1)*INTERVAL '1 day')
-               AND placed_at<date_trunc('day',now())-(($1::int-1)*INTERVAL '1 day')
+             coalesce(sum(platform_net_fee) FILTER (WHERE placed_at>=date_trunc('day',now())-((2*$1::int)*INTERVAL '1 day')
+               AND placed_at<date_trunc('day',now())-($1::int*INTERVAL '1 day')
                AND status='delivered' AND payment_status='confirmed'),0) AS previous_net
            FROM orders
-           WHERE placed_at>=date_trunc('day',now())-((2*$1::int-1)*INTERVAL '1 day')
-             AND placed_at<date_trunc('day',now())+INTERVAL '1 day'`, [days]),
+           WHERE placed_at>=date_trunc('day',now())-((2*$1::int)*INTERVAL '1 day')
+             AND placed_at<date_trunc('day',now())`, [days]),
   ]);
   const currentGmv=Number(comparison.rows[0].current_gmv||0);
   const previousGmv=Number(comparison.rows[0].previous_gmv||0);
