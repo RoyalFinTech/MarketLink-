@@ -327,8 +327,10 @@
     if(!allowedPayment){toast('Choose an enabled payment method. Refresh the cart if payment options have changed.','warning');return;}
     var accountNumber='';
     if(activePaymentCaps.directMobileMoney&&['wave','afrimoney','qmoney'].indexOf(payMethod)>=0){
-      accountNumber=String(G('ml-checkout-mobile-number')&&G('ml-checkout-mobile-number').value||'').replace(/\D/g,'');
-      if(!/^(87|83|86)\d{7}$/.test(accountNumber)){toast('Enter the complete 9-digit Gambian mobile-money number, including its 87, 83 or 86 prefix.','error');if(G('ml-checkout-mobile-number'))G('ml-checkout-mobile-number').focus();return;}
+      var checkoutPrefix=String(G('ml-checkout-mobile-prefix')&&G('ml-checkout-mobile-prefix').value||'');
+      var checkoutSubscriber=String(G('ml-checkout-mobile-number')&&G('ml-checkout-mobile-number').value||'').replace(/\D/g,'');
+      if(!['87','83','86'].includes(checkoutPrefix)||checkoutSubscriber.length!==7){toast('Choose your mobile network and enter the 7 digits after its prefix (9 digits total).','error');if(G('ml-checkout-mobile-number'))G('ml-checkout-mobile-number').focus();return;}
+      accountNumber=checkoutPrefix+checkoutSubscriber;
     }
     var cartSnapshot=Object.assign({},S.cart||{}),cartItemsSnapshot=Object.assign({},CART_ITEMS||{});
     var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
@@ -1242,7 +1244,7 @@
     }).join('');
     var selectedMethod=normalizePaymentChoice(chosenPaymentLabel);
     var mobileMoneyInputHtml=S.paymentCapabilities&&S.paymentCapabilities.directMobileMoney&&['wave','afrimoney','qmoney'].indexOf(selectedMethod)>=0
-      ?'<div style="margin-top:12px"><label class="ml-field-label" for="ml-checkout-mobile-number">Your '+esc(chosenPaymentLabel)+' number (9 digits)</label><input id="ml-checkout-mobile-number" class="ml-daha-input" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="9" placeholder="Enter all 9 digits, including 87, 83 or 86"><small class="ml-daha-copy">Enter the complete Gambian number without +220. The selected network is sent separately.</small></div>':'';
+      ?'<div style="margin-top:12px"><label class="ml-field-label" for="ml-checkout-mobile-prefix">Your '+esc(chosenPaymentLabel)+' number</label><div style="display:grid;grid-template-columns:minmax(112px, .85fr) minmax(0,1.15fr);gap:8px"><select id="ml-checkout-mobile-prefix" class="ml-daha-input" aria-label="Mobile network prefix"><option value="87">Africell (87)</option><option value="83">QCell (83)</option><option value="86">Comium (86)</option></select><input id="ml-checkout-mobile-number" class="ml-daha-input" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="7" placeholder="7 subscriber digits"></div><small class="ml-daha-copy">Choose your network and enter the 7 digits after the prefix. MarketLink combines them into your 9-digit Gambian number.</small></div>':'';
     var itemsHtml=ids.map(function(id){var p=CART_ITEMS[id],qty=Number(S.cart[id]||0);return '<div class="ml-profile-row"><div class="ico">🛍️</div><div class="copy"><b>'+esc(p.name)+'</b><span>'+money(p.price)+' × '+qty+' · '+esc(p.vendorName||'Vendor')+'</span></div><strong style="color:#FFD778">'+money(Number(p.price||0)*qty)+'</strong></div>';}).join('');
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Your cart</h3><button onclick="window.ML_Premium.refreshCart()">Refresh</button></div><div class="ml-profile-card"><div class="ml-section-head"><h3>Items</h3><span style="color:#91A4B4;font-size:10px">'+vendorIds.length+' vendor'+(vendorIds.length===1?'':'s')+'</span></div>'+itemsHtml+'</div>'+
       (vendorIds.length>1?'<div class="ml-empty" style="margin-top:10px"><b>Multiple vendors in cart</b><span>MarketLink currently requires one vendor per checkout. Remove items from other vendors.</span></div>':'')+
