@@ -2651,7 +2651,8 @@
     root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Live payouts</div><div class="ml-hero-sub">Loading pending withdrawals from the production database…</div></div>';
     try{
       var r=await ML_API.admin.withdrawals({page:1,limit:100}),rows=normalizeProducts(r.data);
-      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><h3>Pending payouts</h3><button onclick="window.ML_Premium.refreshAdminPayouts()">Refresh</button></div>'+
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">DAHA WALLET · PAYOUT CONTROL</div><h3>Pending payouts</h3></div><button onclick="window.ML_Premium.refreshAdminPayouts()">↻ Refresh</button></div>'+
+      '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px"><b>Review guide:</b> This queue includes vendor, rider and affiliate withdrawals. Check the account holder and 9-digit Wave/AfriMoney destination before approval. The minimum request is D50. Approval starts a provider transfer; the wallet is debited only after a verified provider confirmation webhook. If the provider is not configured, no money is sent.</div>'+
       (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
         var status=String(x.status||'processing').toLowerCase();
         var providerStatus=String(x.provider_status||'').replace(/_/g,' ');
