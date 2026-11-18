@@ -48,7 +48,7 @@
   var style = document.createElement('style');
   style.id = 'ml-admin-isolation-style';
   style.textContent = [
-    '#scr-splash,#scr-onboard,#scr-auth,#scr-returning{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+    '#scr-onboard,#scr-auth,#scr-returning{display:none!important;visibility:hidden!important;pointer-events:none!important}',
     '#scr-admin-login,#scr-app{visibility:visible}',
     '#scr-admin-login.active{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;min-height:100dvh!important}',
     '#scr-admin-login.active~#ml-live-promo-ticker,#ml-live-promo-ticker,#ml-install-prompt{display:none!important}',
@@ -781,7 +781,7 @@
           if (!adminPin || !adminButton || !adminShield) buildAdminLogin();
         }
         var customerScreen = document.querySelector(
-          '#scr-splash.active,#scr-onboard.active,#scr-auth.active,#scr-returning.active'
+          '#scr-onboard.active,#scr-auth.active,#scr-returning.active'
         );
         if (!customerScreen) return;
         customerScreen.classList.remove('active');
@@ -794,7 +794,8 @@
     var app = document.getElementById('scr-app');
     var login = document.getElementById('scr-admin-login');
     if (app && app.classList.contains('active')) return;
-    if (login && !login.classList.contains('active')) openAdmin();
+    var splash = document.getElementById('scr-splash');
+    if (login && !login.classList.contains('active') && !(splash && splash.classList.contains('active'))) openAdmin();
   }
 
   function enablePinAutofillAndSubmit() {
@@ -808,6 +809,47 @@
       pin.setAttribute('inputmode', 'numeric');
       pin.setAttribute('maxlength', '4');
     }
+  }
+
+  function installAdminExplicitSubmit() {
+    if (window.__ML_ADMIN_EXPLICIT_SUBMIT_INSTALLED) return;
+    var button = document.getElementById('admin-lbtn');
+    var pin = document.getElementById('admin-password');
+    if (!button || !pin) return;
+    window.__ML_ADMIN_EXPLICIT_SUBMIT_INSTALLED = true;
+    function submit(event) {
+      if (event) { event.preventDefault(); event.stopPropagation(); if (event.stopImmediatePropagation) event.stopImmediatePropagation(); }
+      if (window.__ML_ADMIN_LOGIN_IN_FLIGHT) return;
+      var login = window.doAdminLogin;
+      if (typeof login !== 'function') {
+        var err = document.getElementById('admin-auth-err');
+        if (err) { err.textContent = 'Secure sign-in is still starting. Please wait a moment and try again.'; err.style.display = 'block'; }
+        return;
+      }
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Connecting securely…';
+      var errBox = document.getElementById('admin-auth-err');
+      if (errBox) { errBox.textContent = 'Connecting to the MarketLink server securely…'; errBox.style.display = 'block'; errBox.setAttribute('role','status'); }
+      window.__ML_ADMIN_LOGIN_IN_FLIGHT = true;
+      Promise.resolve().then(function () { return login(); }).catch(function (error) {
+        var box = document.getElementById('admin-auth-err');
+        if (box) { box.textContent = String(error && (error.message || error.error) || 'Sign-in could not be completed. Please try again.'); box.style.display = 'block'; box.setAttribute('role','alert'); }
+      }).finally(function () {
+        window.__ML_ADMIN_LOGIN_IN_FLIGHT = false;
+        var active = document.getElementById('scr-admin-login');
+        if (active && active.classList.contains('active')) {
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+          button.textContent = 'Sign in securely';
+        }
+      });
+    }
+    button.removeAttribute('onclick');
+    button.addEventListener('click', submit, true);
+    pin.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') submit(event);
+    }, true);
   }
 
   function showAdminBootDiagnostic(error) {
@@ -834,6 +876,7 @@
     normalizeAdminAuthResponse();
     installAdminPhoneSubmit();
     enablePinAutofillAndSubmit();
+    installAdminExplicitSubmit();
   } catch (bootError) {
     showAdminBootDiagnostic(bootError);
     if (window.console && console.error) console.error('[MarketLink Admin] Startup recovery:', bootError);
@@ -846,8 +889,8 @@
   });
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      window.setTimeout(function () { installAdminGuards(); enablePinAutofillAndSubmit(); }, 50);
-      window.setTimeout(function () { installAdminGuards(); enablePinAutofillAndSubmit(); }, 250);
+      window.setTimeout(function () { installAdminGuards(); enablePinAutofillAndSubmit(); installAdminExplicitSubmit(); }, 50);
+      window.setTimeout(function () { installAdminGuards(); enablePinAutofillAndSubmit(); installAdminExplicitSubmit(); }, 250);
     }, { once: true });
   } else {
     window.setTimeout(function () { installAdminGuards(); enablePinAutofillAndSubmit(); }, 50);
