@@ -134,6 +134,16 @@ describe('order creation ownership safeguards', () => {
     withTransaction.mockImplementation(callback => callback({ query: clientQuery }));
   });
 
+  test('rejects an order when no delivery address is supplied', async () => {
+    await expect(placeOrder({
+      customerId:'customer-1',
+      vendorId:'vendor-1',
+      items:[{productId:'product-1',quantity:1}],
+      paymentMethod:'cod'
+    })).rejects.toMatchObject({code:'DELIVERY_ADDRESS_REQUIRED',statusCode:400});
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
   test('rejects a delivery address that belongs to another customer', async () => {
     clientQuery.mockResolvedValueOnce({ rows: [] });
     await expect(placeOrder({
