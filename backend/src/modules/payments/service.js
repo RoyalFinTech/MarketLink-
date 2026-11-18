@@ -48,10 +48,13 @@ async function releaseOrderInventoryAfterPaymentFailure(orderId, reason){return 
 async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) {
   return withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
-      'SELECT id,customer_id,total,payment_status FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
+      'SELECT id,customer_id,total,payment_status,payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
       [orderId, customerId]
     );
     if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
+    if (String(order.payment_method || '').toLowerCase() !== 'wallet') {
+      throw new AppError('The selected payment method does not match this order. Return to checkout and place the order again.', 409, 'PAYMENT_METHOD_MISMATCH');
+    }
 
     const { rows: [existing] } = await client.query(
       "SELECT * FROM payments WHERE order_id=$1 AND method='wallet' AND status='confirmed' ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
@@ -139,10 +142,13 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
   // both start a provider charge for the same order and method.
   const reservation = await withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
-      'SELECT id, customer_id, total, payment_status FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
+      'SELECT id, customer_id, total, payment_status, payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
       [orderId, customerId]
     );
     if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
+    if (String(order.payment_method || '').toLowerCase() !== method) {
+      throw new AppError('The selected payment method does not match this order. Return to checkout and place the order again.', 409, 'PAYMENT_METHOD_MISMATCH');
+    }
     if (order.payment_status === 'confirmed') throw new AppError('Order is already paid.', 400, 'ALREADY_PAID');
     if (Math.abs(requestedAmount - Number(order.total)) > 0.01) throw new AppError('Payment amount does not match the order total.', 400, 'AMOUNT_MISMATCH');
 
