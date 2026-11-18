@@ -391,7 +391,7 @@
         GAMCEL:{prefix:'',legacy:/^9/}
       };
       var networkRule=networkRules[operatorEl.value];
-      if(national.length!==7){adminAuthErr('Enter all 7 digits of your Gambian mobile number.');nationalEl.focus();return;}
+      if(national.length!==7){adminAuthErr('Enter the 7 digits after the selected network prefix (9 digits total).');nationalEl.focus();return;}
       if(!networkRule||!networkRule.legacy.test(national)){adminAuthErr('The number does not match the selected network. Check the number and network, then try again.');nationalEl.focus();return;}
       phone=networkRule.prefix+national;
       if(idEl)idEl.value=phone;
