@@ -32,6 +32,7 @@
   style.textContent = [
     '#scr-splash,#scr-onboard,#scr-auth,#scr-returning{display:none!important;visibility:hidden!important;pointer-events:none!important}',
     '#scr-admin-login,#scr-app{visibility:visible}',
+    '#scr-admin-login.active{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;min-height:100dvh!important}',
     '#scr-admin-login.active~#ml-live-promo-ticker,#ml-live-promo-ticker,#ml-install-prompt{display:none!important}',
     /* Admin portal: light by default, and follows the device appearance in dark mode. */
     '#scr-admin-login{background:#f4f7fb!important;color:#152536!important;overflow-y:auto!important;height:auto!important;min-height:100%!important;padding-bottom:28px!important;color-scheme:light}',
@@ -109,8 +110,13 @@
   function openAdmin() {
     buildAdminLogin();
     if (typeof window.openAdminLogin === 'function') {
-      window.openAdminLogin();
-      return true;
+      try {
+        window.openAdminLogin();
+        var opened = document.getElementById('scr-admin-login');
+        if (opened && opened.classList.contains('active')) return true;
+      } catch (error) {
+        // Fall through to the isolated Admin-only screen activation below.
+      }
     }
     var login = document.getElementById('scr-admin-login');
     if (login) {
@@ -560,9 +566,39 @@
     window.setTimeout(maybeSubmit, 500);
   }
 
-  installAdminGuards();
-  normalizeAdminAuthResponse();
-  enablePinAutofillAndSubmit();
+  function showAdminBootDiagnostic(error) {
+    var active = document.querySelector('.screen.active');
+    if (active) return;
+    var login = document.getElementById('scr-admin-login');
+    if (login) {
+      login.classList.add('active');
+      login.style.display = 'block';
+      var note = document.getElementById('ml-admin-boot-diagnostic');
+      if (!note) {
+        note = document.createElement('div');
+        note.id = 'ml-admin-boot-diagnostic';
+        note.setAttribute('role', 'alert');
+        note.style.cssText = 'max-width:460px;margin:12px auto;padding:12px 14px;border:1px solid #d97706;border-radius:12px;background:#fff7ed;color:#7c2d12;font:12px/1.5 system-ui,sans-serif;overflow-wrap:anywhere';
+        login.appendChild(note);
+      }
+      note.textContent = 'Admin portal startup recovered. ' + String(error && error.message || 'A page component did not initialize.') + ' You can still sign in; if this persists, send this message to support.';
+    }
+  }
+
+  try {
+    installAdminGuards();
+    normalizeAdminAuthResponse();
+    enablePinAutofillAndSubmit();
+  } catch (bootError) {
+    showAdminBootDiagnostic(bootError);
+    if (window.console && console.error) console.error('[MarketLink Admin] Startup recovery:', bootError);
+  }
+  window.addEventListener('error', function (event) {
+    if (!document.querySelector('.screen.active')) showAdminBootDiagnostic(event.error || event.message);
+  });
+  window.addEventListener('unhandledrejection', function (event) {
+    if (!document.querySelector('.screen.active')) showAdminBootDiagnostic(event.reason);
+  });
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
       window.setTimeout(function () { installAdminGuards(); enablePinAutofillAndSubmit(); }, 50);
