@@ -680,16 +680,25 @@ async function processWebhook({ event, rawBody }) {
       await dahaWalletService.failDepositWebhook(client, payload, eventType);
       const orderId = metadata.orderId || metadata.order_id;
       const paymentId = metadata.paymentId || metadata.payment_id;
+      // Keep the same order-first lock order used by success webhooks and
+      // customer cancellation, so failed-payment events cannot deadlock them.
+      let lockedOrder = null;
+      if (orderId) {
+        const { rows: [orderRow] } = await client.query(
+          'SELECT id,status,payment_status FROM orders WHERE id=$1 FOR UPDATE', [String(orderId)]
+        );
+        lockedOrder = orderRow || null;
+      }
       let payment = null;
 
-      if (orderId && paymentId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(paymentId))) {
+      if (lockedOrder && orderId && paymentId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(paymentId))) {
         const { rows: [byId] } = await client.query(
           "SELECT p.* FROM payments p WHERE p.id=$1 AND p.order_id=$2 AND p.method IN ('modempay','wave','afrimoney','qmoney') AND p.status='pending' FOR UPDATE",
           [String(paymentId), String(orderId)]
         );
         payment = byId || null;
       }
-      if (!payment && orderId && providerRefs.length) {
+      if (!payment && lockedOrder && orderId && providerRefs.length) {
         const { rows: [byReference] } = await client.query(
           "SELECT p.* FROM payments p WHERE p.order_id=$1 AND p.provider_ref=ANY($2::text[]) AND p.method IN ('modempay','wave','afrimoney','qmoney') AND p.status='pending' ORDER BY p.created_at DESC LIMIT 1 FOR UPDATE",
           [String(orderId), providerRefs]
@@ -699,10 +708,7 @@ async function processWebhook({ event, rawBody }) {
 
       if (payment) {
         await client.query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'", [payment.id]);
-        const { rows: [order] } = await client.query(
-          'SELECT status FROM orders WHERE id=$1 FOR UPDATE',
-          [payment.order_id]
-        );
+        const order = lockedOrder;
         if (order && !['cancelled','delivered'].includes(order.status)) {
           const { rows: items } = await client.query(
             'SELECT product_id,quantity FROM order_items WHERE order_id=$1',
