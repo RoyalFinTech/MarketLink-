@@ -189,12 +189,23 @@ describe('customer order cancellation permissions', () => {
   test('allows a customer to cancel their own pending order', async () => {
     const order = { id:'order-1', status:'pending', payment_status:'pending', customer_id:'customer-1', vendor_id:'vendor-1', rider_id:null };
     query.mockResolvedValueOnce({ rows:[order] });
-    clientQuery.mockResolvedValueOnce({ rows:[{...order,status:'cancelled'}] }).mockResolvedValue({ rows:[] });
+    clientQuery.mockResolvedValueOnce({ rows:[order] }).mockResolvedValueOnce({ rows:[{...order,status:'cancelled'}] }).mockResolvedValue({ rows:[] });
     await expect(updateStatus('order-1','cancelled','customer-1',['customer'],'Customer requested cancellation')).resolves.toMatchObject({status:'cancelled'});
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status/i.test(sql))).toBe(true);
     const inventoryRestore = clientQuery.mock.calls.find(([sql]) => /UPDATE inventory SET quantity=quantity\+\$1/i.test(sql));
     expect(inventoryRestore).toBeDefined();
     expect(inventoryRestore[0]).toContain('variant_id IS NULL');
+  });
+
+  test('rechecks pending mobile-money payment under the order lock before cancellation', async () => {
+    const order = { id:'order-race', status:'pending', payment_status:'pending', payment_method:'wave', customer_id:'customer-1', vendor_id:'vendor-1', rider_id:null };
+    query.mockResolvedValueOnce({ rows:[order] }).mockResolvedValueOnce({ rows:[] });
+    clientQuery.mockResolvedValueOnce({ rows:[order] }).mockResolvedValueOnce({ rows:[{id:'payment-pending'}] });
+    await expect(updateStatus('order-race','cancelled','customer-1',['customer']))
+      .rejects.toMatchObject({code:'PAYMENT_ATTEMPT_PENDING',statusCode:409});
+    expect(clientQuery).toHaveBeenCalledTimes(2);
+    expect(clientQuery.mock.calls[0][0]).toContain('FOR UPDATE');
+    expect(clientQuery.mock.calls[1][0]).toContain("status='pending'");
   });
 
   test('blocks cancellation while a non-COD payment attempt is still pending', async () => {
