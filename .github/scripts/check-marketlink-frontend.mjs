@@ -216,6 +216,18 @@ assert.match(html, /dataset\.loaded!==\x271\x27/, 'Vendor onboarding must wait f
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Vendor backend must validate the independently supplied WhatsApp contact number');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Rider backend must validate the independently supplied WhatsApp contact number');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.js'), 'utf8'), /PROFILE_IMAGE_MIN_DIMENSION = 512/, 'Backend profile photo validation must preserve the minimum image dimensions');
+
+const uploadService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.js'), 'utf8');
+const uploadController = fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/controller.js'), 'utf8');
+const uploadTests = fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.test.js'), 'utf8');
+assert.match(uploadService, /async function uploadProfilePhoto/, 'Profile-photo uploads must have a dedicated backend persistence flow');
+assert.match(uploadService, /UPDATE customers SET profile_photo_url=\$1, updated_at=now\(\) WHERE user_id=\$2/, 'Profile-photo uploads must link the stored URL to the authenticated customer');
+assert.match(uploadController, /svc\.uploadProfilePhoto\(req\.file, req\.user\.id\)/, 'The multipart upload route must persist the customer profile photo');
+assert.match(uploadTests, /uploads the photo, persists its URL on the customer and serves the same image/, 'Profile-photo upload tests must cover backend storage, profile linking and image retrieval');
+assert.match(premiumJs, /ML_API\.uploads\.upload\(file,'profile-photo'\)/, 'Customer profile photo must upload through the authenticated backend endpoint');
+assert.doesNotMatch(premiumJs, /ML_API\.customers\.updateProfile\(\{profilePhotoUrl:uploadedUrl\}\)/, 'Profile photo must not depend on a second frontend profile-update request');
+assert.match(fs.readFileSync(path.join(root, '..', 'frontend/admin-entry.js'), 'utf8'), /ml-crm-profile-photo[\s\S]*?ml-crm-profile-placeholder/, 'CRM profile photo must show a visible fallback when an image cannot load');
+
 assert.match(premiumJs, /id="ml-daha-withdraw-number"/, 'Withdrawal must retain a manually entered payout destination independent of account sign-in phone');
 assert.match(premiumJs, /Cancel order/, 'Customers must see the cancellation action for eligible pending or accepted orders');
 assert.match(premiumJs, /ML_API\.orders\.cancel\(id,'Cancelled by customer\.'/,'Customer cancellation must call the authenticated order API');
@@ -253,6 +265,12 @@ assert.match(paymentUi, /window\.ML_Premium\.selectPayment/, 'Payment method cho
 assert.match(paymentUi, /selectPayment:selectPayment/, 'Payment method click handler must be exported to the checkout UI');
 assert.match(paymentUi, /placeOrder:placeLiveOrder/, 'Checkout submit button must call the authenticated live order flow');
 assert.match(paymentUi, /action!=='wallet_paid'/, 'DAHA Wallet checkout must require explicit confirmed wallet-payment response');
+
+assert.match(paymentUi, /selectDahaDepositMethod:selectDahaDepositMethod/, 'DAHA deposit selector must expose its change handler');
+assert.match(paymentUi, /onchange="window\.ML_Premium\.selectDahaDepositMethod\(this\.value\)"/, 'DAHA deposit selection must respond immediately to user input');
+assert.match(paymentUi, /var depositChoices=rails\.length\?rails:\['wave','afrimoney','qmoney'\]/, 'DAHA deposit methods must remain selectable while provider setup is pending');
+assert.match(paymentUi, /Provider credentials and webhook setup are still required/, 'DAHA must clearly explain that no deposit can start before payment configuration is ready');
+
 const paymentApi = fs.readFileSync(path.join(root, '..', 'frontend/index.html'), 'utf8');
 assert.match(paymentApi, /methods: function\(\)\{ return get\('\/payments\/methods'\); \}/, 'Checkout must load enabled payment capabilities from the backend');
 assert.match(paymentApi, /initiate: function\(orderId, method, amount, accountNumber\)\{ return post\('\/payments\/initiate'/, 'Checkout must route payment initiation to the authenticated backend endpoint');
