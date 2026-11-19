@@ -41,4 +41,32 @@ describe('product category filtering',()=>{
   expect(query.mock.calls[0][1]).toEqual([1,0]);
  });
 
+ test('keeps vendor and price filters aligned across list and count queries',async()=>{
+  query.mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[{count:'0'}]});
+  await list({vendorId:'vendor-1',minPrice:10,maxPrice:50});
+  const [listSql,listParams]=query.mock.calls[0];
+  const [countSql,countParams]=query.mock.calls[1];
+  expect(listSql).toContain('p.vendor_id=$1');
+  expect(listSql).toContain('p.price>=$2');
+  expect(listSql).toContain('p.price<=$3');
+  expect(countSql).toContain('p.vendor_id=$1');
+  expect(countSql).toContain('p.price>=$2');
+  expect(countSql).toContain('p.price<=$3');
+  expect(listParams).toEqual(['vendor-1',10,50,20,0]);
+  expect(countParams).toEqual(['vendor-1',10,50]);
+ });
+ test('keeps the vendors join in the count query for vendor-owned unpublished listings',async()=>{
+  query.mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[{count:'0'}]});
+  await list({vendorId:'vendor-1',includeAllStatuses:true});
+  const [countSql,countParams]=query.mock.calls[1];
+  expect(countSql).toContain('LEFT JOIN vendors v ON v.user_id=p.vendor_id');
+  expect(countSql).toContain('WHERE p.vendor_id=$1');
+  expect(countSql).not.toContain("p.status='active'");
+  expect(countParams).toEqual(['vendor-1']);
+ });
+ test('rejects unpublished catalogue access without vendor ownership before querying',async()=>{
+  await expect(list({includeAllStatuses:true})).rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
+  expect(query).not.toHaveBeenCalled();
+ });
+
 });
