@@ -529,7 +529,16 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
 
 async function markPaymentConfirmed(paymentId,actor=null){
   return withTransaction(async(client)=>{
-    const {rows:[payment]}=await client.query('SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);
+    // All payment mutation paths lock the order before its payment row.
+    const {rows:[paymentReference]}=await client.query(
+      'SELECT order_id FROM payments WHERE id=$1',[paymentId]);
+    if(!paymentReference)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+    const {rows:[order]}=await client.query(
+      'SELECT id,customer_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE',
+      [paymentReference.order_id]);
+    if(!order)throw new AppError('The order linked to this payment was not found.',404,'ORDER_NOT_FOUND');
+    const {rows:[payment]}=await client.query(
+      'SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,paymentReference.order_id]);
     if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
     if(payment.status==='confirmed')return payment;
     const {rows:[updated]}=await client.query(
@@ -537,10 +546,6 @@ async function markPaymentConfirmed(paymentId,actor=null){
       [paymentId]
     );
     await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1",[payment.order_id]);
-    const {rows:[order]}=await client.query(
-      'SELECT customer_id,total,status,order_number FROM orders WHERE id=$1',
-      [payment.order_id]
-    );
     if(order){
       await client.query(
         `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
