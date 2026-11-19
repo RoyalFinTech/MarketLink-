@@ -17,8 +17,9 @@ describe('customer payment refunds',()=>{
  beforeEach(()=>{
   jest.clearAllMocks();
   tx=jest.fn(async(sql,params=[])=>{
-   if(sql.includes('SELECT * FROM payments WHERE id=$1 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none',refund_amount:'0.00'}]};
-   if(sql.includes('SELECT customer_id FROM orders'))return{rows:[{customer_id:customerId}]};
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none',refund_amount:'0.00'}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
    if(sql.includes('UPDATE payments SET refund_status'))return{rows:[{id:paymentId,status:params[1]?'refunded':'partially_refunded',refund_status:'processed',refund_amount:params[0]}]};
    return{rows:[]};
@@ -28,7 +29,8 @@ describe('customer payment refunds',()=>{
  test('credits a full COD refund to DAHA Wallet atomically and marks the order refunded',async()=>{
   const result=await refund(paymentId,{reason:'Customer cancellation'},actor);
   expect(result).toMatchObject({id:paymentId,status:'refunded',refund_status:'processed'});
-  expect(tx.mock.calls.some(([sql])=>sql.includes('FOR UPDATE'))).toBe(true);
+  expect(tx.mock.calls[1][0]).toContain('orders WHERE id=$1 FOR UPDATE');
+  expect(tx.mock.calls[2][0]).toContain('payments WHERE id=$1 AND order_id=$2 FOR UPDATE');
   expect(tx.mock.calls.some(([sql])=>sql.includes("UPDATE orders SET payment_status='refunded'"))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO transactions")&&sql.includes("'refund'"))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO admin_action_logs")&&sql.includes('payment.refunded'))).toBe(true);
@@ -41,7 +43,9 @@ describe('customer payment refunds',()=>{
  });
  test('rejects duplicate refund requests without a second wallet credit',async()=>{
   tx.mockImplementation(async(sql)=>{
-   if(sql.includes('SELECT * FROM payments WHERE id=$1 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'refunded',refund_status:'processed',refund_amount:'100.00'}]};
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'refunded',refund_status:'processed',refund_amount:'100.00'}]};
    return{rows:[]};
   });
   await expect(refund(paymentId,{},actor)).rejects.toMatchObject({statusCode:409,code:'ALREADY_REFUNDED'});
@@ -53,8 +57,9 @@ describe('customer payment refunds',()=>{
  });
  test('fails safely when the customer wallet is missing',async()=>{
   tx.mockImplementation(async(sql)=>{
-   if(sql.includes('SELECT * FROM payments WHERE id=$1 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
-   if(sql.includes('SELECT customer_id FROM orders'))return{rows:[{customer_id:customerId}]};
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[]};
    return{rows:[]};
   });
