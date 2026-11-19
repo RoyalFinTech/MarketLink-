@@ -69,7 +69,7 @@ describe('vendor and rider onboarding uploads',()=>{
   const file={mimetype:'image/png',size:4,buffer:Buffer.from('logo'),originalname:'shop-logo.png'};
   const result=await upload(file,'vendor-logo',riderId);
   expect(result.url).toContain('/api/v1/uploads/');
-  expect(result.url.endsWith('/profile-content')).toBe(true);
+  expect(result.url.endsWith('/content')).toBe(true);
   expect(result.record.storage_backend).toBe('database');
   const image=await getPublicProfileContent(result.record.id);
   expect(image).toMatchObject({contentType:'image/png'});
