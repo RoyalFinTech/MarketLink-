@@ -755,8 +755,16 @@ async function processWebhook({ event, rawBody }) {
 
 async function refund(paymentId,{amount,reason},actor){
   return withTransaction(async(client)=>{
+    // Use the same order-first lock order as payment webhooks and cancellation.
+    // The initial lookup is deliberately non-locking; order_id is immutable.
+    const {rows:[paymentReference]}=await client.query(
+      'SELECT order_id FROM payments WHERE id=$1',[paymentId]);
+    if(!paymentReference)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
+    const {rows:[customerOrder]}=await client.query(
+      'SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE',[paymentReference.order_id]);
+    if(!customerOrder)throw new AppError('The customer order linked to this payment was not found.',409,'REFUND_ORDER_MISSING');
     const {rows:[payment]}=await client.query(
-      'SELECT * FROM payments WHERE id=$1 FOR UPDATE',[paymentId]);
+      'SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,paymentReference.order_id]);
     if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
     if(['processed','requested'].includes(String(payment.refund_status||'none')))
       throw new AppError('A refund has already been processed or is awaiting reconciliation.',409,'ALREADY_REFUNDED');
@@ -778,9 +786,6 @@ async function refund(paymentId,{amount,reason},actor){
       // The payment row stays locked so duplicate Admin requests cannot race.
       await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});
     }
-    const {rows:[customerOrder]}=await client.query(
-      'SELECT customer_id FROM orders WHERE id=$1 FOR UPDATE',[payment.order_id]);
-    if(!customerOrder)throw new AppError('The customer order linked to this payment was not found.',409,'REFUND_ORDER_MISSING');
     const {rows:[wallet]}=await client.query(
       'SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE',[customerOrder.customer_id]);
     if(!wallet)throw new AppError('The customer DAHA Wallet is not available for this refund.',409,'REFUND_WALLET_MISSING');
