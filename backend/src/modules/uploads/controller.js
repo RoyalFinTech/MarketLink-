@@ -22,7 +22,10 @@ exports.uploadMiddleware = upload.single('file');
 exports.uploadFile = wrap(async (req, res) => {
   if (!req.file) throw new AppError('No file uploaded. Send file as multipart/form-data field "file".', 400, 'NO_FILE');
   const purpose = req.body.purpose || req.query.purpose || 'general';
-  const result = await svc.upload(req.file, purpose, req.user.id);
+  const normalizedPurpose=String(purpose).toLowerCase().replace(/_/g,'-');
+  const result = normalizedPurpose==='profile-photo'||normalizedPurpose==='profile-image'||normalizedPurpose==='avatar'
+    ? await svc.uploadProfilePhoto(req.file, req.user.id)
+    : await svc.upload(req.file, purpose, req.user.id);
   res.status(201).json({ success: true, data: result });
 });
 
