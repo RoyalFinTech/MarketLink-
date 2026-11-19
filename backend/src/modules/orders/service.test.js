@@ -189,7 +189,7 @@ describe('customer order cancellation permissions', () => {
   test('allows a customer to cancel their own pending order', async () => {
     const order = { id:'order-1', status:'pending', payment_status:'pending', customer_id:'customer-1', vendor_id:'vendor-1', rider_id:null };
     query.mockResolvedValueOnce({ rows:[order] });
-    clientQuery.mockResolvedValueOnce({ rows:[order] }).mockResolvedValueOnce({ rows:[{...order,status:'cancelled'}] }).mockResolvedValueOnce({ rows:[{product_id:'product-1',quantity:1}] }).mockResolvedValue({ rows:[] });
+    clientQuery.mockResolvedValueOnce({ rows:[order] }).mockResolvedValueOnce({ rows:[{...order,status:'cancelled'}] }).mockResolvedValueOnce({ rows:[] }).mockResolvedValueOnce({ rows:[{product_id:'product-1',quantity:1}] }).mockResolvedValue({ rows:[] });
     await expect(updateStatus('order-1','cancelled','customer-1',['customer'],'Customer requested cancellation')).resolves.toMatchObject({status:'cancelled'});
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status/i.test(sql))).toBe(true);
     const inventoryRestore = clientQuery.mock.calls.find(([sql]) => /UPDATE inventory SET quantity=quantity\+\$1/i.test(sql));
