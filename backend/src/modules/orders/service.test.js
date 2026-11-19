@@ -192,6 +192,9 @@ describe('customer order cancellation permissions', () => {
     clientQuery.mockResolvedValueOnce({ rows:[{...order,status:'cancelled'}] }).mockResolvedValue({ rows:[] });
     await expect(updateStatus('order-1','cancelled','customer-1',['customer'],'Customer requested cancellation')).resolves.toMatchObject({status:'cancelled'});
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status/i.test(sql))).toBe(true);
+    const inventoryRestore = clientQuery.mock.calls.find(([sql]) => /UPDATE inventory SET quantity=quantity\+\$1/i.test(sql));
+    expect(inventoryRestore).toBeDefined();
+    expect(inventoryRestore[0]).toContain('variant_id IS NULL');
   });
 
   test('blocks cancellation while a non-COD payment attempt is still pending', async () => {
