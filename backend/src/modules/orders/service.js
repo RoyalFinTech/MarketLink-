@@ -339,6 +339,26 @@ async function updateStatus(orderId,status,userId,roles,note){
   }
 
   const result=await withTransaction(async(client)=>{
+    // For cancellation, serialize against provider confirmation using the order
+    // row as the first lock in both flows. Recheck payment state inside the
+    // transaction; the earlier preflight read can become stale.
+    if(status==='cancelled'){
+      const {rows:[lockedOrder]}=await client.query(
+        'SELECT id,status,payment_status,payment_method FROM orders WHERE id=$1 FOR UPDATE',[orderId]
+      );
+      if(!lockedOrder||lockedOrder.status!==order.status){
+        throw new AppError('This order was updated by another action. Refresh and try again.',409,'ORDER_STATE_CHANGED');
+      }
+      if(lockedOrder.payment_status==='confirmed'){
+        throw new AppError('This order has a confirmed payment and cannot be cancelled until a supported refund is processed.',409,'PAYMENT_REFUND_REQUIRED');
+      }
+      if(lockedOrder.payment_method&&lockedOrder.payment_method!=='cod'){
+        const {rows:[pendingPayment]}=await client.query(
+          "SELECT id FROM payments WHERE order_id=$1 AND method<>'cod' AND status='pending' FOR UPDATE",[orderId]
+        );
+        if(pendingPayment)throw new AppError('A mobile-money payment is still processing. Check its status before cancelling this order.',409,'PAYMENT_ATTEMPT_PENDING');
+      }
+    }
     // Optimistic concurrency guard: only the state we validated above may be
     // changed. PostgreSQL rechecks this predicate after any competing update.
     const {rows:[updatedOrder]}=await client.query(
