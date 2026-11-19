@@ -613,6 +613,16 @@ async function processWebhook({ event, rawBody }) {
         return { processed: true, ignored: true, eventId, eventType, reason: 'missing_order_id' };
       }
 
+      // Match cancellation's lock order: lock the order before the payment row.
+      // This prevents a customer cancellation racing a successful provider event.
+      const { rows: [orderState] } = await client.query(
+        'SELECT id,status,payment_status FROM orders WHERE id=$1 FOR UPDATE', [String(orderId)]
+      );
+      if (!orderState) {
+        logger.warn('Modem Pay success event references a missing order', { eventId, orderId });
+        return { processed: true, ignored: true, eventId, eventType, reason: 'order_not_found' };
+      }
+
       const paymentId = metadata.paymentId || metadata.payment_id;
       let payment = null;
       if (paymentId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(paymentId))) {
