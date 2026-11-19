@@ -208,6 +208,22 @@ async function upload(file, purpose, uploaderId) {
   const url=stored.publicUrl||(publicApiBase()+'/api/v1/uploads/'+record.id+'/content');
   return {url,record:Object.assign({},record,{file_url:url})};
 }
+async function uploadProfilePhoto(file, uploaderId) {
+  const uploaded = await upload(file, 'profile-photo', uploaderId);
+  try {
+    const { rows:[profile] } = await query(
+      'UPDATE customers SET profile_photo_url=$1, updated_at=now() WHERE user_id=$2 RETURNING user_id',
+      [uploaded.url, uploaderId]
+    );
+    if (!profile) throw new AppError('A customer profile could not be found for this account.',404,'CUSTOMER_NOT_FOUND');
+    return Object.assign({}, uploaded, { profilePhotoUrl: uploaded.url });
+  } catch (error) {
+    // Do not leave an unreferenced object behind if the profile link cannot be saved.
+    await deleteFileByUrl(uploaded.url, uploaderId).catch(() => {});
+    throw error;
+  }
+}
+
 async function getPublicProfileContent(fileId) {
   const {rows:[f]}=await query("SELECT content_bytes,content_type,purpose,file_type FROM file_uploads WHERE id=$1 AND deleted_at IS NULL",[fileId]);
   const purpose=String(f&&f.purpose||'').toLowerCase().replace(/_/g,'-');
@@ -360,4 +376,4 @@ async function removeProfilePhoto(requesterId) {
   }
   return {removed:true,profilePhotoUrl:null};
 }
-module.exports={upload,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,getPublicProfileContent,validateFile};
+module.exports={upload,uploadProfilePhoto,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,getPublicProfileContent,validateFile};
