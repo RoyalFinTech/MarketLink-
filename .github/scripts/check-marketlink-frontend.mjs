@@ -270,6 +270,8 @@ assert.match(paymentUi, /selectDahaDepositMethod:selectDahaDepositMethod/, 'DAHA
 assert.match(paymentUi, /onchange="window\.ML_Premium\.selectDahaDepositMethod\(this\.value\)"/, 'DAHA deposit selection must respond immediately to user input');
 assert.match(paymentUi, /var depositChoices=rails\.length\?rails:\['wave','afrimoney','qmoney'\]/, 'DAHA deposit methods must remain selectable while provider setup is pending');
 assert.match(paymentUi, /Provider credentials and webhook setup are still required/, 'DAHA must clearly explain that no deposit can start before payment configuration is ready');
+assert.match(paymentUi, /Wallet deposit · '\+esc\(methodLabel\)/, 'Wallet deposit history must display the selected payment rail beside its status');
+assert.match(paymentUi, /via '\+esc\(pendingMethodLabel\)/, 'Pending wallet deposits must display the selected payment rail');
 
 const paymentApi = fs.readFileSync(path.join(root, '..', 'frontend/index.html'), 'utf8');
 assert.match(paymentApi, /methods: function\(\)\{ return get\('\/payments\/methods'\); \}/, 'Checkout must load enabled payment capabilities from the backend');
