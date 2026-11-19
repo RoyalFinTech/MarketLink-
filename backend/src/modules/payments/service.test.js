@@ -57,9 +57,10 @@ describe('Pay on Delivery reconciliation',()=>{
    return{rows:[]};
   });
   transactionQuery=jest.fn(async(sql)=>{
-   if(sql.startsWith('SELECT * FROM payments WHERE id=$1 FOR UPDATE'))return{rows:[payment]};
+   if(sql.startsWith('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:payment.order_id}]};
+   if(sql.startsWith('SELECT id,customer_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:payment.order_id,...deliveredOrder}]};
+   if(sql.startsWith('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[payment]};
    if(sql.startsWith("UPDATE payments SET status='confirmed'"))return{rows:[{...payment,status:'confirmed'}]};
-   if(sql.startsWith('SELECT customer_id,total,status,order_number FROM orders'))return{rows:[deliveredOrder]};
    return{rows:[]};
   });
   withTransaction.mockImplementation(async(work)=>work({query:transactionQuery}));
@@ -202,6 +203,8 @@ describe('Pay on Delivery reconciliation',()=>{
  });
  test('records the Admin actor in the payment audit log and settles once confirmed',async()=>{
   const result=await confirmPayment(payment.id,'admin-id',['admin']);
+  expect(transactionQuery.mock.calls[1][0]).toContain('orders WHERE id=$1 FOR UPDATE');
+  expect(transactionQuery.mock.calls[2][0]).toContain('payments WHERE id=$1 AND order_id=$2 FOR UPDATE');
   expect(result.payment).toMatchObject({id:payment.id,status:'confirmed'});
   expect(result.settlement).toMatchObject({settled:true});
   expect(ordersService.settleOrderFinancials).toHaveBeenCalledTimes(1);
