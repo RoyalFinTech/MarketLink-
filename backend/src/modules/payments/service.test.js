@@ -2,12 +2,12 @@ jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 jest.mock('../../integrations/modempay',()=>({isConfigured:jest.fn(()=>false),isWebhookConfigured:jest.fn(()=>false),isH2H:jest.fn(()=>false),isH2HApproved:jest.fn(()=>false),createPaymentIntent:jest.fn()}));
 jest.mock('../orders/service',()=>({settleOrderFinancials:jest.fn()}));
-jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn()}));
+jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn(),failDepositWebhook:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
 const modemPay=require('../../integrations/modempay');
-const {confirmPayment,listPendingCodPayments,initiatePayment,submitCodCashRemittance}=require('./service');
+const {confirmPayment,listPendingCodPayments,initiatePayment,submitCodCashRemittance,processWebhook}=require('./service');
 
 const payment={
  id:'11111111-1111-4111-8111-111111111111',
@@ -18,6 +18,31 @@ const deliveredOrder={
  customer_id:'33333333-3333-4333-8333-333333333333',
  total:'145.00',status:'delivered',order_number:'ML-TEST-0001'
 };
+
+describe('payment webhook lock ordering',()=>{
+ beforeEach(()=>jest.clearAllMocks());
+ test('locks the order before the payment row when a provider reports payment failure',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'webhook-event-1'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.id,order_id:payment.order_id,status:'pending',method:'wave'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[{product_id:'product-1',quantity:2}]})
+   .mockResolvedValue({rows:[]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  await processWebhook({
+   event:{event:'charge.failed',payload:{
+    id:'provider-charge-1',status:'failed',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+   }},
+   rawBody:'{}'
+  });
+  expect(clientQuery.mock.calls[1][0]).toContain('FROM orders WHERE id=$1 FOR UPDATE');
+  expect(clientQuery.mock.calls[2][0]).toContain('FROM payments p');
+  expect(clientQuery.mock.calls[2][0]).toContain('FOR UPDATE');
+  expect(clientQuery.mock.calls[3][0]).toContain("UPDATE payments SET status='failed'");
+ });
+});
 
 describe('Pay on Delivery reconciliation',()=>{
  let transactionQuery;
