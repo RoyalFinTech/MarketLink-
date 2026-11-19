@@ -1379,23 +1379,32 @@
       }
     }catch(imageReadError){toast(imageReadError.message||'Could not read this image. Please choose a valid JPG or PNG.','error');return false;}
     var oldPhoto=liveProfile&&liveProfile.profile_photo_url||null;
-    var uploadedUrl=null,previewUrl='',profileUpdateAttempted=false;
+    var uploadedUrl=null,previewUrl='';
     try{previewUrl=await makeProfilePhotoPreview(file);}catch(previewError){}
     try{
       toast('Uploading your profile photo…','info');
+      // The upload endpoint now stores the image and links it to this customer
+      // in one backend operation. This avoids a second profile update request
+      // racing the upload or failing after the file has already been stored.
       var uploaded=await ML_API.uploads.upload(file,'profile-photo');
       uploadedUrl=uploaded&&uploaded.url;
       if(!uploadedUrl||!/^https?:\/\//i.test(uploadedUrl))throw {error:'MarketLink did not receive a valid saved image URL. Please retry or contact support.'};
-      profileUpdateAttempted=true;
-      await ML_API.customers.updateProfile({profilePhotoUrl:uploadedUrl});
-      // Do not show a success message based only on the upload response: confirm
-      // that a fresh profile read returns the exact saved URL.
+      try{
+        if(previewUrl){
+          localStorage.setItem('ml_profile_photo_preview',previewUrl);
+          localStorage.setItem('ml_profile_photo_preview_url',uploadedUrl);
+        }
+      }catch(previewStorageError){}
+      // Verify the persisted customer record, but keep the server-linked image
+      // if a later read is interrupted: the upload endpoint has already saved it.
       var verifiedResponse=await ML_API.customers.getProfile();
       var verifiedProfile=verifiedResponse&&verifiedResponse.data;
       if(!verifiedProfile||String(verifiedProfile.profile_photo_url||'')!==String(uploadedUrl)){
-        throw {error:'The photo uploaded, but MarketLink could not confirm it was saved to your profile. Please try again.'};
+        throw {error:'The image reached MarketLink storage, but the profile refresh did not confirm the saved link. Refresh your profile before retrying.'};
       }
-      await verifyProfilePhotoImage(uploadedUrl);
+      // A local preview remains available if a mobile browser temporarily cannot
+      // decode the server image URL. It never replaces the backend URL in CRM.
+      await verifyProfilePhotoImage(uploadedUrl).catch(function(){return false;});
       liveProfile=verifiedProfile;
       S.profilePhoto=uploadedUrl;
       if(S.user){S.user.profilePhotoUrl=uploadedUrl;S.user.avatarUrl=uploadedUrl;}
@@ -1415,14 +1424,9 @@
       }
       return true;
     }catch(e){
-      // If the server update succeeded but the URL cannot be verified/displayed,
-      // restore the previous profile reference before cleaning up the new upload.
-      if(profileUpdateAttempted){
-        try{await ML_API.customers.updateProfile({profilePhotoUrl:oldPhoto});}catch(rollbackError){}
-      }
-      if(uploadedUrl&&uploadedUrl!==oldPhoto){
-        try{await ML_API.uploads.deleteByUrl(uploadedUrl);}catch(cleanupError){}
-      }
+      // Never delete a profile image after the backend has returned its URL:
+      // it may already be linked to the customer and visible in Admin CRM.
+      // The backend upload endpoint cleans up only if it cannot save the link.
       toast(e.error||e.message||'Could not save your profile photo. Please try again.','error');
       return false;
     }
