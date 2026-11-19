@@ -363,7 +363,7 @@ async function updateStatus(orderId,status,userId,roles,note){
     if(status==='cancelled'){
       const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);
       for(const item of items){
-        await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND quantity IS NOT NULL',[item.quantity,item.product_id]);
+        await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL',[item.quantity,item.product_id]);
       }
       await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered')",[orderId]);
     }
