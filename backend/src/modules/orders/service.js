@@ -104,6 +104,10 @@ async function getById(id, userId, roles) {
   const { rows } = await query(`
     SELECT o.*,
       EXISTS(SELECT 1 FROM payments pending_payment WHERE pending_payment.order_id=o.id AND pending_payment.method<>'cod' AND pending_payment.status='pending') AS payment_attempt_pending,
+      (SELECT json_build_object('id',latest_payment.id,'method',latest_payment.method,'status',latest_payment.status)
+       FROM payments latest_payment
+       WHERE latest_payment.order_id=o.id AND latest_payment.status IN ('pending','confirmed')
+       ORDER BY latest_payment.created_at DESC LIMIT 1) AS payment_attempt,
       u.full_name AS customer_name,
       v.business_name AS vendor_name,
       COALESCE(json_agg(json_build_object(
