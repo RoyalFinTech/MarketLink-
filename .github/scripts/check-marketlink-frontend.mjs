@@ -235,6 +235,7 @@ assert.match(premiumJs, /ML_API\.orders\.cancel\(id,'Cancelled by customer\.'/,'
 assert.match(premiumJs, /pendingForThisOrder/, 'Checkout failures must preserve orders with a real pending payment attempt');
 assert.match(premiumJs, /async function recoverPendingCheckoutPayment\(order,payMethod,accountNumber\)/, 'Checkout must recover an existing payment attempt when the initiation response is lost');
 assert.match(premiumJs, /latestOrder\.payment_attempt/, 'Order detail must be used to locate an existing payment attempt without creating another order');
+assert.match(premiumJs, /if\(status==='pending'&&payMethod!=='cod'\)/, 'Recovered Cash on Delivery orders must not be polled as provider transactions');
 assert.match(premiumJs, /Payment instructions are not available yet/, 'Checkout must explain how to handle a recovered payment without a provider link');
 assert.match(premiumJs, /payment attempt is still processing for this order\. Do not place another order/, 'Checkout must warn customers not to duplicate orders while payment remains pending');
 assert.match(premiumJs, /Payment could not be completed; order cancelled and stock released/, 'Failed checkout attempts must cancel the unconfirmed order to release inventory');
