@@ -854,9 +854,16 @@ async function refund(paymentId,{amount,reason},actor){
         const {rows:items}=await client.query(
           'SELECT product_id,quantity FROM order_items WHERE order_id=$1',[payment.order_id]);
         for(const item of items){
-          await client.query(
-            'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL',
+          const {rows:[restored]}=await client.query(
+            'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL RETURNING product_id',
             [item.quantity,item.product_id]);
+          if(!restored){
+            throw new AppError(
+              'MarketLink could not restore inventory for this refunded order. The refund has been rolled back; Admin must reconcile the stock record first.',
+              409,
+              'REFUND_INVENTORY_RESTORE_FAILED'
+            );
+          }
         }
         const cancellationReason='Payment refunded by Admin: '+(String(reason||'Customer refund').trim().slice(0,400)||'Customer refund');
         await client.query(
