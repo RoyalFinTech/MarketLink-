@@ -317,7 +317,7 @@
     if(!attempt||!attempt.id||String(attempt.method||'').toLowerCase()!==String(payMethod||'').toLowerCase())return false;
     var status=String(attempt.status||'').toLowerCase(),nextStep=null,redirectUrl=null,payment=attempt;
     if(status==='failed'||status==='refunded'||status==='partially_refunded')return false;
-    if(status==='pending'){
+    if(status==='pending'&&payMethod!=='cod'){
       try{
         var statusResponse=await ML_API.payments.status(attempt.id),statusData=statusResponse&&statusResponse.data?statusResponse.data:statusResponse;
         if(statusData){
