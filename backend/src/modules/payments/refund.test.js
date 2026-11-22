@@ -18,7 +18,7 @@ describe('customer payment refunds',()=>{
   jest.clearAllMocks();
   tx=jest.fn(async(sql,params=[])=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
-   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none',refund_amount:'0.00'}]};
    if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
@@ -36,6 +36,38 @@ describe('customer payment refunds',()=>{
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO transactions")&&sql.includes("'refund'"))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO admin_action_logs")&&sql.includes('payment.refunded'))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO notifications")&&sql.includes('payment_refunded'))).toBe(true);
+ });
+ test('cancels an undispatched paid order and restores only its base inventory during a full refund',async()=>{
+  tx.mockImplementation(async(sql,params=[])=>{
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'pending'}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'wallet',amount:'100.00',status:'confirmed',refund_status:'none'}]};
+   if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
+   if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
+   if(sql.includes('SELECT product_id,quantity FROM order_items'))return{rows:[{product_id:'product-1',quantity:2}]};
+   if(sql.includes('UPDATE payments SET refund_status'))return{rows:[{id:paymentId,status:'refunded',refund_status:'processed',refund_amount:100}]};
+   return{rows:[]};
+  });
+  await expect(refund(paymentId,{reason:'Customer cancelled before dispatch'},actor))
+   .resolves.toMatchObject({id:paymentId,status:'refunded'});
+  const stockRestore=tx.mock.calls.find(([sql])=>sql.includes('UPDATE inventory SET quantity=quantity+$1'));
+  expect(stockRestore).toBeDefined();
+  expect(stockRestore[0]).toContain('variant_id IS NULL');
+  expect(tx.mock.calls.some(([sql])=>sql.includes("status='cancelled'")&&sql.includes("payment_status='refunded'"))).toBe(true);
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO order_status_history'))).toBe(true);
+ });
+ test('does not automatically refund an order already assigned to a rider or in transit',async()=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'on_the_way'}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
+   if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
+   return{rows:[]};
+  });
+  await expect(refund(paymentId,{reason:'Customer reports delay'},actor))
+   .rejects.toMatchObject({statusCode:409,code:'REFUND_ORDER_IN_PROGRESS'});
+  expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
  });
  test('blocks a refund when vendor, rider or affiliate earnings have already been settled',async()=>{
   tx.mockImplementation(async(sql)=>{
