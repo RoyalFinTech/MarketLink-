@@ -42,7 +42,47 @@ const paystackAdapter = { name:'paystack', charge:async()=>{throw new AppError('
 const flutterwaveAdapter = { name:'flutterwave', charge:async()=>{throw new AppError('Flutterwave integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, refund:async()=>{throw new AppError('Flutterwave integration is not configured.',503,'PROVIDER_UNAVAILABLE');}, verify:async()=>{throw new AppError('Flutterwave integration is not configured.',503,'PROVIDER_UNAVAILABLE');} };
 const PROVIDERS = { modempay:modemAdapter, wave:modemAdapter, afrimoney:modemAdapter, qmoney:modemAdapter, stripe:stripeAdapter, paystack:paystackAdapter, flutterwave:flutterwaveAdapter };
 async function checkIdempotency(key){const {rows}=await query("SELECT * FROM payments WHERE provider_ref = $1 AND status IN ('confirmed','pending')",[key]);return rows.length?rows[0]:null;}
-async function releaseOrderInventoryAfterPaymentFailure(orderId, reason){return withTransaction(async(client)=>{const {rows:[order]}=await client.query('SELECT id,status,payment_status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);if(!order)return{released:false,reason:'ORDER_NOT_FOUND'};if(order.payment_status==='confirmed')return{released:false,reason:'PAYMENT_ALREADY_CONFIRMED'};if(!['pending','accepted','preparing','awaiting_rider'].includes(order.status))return{released:false,reason:'ORDER_NOT_RELEASEABLE'};const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);for(const item of items)await client.query('UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL',[item.quantity,item.product_id]);await client.query("UPDATE orders SET status='cancelled',cancellation_reason=$2 WHERE id=$1",[orderId,reason||'Payment initiation failed; inventory released.']);await client.query("INSERT INTO order_status_history (order_id,status,note) VALUES($1,'cancelled',$2)",[orderId,reason||'Payment initiation failed; inventory released.']);await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered','cancelled')",[orderId]);return{released:true};});}
+async function releaseOrderInventoryAfterPaymentFailure(orderId,paymentId,reason,releaseInventory=true){
+  return withTransaction(async(client)=>{
+    // Every failure path follows the same order-first lock order as cancellation,
+    // refund and provider webhooks. The payment must still be pending under lock.
+    const {rows:[order]}=await client.query(
+      'SELECT id,status,payment_status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);
+    if(!order)return{released:false,reason:'ORDER_NOT_FOUND'};
+    if(order.payment_status==='confirmed')return{released:false,reason:'PAYMENT_ALREADY_CONFIRMED'};
+    const {rows:[payment]}=await client.query(
+      'SELECT id,status FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,orderId]);
+    if(!payment)return{released:false,reason:'PAYMENT_NOT_FOUND'};
+    if(payment.status!=='pending')return{released:false,reason:'PAYMENT_NOT_PENDING'};
+    await client.query(
+      "UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'",[paymentId]);
+    if(!releaseInventory)return{released:false,reason:'PAYMENT_FAILED_STOCK_HELD'};
+    if(!['pending','accepted','preparing','awaiting_rider'].includes(order.status)){
+      return{released:false,reason:'ORDER_NOT_RELEASEABLE'};
+    }
+    const failureReason=reason||'Payment failed; inventory released.';
+    const {rows:items}=await client.query(
+      'SELECT product_id,quantity FROM order_items WHERE order_id=$1',[orderId]);
+    for(const item of items){
+      const {rows:[restored]}=await client.query(
+        'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL RETURNING product_id',
+        [item.quantity,item.product_id]);
+      if(!restored)throw new AppError(
+        'Payment failed, but MarketLink could not restore the reserved inventory. The failure transaction was rolled back for Admin reconciliation.',
+        409,'PAYMENT_FAILURE_INVENTORY_RESTORE_FAILED');
+    }
+    await client.query(
+      "UPDATE orders SET status='cancelled',payment_status='failed',cancellation_reason=$2 WHERE id=$1",
+      [orderId,failureReason]);
+    await client.query(
+      "INSERT INTO order_status_history (order_id,status,note) VALUES($1,'cancelled',$2)",
+      [orderId,failureReason]);
+    await client.query(
+      "UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered','cancelled')",
+      [orderId]);
+    return{released:true};
+  });
+}
 
 
 async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) {
@@ -207,11 +247,17 @@ async function initiatePayment({ orderId, method, amount, currency='GMD', custom
       const {rows:[pendingAttempt]}=await query('SELECT * FROM payments WHERE id=$1',[payment.id]);
       return {payment:pendingAttempt||payment,action:'continue',status:'pending',providerStatus:'unknown'};
     }
-    try { await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'", [payment.id]); }
-    catch (updateErr) { logger.error('Could not mark failed payment attempt',{paymentId:payment.id,error:updateErr.message}); }
-    if (err && ((err.code === 'PROVIDER_UNAVAILABLE') || (Number(err.status) >= 400 && Number(err.status) < 500))) {
-      try { await releaseOrderInventoryAfterPaymentFailure(orderId, err.error || 'Payment initiation failed.'); }
-      catch (releaseErr) { logger.error('Failed to release inventory after payment initiation failure',{orderId,error:releaseErr.message}); }
+    const releaseInventory = Boolean(err && (
+      err.code === 'PROVIDER_UNAVAILABLE' ||
+      (Number(err.status) >= 400 && Number(err.status) < 500)
+    ));
+    try {
+      await releaseOrderInventoryAfterPaymentFailure(
+        orderId,payment.id,err.error||'Payment initiation failed.',releaseInventory);
+    } catch (failureHandlingError) {
+      logger.error('Could not reconcile failed payment attempt',{
+        paymentId:payment.id,orderId,error:failureHandlingError.message
+      });
     }
     throw err;
   }
@@ -313,11 +359,16 @@ async function getPaymentStatus(paymentId, actorId, roles) {
   }
 
   if (['failed','cancelled','abandoned','expired'].includes(providerStatus)) {
-    await query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'",[paymentId]);
-    try { await releaseOrderInventoryAfterPaymentFailure(payment.order_id,'The payment provider reported '+providerStatus+'.'); }
-    catch (e) { logger.error('Could not release inventory after provider failure',{paymentId,orderId:payment.order_id,error:e.message}); }
+    try {
+      await releaseOrderInventoryAfterPaymentFailure(
+        payment.order_id,paymentId,'The payment provider reported '+providerStatus+'.',true);
+    } catch (e) {
+      logger.error('Could not reconcile provider payment failure',{
+        paymentId,orderId:payment.order_id,error:e.message
+      });
+    }
     payment = await findOwnedPayment(paymentId, actorId, roles);
-    return { payment, status:'failed', providerStatus };
+    return { payment, status:payment.status==='failed'?'failed':'pending', providerStatus };
   }
   return { payment, status:providerStatus === 'processing' ? 'processing' : 'pending', providerStatus, nextStep, redirectUrl:nextStep && nextStep.launch_url || null };
 }
