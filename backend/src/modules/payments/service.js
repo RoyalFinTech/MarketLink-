@@ -782,6 +782,33 @@ async function refund(paymentId,{amount,reason},actor){
       throw new AppError('Enter a valid refund amount not exceeding the payment amount.',400,'INVALID_AMOUNT');
     if(refundAmount!==paymentAmount)
       throw new AppError('Partial refunds are not enabled yet. Process a full refund so the customer ledger and revenue reconciliation remain consistent.',409,'PARTIAL_REFUND_NOT_SUPPORTED');
+
+    // A settled order has already credited vendor, rider and/or affiliate wallets.
+    // Do not credit the customer while leaving those earnings untouched. A
+    // separate Admin reversal workflow must reconcile paid earnings first.
+    const {rows:[settlementEvidence]}=await client.query(
+      `SELECT
+         (SELECT status FROM commission_records WHERE order_id=$1) AS commission_status,
+         EXISTS (
+           SELECT 1 FROM transactions
+           WHERE reference_id=$1
+             AND reference_type IN ('order_vendor_payout','order_rider_payout','order_affiliate_payout')
+             AND type='credit'
+         ) AS has_settlement_credits,
+         (SELECT status FROM platform_earnings WHERE order_id=$1) AS platform_earning_status`,
+      [payment.order_id]);
+    const settlementAlreadyPaid =
+      String(settlementEvidence?.commission_status||'')==='paid' ||
+      Boolean(settlementEvidence?.has_settlement_credits) ||
+      String(settlementEvidence?.platform_earning_status||'')==='earned';
+    if(settlementAlreadyPaid){
+      throw new AppError(
+        'This order has already been financially settled. The earnings-reversal workflow is not enabled, so no refund was issued. Admin Finance must reconcile the vendor, rider and affiliate credits first.',
+        409,
+        'REFUND_SETTLEMENT_REVERSAL_REQUIRED'
+      );
+    }
+
     const fullRefund=true;
     if(payment.method!=='cod'&&payment.method!=='wallet'){
       const provider=PROVIDERS[payment.method];
