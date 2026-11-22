@@ -18,7 +18,7 @@ describe('customer payment refunds',()=>{
   jest.clearAllMocks();
   tx=jest.fn(async(sql,params=[])=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
-   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none',refund_amount:'0.00'}]};
    if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
@@ -89,7 +89,7 @@ describe('customer payment refunds',()=>{
  test('blocks a refund when vendor, rider or affiliate earnings have already been settled',async()=>{
   tx.mockImplementation(async(sql)=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
-   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
    if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'paid',has_settlement_credits:true,platform_earning_status:'earned'}]};
    return{rows:[]};
@@ -108,7 +108,7 @@ describe('customer payment refunds',()=>{
  test('rejects duplicate refund requests without a second wallet credit',async()=>{
   tx.mockImplementation(async(sql)=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
-   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'refunded',refund_status:'processed',refund_amount:'100.00'}]};
    return{rows:[]};
   });
@@ -122,7 +122,7 @@ describe('customer payment refunds',()=>{
  test('fails safely when the customer wallet is missing',async()=>{
   tx.mockImplementation(async(sql)=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
-   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[]};
    return{rows:[]};
