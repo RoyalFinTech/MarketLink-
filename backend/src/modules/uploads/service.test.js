@@ -69,7 +69,7 @@ describe('vendor and rider onboarding uploads',()=>{
   const file={mimetype:'image/png',size:4,buffer:Buffer.from('logo'),originalname:'shop-logo.png'};
   const result=await upload(file,'vendor-logo',riderId);
   expect(result.url).toContain('/api/v1/uploads/');
-  expect(result.url.endsWith('/content')).toBe(true);
+  expect(result.url.endsWith('/profile-content')).toBe(true);
   expect(result.record.storage_backend).toBe('database');
   const image=await getPublicProfileContent(result.record.id);
   expect(image).toMatchObject({contentType:'image/png'});
@@ -84,7 +84,7 @@ describe('vendor and rider onboarding uploads',()=>{
   const file={mimetype:'application/pdf',size:12,buffer:Buffer.from('identity-pdf'),originalname:'identity.pdf'};
   const result=await upload(file,purpose,riderId);
   expect(result.url).toContain('/api/v1/uploads/');
-  expect(result.url.endsWith('/profile-content')).toBe(true);
+  expect(result.url.endsWith('/content')).toBe(true);
   expect(result.record.storage_backend).toBe('database');
   const downloaded=await getFile(result.record.id,riderId,['rider']);
   expect(downloaded.buffer.toString()).toBe('identity-pdf');
