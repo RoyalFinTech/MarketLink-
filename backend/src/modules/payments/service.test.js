@@ -7,7 +7,7 @@ jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn(),failDeposit
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
 const modemPay=require('../../integrations/modempay');
-const {confirmPayment,listPendingCodPayments,initiatePayment,submitCodCashRemittance,processWebhook}=require('./service');
+const {confirmPayment,getPaymentStatus,listPendingCodPayments,initiatePayment,submitCodCashRemittance,processWebhook}=require('./service');
 
 const payment={
  id:'11111111-1111-4111-8111-111111111111',
@@ -21,6 +21,34 @@ const deliveredOrder={
 
 describe('payment webhook lock ordering',()=>{
  beforeEach(()=>jest.clearAllMocks());
+  test('locks the order before the payment row when status polling reports provider failure',async()=>{
+    modemPay.isH2H.mockReturnValue(true);
+    modemPay.getTransaction=jest.fn().mockResolvedValue({status:'failed'});
+    let paymentReads=0;
+    query.mockImplementation(async(sql)=>{
+      if(sql.includes('FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.id=$1')){
+        paymentReads+=1;
+        return{rows:[{...payment,method:'wave',status:paymentReads===1?'pending':'failed',customer_id:'customer-1'}]};
+      }
+      return{rows:[]};
+    });
+    const clientQuery=jest.fn()
+      .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+      .mockResolvedValueOnce({rows:[{id:payment.id,status:'pending'}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{product_id:'product-1',quantity:2}]})
+      .mockResolvedValueOnce({rows:[{product_id:'product-1'}]})
+      .mockResolvedValue({rows:[]});
+    withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+
+    const result=await getPaymentStatus(payment.id,'customer-1',['customer']);
+
+    expect(clientQuery.mock.calls[0][0]).toContain('FROM orders WHERE id=$1 FOR UPDATE');
+    expect(clientQuery.mock.calls[1][0]).toContain('FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE');
+    expect(clientQuery.mock.calls[2][0]).toContain("UPDATE payments SET status='failed'");
+    expect(clientQuery.mock.calls[3][0]).toContain('FROM order_items');
+    expect(result).toMatchObject({status:'failed',payment:{status:'failed'}});
+  });
  test('locks the order before the payment row when a provider reports payment failure',async()=>{
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[{id:'webhook-event-1'}]})
