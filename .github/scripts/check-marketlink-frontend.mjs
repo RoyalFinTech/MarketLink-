@@ -308,7 +308,7 @@ assert.match(adminEntry, /__ML_ADMIN_GRANT_ROLE/, 'Staff & access page must expo
 
 const refundService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/payments/service.js'), 'utf8');
 const refundTests = fs.readFileSync(path.join(root, '..', 'backend/src/modules/payments/refund.test.js'), 'utf8');
-assert.match(refundService, /SELECT \\* FROM payments WHERE id=\\$1 AND order_id=\\$2 FOR UPDATE/, 'Refund processing must lock the payment row after locking its owning order');
+assert.ok(refundService.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'), 'Refund processing must lock the payment row after locking its owning order');
 assert.match(refundService, /ALREADY_REFUNDED/, 'Refund processing must reject repeated requests');
 assert.match(refundService, /PARTIAL_REFUND_NOT_SUPPORTED/, 'Partial refunds must remain blocked until financial reconciliation supports them');
 assert.match(refundService, /SELECT id,balance FROM wallets WHERE user_id=\$1 FOR UPDATE/, 'Refund processing must lock the customer wallet before crediting');
