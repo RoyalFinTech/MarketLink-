@@ -33,9 +33,10 @@ describe('rider cash remittance controls',()=>{
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
    if(sql.includes('SELECT p.method,p.amount'))return{rows:[{method:'cod',amount:'145.00',payment_status:'pending',order_status:'delivered',delivery_status:'delivered',rider_id:riderId}]};
    if(sql.includes('UPDATE cod_cash_remittances'))return{rows:[{...remittance,status:params[0]}]};
-   if(sql.includes("SELECT * FROM payments WHERE id=$1 FOR UPDATE"))return{rows:[payment]};
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:'customer-1',total:'145.00',status:'delivered',order_number:'ML-123'}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[payment]};
    if(sql.includes("UPDATE payments SET status='confirmed'"))return{rows:[{...payment,status:'confirmed'}]};
-   if(sql.includes('SELECT customer_id,total,status,order_number'))return{rows:[{customer_id:'customer-1',total:'145.00',status:'delivered',order_number:'ML-123'}]};
    return{rows:[]};
   });
   withTransaction.mockImplementation(async(fn)=>fn({query:tx}));
