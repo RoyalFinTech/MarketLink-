@@ -7,7 +7,7 @@ jest.mock('../../utils/logger', () => ({
 }));
 
 const { query, withTransaction } = require('../../config/db');
-const { updateStatus, placeOrder, listForCustomer, listForVendor } = require('./service');
+const { updateStatus, placeOrder, getById, listForCustomer, listForVendor } = require('./service');
 
 describe('order payment method validation',()=>{
  beforeEach(()=>jest.clearAllMocks());
@@ -38,6 +38,21 @@ describe('order history pagination', () => {
   });
 });
 
+describe('order payment recovery details',()=>{
+ beforeEach(()=>jest.clearAllMocks());
+ test('returns the latest pending or confirmed payment attempt to the order owner',async()=>{
+  const attempt={id:'11111111-1111-4111-8111-111111111111',method:'wave',status:'pending'};
+  query.mockResolvedValueOnce({rows:[{
+   id:'order-1',customer_id:'customer-1',vendor_id:'vendor-1',
+   payment_attempt_pending:true,payment_attempt:attempt,items:[]
+  }]});
+  const result=await getById('order-1','customer-1',['customer']);
+  expect(result.payment_attempt).toEqual(attempt);
+  expect(result.payment_attempt_pending).toBe(true);
+  expect(query.mock.calls[0][0]).toContain("latest_payment.status IN ('pending','confirmed')");
+  expect(query.mock.calls[0][0]).toContain('latest_payment.created_at DESC LIMIT 1');
+ });
+});
 describe('order status concurrency', () => {
   let clientQuery;
 
