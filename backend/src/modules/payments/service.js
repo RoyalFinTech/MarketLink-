@@ -766,7 +766,7 @@ async function refund(paymentId,{amount,reason},actor){
       'SELECT order_id FROM payments WHERE id=$1',[paymentId]);
     if(!paymentReference)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
     const {rows:[customerOrder]}=await client.query(
-      'SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE',[paymentReference.order_id]);
+      'SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE',[paymentReference.order_id]);
     if(!customerOrder)throw new AppError('The customer order linked to this payment was not found.',409,'REFUND_ORDER_MISSING');
     const {rows:[payment]}=await client.query(
       'SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,paymentReference.order_id]);
@@ -809,6 +809,23 @@ async function refund(paymentId,{amount,reason},actor){
       );
     }
 
+    const orderStatus=String(customerOrder.status||'');
+    const cancelUndispatchedOrder=['pending','accepted','preparing','awaiting_rider'].includes(orderStatus);
+    if(['rider_assigned','picked_up','on_the_way'].includes(orderStatus)){
+      throw new AppError(
+        'This order is already assigned to a rider or in transit. Reconcile the delivery or return first; MarketLink has not issued a refund.',
+        409,
+        'REFUND_ORDER_IN_PROGRESS'
+      );
+    }
+    if(!cancelUndispatchedOrder&&!['cancelled','delivered'].includes(orderStatus)){
+      throw new AppError(
+        'This order is not in a supported refund state. Admin must reconcile its delivery status before issuing a refund.',
+        409,
+        'REFUND_ORDER_STATE_UNSUPPORTED'
+      );
+    }
+
     const fullRefund=true;
     if(payment.method!=='cod'&&payment.method!=='wallet'){
       const provider=PROVIDERS[payment.method];
@@ -833,7 +850,30 @@ async function refund(paymentId,{amount,reason},actor){
        WHERE id=$3 RETURNING *`,
       [refundAmount,fullRefund,paymentId]);
     if(fullRefund){
-      await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
+      if(cancelUndispatchedOrder){
+        const {rows:items}=await client.query(
+          'SELECT product_id,quantity FROM order_items WHERE order_id=$1',[payment.order_id]);
+        for(const item of items){
+          await client.query(
+            'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL',
+            [item.quantity,item.product_id]);
+        }
+        const cancellationReason='Payment refunded by Admin: '+(String(reason||'Customer refund').trim().slice(0,400)||'Customer refund');
+        await client.query(
+          "UPDATE orders SET payment_status='refunded',status='cancelled',cancellation_reason=$2 WHERE id=$1",
+          [payment.order_id,cancellationReason]);
+        await client.query(
+          "INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,'cancelled',$2,$3)",
+          [payment.order_id,actor.id,cancellationReason]);
+        await client.query(
+          "UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered','cancelled')",
+          [payment.order_id]);
+        await client.query(
+          "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE location_sharing_delivery_id IN (SELECT id FROM deliveries WHERE order_id=$1)",
+          [payment.order_id]);
+      }else{
+        await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
+      }
     }
     await client.query(
       `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
