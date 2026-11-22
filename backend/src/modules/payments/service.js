@@ -835,20 +835,6 @@ async function refund(paymentId,{amount,reason},actor){
       // The payment row stays locked so duplicate Admin requests cannot race.
       await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});
     }
-    const {rows:[wallet]}=await client.query(
-      'SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE',[customerOrder.customer_id]);
-    if(!wallet)throw new AppError('The customer DAHA Wallet is not available for this refund.',409,'REFUND_WALLET_MISSING');
-    const balanceAfter=Number(wallet.balance)+refundAmount;
-    await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[balanceAfter,wallet.id]);
-    await client.query(
-      `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,
-      [wallet.id,refundAmount,balanceAfter,paymentId,String(reason||'Order refund').trim().slice(0,500)||'Order refund']);
-    const {rows:[updated]}=await client.query(
-      `UPDATE payments SET refund_status='processed',refund_amount=$1,
-         status=CASE WHEN $2 THEN 'refunded' ELSE 'partially_refunded' END
-       WHERE id=$3 RETURNING *`,
-      [refundAmount,fullRefund,paymentId]);
     if(fullRefund){
       if(cancelUndispatchedOrder){
         const {rows:items}=await client.query(
@@ -881,6 +867,23 @@ async function refund(paymentId,{amount,reason},actor){
       }else{
         await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
       }
+    }
+    const {rows:[wallet]}=await client.query(
+      'SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE',[customerOrder.customer_id]);
+    if(!wallet)throw new AppError('The customer DAHA Wallet is not available for this refund.',409,'REFUND_WALLET_MISSING');
+    const balanceAfter=Number(wallet.balance)+refundAmount;
+    await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[balanceAfter,wallet.id]);
+    await client.query(
+      `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
+       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,
+      [wallet.id,refundAmount,balanceAfter,paymentId,String(reason||'Order refund').trim().slice(0,500)||'Order refund']);
+    const {rows:[updated]}=await client.query(
+      `UPDATE payments SET refund_status='processed',refund_amount=$1,
+         status=CASE WHEN $2 THEN 'refunded' ELSE 'partially_refunded' END
+       WHERE id=$3 RETURNING *`,
+      [refundAmount,fullRefund,paymentId]);
+    if(fullRefund&&!cancelUndispatchedOrder){
+      await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
     }
     await client.query(
       `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
