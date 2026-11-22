@@ -45,6 +45,7 @@ describe('customer payment refunds',()=>{
    if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
    if(sql.includes('SELECT product_id,quantity FROM order_items'))return{rows:[{product_id:'product-1',quantity:2}]};
+   if(sql.includes('UPDATE inventory SET quantity=quantity+$1'))return{rows:[{product_id:'product-1'}]};
    if(sql.includes('UPDATE payments SET refund_status'))return{rows:[{id:paymentId,status:'refunded',refund_status:'processed',refund_amount:100}]};
    return{rows:[]};
   });
@@ -55,6 +56,22 @@ describe('customer payment refunds',()=>{
   expect(stockRestore[0]).toContain('variant_id IS NULL');
   expect(tx.mock.calls.some(([sql])=>sql.includes("status='cancelled'")&&sql.includes("payment_status='refunded'"))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO order_status_history'))).toBe(true);
+ });
+ test('rolls back a pre-dispatch refund if its inventory row cannot be restored',async()=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'pending'}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'wallet',amount:'100.00',status:'confirmed',refund_status:'none'}]};
+   if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
+   if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
+   if(sql.includes('SELECT product_id,quantity FROM order_items'))return{rows:[{product_id:'product-missing',quantity:1}]};
+   if(sql.includes('UPDATE inventory SET quantity=quantity+$1'))return{rows:[]};
+   return{rows:[]};
+  });
+  await expect(refund(paymentId,{reason:'Customer cancelled'},actor))
+   .rejects.toMatchObject({statusCode:409,code:'REFUND_INVENTORY_RESTORE_FAILED'});
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
+  expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE payments SET refund_status'))).toBe(false);
  });
  test('does not automatically refund an order already assigned to a rider or in transit',async()=>{
   tx.mockImplementation(async(sql)=>{
