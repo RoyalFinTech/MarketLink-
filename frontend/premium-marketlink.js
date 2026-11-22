@@ -202,6 +202,8 @@
     var methodLabel=pending.method==='wave'?'Wave':pending.method==='afrimoney'?'AfriMoney':pending.method==='qmoney'?'QMoney':'Mobile money (secure checkout)';
     var pinMode=String(step.auth_mode||'').toLowerCase()==='pin';
     var confirmMode=String(step.auth_mode||'').toLowerCase()==='confirm'&&!step.openExternal;
+    var needsProviderInstruction=!isComplete&&!isFailed&&!link&&!confirmMode&&!pinMode;
+    var providerRecoveryNotice=needsProviderInstruction?'<div class="ml-payment-next-step"><b>Payment instructions are not available yet</b><p>Your order and payment attempt are saved. Do not place another order or pay again. Check payment status; if no secure payment page or phone prompt appears, contact MarketLink support with this order reference.</p></div>':'';
     var headline=isComplete?'Payment confirmed':isFailed?'Payment not completed':'Complete your payment';
     var message=isComplete?'Your payment is confirmed. Your MarketLink order status is now updated.':isFailed?'The payment was not completed. You can return to your cart and try again with a new payment attempt.':'Follow the instructions shown below. MarketLink will only mark your order as paid after a verified confirmation.';
     root.innerHTML='<div class="ml-profile-shell ml-payment-flow">'+
@@ -213,6 +215,7 @@
        (link?'<a class="ml-btn ml-btn-primary ml-payment-open-provider" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">Continue to '+esc(methodLabel)+' ↗</a>':'')+
        (confirmMode?'<div class="ml-payment-next-step"><b>Approve the request on your phone</b><p>'+esc(step.confirmation_steps||'Approve the payment request on your mobile-money phone. Then select the button below.')+'</p><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'confirm\')">I have approved the request</button></div>':'')+
        (pinMode?'<div class="ml-payment-next-step"><label for="ml-modem-payment-pin">Provider authorization code</label><p>Enter the temporary code requested for this payment. MarketLink will send it for this payment attempt only and will not save it.</p><input id="ml-modem-payment-pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="'+Math.min(8,Math.max(4,Number(step.auth_length)||6))+'" placeholder="Enter authorization code"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.continueModemPay(\'pin\')">Submit code securely</button></div>':'')+
+       providerRecoveryNotice+
        '<div class="ml-payment-status-line" id="ml-payment-status-message">Waiting for payment confirmation. This can take a little time.</div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.checkPaymentStatus()">Check payment status</button>')+
       '</div><p class="ml-payment-footnote">Do not pay twice while a transaction is pending. If the provider has already requested approval on your phone, finish that request first.</p></div>';
     if(!isComplete&&!isFailed&&!mlPaymentStatusTimer){
