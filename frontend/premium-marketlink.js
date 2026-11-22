@@ -304,6 +304,53 @@
     switchTab('orders');
     startOrderTracking();
   }
+  async function recoverPendingCheckoutPayment(order,payMethod,accountNumber){
+    if(!order||!order.id)return false;
+    var orderResponse=await ML_API.orders.getById(order.id);
+    var latestOrder=orderResponse&&orderResponse.data?orderResponse.data:orderResponse;
+    latestOrder=latestOrder&&latestOrder.order?latestOrder.order:latestOrder;
+    if(!latestOrder||String(latestOrder.id)!==String(order.id))return false;
+    var attempt=latestOrder.payment_attempt;
+    if(!attempt||!attempt.id||String(attempt.method||'').toLowerCase()!==String(payMethod||'').toLowerCase())return false;
+    var status=String(attempt.status||'').toLowerCase(),nextStep=null,redirectUrl=null,payment=attempt;
+    if(status==='failed'||status==='refunded'||status==='partially_refunded')return false;
+    if(status==='pending'){
+      try{
+        var statusResponse=await ML_API.payments.status(attempt.id),statusData=statusResponse&&statusResponse.data?statusResponse.data:statusResponse;
+        if(statusData){
+          if(statusData.payment)payment=statusData.payment;
+          status=String(statusData.status||statusData.payment&&statusData.payment.status||status).toLowerCase();
+          nextStep=statusData.nextStep||null;
+          redirectUrl=statusData.redirectUrl||null;
+        }
+      }catch(statusError){}
+    }
+    S.order=latestOrder;S.orderSI=0;
+    if(status==='confirmed'||status==='completed'){
+      toast(payMethod==='cod'?'Order placed — Pay on Delivery selected ✓':'Payment confirmed. Your order is updated.','success');
+      finishLivePaidOrder();
+      return true;
+    }
+    if(payMethod==='cod'&&status==='pending'){
+      toast('Order placed — Pay on Delivery selected ✓','success');
+      S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();
+      switchTab('orders');startOrderTracking();
+      return true;
+    }
+    if(status!=='pending'&&status!=='processing')return false;
+    S.pendingPayment={
+      order:latestOrder,payment:payment,method:payMethod,accountNumber:accountNumber||'',
+      nextStep:nextStep,redirectUrl:redirectUrl,status:status,
+      amount:Number(latestOrder.total||order.total||0),
+      cartSnapshot:Object.assign({},S.cart||{}),
+      cartItemsSnapshot:Object.assign({},CART_ITEMS||{})
+    };
+    persistPendingPayment(S.pendingPayment);
+    renderLivePaymentStep();
+    checkLivePaymentStatus(true);
+    return true;
+  }
+
   async function placeLiveOrder(){
     if(!apiOk()){toast('Please sign in before placing an order.','error');return;}
     var ids=Object.keys(S.cart||{});
@@ -366,7 +413,23 @@
     }catch(e){
       var pendingForThisOrder=Boolean(S.pendingPayment&&S.pendingPayment.order&&String(S.pendingPayment.order.id)===String(order&&order.id));
       if(order&&!walletPaymentCompleted&&!pendingForThisOrder){
-        try{await ML_API.orders.cancel(order.id,'Payment could not be completed; order cancelled and stock released.');}catch(cancelError){}
+        try{
+          if(await recoverPendingCheckoutPayment(order,payMethod,accountNumber))return;
+        }catch(recoveryError){}
+      }
+      var cancellationError=null;
+      if(order&&!walletPaymentCompleted&&!pendingForThisOrder){
+        try{await ML_API.orders.cancel(order.id,'Payment could not be completed; order cancelled and stock released.');}
+        catch(cancelError){cancellationError=cancelError;}
+      }
+      if(cancellationError&&cancellationError.code==='PAYMENT_ATTEMPT_PENDING'){
+        try{
+          if(await recoverPendingCheckoutPayment(order,payMethod,accountNumber))return;
+        }catch(recoveryError){}
+        if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
+        S.order=order;switchTab('orders');startOrderTracking();
+        toast('A payment attempt is still processing for this order. Do not place another order; check its status in My Orders.','warning');
+        return;
       }
       if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
       toast(e.error||'Could not place your order.','error');
