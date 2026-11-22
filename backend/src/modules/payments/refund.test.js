@@ -20,6 +20,7 @@ describe('customer payment refunds',()=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
    if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none',refund_amount:'0.00'}]};
+   if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
    if(sql.includes('SELECT id,balance FROM wallets'))return{rows:[{id:walletId,balance:'25.00'}]};
    if(sql.includes('UPDATE payments SET refund_status'))return{rows:[{id:paymentId,status:params[1]?'refunded':'partially_refunded',refund_status:'processed',refund_amount:params[0]}]};
    return{rows:[]};
@@ -35,6 +36,20 @@ describe('customer payment refunds',()=>{
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO transactions")&&sql.includes("'refund'"))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO admin_action_logs")&&sql.includes('payment.refunded'))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes("INSERT INTO notifications")&&sql.includes('payment_refunded'))).toBe(true);
+ });
+ test('blocks a refund when vendor, rider or affiliate earnings have already been settled',async()=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
+   if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'paid',has_settlement_credits:true,platform_earning_status:'earned'}]};
+   return{rows:[]};
+  });
+  await expect(refund(paymentId,{reason:'Customer refund request'},actor))
+   .rejects.toMatchObject({statusCode:409,code:'REFUND_SETTLEMENT_REVERSAL_REQUIRED'});
+  expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
+  expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE payments SET refund_status'))).toBe(false);
  });
  test('rejects partial refunds until refund reconciliation supports them',async()=>{
   await expect(refund(paymentId,{amount:20,reason:'Partial adjustment'},actor))
