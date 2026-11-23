@@ -2163,7 +2163,8 @@ async function getPaymentReadiness() {
   const h2h=modemPay.isH2H();
   const h2hApproved=modemPay.isH2HApproved();
   const callbackUrlConfigured=Boolean(String(process.env.MODEM_PAY_CALLBACK_URL||'').trim());
-  const mobileMoneyReady=apiKeyConfigured&&webhookSecretConfigured&&h2hApproved;
+  const h2hGateReady=!h2h||h2hApproved;
+  const mobileMoneyReady=apiKeyConfigured&&webhookSecretConfigured&&callbackUrlConfigured&&h2hGateReady;
   return {
     currency:'GMD',
     provider:'Modem Pay',
@@ -2174,10 +2175,10 @@ async function getPaymentReadiness() {
       mobileMoneyCheckoutReady:mobileMoneyReady,
       walletCheckoutReady:true,
       cashOnDeliveryEnabled:true,
-      transferApiReady:apiKeyConfigured,
+      transferApiConfigured:apiKeyConfigured&&h2hGateReady,
       note:mobileMoneyReady
-        ? 'Provider credentials are present. Complete test-mode collection, signed webhook and payout tests before enabling real-money operations.'
-        : 'Mobile-money collection and provider transfers remain blocked until Modem Pay API credentials, webhook signing configuration and any H2H approval are set privately in Render.'
+        ? 'Provider settings are present. Complete test-mode collections, signed and duplicate webhook tests, reconciliation and payout tests before enabling real-money operations.'
+        : 'Mobile-money checkout remains blocked until the API key, webhook signing secret, public callback URL and any required H2H approval are configured privately in Render.'
     },
     recentPayments:counts.rows,
   };
