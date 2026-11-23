@@ -9,7 +9,8 @@ exports.methods = wrap(async (req,res) => {
   const webhookConfigured = Boolean(modemPay.isWebhookConfigured());
   const h2h = Boolean(modemPay.isH2H());
   const h2hApproved = Boolean(modemPay.isH2HApproved());
-  const configured = keyConfigured && webhookConfigured && (!h2h || h2hApproved);
+  const callbackUrlConfigured = Boolean(String(process.env.MODEM_PAY_CALLBACK_URL||'').trim());
+  const configured = keyConfigured && webhookConfigured && callbackUrlConfigured && (!h2h || h2hApproved);
   // Return only the public checkout capabilities. Gateway mode, webhook
   // configuration and provider identity stay inside the backend integration.
   res.json({success:true,data:{
@@ -17,6 +18,7 @@ exports.methods = wrap(async (req,res) => {
     directMobileMoney:configured&&h2h,
     hostedCheckout:configured&&!h2h,
     methods:configured?['wave','afrimoney','qmoney']:[],
+    setupReason:configured?null:'Mobile-money checkout is not enabled until the Modem Pay API key, webhook signing secret, public callback URL and any required H2H approval are configured.'
     currency:'GMD'
   }});
 });
