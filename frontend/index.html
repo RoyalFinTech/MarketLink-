@@ -1500,6 +1500,9 @@ var ML_API = (function(){
     resolve: function(code){ return get('/affiliates/resolve/'+encodeURIComponent(code)); },
     click: function(code){ return post('/affiliates/click', {code:code}); },
     me: function(){ return get('/affiliates/me'); },
+    marketerStatus: function(){ return get('/affiliates/marketer/status'); },
+    applyMarketer: function(data){ return post('/affiliates/marketer/apply',data); },
+    marketerDashboard: function(){ return get('/affiliates/marketer/dashboard'); },
   };
 
   var customers = {
@@ -1748,6 +1751,8 @@ var ML_API = (function(){
     settings: function(){return get('/admin/settings');},
     setSetting: function(key,value){return put('/admin/settings/'+encodeURIComponent(key),{value:value});},
     auditLogs: function(qs){return get('/admin/audit-logs',qs);},
+    affiliateMarketerApplications: function(qs){return get('/admin/affiliate-marketer-applications',qs);},
+    reviewAffiliateMarketerApplication: function(id,data){return post('/admin/affiliate-marketer-applications/'+encodeURIComponent(id)+'/review',data);},
   };
 
   // ── HEALTH CHECK (detect backend availability) ───────────────
