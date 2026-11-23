@@ -2053,7 +2053,7 @@
       wave:'Use Wave from checkout. Enter your full nine-digit Gambian mobile-money number and follow the payment step shown by the provider.',
       afrimoney:'Use AfriMoney from checkout. Enter your full nine-digit Gambian mobile-money number and follow the provider confirmation step.',
       qmoney:'Use QMoney from checkout. Enter your full nine-digit Gambian mobile-money number and follow the provider instructions.',
-      modempay:'Continue to the secure secure mobile-money checkout checkout and choose a method enabled for MarketLink.'
+      modempay:'Use secure mobile-money checkout to choose a method enabled for MarketLink and complete provider confirmation.'
     };
     var icons={cod:'💵',wallet:'👛',wave:'📱',afrimoney:'📲',qmoney:'💳',modempay:'🔐'};
     var cards=options.map(function(option){
