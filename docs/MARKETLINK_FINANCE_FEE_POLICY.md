@@ -72,7 +72,7 @@ For a route without a matching fixed fare, the server calculates:
 
 For a matching saved route pair, the rider's fixed fare overrides the calculator, but the administrator-approved minimum and maximum still apply. Prices are stored in the rider tariff table. Admin policy updates are audited and apply to new quotes; an already placed order keeps its locked price.
 
-Vendors continue to set their product retail prices in their product catalogue. Product price changes are revalidated against the checkout quote before order placement. There is currently no separate vendor delivery-tariff field: customer delivery pricing is based on the selected rider's tariff, not a second vendor-added delivery charge.
+Vendors continue to set their product retail prices in their product catalogue; the existing product API also allows Admin/Super Admin to edit those listed prices. Product price changes are revalidated against the checkout quote before order placement. There is currently no separate vendor delivery-tariff field: customer delivery pricing is based on the selected rider's tariff, not a second vendor-added delivery charge.
 
 The checkout route estimate uses the vendor's saved pickup GPS and the customer's saved delivery-address GPS. The current road-distance estimate applies a configurable distance factor (default 1.25) to straight-line GPS distance. It is an estimate, not live turn-by-turn navigation or a guaranteed road-route calculation.
 
