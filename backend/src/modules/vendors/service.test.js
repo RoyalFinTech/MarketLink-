@@ -4,7 +4,7 @@ jest.mock('../uploads/service',()=>({assertOwnedUploadReference:jest.fn().mockRe
 
 const {query,withTransaction}=require('../../config/db');
 const {assertOwnedUploadReference}=require('../uploads/service');
-const {register,approve,updateProfile,updateAdminProfile}=require('./service');
+const {register,approve,updateProfile}=require('./service');
 
 describe('vendor application registration and approval',()=>{
  const userId='22222222-2222-4222-8222-222222222222';
@@ -55,13 +55,9 @@ describe('vendor application registration and approval',()=>{
   expect(query.mock.calls[0][0]).toContain('whatsapp_number = $1 WHERE user_id = $2 RETURNING *');
   expect(query.mock.calls[0][1]).toEqual(['+220831234567',userId]);
  });
- test('Admin can update commission percentage but vendor self-service cannot',async()=>{
+ test('vendor self-service cannot change the global marketplace commission',async()=>{
   await expect(updateProfile(userId,{commissionPct:3.5})).rejects.toMatchObject({statusCode:400,code:'VALIDATION_ERROR'});
-  query.mockResolvedValueOnce({rows:[{user_id:userId,commission_pct:'3.50'}]});
-  const result=await updateAdminProfile(userId,{commissionPct:3.5});
-  expect(result.commission_pct).toBe('3.50');
-  expect(query.mock.calls[0][0]).toContain('commission_pct = $1 WHERE user_id = $2 RETURNING *');
-  expect(query.mock.calls[0][1]).toEqual([3.5,userId]);
+  expect(query).not.toHaveBeenCalled();
  });
  test('admin approval changes KYC state, notifies the vendor and writes an audit entry',async()=>{
   const before={user_id:userId,kyc_status:'pending'};
