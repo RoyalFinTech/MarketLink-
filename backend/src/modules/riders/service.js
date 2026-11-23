@@ -465,7 +465,7 @@ async function getDeliveryPricing(userId) {
       id: rate.id,
       originArea: rate.origin_area,
       destinationArea: rate.destination_area,
-      fixedFee: Number(rate.fixed_fee_gmd),
+      fixedFee: Number(Math.max(policy.minimumAllowedFeeGmd, Number(rate.fixed_fee_gmd))),
       active: Boolean(rate.is_active),
     })),
   };
