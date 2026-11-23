@@ -45,13 +45,23 @@ function roundGmd(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function areaMatches(configuredArea, actualAddress) {
+  const configured = normalizeArea(configuredArea);
+  const actual = normalizeArea(actualAddress);
+  if (!configured || !actual) return false;
+  if (configured === actual) return true;
+  // Route profiles usually use a locality (e.g. "Serrekunda") while a vendor
+  // or saved customer address may contain a street plus that locality.
+  const boundedActual = ' ' + actual + ' ';
+  const boundedConfigured = ' ' + configured + ' ';
+  return boundedActual.includes(boundedConfigured);
+}
+
 function matchingRouteRate(routeRates, originArea, destinationArea) {
-  const origin = normalizeArea(originArea);
-  const destination = normalizeArea(destinationArea);
-  if (!origin || !destination) return null;
+  if (!normalizeArea(originArea) || !normalizeArea(destinationArea)) return null;
   return (Array.isArray(routeRates) ? routeRates : []).find(rate =>
-    normalizeArea(rate.origin_area || rate.originArea) === origin &&
-    normalizeArea(rate.destination_area || rate.destinationArea) === destination
+    areaMatches(rate.origin_area || rate.originArea, originArea) &&
+    areaMatches(rate.destination_area || rate.destinationArea, destinationArea)
   ) || null;
 }
 
@@ -81,6 +91,7 @@ module.exports = {
   estimateRoadDistanceKm,
   normalizeArea,
   matchingRouteRate,
+  areaMatches,
   calculateDeliveryFare,
   roundGmd,
 };
