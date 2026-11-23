@@ -45,7 +45,14 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId })
          AND r.delivery_min_fee_gmd IS NOT NULL
          AND NOT EXISTS (
            SELECT 1 FROM deliveries active
-           WHERE active.rider_id=r.user_id AND active.status IN ('assigned','picked_up','in_transit')
+           WHERE active.rider_id=r.user_id AND (
+             active.status IN ('assigned','picked_up','in_transit')
+             OR (active.status='unassigned' AND EXISTS (
+               SELECT 1 FROM orders reserved_order
+               WHERE reserved_order.id=active.order_id
+                 AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned')
+             ))
+           )
          )
        ORDER BY r.rating_avg DESC,r.rating_count DESC
        LIMIT 20`
@@ -170,7 +177,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     );
     if (!lockedRider) throw new AppError('The selected rider is no longer online. Refresh delivery prices and choose another rider.', 409, 'RIDER_QUOTE_NO_LONGER_AVAILABLE');
     const { rows: [busyRider] } = await client.query(
-      "SELECT id FROM deliveries WHERE rider_id=$1 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+      "SELECT d.id FROM deliveries d JOIN orders reserved_order ON reserved_order.id=d.order_id WHERE d.rider_id=$1 AND (d.status IN ('assigned','picked_up','in_transit') OR (d.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned'))) LIMIT 1",
       [deliveryQuote.rider_id]
     );
     if (busyRider) throw new AppError('The selected rider has just accepted another delivery. Refresh delivery prices and choose another rider.', 409, 'RIDER_QUOTE_NO_LONGER_AVAILABLE');
@@ -563,7 +570,11 @@ async function updateStatus(orderId,status,userId,roles,note){
                 EXISTS(
                   SELECT 1 FROM deliveries active
                   WHERE active.rider_id=d.rider_id AND active.id<>d.id
-                    AND active.status IN ('assigned','picked_up','in_transit')
+                    AND (active.status IN ('assigned','picked_up','in_transit') OR (active.status='unassigned' AND EXISTS (
+                       SELECT 1 FROM orders reserved_order
+                       WHERE reserved_order.id=active.order_id
+                         AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned')
+                     )))
                 ) AS rider_busy
          FROM deliveries d JOIN orders o ON o.id=d.order_id
          LEFT JOIN riders r ON r.user_id=d.rider_id
