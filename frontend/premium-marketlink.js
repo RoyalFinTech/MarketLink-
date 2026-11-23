@@ -403,7 +403,7 @@
         var walletResponse=await ML_API.wallet.getBalance();
         var walletData=walletResponse&&walletResponse.data||walletResponse||{};
         var availableWallet=Number(walletData.available_balance==null?walletData.balance||0:walletData.available_balance);
-        var expectedDebit=Number((estimatedSubtotal+Number(chosenQuote.deliveryFee||0)).toFixed(2));
+        var expectedDebit=Number(chosenQuote.estimatedCustomerTotal||0);
         if(availableWallet+0.001<expectedDebit){
           toast('Your DAHA Wallet needs a top-up. Your cart and selected rider price are saved.','info');
           setTimeout(function(){openProfilePage('wallet');},200);
@@ -467,6 +467,11 @@
         return;
       }
       if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
+      if(e&&['CHECKOUT_QUOTE_REFRESH_REQUIRED','CHECKOUT_PRICING_SETTINGS_CHANGED','CHECKOUT_TOTAL_CHANGED'].indexOf(e.code)>=0){
+        S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';
+        toast('Checkout prices changed. MarketLink is refreshing the rider prices and all-in total; review it before continuing.','warning');
+        renderLiveCart();return;
+      }
       toast(e.error||'Could not place your order.','error');
       if(payMethod==='wallet'&&e&&e.code==='INSUFFICIENT_WALLET_BALANCE'){
         S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';
