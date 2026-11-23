@@ -58,7 +58,7 @@ Wave and AfriMoney are the configured outgoing mobile-money rails in the current
 
 ## 5. Admin, vendor and rider price controls
 
-The initial MarketLink Gambia delivery tariff is **D150 base + D10 per estimated kilometre, with a D150 minimum**. This is a configurable MarketLink starting point, not a verified 1Bena tariff. Admin controls the default amounts, lowest permitted fare and highest permitted fare from Finance. The initial allowed range is D1–D5,000.
+The initial MarketLink Gambia delivery tariff is **D150 base + D10 per estimated kilometre, with a D150 minimum**. This is a configurable MarketLink starting point, not a verified 1Bena tariff. Admin controls the default amounts, lowest permitted fare and highest permitted fare from Finance. The initial allowed range is D150–D5,000; Admin can change that floor in Finance.
 
 Riders can save their own tariff within the administrator-approved limits:
 - a default base delivery fee;
