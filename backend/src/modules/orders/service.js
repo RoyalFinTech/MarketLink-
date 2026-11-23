@@ -1,6 +1,7 @@
 'use strict';
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
+const { SETTING_KEYS, commissionSettingsFromRows } = require('../../utils/marketplaceCommission');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
 async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paymentMethod, couponCode, affiliateCode }) {
@@ -60,11 +61,16 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
 
     // Transparent marketplace pricing: vendor sets retail price; MarketLink commission is not added to checkout.
     const fee = Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD || 25);
-    const commPct = Number(process.env.MARKETLINK_PLATFORM_COMMISSION_PCT || 5);
-    const affiliateDefaultPct = 2;
+    const { rows: commissionSettingRows } = await client.query(
+      "SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",
+      [[SETTING_KEYS.marketplace, SETTING_KEYS.affiliate]]
+    );
+    const commissionSettings = commissionSettingsFromRows(commissionSettingRows);
+    const commPct = commissionSettings.marketplaceCommissionPct;
+    const affiliateDefaultPct = commissionSettings.affiliateCommissionPct;
     if (!Number.isFinite(fee) || fee < 0) throw new AppError('Invalid delivery fee configuration.',500,'FEE_CONFIG_ERROR');
     if (!Number.isFinite(commPct) || commPct < 0 || commPct > 20) throw new AppError('Invalid platform commission configuration.',500,'FEE_CONFIG_ERROR');
-    if (affiliateDefaultPct > commPct) throw new AppError('Platform commission must cover the 2% affiliate reward.',500,'FEE_CONFIG_ERROR');
+    if (affiliateDefaultPct > commPct) throw new AppError('Platform commission must cover the affiliate reward.',500,'FEE_CONFIG_ERROR');
 
     const discountedSubtotal = Math.max(0, sub-discount);
     const platFee = parseFloat((discountedSubtotal*commPct/100).toFixed(2));
