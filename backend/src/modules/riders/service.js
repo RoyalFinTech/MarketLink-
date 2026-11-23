@@ -429,6 +429,86 @@ async function getEarnings(riderId, { page = 1, limit = 20, period = '30d' }) {
   return { period, summary: summary.rows[0], entries: entries.rows };
 }
 
+
+/* ── RIDER DELIVERY PRICING ──────────────────────────────────────────
+ * Riders own their delivery tariffs. Exact area-to-area prices override
+ * their default base + per-kilometre schedule.
+ */
+async function getDeliveryPricing(userId) {
+  const { rows: [rider] } = await query(
+    `SELECT delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd
+     FROM riders WHERE user_id=$1`, [userId]
+  );
+  if (!rider) throw new AppError('Rider profile not found.', 404, 'RIDER_NOT_FOUND');
+  const { rows: routeRates } = await query(
+    `SELECT id,origin_area,destination_area,fixed_fee_gmd,is_active
+     FROM rider_delivery_rates WHERE rider_id=$1 ORDER BY origin_area,destination_area`, [userId]
+  );
+  return {
+    enabled: Boolean(rider.delivery_pricing_enabled),
+    baseFee: rider.delivery_base_fee_gmd == null ? null : Number(rider.delivery_base_fee_gmd),
+    perKmFee: rider.delivery_per_km_fee_gmd == null ? null : Number(rider.delivery_per_km_fee_gmd),
+    minimumFee: rider.delivery_min_fee_gmd == null ? null : Number(rider.delivery_min_fee_gmd),
+    routeRates: routeRates.map(rate => ({
+      id: rate.id,
+      originArea: rate.origin_area,
+      destinationArea: rate.destination_area,
+      fixedFee: Number(rate.fixed_fee_gmd),
+      active: Boolean(rate.is_active),
+    })),
+  };
+}
+
+async function updateDeliveryPricing(userId, data = {}) {
+  const enabled = data.enabled === undefined ? true : data.enabled === true;
+  const baseFee = Number(data.baseFee);
+  const perKmFee = Number(data.perKmFee);
+  const minimumFee = Number(data.minimumFee);
+  if (![baseFee, perKmFee, minimumFee].every(Number.isFinite) ||
+      baseFee < 0 || baseFee > 2000 || perKmFee < 0 || perKmFee > 500 ||
+      minimumFee <= 0 || minimumFee > 5000) {
+    throw new AppError('Enter valid GMD rates: base D0–D2,000, per kilometre D0–D500, and minimum D0.01–D5,000.', 400, 'INVALID_DELIVERY_PRICING');
+  }
+  const rawRates = data.routeRates === undefined ? [] : data.routeRates;
+  if (!Array.isArray(rawRates) || rawRates.length > 20) {
+    throw new AppError('You can save up to 20 fixed pickup-to-destination prices.', 400, 'INVALID_ROUTE_RATES');
+  }
+  const seen = new Set();
+  const routes = rawRates.map((rate, index) => {
+    const originArea = String(rate && rate.originArea || '').trim();
+    const destinationArea = String(rate && rate.destinationArea || '').trim();
+    const fixedFee = Number(rate && rate.fixedFee);
+    if (!originArea || !destinationArea || originArea.length > 120 || destinationArea.length > 120 ||
+        !Number.isFinite(fixedFee) || fixedFee <= 0 || fixedFee > 5000) {
+      throw new AppError('Each saved route needs a pickup area, destination area and valid fixed fee.', 400, 'INVALID_ROUTE_RATE');
+    }
+    const key = originArea.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ') +
+      '|' + destinationArea.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
+    if (seen.has(key)) throw new AppError('Duplicate pickup-to-destination route on row ' + (index + 1) + '.', 400, 'DUPLICATE_ROUTE_RATE');
+    seen.add(key);
+    return { originArea, destinationArea, fixedFee: Math.round(fixedFee * 100) / 100 };
+  });
+
+  await withTransaction(async client => {
+    const { rows: [updated] } = await client.query(
+      `UPDATE riders SET delivery_pricing_enabled=$1,delivery_base_fee_gmd=$2,
+       delivery_per_km_fee_gmd=$3,delivery_min_fee_gmd=$4,updated_at=now()
+       WHERE user_id=$5 RETURNING user_id`,
+      [enabled, baseFee, perKmFee, minimumFee, userId]
+    );
+    if (!updated) throw new AppError('Rider profile not found.', 404, 'RIDER_NOT_FOUND');
+    await client.query('DELETE FROM rider_delivery_rates WHERE rider_id=$1', [userId]);
+    for (const route of routes) {
+      await client.query(
+        `INSERT INTO rider_delivery_rates (rider_id,origin_area,destination_area,fixed_fee_gmd)
+         VALUES ($1,$2,$3,$4)`,
+        [userId, route.originArea, route.destinationArea, route.fixedFee]
+      );
+    }
+  });
+  return getDeliveryPricing(userId);
+}
+
 // ── KYC WORKFLOW ─────────────────────────────────────────────────────
 async function approve(riderId, actor, notes) {
   const { rows } = await query('SELECT * FROM riders WHERE user_id = $1', [riderId]);
@@ -508,5 +588,6 @@ async function reinstate(riderId, actor) {
 // ordersService.settleOrderFinancials after payment confirmation and delivery.
 module.exports = {
   register, getById, list, updateProfile, setAvailability, updateLocation,
+  getDeliveryPricing, updateDeliveryPricing,
   getDeliveryHistory, getEarnings, approve, reject, suspend, reinstate,
 };
