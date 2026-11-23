@@ -74,7 +74,7 @@ describe('vendor and rider onboarding uploads',()=>{
   expect(result.record.storage_backend).toBe('database');
   const image=await getPublicProfileContent(result.record.id);
   expect(image).toMatchObject({contentType:'image/png'});
-  expect(image.buffer.toString()).toBe('logo');
+  expect(image.buffer.toString()).toBe(logo.toString());
  });
  test('rejects a spoofed browser MIME type before storing content',async()=>{
   query.mockClear();
