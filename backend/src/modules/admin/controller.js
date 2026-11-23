@@ -16,6 +16,8 @@ exports.analytics  = wrap(async (req,res) => res.json({ success:true, data: awai
 exports.settings   = wrap(async (req,res) => res.json({ success:true, data: await svc.getSystemSettings() }));
 exports.commissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getMarketplaceCommissionSettings() }));
 exports.updateCommissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.updateMarketplaceCommissionSettings(req.body, actor(req)) }));
+exports.deliveryPricingSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getDeliveryPricingSettings() }));
+exports.updateDeliveryPricingSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.updateDeliveryPricingSettings(req.body, actor(req)) }));
 exports.setSetting = wrap(async (req,res) => res.json({ success:true, data: await svc.updateSystemSetting(req.params.key, req.body.value, req.user.id) }));
 exports.auditLogs  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAuditLogs(req.query) }));
 exports.reports    = wrap(async (req,res) => res.json({ success:true, data: await svc.getReports(req.query) }));
