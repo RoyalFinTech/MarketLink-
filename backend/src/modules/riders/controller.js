@@ -39,6 +39,14 @@ exports.getById = wrap(async (req, res) => {
   res.json({ success: true, data: rider });
 });
 
+// Rider-owned delivery price schedule and optional area-to-area fixed routes.
+exports.getDeliveryPricing = wrap(async (req, res) => {
+  res.json({ success: true, data: await svc.getDeliveryPricing(req.user.id) });
+});
+exports.saveDeliveryPricing = wrap(async (req, res) => {
+  res.json({ success: true, data: await svc.updateDeliveryPricing(req.user.id, req.body) });
+});
+
 // Rider updates their own profile
 exports.updateProfile = wrap(async (req, res) => {
   const updated = await svc.updateProfile(req.user.id, req.body);
