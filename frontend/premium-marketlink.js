@@ -1391,6 +1391,65 @@
     var sub=ids.reduce(function(t,id){var p=CART_ITEMS[id];return t+Number(p&&p.price||0)*Number(S.cart[id]||0);},0);
     var addresses;try{addresses=await loadLiveAddresses();}catch(e){root.innerHTML='<div class="ml-empty"><b>Saved addresses unavailable</b><span>'+esc(e.error||'Could not load your saved addresses.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:12px" onclick="window.ML_Premium.refreshCart()">Retry</button></div>';return;}
     var addressHtml=addresses.length?addresses.map(function(a){var selected=String(a.id)===String(S.delivAddressId||S.deliveryAddressId);return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectAddress(\''+esc(String(a.id))+'\')"><div class="ico">📍</div><div class="copy"><b>'+esc(a.label||'Address')+'</b><span>'+esc(a.full_address||'')+(a.area?' · '+esc(a.area):'')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join(''):'<div class="ml-empty"><b>No saved delivery addresses</b><span>Add your first address in Profile → Saved addresses.</span></div>';
+    var selectedDeliveryAddressId=String(S.delivAddressId||S.deliveryAddressId||'');
+    var deliveryQuoteError='',deliveryQuoteCache=S.deliveryQuoteCache||null;
+    var deliveryQuoteKey=vendorIds.length===1&&selectedDeliveryAddressId?vendorIds[0]+'|'+selectedDeliveryAddressId:'';
+    var deliveryQuoteCacheValid=Boolean(deliveryQuoteCache&&deliveryQuoteCache.key===deliveryQuoteKey&&Number(deliveryQuoteCache.cacheUntil||0)>Date.now());
+    if(deliveryQuoteKey&&!deliveryQuoteCacheValid){
+      try{
+        var quoteResponse=await ML_API.orders.deliveryQuotes({vendorId:vendorIds[0],deliveryAddressId:selectedDeliveryAddressId});
+        var quoteData=quoteResponse&&quoteResponse.data?quoteResponse.data:quoteResponse;
+        var quoteOptions=quoteData&&Array.isArray(quoteData.quotes)?quoteData.quotes:[];
+        var quoteExpiry=quoteOptions.reduce(function(earliest,q){
+          var time=q.expiresAt?new Date(q.expiresAt).getTime():0;
+          return time>0&&(earliest===0||time<earliest)?time:earliest;
+        },0);
+        S.deliveryQuoteCache={
+          key:deliveryQuoteKey,options:quoteOptions,origin:quoteData&&quoteData.origin||'Vendor pickup',
+          destination:quoteData&&quoteData.destination||'Saved address',
+          straightLineDistanceKm:Number(quoteData&&quoteData.straightLineDistanceKm||0),
+          estimatedRouteDistanceKm:Number(quoteData&&quoteData.estimatedRouteDistanceKm||0),
+          cacheUntil:quoteExpiry?Math.max(Date.now()+1000,quoteExpiry-5000):Date.now()+30000
+        };
+        deliveryQuoteCache=S.deliveryQuoteCache;
+        deliveryQuoteCacheValid=true;
+        if(!quoteOptions.some(function(q){return String(q.quoteId)===String(S.selectedDeliveryQuoteId||'');})){
+          S.selectedDeliveryQuoteId=quoteOptions.length?String(quoteOptions[0].quoteId):'';
+        }
+      }catch(quoteError){
+        deliveryQuoteError=quoteError&&quoteError.error||'Could not calculate delivery prices. Check your vendor and saved address GPS, then retry.';
+        S.deliveryQuoteCache={key:deliveryQuoteKey,options:[],origin:'',destination:'',cacheUntil:Date.now()+15000,error:deliveryQuoteError};
+        deliveryQuoteCache=S.deliveryQuoteCache;
+      }
+    }else if(deliveryQuoteCacheValid&&deliveryQuoteCache.error){
+      deliveryQuoteError=deliveryQuoteCache.error;
+    }
+    if(deliveryQuoteKey&&deliveryQuoteCacheValid&&deliveryQuoteCache&&Array.isArray(deliveryQuoteCache.options)&&
+       !deliveryQuoteCache.options.some(function(q){return String(q.quoteId)===String(S.selectedDeliveryQuoteId||'');})){
+      S.selectedDeliveryQuoteId=deliveryQuoteCache.options.length?String(deliveryQuoteCache.options[0].quoteId):'';
+    }
+    var availableDeliveryQuotes=deliveryQuoteCacheValid&&deliveryQuoteCache&&Array.isArray(deliveryQuoteCache.options)?deliveryQuoteCache.options:[];
+    var selectedDeliveryQuote=availableDeliveryQuotes.find(function(q){return String(q.quoteId)===String(S.selectedDeliveryQuoteId||'');})||null;
+    var deliveryQuoteMarkup='';
+    if(vendorIds.length>1){
+      deliveryQuoteMarkup='<div class="ml-delivery-quote-empty"><b>One vendor per checkout</b><span>Split products from different vendors into separate orders so MarketLink can quote the correct pickup location.</span></div>';
+    }else if(!selectedDeliveryAddressId){
+      deliveryQuoteMarkup='<div class="ml-delivery-quote-empty"><b>Select a saved delivery address</b><span>MarketLink needs the delivery address GPS to calculate available rider prices.</span></div>';
+    }else if(deliveryQuoteError||deliveryQuoteCache&&deliveryQuoteCache.error){
+      deliveryQuoteMarkup='<div class="ml-delivery-quote-empty"><b>Delivery price unavailable</b><span>'+esc(deliveryQuoteError||deliveryQuoteCache.error)+'</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshCart()">Try again</button></div>';
+    }else if(!availableDeliveryQuotes.length){
+      deliveryQuoteMarkup='<div class="ml-delivery-quote-empty"><b>No rider prices available yet</b><span>No online, approved rider has saved a delivery tariff for this area. Try again when a rider is online with pricing configured.</span><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshCart()">Refresh rider prices</button></div>';
+    }else{
+      deliveryQuoteMarkup='<div class="ml-delivery-route-meta"><span>📍 '+esc(deliveryQuoteCache.origin)+' → '+esc(deliveryQuoteCache.destination)+'</span><b>Estimated route '+Number(deliveryQuoteCache.estimatedRouteDistanceKm||0).toFixed(1)+' km</b></div>'+
+        '<div class="ml-delivery-quote-list">'+availableDeliveryQuotes.map(function(q){
+          var selected=String(q.quoteId)===String(S.selectedDeliveryQuoteId||'');
+          var rating=Number(q.rating||0)>0?Number(q.rating).toFixed(1)+' ★'+(Number(q.ratingCount||0)>0?' ('+Number(q.ratingCount)+')':''):'New rider';
+          var expiry=q.expiresAt?new Date(q.expiresAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+          return '<button type="button" class="ml-delivery-quote-card '+(selected?'selected':'')+'" onclick="window.ML_Premium.selectDeliveryQuote(\''+esc(String(q.quoteId))+'\')">'+
+            '<span class="ml-delivery-quote-icon">🛵</span><span class="ml-delivery-quote-copy"><b>'+esc(q.riderName||'MarketLink Rider')+'</b><small>'+esc(q.vehicleType||'Delivery rider')+' · '+esc(rating)+'</small><small>'+Number(q.estimatedRouteDistanceKm||deliveryQuoteCache.estimatedRouteDistanceKm||0).toFixed(1)+' km · price locked for this order'+(expiry?' · valid until '+esc(expiry):'')+'</small></span>'+
+            '<strong>'+money(q.deliveryFee)+'</strong><span class="ml-delivery-quote-check">'+(selected?'✓ Selected':'Select')+'</span></button>';
+        }).join('')+'</div><p class="ml-delivery-estimate-note">Distance is an estimate calculated from the vendor and saved address GPS coordinates. The rider’s price is locked when you place this order; there is no extra MarketLink checkout commission or wallet withdrawal fee added to this delivery quote.</p>';
+    }
     try{
       var capabilityResponse=await ML_API.payments.methods();
       var capabilityData=capabilityResponse&&capabilityResponse.data?capabilityResponse.data:capabilityResponse;
@@ -1411,7 +1470,7 @@
     var chosenPaymentLabel=S.selPay||'Cash on Delivery';
     var paymentHtml=paymentOptions.map(function(opt){
       var selected=chosenPaymentLabel===opt[0],isCod=opt[1]==='cod',isWallet=opt[1]==='wallet';
-      var subText=isCod?'Pay the rider in cash when your order arrives. After delivery, the rider submits the deposit reference for MarketLink verification.':isWallet?'Pay securely using your available DAHA Wallet balance. If the balance is insufficient, add funds to your wallet first.':opt[1]==='modempay'?'Continue to the secure hosted payment page and choose an enabled method.':'Pay securely with '+opt[0]+'. Enter your full nine-digit Gambian mobile number below.';
+      var subText=isCod?'Pay the rider in cash when your order arrives. After delivery, the rider submits the deposit reference for MarketLink verification.':isWallet?'Pay securely using your DAHA Wallet balance. If you need a top-up, MarketLink can open your wallet without clearing this cart.':opt[1]==='modempay'?'Continue to the secure hosted payment page and choose an enabled method.':'Pay securely with '+opt[0]+'. Enter your full nine-digit Gambian mobile number below.';
       return '<button type="button" class="ml-profile-row ml-payment-option" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectPayment(\''+esc(opt[0])+'\')"><div class="ico">'+(isCod?'💵':isWallet?'👛':'📱')+'</div><div class="copy"><b>'+esc(opt[0])+'</b><span>'+esc(subText)+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';
     }).join('');
     var selectedMethod=normalizePaymentChoice(chosenPaymentLabel);
@@ -1423,11 +1482,23 @@
       '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Delivery address</h3><button onclick="window.ML_Premium.manageAddresses()">Manage</button></div>'+addressHtml+'</div>'+
       '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Payment method</h3><span style="color:#91A4B4;font-size:10px">Choose how to pay</span></div>'+paymentHtml+mobileMoneyInputHtml+'</div>'+
       '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-section-head"><h3>Coupon</h3><span style="color:#91A4B4;font-size:10px">Validated by backend</span></div><div style="display:flex;gap:8px"><input id="ml-cart-coupon" class="inp" placeholder="Optional coupon code" value="'+esc((S.appliedCoupon&&S.appliedCoupon.code)||'')+'" style="margin:0;flex:1"><button class="ml-btn ml-btn-secondary" type="button" onclick="window.ML_Premium.setCoupon()">Apply</button></div></div>'+
-      '<div class="ml-profile-card" style="margin-top:10px"><div class="ml-profile-row"><div class="copy"><b>Subtotal</b><span>Current live product prices; final totals are validated by the backend.</span></div><strong>'+money(sub)+'</strong></div><div class="ml-profile-row"><div class="copy"><b>Delivery</b><span>Calculated by MarketLink server.</span></div><strong>At checkout</strong></div><div class="ml-profile-row"><div class="copy"><b>Total</b><span>The backend confirms the final payable amount.</span></div><strong style="color:#42D2C9">Server-calculated</strong></div></div>'+
-      (addresses.length&&String(S.delivAddressId||S.deliveryAddressId)?'<button class="ml-btn ml-btn-primary" data-ml-place-order style="width:100%;margin-top:12px" onclick="window.ML_Premium.placeOrder()">Place Order</button>':'<button class="ml-btn ml-btn-primary" style="width:100%;margin-top:12px" disabled>Select a delivery address first</button>')+
+      '<section class="ml-profile-card ml-checkout-delivery-panel" style="margin-top:10px"><div class="ml-section-head"><h3>Choose your rider</h3><span>GPS-based price</span></div>'+deliveryQuoteMarkup+'</section>'+
+      '<div class="ml-profile-card ml-checkout-total-card" style="margin-top:10px"><div class="ml-profile-row"><div class="copy"><b>Product subtotal</b><span>Vendor-listed prices, before any verified coupon.</span></div><strong>'+money(sub)+'</strong></div>'+
+      (selectedDeliveryQuote?'<div class="ml-profile-row"><div class="copy"><b>Rider delivery fee</b><span>'+esc(selectedDeliveryQuote.riderName||'Selected rider')+' · locked at order placement.</span></div><strong>'+money(selectedDeliveryQuote.deliveryFee)+'</strong></div>':'<div class="ml-profile-row"><div class="copy"><b>Rider delivery fee</b><span>Select an available rider to see the price.</span></div><strong>—</strong></div>')+
+      (selectedDeliveryQuote?'<div class="ml-checkout-payable"><span>'+(S.appliedCoupon&&S.appliedCoupon.code?'Estimated total before verified coupon':'Total to pay')+'</span><strong>'+money(sub+Number(selectedDeliveryQuote.deliveryFee||0))+'</strong></div>':'<div class="ml-checkout-payable"><span>Total to pay</span><strong>Awaiting rider price</strong></div>')+
+      (S.appliedCoupon&&S.appliedCoupon.code?'<small class="ml-checkout-coupon-note">Your coupon is validated by MarketLink when the order is created. An eligible discount will reduce the final total shown by the payment provider.</small>':'')+
+      '<small class="ml-checkout-no-hidden-fees">No marketplace commission or DAHA withdrawal service fee is added to checkout. Your payment covers the product total and the selected rider’s delivery fare.</small></div>'+
+      (addresses.length&&selectedDeliveryQuote?'<button class="ml-btn ml-btn-primary" data-ml-place-order style="width:100%;margin-top:12px" onclick="window.ML_Premium.placeOrder()">'+(selectedMethod==='wallet'?'Pay '+money(sub+Number(selectedDeliveryQuote.deliveryFee||0))+' with DAHA Wallet →':selectedMethod==='cod'?'Place order · Pay on Delivery':'Continue to pay '+money(sub+Number(selectedDeliveryQuote.deliveryFee||0))+' →')+'</button>':'<button class="ml-btn ml-btn-primary" style="width:100%;margin-top:12px" disabled>'+(addresses.length?'Choose an available rider first':'Select a delivery address first')+'</button>')+
       '</div>';
   }
-  function selectAddress(id){S.delivAddressId=String(id);S.deliveryAddressId=String(id);renderLiveCart();}
+  function selectDeliveryQuote(id){
+    var cache=S.deliveryQuoteCache;
+    var option=cache&&Array.isArray(cache.options)?cache.options.find(function(q){return String(q.quoteId)===String(id);}):null;
+    if(!option||new Date(option.expiresAt).getTime()<=Date.now()){S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';toast('That delivery price has expired. Refresh the rider prices.','warning');renderLiveCart();return;}
+    S.selectedDeliveryQuoteId=String(option.quoteId);
+    renderLiveCart();
+  }
+  function selectAddress(id){S.delivAddressId=String(id);S.deliveryAddressId=String(id);S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';renderLiveCart();}
   function selectPayment(label){
     var method=normalizePaymentChoice(label),allowed=livePaymentOptions(S.paymentCapabilities).some(function(option){return option[1]===method;});
     if(!allowed){toast('That payment method is not currently enabled.','warning');return;}
