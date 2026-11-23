@@ -90,7 +90,7 @@ describe('vendor and rider onboarding uploads',()=>{
    .rejects.toMatchObject({statusCode:400,code:'INVALID_FILE'});
   expect(query).not.toHaveBeenCalled();
  });
- test.each(['vendor-document','rider-document','license-document'])('%s stays private and can be retrieved by its owner',async purpose=>{
+ test.each(['vendor-document','rider-document','license-document','affiliate-document'])('%s stays private and can be retrieved by its owner',async purpose=>{
   const pdf=Buffer.from('%PDF-1.7\\nidentity-pdf');
   query.mockImplementation(async(sql,params)=>{
    if(sql.includes('INSERT INTO file_uploads'))return{rows:[{id:params[0],uploaded_by:params[1],file_url:params[2],file_type:params[3],purpose:params[4],content_bytes:params[6],content_type:params[7],storage_backend:params[8]}]};

@@ -1937,9 +1937,9 @@
         if(!channels.length){toast('Choose at least one marketing channel.','warning');return;}
         button.disabled=true;button.textContent='Uploading private KYC documents…';
         try{
-          var identityUpload=await ML_API.uploads.upload(identity,'affiliate_document');
-          var selfieUpload=await ML_API.uploads.upload(selfie,'affiliate_document');
-          var proofUpload=proof?await ML_API.uploads.upload(proof,'affiliate_document'):null;
+          var identityUpload=await ML_API.uploads.upload(identity,'affiliate-document');
+          var selfieUpload=await ML_API.uploads.upload(selfie,'affiliate-document');
+          var proofUpload=proof?await ML_API.uploads.upload(proof,'affiliate-document'):null;
           button.textContent='Submitting application…';
           var payload={
             legalName:form.elements.legalName.value,
