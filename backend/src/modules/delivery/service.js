@@ -219,6 +219,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
     "FROM riders r JOIN users u ON u.id=r.user_id "+
     "WHERE r.kyc_status=$5 AND r.is_online=TRUE "+
     "AND NOT EXISTS (SELECT 1 FROM deliveries active WHERE active.rider_id=r.user_id AND active.status IN ('assigned','picked_up','in_transit')) "+
+    "AND NOT EXISTS (SELECT 1 FROM rider_assignments declined WHERE declined.delivery_id=$4 AND declined.rider_id=r.user_id AND declined.status='declined') "+
     "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
     [hasPickup,delivery.pickup_lat,delivery.pickup_lng,deliveryId,'approved']
   );
