@@ -119,13 +119,26 @@ async function assertRiderMatchesLockedQuote(client, orderId, riderId) {
 
 async function assignRider(deliveryId, riderId, actor) {
   return withTransaction(async (client) => {
-    // Lock the delivery first so two shop users cannot replace one another's
-    // rider assignment concurrently.
-    const { rows: [d] } = await client.query(
-      'SELECT d.*,o.vendor_id FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id=$1 FOR UPDATE OF d',
-      [deliveryId]
+    // Follow the global lock order: order first, delivery second. This
+    // prevents a vendor assignment racing with the "ready for rider" update.
+    const { rows: [snapshot] } = await client.query(
+      'SELECT order_id FROM deliveries WHERE id=$1',[deliveryId]
     );
-    if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
+    if(!snapshot)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const { rows: [order] } = await client.query(
+      'SELECT vendor_id,status,delivery_fee_quote_id FROM orders WHERE id=$1 FOR UPDATE',
+      [snapshot.order_id]
+    );
+    if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+    if(order.delivery_fee_quote_id&&!['awaiting_rider','rider_assigned'].includes(String(order.status))){
+      throw new AppError('The vendor must mark this order ready before assigning its quoted rider.',409,'DELIVERY_NOT_READY');
+    }
+    const { rows: [d] } = await client.query(
+      'SELECT * FROM deliveries WHERE id=$1 AND order_id=$2 FOR UPDATE',
+      [deliveryId,snapshot.order_id]
+    );
+    if (!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    d.vendor_id=order.vendor_id;
 
     const actorRoles=actor&&Array.isArray(actor.roles)?actor.roles:[];
     const actorIsAdmin=actorRoles.some(r=>['admin','super_admin','moderator'].includes(r));
