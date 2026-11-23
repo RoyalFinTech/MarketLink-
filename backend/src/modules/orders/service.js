@@ -761,4 +761,4 @@ async function vendorAccept(orderId,vendorUserId,roles){return updateStatus(orde
 async function vendorReject(orderId,vendorUserId,roles,reason){return updateStatus(orderId,'cancelled',vendorUserId,roles,reason||'Rejected by vendor');}
 async function cancel(orderId,userId,roles,reason){return updateStatus(orderId,'cancelled',userId,roles,reason||'Cancelled');}
 
-module.exports={quoteDeliveryOptions,placeOrder,getById,listForCustomer,listForVendor,updateStatus,vendorAccept,vendorReject,cancel,settleOrderFinancials};
+module.exports={quoteDeliveryOptions,placeOrder,getById,listForCustomer,listForVendor,updateStatus,vendorAccept,vendorReject,cancel,settleOrderFinancials,buildCheckoutFingerprint};
