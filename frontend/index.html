@@ -4653,7 +4653,7 @@ function renderRDash(){
       '<div class="ml-rider-pricing-grid">'+
       '<label><span>Base fee (GMD)</span><input id="rider-base-fee" class="ml-daha-input" type="number" min="0" max="2000" step="0.01" value="'+(pricing.baseFee==null?'':Number(pricing.baseFee).toFixed(2))+'" placeholder="150.00"></label>'+
       '<label><span>Per kilometre (GMD)</span><input id="rider-per-km-fee" class="ml-daha-input" type="number" min="0" max="500" step="0.01" value="'+(pricing.perKmFee==null?'':Number(pricing.perKmFee).toFixed(2))+'" placeholder="10.00"></label>'+
-      '<label><span>Minimum fare (GMD)</span><input id="rider-minimum-fee" class="ml-daha-input" type="number" min="0.01" max="5000" step="0.01" value="'+(pricing.minimumFee==null?'':Number(pricing.minimumFee).toFixed(2))+'" placeholder="150.00"></label></div>'+
+      '<label><span>Minimum fare (GMD)</span><input id="rider-minimum-fee" class="ml-daha-input" type="number" min="'+routeMin.toFixed(2)+'" max="'+routeMax.toFixed(2)+'" step="0.01" value="'+(pricing.minimumFee==null?'':Number(pricing.minimumFee).toFixed(2))+'" placeholder="150.00"></label></div>'+
       '<div class="ml-rider-pricing-subhead"><div><b>Fixed area-to-area prices</b><small>A fixed route fare overrides your per-kilometre calculator when both area names match.</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="rAddDeliveryRouteRow()">＋ Add route</button></div>'+
       '<div id="rider-route-rates">'+routeRows+'</div>'+
       '<button type="button" class="ml-btn ml-btn-primary ml-rider-pricing-save" onclick="rSaveDeliveryPricing()">Save delivery prices</button>'+
