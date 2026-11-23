@@ -20,6 +20,11 @@ router.post('/users/:id/reinstate', authenticate, authorize(...ADMIN),
   [param('id').isUUID()], validate, ctrl.reinstate);
 router.get('/analytics',   authenticate, authorize(...ADMIN),
   [query('period').optional().isIn(['7d','30d','90d'])], validate, ctrl.analytics);
+router.get('/commission-settings', authenticate, authorize(...ADMIN), ctrl.commissionSettings);
+router.put('/commission-settings', authenticate, authorize(...ADMIN), [
+  body('marketplaceCommissionPct').isFloat({min:0,max:20}),
+  body('affiliateCommissionPct').isFloat({min:0,max:20}),
+], validate, ctrl.updateCommissionSettings);
 router.get('/settings',    authenticate, authorize(...SA), ctrl.settings);
 router.put('/settings/:key', authenticate, authorize(...SA),
   [param('key').trim().notEmpty(), body('value').exists()], validate, ctrl.setSetting);
