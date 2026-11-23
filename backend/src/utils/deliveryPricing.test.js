@@ -24,6 +24,8 @@ describe('delivery pricing calculator', () => {
 
   test('rejects missing GPS rather than falling back to an invented flat delivery price', () => {
     expect(haversineKm({ latitude: null, longitude: 0 }, { latitude: 1, longitude: 1 })).toBeNull();
+    expect(haversineKm({ latitude: '', longitude: 0 }, { latitude: 1, longitude: 1 })).toBeNull();
+    expect(haversineKm({ latitude: undefined, longitude: 0 }, { latitude: 1, longitude: 1 })).toBeNull();
     expect(estimateRoadDistanceKm({}, {})).toBeNull();
   });
 

@@ -7,7 +7,7 @@ const modemPay = require('../../integrations/modempay');
 // a row lock (SELECT ... FOR UPDATE) to prevent concurrent double-withdrawals.
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
-const { calculateWithdrawalDebit, validateWithdrawalFeePct, DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, roundGmd } = require('../../utils/walletWithdrawalFees');
+const { calculateWithdrawalDebit, validateWithdrawalFeePct, resolveWithdrawalServiceFeePct, DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, roundGmd } = require('../../utils/walletWithdrawalFees');
 
 const MIN_WITHDRAWAL = 50; // GMD — floor to avoid churn on tiny payout requests
 
@@ -51,6 +51,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
 
     const { rows: [vendor] } = await client.query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
     const { rows: [rider] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1', [userId]);
+    const { rows: [affiliate] } = await client.query('SELECT user_id FROM affiliates WHERE user_id=$1', [userId]);
     let saved = null;
     if (vendor) {
       const { rows: [profile] } = await client.query(
@@ -77,7 +78,10 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
     if (!beneficiaryName || beneficiaryName.length > 150) throw new AppError('Enter the account holder name for the payout.', 400, 'BENEFICIARY_REQUIRED');
 
     const { rows: [feeSetting] } = await client.query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1", ['withdrawal_service_fee_pct']);
-    const feePct = validateWithdrawalFeePct(feeSetting ? feeSetting.value : DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, 500);
+    const feePct = resolveWithdrawalServiceFeePct({
+      isMarketplacePayee: Boolean(vendor || rider || affiliate),
+      configuredFeePct: feeSetting ? feeSetting.value : DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT
+    });
     const debit = calculateWithdrawalDebit(amount, feePct);
     const { rows: [wallet] } = await client.query('SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE', [userId]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
@@ -86,7 +90,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
     const available = Number(wallet.balance) - Number(pendingRow.pending || 0);
     if (debit.walletDebitAmount - available > 0.0001) {
       throw new AppError('Insufficient available balance. Available: D ' + Math.max(0,available).toFixed(2) +
-        '. Wallet debit including the ' + feePct.toFixed(2) + '% DAHA service fee is D ' + debit.walletDebitAmount.toFixed(2) + '.',400,'INSUFFICIENT_BALANCE');
+        (feePct>0?'. Wallet debit including the ' + feePct.toFixed(2) + '% DAHA service fee is D ':' . Required wallet debit is D ') + debit.walletDebitAmount.toFixed(2) + '.',400,'INSUFFICIENT_BALANCE');
     }
     const { rows: [wd] } = await client.query(
       "INSERT INTO withdrawals (user_id,wallet_id,amount,wallet_debit_amount,service_fee_pct,service_fee_amount,payout_method,payout_details,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'processing') RETURNING *",
