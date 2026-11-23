@@ -4,7 +4,7 @@ const DEFAULT_DELIVERY_PRICING_POLICY = Object.freeze({
   baseFeeGmd: 150,
   perKmFeeGmd: 10,
   minimumFeeGmd: 150,
-  minimumAllowedFeeGmd: 1,
+  minimumAllowedFeeGmd: 150,
   maximumFeeGmd: 5000,
 });
 
