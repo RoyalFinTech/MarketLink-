@@ -81,6 +81,46 @@ async function confirmPinReset({phone:rawPhone,otp,newPin}){
   logger.info('PIN reset completed',{userId:rec.user_id});
   return {message:'PIN reset successfully.'};
 }
-async function refreshAccessToken(rt){let decoded;try{decoded=jwt.verify(rt,process.env.JWT_REFRESH_SECRET);}catch{throw new AppError('Invalid refresh token.',401,'INVALID_REFRESH_TOKEN');}const {rows}=await query('SELECT id,token_hash FROM refresh_tokens WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now()',[decoded.sub]);let matched=null;for(const row of rows){if(await bcrypt.compare(rt,row.token_hash)){matched=row;break;}}if(!matched)throw new AppError('Refresh token not recognised.',401,'INVALID_REFRESH_TOKEN');await query('UPDATE refresh_tokens SET revoked_at=now() WHERE id=$1',[matched.id]);const {rows:roleRows}=await query('SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1',[decoded.sub]);const roles=roleRows.map(r=>r.name);const newAccess=signAccess(decoded.sub,roles);const newRt=signRefresh(decoded.sub);const newRth=await bcrypt.hash(newRt,8);await query('INSERT INTO refresh_tokens (user_id,token_hash,expires_at) VALUES($1,$2,$3)',[decoded.sub,newRth,new Date(Date.now()+30*24*60*60*1000)]);return{accessToken:newAccess,refreshToken:newRt};}
+async function refreshAccessToken(rt) {
+  let decoded;
+  try { decoded = jwt.verify(rt, process.env.JWT_REFRESH_SECRET); }
+  catch { throw new AppError('Invalid refresh token.',401,'INVALID_REFRESH_TOKEN'); }
+  if (!decoded || !decoded.sub) throw new AppError('Invalid refresh token.',401,'INVALID_REFRESH_TOKEN');
+
+  // Prepare the replacement token before taking row locks, then rotate the old
+  // token and insert its replacement in one transaction. Concurrent refresh
+  // requests serialize on the active-token rows and only one can consume them.
+  const newRt = signRefresh(decoded.sub);
+  const newRth = await bcrypt.hash(newRt,8);
+  const roles = await withTransaction(async client => {
+    const {rows} = await client.query(
+      'SELECT id,token_hash FROM refresh_tokens WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now() FOR UPDATE',
+      [decoded.sub]
+    );
+    let matched = null;
+    for (const row of rows) {
+      if (await bcrypt.compare(rt,row.token_hash)) { matched = row; break; }
+    }
+    if (!matched) throw new AppError('Refresh token not recognised or already used.',401,'INVALID_REFRESH_TOKEN');
+
+    const {rows:revoked} = await client.query(
+      'UPDATE refresh_tokens SET revoked_at=now() WHERE id=$1 AND revoked_at IS NULL RETURNING id',
+      [matched.id]
+    );
+    if (!revoked.length) throw new AppError('Refresh token has already been used.',401,'INVALID_REFRESH_TOKEN');
+
+    const {rows:roleRows} = await client.query(
+      'SELECT r.name FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1',
+      [decoded.sub]
+    );
+    const currentRoles = roleRows.map(r => r.name);
+    await client.query(
+      'INSERT INTO refresh_tokens (user_id,token_hash,expires_at) VALUES($1,$2,$3)',
+      [decoded.sub,newRth,new Date(Date.now()+30*24*60*60*1000)]
+    );
+    return currentRoles;
+  });
+  return {accessToken:signAccess(decoded.sub,roles),refreshToken:newRt};
+}
 async function logout(userId,rt){if(!rt)return;const {rows}=await query('SELECT id,token_hash FROM refresh_tokens WHERE user_id=$1 AND revoked_at IS NULL',[userId]);for(const row of rows){if(await bcrypt.compare(rt,row.token_hash)){await query('UPDATE refresh_tokens SET revoked_at=now() WHERE id=$1',[row.id]);break;}}}
 module.exports={registerInitiate,registerComplete,login,refreshAccessToken,logout,requestPinReset,confirmPinReset};
