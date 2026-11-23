@@ -740,6 +740,7 @@ module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstat
     `SELECT r.user_id,r.kyc_status,r.is_online,r.delivery_zone,r.vehicle_type,
             r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,
             r.admin_delivery_pricing_override,r.admin_delivery_pricing_override_by,r.admin_delivery_pricing_override_at,
+            (SELECT COALESCE(jsonb_agg(jsonb_build_object('originArea',rr.origin_area,'destinationArea',rr.destination_area,'fixedFeeGmd',rr.fixed_fee_gmd) ORDER BY rr.origin_area,rr.destination_area),'[]'::jsonb) FROM rider_delivery_rates rr WHERE rr.rider_id=r.user_id AND rr.is_active=TRUE) AS route_rates,
             u.full_name,u.phone,u.email,
             (SELECT count(*)::int FROM rider_delivery_rates rr WHERE rr.rider_id=r.user_id AND rr.is_active=TRUE) AS saved_route_count
      FROM riders r JOIN users u ON u.id=r.user_id ${whereSql}
@@ -776,6 +777,7 @@ async function updateAdminRiderPricingOverride(riderId,input={},actor) {
       riderMinimumFeeGmd:rider.delivery_min_fee_gmd,
       adminOverride:rider.admin_delivery_pricing_override||null,
     };
+    if (override && input.note) override.note=String(input.note).trim().slice(0,500);
     const {rows:[updated]}=await client.query(
       `UPDATE riders
        SET admin_delivery_pricing_override=$2::jsonb,admin_delivery_pricing_override_by=$3,
@@ -784,7 +786,7 @@ async function updateAdminRiderPricingOverride(riderId,input={},actor) {
        RETURNING user_id,admin_delivery_pricing_override,admin_delivery_pricing_override_by,admin_delivery_pricing_override_at`,
       [riderId,override===null?null:JSON.stringify(override),actor.id]
     );
-    const after={adminOverride:updated.admin_delivery_pricing_override||null,adminOverrideActive:updated.admin_delivery_pricing_override!=null};
+    const after={adminOverride:updated.admin_delivery_pricing_override||null,adminOverrideActive:updated.admin_delivery_pricing_override!=null,note:updated.admin_delivery_pricing_override?.note||null};
     await client.query(
       `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
        VALUES($1,$2,$3,'rider_delivery_pricing',$4,$5::jsonb,$6::jsonb)`,
