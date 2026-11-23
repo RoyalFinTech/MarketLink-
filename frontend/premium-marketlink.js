@@ -372,7 +372,8 @@
       try{var ar=await ML_API.customers.getAddresses(),addresses=normalizeProducts(ar.data),def=addresses.find(function(x){return x.is_default;});if(def){addressId=String(def.id);S.delivAddressId=addressId;S.deliveryAddressId=addressId;S.delivAddr=def.full_address||S.delivAddr||'';}}catch(e){}
     }
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
-    var expectedQuoteKey=vendors[0]+'|'+addressId;
+    var checkoutQuoteFingerprint=ids.slice().sort().map(function(id){return id+':'+Number(S.cart[id]||0);}).join(',')+'|coupon:'+String(S.appliedCoupon&&S.appliedCoupon.code||'')+'|affiliate:'+String(S.referredAffiliateCode||'');
+    var expectedQuoteKey=vendors[0]+'|'+addressId+'|'+checkoutQuoteFingerprint;
     var quoteCache=S.deliveryQuoteCache||null;
     var chosenQuote=quoteCache&&quoteCache.key===expectedQuoteKey&&Array.isArray(quoteCache.options)
       ?quoteCache.options.find(function(q){return String(q.quoteId)===String(S.selectedDeliveryQuoteId||'');}):null;
