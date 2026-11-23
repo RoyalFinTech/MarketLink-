@@ -19,6 +19,86 @@ const deliveredOrder={
  total:'145.00',status:'delivered',order_number:'ML-TEST-0001'
 };
 
+describe('Modem Pay charge success webhook reconciliation',()=>{
+ beforeEach(()=>{
+  jest.clearAllMocks();
+  ordersService.settleOrderFinancials.mockResolvedValue({settled:true});
+ });
+
+ test('confirms one matching completed GMD charge and settles it after commit',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'event-1'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{...payment,id:payment.id,method:'wave',amount:'145.00',currency:'GMD',status:'pending'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[{customer_id:deliveredOrder.customer_id,total:'145.00'}]})
+   .mockResolvedValueOnce({rows:[]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const event={event:'charge.succeeded',payload:{
+    id:'provider-charge-145',status:'completed',amount:145,currency:'GMD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+  }};
+  const result=await processWebhook({event,rawBody:JSON.stringify(event)});
+  expect(result).toMatchObject({processed:true,eventType:'charge.succeeded',paymentId:payment.id,orderId:payment.order_id});
+  expect(clientQuery.mock.calls[0][0]).toContain('payment_webhook_events');
+  expect(clientQuery.mock.calls[0][0]).toContain('ON CONFLICT (provider,event_id) DO NOTHING');
+  expect(clientQuery.mock.calls[1][0]).toContain('orders WHERE id=$1 FOR UPDATE');
+  expect(clientQuery.mock.calls[2][0]).toContain('payments p');
+  expect(clientQuery.mock.calls[3][0]).toContain("UPDATE payments SET status='confirmed'");
+  expect(clientQuery.mock.calls[4][0]).toContain("UPDATE orders SET payment_status='confirmed'");
+  expect(ordersService.settleOrderFinancials).toHaveBeenCalledTimes(1);
+  expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith(payment.order_id);
+ });
+
+ test('deduplicates a repeated signed provider event without confirming or settling twice',async()=>{
+  const clientQuery=jest.fn().mockResolvedValueOnce({rows:[]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const event={event:'charge.succeeded',payload:{
+    id:'provider-charge-duplicate',status:'completed',amount:145,currency:'GMD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+  }};
+  const result=await processWebhook({event,rawBody:JSON.stringify(event)});
+  expect(result).toMatchObject({duplicate:true,eventType:'charge.succeeded'});
+  expect(clientQuery).toHaveBeenCalledTimes(1);
+  expect(clientQuery.mock.calls[0][0]).toContain('ON CONFLICT (provider,event_id) DO NOTHING');
+  expect(clientQuery.mock.calls.some(([sql])=>/UPDATE payments SET status='confirmed'/.test(sql))).toBe(false);
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
+
+ test('does not confirm or settle a signed provider event with an amount mismatch',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'event-bad-amount'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{...payment,method:'wave',amount:'145.00',currency:'GMD',status:'pending'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const event={event:'charge.succeeded',payload:{
+    id:'provider-charge-wrong-amount',status:'completed',amount:144,currency:'GMD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+  }};
+  const result=await processWebhook({event,rawBody:JSON.stringify(event)});
+  expect(result).toMatchObject({processed:true,ignored:true,reason:'amount_mismatch'});
+  expect(clientQuery.mock.calls.some(([sql])=>/UPDATE payments SET status='confirmed'/.test(sql))).toBe(false);
+  expect(clientQuery.mock.calls.some(([sql])=>/UPDATE orders SET payment_status='confirmed'/.test(sql))).toBe(false);
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
+
+ test('does not confirm a completed provider event with the wrong currency',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'event-bad-currency'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{...payment,method:'wave',amount:'145.00',currency:'GMD',status:'pending'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const event={event:'charge.succeeded',payload:{
+    id:'provider-charge-wrong-currency',status:'completed',amount:145,currency:'USD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+  }};
+  const result=await processWebhook({event,rawBody:JSON.stringify(event)});
+  expect(result).toMatchObject({processed:true,ignored:true,reason:'currency_mismatch'});
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
+});
+
 describe('payment webhook lock ordering',()=>{
  beforeEach(()=>jest.clearAllMocks());
   test('locks the order before the payment row when status polling reports provider failure',async()=>{
