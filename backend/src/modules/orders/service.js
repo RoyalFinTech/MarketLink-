@@ -1,7 +1,8 @@
 'use strict';
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
-const { SETTING_KEYS, commissionSettingsFromRows } = require('../../utils/marketplaceCommission');
+const { SETTING_KEYS, commissionSettingsFromRows, payoutFeeRecoveryPctFromRows } = require('../../utils/marketplaceCommission');
+const { calculatePayoutFeeRecovery } = require('../../utils/payoutFeeRecovery');
 const { haversineKm, estimateRoadDistanceKm, matchingRouteRate, calculateDeliveryFare, roundGmd } = require('../../utils/deliveryPricing');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
@@ -219,7 +220,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     // Transparent marketplace pricing: vendor sets retail price; MarketLink commission is not added to checkout.
     const { rows: commissionSettingRows } = await client.query(
       "SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",
-      [[SETTING_KEYS.marketplace, SETTING_KEYS.affiliate]]
+      [[SETTING_KEYS.marketplace, SETTING_KEYS.affiliate, SETTING_KEYS.payoutRecovery]]
     );
     const commissionSettings = commissionSettingsFromRows(commissionSettingRows);
     const commPct = commissionSettings.marketplaceCommissionPct;
@@ -244,11 +245,17 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     const platformNetFee = parseFloat(Math.max(0,platFee-affiliateAmount).toFixed(2));
     const vendorPayout = parseFloat((discountedSubtotal-platFee).toFixed(2));
     const riderPayout = parseFloat(fee.toFixed(2));
-    const total = parseFloat((discountedSubtotal+fee).toFixed(2));
+    const payoutRecovery = calculatePayoutFeeRecovery({
+      vendorPayout,
+      riderPayout,
+      affiliatePayout: affiliateAmount,
+      pct: payoutFeeRecoveryPctFromRows(commissionSettingRows),
+    });
+    const total = parseFloat((discountedSubtotal+fee+payoutRecovery.payoutFeeRecoveryAmount).toFixed(2));
 
     const { rows:[order] } = await client.query(
-      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,delivery_fee_quote_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_fee,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending','pending') RETURNING *",
-      [genNum(),customerId,vendorId,deliveryAddressId,deliveryFeeQuoteId,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
+      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,delivery_fee_quote_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_fee,payout_fee_recovery_pct,payout_fee_recovery_amount,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending','pending') RETURNING *",
+      [genNum(),customerId,vendorId,deliveryAddressId,deliveryFeeQuoteId,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee,payoutRecovery.payoutFeeRecoveryPct,payoutRecovery.payoutFeeRecoveryAmount]);
     for (const li of lines) await client.query("INSERT INTO order_items (order_id,product_id,product_name_snapshot,unit_price_snapshot,quantity,line_total) VALUES($1,$2,$3,$4,$5,$6)",[order.id,li.productId,li.name,li.price,li.qty,li.lt]);
     for (const item of items) {
       const { rows:[updated] } = await client.query("UPDATE inventory SET quantity=quantity-$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity>=$1 RETURNING quantity",[Number(item.quantity),item.productId]);
@@ -400,8 +407,10 @@ async function settleOrderFinancials(orderId) {
     const affiliateAmount = Number(order.affiliate_commission_amount || 0);
     const platformNet = Number(order.platform_net_fee || 0);
     const platformFee = Number(order.platform_fee || 0);
+    const payoutFeeRecoveryPct = Number(order.payout_fee_recovery_pct || 0);
+    const payoutFeeRecoveryAmount = Number(order.payout_fee_recovery_amount || 0);
     const commissionAmounts = [
-      vendorAmount, riderAmount, affiliateAmount, platformNet, platformFee,
+      vendorAmount, riderAmount, affiliateAmount, platformNet, platformFee, payoutFeeRecoveryAmount,
       Number(commission.vendor_payout), Number(commission.rider_payout),
       Number(commission.affiliate_commission_amount), Number(commission.platform_net_amount),
       Number(commission.commission_amount), Number(commission.order_total),
@@ -410,6 +419,13 @@ async function settleOrderFinancials(orderId) {
       throw new AppError('The order contains invalid financial amounts. No wallet balances were changed.', 409, 'SETTLEMENT_AMOUNT_INVALID');
     }
     const sameMoney = (a, b) => Math.abs(Number(a) - Number(b)) <= 0.01;
+    const expectedPayoutRecovery = calculatePayoutFeeRecovery({
+      vendorPayout: vendorAmount, riderPayout: riderAmount,
+      affiliatePayout: affiliateAmount, pct: payoutFeeRecoveryPct,
+    });
+    if (!sameMoney(expectedPayoutRecovery.payoutFeeRecoveryAmount, payoutFeeRecoveryAmount)) {
+      throw new AppError('The order payout cost recovery snapshot does not match its payout amounts. No wallet balances were changed.', 409, 'SETTLEMENT_PAYOUT_RECOVERY_MISMATCH');
+    }
     if (affiliateAmount > 0 && !order.affiliate_user_id) {
       throw new AppError('This order has an affiliate reward but no affiliate account. No wallet balances were changed.', 409, 'SETTLEMENT_AFFILIATE_MISSING');
     }
@@ -496,8 +512,8 @@ async function settleOrderFinancials(orderId) {
     }
 
     await client.query(
-      "INSERT INTO platform_earnings (order_id,gross_merchandise,discount_amount,commission_pct,commission_amount,status,earned_at) VALUES($1,$2,$3,$4,$5,'earned',now()) ON CONFLICT (order_id) DO UPDATE SET commission_amount=EXCLUDED.commission_amount,status='earned'",
-      [orderId, Number(order.subtotal), Number(order.discount_amount || 0), Number(order.platform_fee_pct || 0), platformNet]);
+      "INSERT INTO platform_earnings (order_id,gross_merchandise,discount_amount,commission_pct,commission_amount,payout_fee_recovery_pct,payout_fee_recovery_amount,status,earned_at) VALUES($1,$2,$3,$4,$5,$6,$7,'earned',now()) ON CONFLICT (order_id) DO UPDATE SET commission_amount=EXCLUDED.commission_amount,payout_fee_recovery_pct=EXCLUDED.payout_fee_recovery_pct,payout_fee_recovery_amount=EXCLUDED.payout_fee_recovery_amount,status='earned'",
+      [orderId, Number(order.subtotal), Number(order.discount_amount || 0), Number(order.platform_fee_pct || 0), platformNet, payoutFeeRecoveryPct, payoutFeeRecoveryAmount]);
     await client.query("UPDATE commission_records SET status='paid' WHERE id=$1", [commission.id]);
 
     return {
@@ -506,6 +522,7 @@ async function settleOrderFinancials(orderId) {
       riderPayout:riderAmount,
       affiliatePayout:affiliateAmount,
       platformNet:platformNet,
+      payoutFeeRecoveryAmount:payoutFeeRecoveryAmount,
     };
   });
 }
