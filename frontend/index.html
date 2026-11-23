@@ -4573,7 +4573,7 @@ function renderRDash(){
       '<div class="ml-rider-pricing-subhead"><div><b>Fixed area-to-area prices</b><small>A fixed route fare overrides your per-kilometre calculator when both area names match.</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="rAddDeliveryRouteRow()">＋ Add route</button></div>'+
       '<div id="rider-route-rates">'+routeRows+'</div>'+
       '<button type="button" class="ml-btn ml-btn-primary ml-rider-pricing-save" onclick="rSaveDeliveryPricing()">Save delivery prices</button>'+
-      '<p class="ml-rider-pricing-note">When there is no matching fixed route, MarketLink calculates: max(minimum fare, base fee + estimated route kilometres × your per-kilometre rate). The estimate uses vendor pickup GPS and customer saved GPS with a road-distance factor; it is a pricing estimate, not live turn-by-turn navigation. You can update your prices at any time. Prices already accepted by customers stay locked to that order.</p>'+
+      '<p class="ml-rider-pricing-note">When there is no matching fixed route, MarketLink calculates: max(minimum fare, base fee + estimated route kilometres × your per-kilometre rate). Use locality names (e.g. Serrekunda, Brikama or Bakau) for your saved route prices; these can match inside full street addresses. The estimate uses vendor pickup GPS and customer saved GPS with a road-distance factor; it is a pricing estimate, not live turn-by-turn navigation. You can update your prices at any time. Prices already accepted by customers stay locked to that order.</p>'+
       '</section>';
   } else if(S.rSubTab==='wallet'){
     var total30=Number(S.rEarningsSummary&&S.rEarningsSummary.total_earnings||0);
