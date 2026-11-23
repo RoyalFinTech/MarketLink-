@@ -236,7 +236,7 @@ describe('order creation ownership safeguards', () => {
     });
     const lockedProductQuery=clientQuery.mock.calls.find(([sql])=>sql.includes('FROM products p')&&sql.includes('FOR UPDATE OF p'));
     expect(lockedProductQuery[0]).toContain('CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price');
-    expect(lockedProductQuery[0]).toContain('p.price AS vendor_listed_price');
+    expect(lockedProductQuery[0]).not.toContain('p.price AS vendor_listed_price');
     const orderInsert=clientQuery.mock.calls.find(([sql])=>sql.startsWith('INSERT INTO orders'));
     expect(orderInsert).toBeDefined();
     expect(orderInsert[0]).toContain('payout_fee_recovery_pct');
