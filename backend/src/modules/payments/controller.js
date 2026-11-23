@@ -18,7 +18,7 @@ exports.methods = wrap(async (req,res) => {
     directMobileMoney:configured&&h2h,
     hostedCheckout:configured&&!h2h,
     methods:configured?['wave','afrimoney','qmoney']:[],
-    setupReason:configured?null:'Mobile-money checkout is not enabled until the Modem Pay API key, webhook signing secret, public callback URL and any required H2H approval are configured.'
+    setupReason:configured?null:'Mobile-money checkout is not enabled until the Modem Pay API key, webhook signing secret, public callback URL and any required H2H approval are configured.',
     currency:'GMD'
   }});
 });
