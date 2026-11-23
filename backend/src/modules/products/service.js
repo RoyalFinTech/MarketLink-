@@ -73,7 +73,16 @@ async function update(id, vendorId, isAdmin, fields) {
   for (const [k,v] of Object.entries(fields)) { const col=k.replace(/([A-Z])/g,'_$1').toLowerCase(); if(allowed.includes(col)){sets.push(`${col}=$${pi++}`);params.push(v);} }
   if (!sets.length) throw new AppError('No valid fields.',400);
   params.push(id);
-  const { rows:[up] } = await query(`UPDATE products SET ${sets.join(',')} WHERE id=$${pi} RETURNING *`, params);
+  const { rows:[up] } = await query(`UPDATE products SET ${sets.join(',')} WHERE id=${pi} RETURNING *`, params);
+  if (!isAdmin) {
+    up.effective_customer_price=Number(up.admin_price_override_enabled?up.admin_price_override:up.price);
+    up.admin_pricing_adjusted=Boolean(up.admin_price_override_enabled);
+    delete up.admin_price_override;
+    delete up.admin_price_override_enabled;
+    delete up.admin_price_override_by;
+    delete up.admin_price_override_at;
+    delete up.admin_price_override_note;
+  }
   return up;
 }
 async function remove(id, vendorId, isAdmin) {
