@@ -124,7 +124,7 @@ async function updateAddress(customerId, addressId, data) {
   };
   const sets = [], params = []; let pi = 1;
   for (const [jsKey, col] of Object.entries(allowed)) {
-    if (data[jsKey] !== undefined) { sets.push(`${col} = ${pi++}`); params.push(data[jsKey]); }
+        if (data[jsKey] !== undefined) { sets.push(`${col} = ${pi++}`); params.push(data[jsKey]); }
   }
   if (!sets.length) throw new AppError('No fields to update.', 400, 'VALIDATION_ERROR');
 
