@@ -115,12 +115,12 @@ describe('rider live GPS and arrival alerts', () => {
 
 describe('Admin-controlled rider delivery tariffs',()=>{
  const riderId='33333333-3333-4333-8333-333333333333';
+ let clientQuery;
  beforeEach(()=>{
   jest.clearAllMocks();
+  clientQuery=jest.fn();
   withTransaction.mockImplementation(callback=>callback({query:clientQuery}));
  });
- let clientQuery;
- beforeEach(()=>{clientQuery=jest.fn();});
 
  test('allows an approved rider online when an enabled Admin override supplies the tariff',async()=>{
   clientQuery
