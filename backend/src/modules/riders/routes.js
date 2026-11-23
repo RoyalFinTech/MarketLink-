@@ -68,6 +68,21 @@ router.put('/profile',
   validate, ctrl.updateProfile
 );
 
+router.get('/me/delivery-pricing',
+  authenticate, authorize('rider'), ctrl.getDeliveryPricing
+);
+router.put('/me/delivery-pricing',
+  authenticate, authorize('rider'),
+  [
+    body('enabled').optional().isBoolean(),
+    body('baseFee').isFloat({ min: 0, max: 2000 }),
+    body('perKmFee').isFloat({ min: 0, max: 500 }),
+    body('minimumFee').isFloat({ gt: 0, max: 5000 }),
+    body('routeRates').optional().isArray({ max: 20 }),
+  ],
+  validate, ctrl.saveDeliveryPricing
+);
+
 router.patch('/availability',
   authenticate, authorize('rider'),
   [body('isOnline').isBoolean().withMessage('isOnline must be a boolean.')],
