@@ -19,8 +19,8 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
     params.push(categoryId); pi++;
   }
   if (vendorId)   { conds.push(`p.vendor_id=$${pi++}`);   params.push(vendorId); }
-  if (minPrice)   { conds.push(`(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)>=${pi++}`); params.push(minPrice); }
-  if (maxPrice)   { conds.push(`(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)<=${pi++}`); params.push(maxPrice); }
+  if (minPrice)   { conds.push(`(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)>=$${pi++}`); params.push(minPrice); }
+  if (maxPrice)   { conds.push(`(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)<=$${pi++}`); params.push(maxPrice); }
   const effectivePrice = '(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)';
   const orderMap = { newest:'p.created_at DESC', price_asc:effectivePrice+' ASC', price_desc:effectivePrice+' DESC', top_rated:'p.rating_avg DESC' };
   const ob = orderMap[sort]||'p.created_at DESC', wh = conds.length ? 'WHERE '+conds.join(' AND ') : '';
