@@ -4427,7 +4427,7 @@ function vSaveProdEdit(id){
   renderVDash(); toast('Product updated ✅');
 }
 function vRemoveProd(id){S.vProds=S.vProds.filter(function(p){return p.id!==id;});renderVDash();toast('Product removed.');}
-async async function vCapturePickupGPS(){
+async function vCapturePickupGPS(){
   if(!navigator.geolocation){toast('This browser does not provide GPS. Enter a shop address and use a GPS-enabled device to capture the pickup pin.','error');return;}
   var button=G('v-pickup-capture');
   if(button){button.disabled=true;button.textContent='Reading shop GPS…';}
@@ -4482,7 +4482,7 @@ async function vSavePickupLocation(){
     if(button){button.disabled=false;button.textContent='Save pickup location';}
   }
 }
-function vToggleOnline(){
+async function vToggleOnline(){
   if(!ML_API.auth.isAuthenticated()){toast('Please sign in first.','error');return;}
   var next=!S.vOnline;
   try{
