@@ -137,7 +137,7 @@ async function updateAddress(customerId, addressId, data) {
     params.push(addressId, customerId);
     const { rows: [addr] } = await client.query(
       `UPDATE delivery_addresses SET ${sets.join(', ')}
-       WHERE id = ${pi} AND customer_id = ${pi+1} RETURNING *`,
+       WHERE id = ${String.fromCharCode(36)}${pi} AND customer_id = ${String.fromCharCode(36)}${pi+1} RETURNING *`,
       params
     );
     if (!addr) throw new AppError('Address not found.', 404, 'ADDRESS_NOT_FOUND');
