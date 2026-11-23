@@ -222,7 +222,7 @@ async function setAvailability(userId, isOnline) {
     }
     if(!isOnline) {
       const {rows:[active]}=await client.query(
-        "SELECT id FROM deliveries WHERE rider_id=$1 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+        "SELECT d.id FROM deliveries d JOIN orders reserved_order ON reserved_order.id=d.order_id WHERE d.rider_id=$1 AND (d.status IN ('assigned','picked_up','in_transit') OR (d.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned'))) LIMIT 1",
         [userId]);
       if(active)throw new AppError(
         'Finish or decline your active delivery before going offline. Keep GPS sharing available so the customer can track this delivery.',
