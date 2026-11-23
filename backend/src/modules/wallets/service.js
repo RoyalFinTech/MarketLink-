@@ -32,14 +32,8 @@ async function getWallet(userId) {
   );
   const held = Number(pending?.amount || 0);
   const {rows:[feeSetting]}=await query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1",['withdrawal_service_fee_pct']);
-  const configuredWithdrawalServiceFeePct=validateWithdrawalFeePct(feeSetting?feeSetting.value:DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,500);
-  const {rows:[accountType]}=await query(`SELECT
-    EXISTS(SELECT 1 FROM vendors WHERE user_id=$1) AS is_vendor,
-    EXISTS(SELECT 1 FROM riders WHERE user_id=$1) AS is_rider,
-    EXISTS(SELECT 1 FROM affiliates WHERE user_id=$1) AS is_affiliate`,[userId]);
-  const payoutRecoveryFunded = Boolean(accountType&&(accountType.is_vendor||accountType.is_rider||accountType.is_affiliate));
-  const withdrawalServiceFeePct=payoutRecoveryFunded?0:configuredWithdrawalServiceFeePct;
-  return {...wallet,balance:Number(wallet.balance),reserved_balance:held,available_balance:Math.max(0,Number(wallet.balance)-held),withdrawal_service_fee_pct:withdrawalServiceFeePct,withdrawal_service_fee_waived:payoutRecoveryFunded};
+  const withdrawalServiceFeePct=validateWithdrawalFeePct(feeSetting?feeSetting.value:DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,500);
+  return {...wallet,balance:Number(wallet.balance),reserved_balance:held,available_balance:Math.max(0,Number(wallet.balance)-held),withdrawal_service_fee_pct:withdrawalServiceFeePct};
 }
 
 async function listTransactions(userId, { page = 1, limit = 30 } = {}) {
