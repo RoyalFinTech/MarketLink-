@@ -2213,3 +2213,73 @@ body.ml-photo-viewer-open{overflow:hidden}
 .lm .ml-payout-brand-menu{background:#FFFFFF;border-color:#CCD8DE;box-shadow:0 15px 35px rgba(16,42,54,.18)}
 .lm .ml-payout-brand-option{color:#17313D}
 .lm .ml-payout-brand-copy small{color:#536A75}
+
+
+/* MarketLink customer checkout: rider quotes and final payable summary */
+.ml-delivery-route-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;margin:8px 0 10px;border-radius:12px;background:rgba(13,115,119,.10);border:1px solid rgba(66,210,201,.18);color:var(--ml-muted,#9db0ba);font-size:10px}
+.ml-delivery-route-meta b{color:#e8c978;font-weight:800}
+.ml-delivery-quote-list{display:grid;gap:8px}
+.ml-delivery-quote-card{width:100%;display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px;border-radius:14px;text-align:left;background:rgba(4,20,31,.72);border:1px solid rgba(132,165,181,.24);color:var(--ml-text,#edf4f7);font:inherit;cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease}
+.ml-delivery-quote-card:hover{border-color:rgba(214,173,88,.55);transform:translateY(-1px)}
+.ml-delivery-quote-card.selected{border-color:#d6ad58;background:linear-gradient(120deg,rgba(214,173,88,.12),rgba(13,115,119,.12));box-shadow:0 0 0 1px rgba(214,173,88,.10)}
+.ml-delivery-quote-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:rgba(214,173,88,.12);font-size:20px}
+.ml-delivery-quote-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ml-delivery-quote-copy b{font-size:12px;font-weight:800;color:var(--ml-text,#edf4f7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ml-delivery-quote-copy small{font-size:9px;line-height:1.45;color:var(--ml-muted,#9db0ba)}
+.ml-delivery-quote-card>strong{grid-column:3;grid-row:1;color:#f2d58f;font-size:14px;font-weight:900;white-space:nowrap}
+.ml-delivery-quote-check{grid-column:2/4;justify-self:end;color:#b9d6d8;font-size:9px;font-weight:800}
+.ml-delivery-quote-card.selected .ml-delivery-quote-check{color:#f2d58f}
+.ml-delivery-estimate-note,.ml-checkout-no-hidden-fees,.ml-checkout-coupon-note{display:block;margin:10px 2px 0;color:var(--ml-muted,#9db0ba);font-size:10px;line-height:1.6}
+.ml-delivery-quote-empty{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:15px;border-radius:13px;background:rgba(255,255,255,.035);border:1px dashed rgba(132,165,181,.35)}
+.ml-delivery-quote-empty b{font-size:12px;color:var(--ml-text,#edf4f7)}
+.ml-delivery-quote-empty span{font-size:10px;line-height:1.55;color:var(--ml-muted,#9db0ba)}
+.ml-delivery-quote-empty .ml-btn{margin-top:4px}
+.ml-checkout-delivery-panel>.ml-section-head>span{font-size:10px;color:#d6b566;font-weight:800}
+.ml-checkout-total-card{padding:14px}
+.ml-checkout-payable{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 4px 3px;margin-top:6px;border-top:1px solid rgba(214,173,88,.28)}
+.ml-checkout-payable span{font-size:12px;font-weight:800;color:var(--ml-text,#edf4f7)}
+.ml-checkout-payable strong{font-size:20px;font-weight:900;color:#49d4c7}
+.ml-checkout-no-hidden-fees{padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+.ml-checkout-coupon-note{color:#f1d18a}
+
+/* Rider pricing desk */
+.ml-rider-pricing-card{padding:16px;border:1px solid rgba(214,173,88,.25);border-radius:18px;background:linear-gradient(145deg,rgba(10,35,51,.96),rgba(8,22,34,.96));box-shadow:0 14px 36px rgba(0,0,0,.16)}
+.ml-rider-pricing-head>span{font-size:9px;letter-spacing:1.6px;font-weight:900;color:#d6b566}
+.ml-rider-pricing-head h3{font-size:18px;color:#f5f7f8;margin:5px 0}
+.ml-rider-pricing-head p,.ml-rider-pricing-note{font-size:10px;line-height:1.65;color:#9fb2bd}
+.ml-rider-pricing-toggle{display:flex;gap:10px;align-items:flex-start;padding:13px;margin:14px 0;border:1px solid rgba(66,210,201,.20);border-radius:13px;background:rgba(13,115,119,.10)}
+.ml-rider-pricing-toggle input{width:18px;height:18px;accent-color:#35b9ae;margin-top:2px}
+.ml-rider-pricing-toggle span{display:flex;flex-direction:column;gap:3px}
+.ml-rider-pricing-toggle b{color:#e9f0f3;font-size:11px}
+.ml-rider-pricing-toggle small,.ml-rider-pricing-subhead small{color:#91a8b4;font-size:9px;line-height:1.5}
+.ml-rider-pricing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ml-rider-pricing-grid label,.ml-rider-route-row label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ml-rider-pricing-grid label>span,.ml-rider-route-row label>span{font-size:10px;font-weight:800;color:#e5edf1}
+.ml-rider-pricing-subhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:19px 0 10px}
+.ml-rider-pricing-subhead>div{display:flex;flex-direction:column;gap:3px}
+.ml-rider-pricing-subhead b{font-size:12px;color:#f4d58e}
+.ml-rider-route-row{display:grid;grid-template-columns:1fr 1fr minmax(110px,.7fr) auto;gap:8px;align-items:end;padding:11px;margin:9px 0;border-radius:13px;border:1px solid rgba(132,165,181,.18);background:rgba(255,255,255,.025)}
+.ml-rider-route-row .ml-daha-input{min-height:42px;padding:9px;font-size:11px}
+.ml-rider-route-remove{min-height:40px;padding:8px 10px;font-size:10px}
+.ml-rider-pricing-save{width:100%;margin:13px 0 9px}
+.ml-rider-pricing-note{margin-top:5px}
+
+/* DAHA Wallet overview cards and touch-friendly navigation */
+.ml-daha-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0}
+.ml-daha-summary-grid>div{display:flex;flex-direction:column;gap:5px;min-width:0;padding:13px;border:1px solid rgba(214,173,88,.20);border-radius:14px;background:linear-gradient(145deg,rgba(15,42,58,.96),rgba(8,25,38,.94))}
+.ml-daha-summary-grid span{font-size:9px;color:#9fb2bd;font-weight:700}
+.ml-daha-summary-grid b{font-size:15px;color:#f4d58e;overflow-wrap:anywhere}
+.ml-daha-summary-grid small{font-size:8px;line-height:1.35;color:#8299a6}
+.ml-daha-actions .ml-btn{min-height:43px}
+@media(max-width:600px){
+ .ml-rider-pricing-grid{grid-template-columns:1fr}
+ .ml-rider-route-row{grid-template-columns:1fr 1fr}
+ .ml-rider-route-remove{grid-column:1/-1}
+ .ml-daha-summary-grid{gap:6px}
+ .ml-daha-summary-grid>div{padding:10px 8px}
+ .ml-daha-summary-grid b{font-size:12px}
+ .ml-daha-summary-grid span{font-size:8px}
+ .ml-delivery-quote-card{grid-template-columns:32px minmax(0,1fr) auto;gap:8px;padding:10px}
+ .ml-delivery-quote-icon{width:32px;height:32px}
+ .ml-delivery-quote-card>strong{font-size:12px}
+}
