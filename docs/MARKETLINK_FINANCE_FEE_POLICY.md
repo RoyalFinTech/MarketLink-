@@ -1,54 +1,85 @@
-# MarketLink Gambia — DAHA Wallet and Marketplace Fee Policy
+# MarketLink Gambia — Finance, Delivery and Payout Fee Policy
 
-This document records the finance rules used by the MarketLink production application.
+## 1. Marketplace commission
 
-## Marketplace order commission
+The marketplace commission pool remains **5% of the discounted merchandise subtotal**. It is deducted from the merchandise proceeds; it is not an additional line added to vendor-listed prices.
 
-The marketplace commission pool remains **5% of discounted merchandise subtotal**. It is deducted from merchandise proceeds and is never added to the customer's checkout total.
+For a qualifying affiliate referral, the current split is:
+- Vendor: 95% of discounted merchandise subtotal.
+- Affiliate: 2% of discounted merchandise subtotal, funded from the 5% marketplace commission pool.
+- MarketLink retained share: 3% of discounted merchandise subtotal.
 
-For an eligible affiliate-referred order, the 5% pool is divided into:
-- **2% affiliate reward**
-- **3% MarketLink retained commission**
+Without a qualifying referral, MarketLink retains the full 5% pool. The affiliate amount is not added on top of the 5%.
 
-Without a qualifying affiliate referral, MarketLink retains the full 5%. Affiliate rewards are credited only after the order has been delivered and payment is confirmed. The vendor controls the displayed product price; that listed price is not increased by this commission setting.
+## 2. Customer-funded payout-cost recovery
 
-## DAHA Wallet withdrawal service fee
+New orders include a configurable **2% payout-cost recovery provision** in the customer's one all-in payable total. The calculation base is the total amount that will later be credited to wallet holders for the order:
 
-A separate **2% DAHA Wallet withdrawal service fee** applies when a customer, vendor, rider or affiliate withdraws money from their DAHA Wallet. It also applies when the wallet was funded by a deposit and the user withdraws without making a marketplace purchase.
+`vendor payout + rider delivery payout + qualifying affiliate payout`
 
-The amount entered in the withdrawal form is the amount requested for the recipient. The 2% fee is added on top and shown in the review step before the user enters their MarketLink PIN.
+The 2% provision is not a second marketplace commission and does not alter product listing prices. It is stored as its own order snapshot and is included in the customer total without exposing a separate commission, gateway-fee or processing-fee row during checkout or wallet payment.
 
-Example:
-- Requested payout to recipient: **D100.00**
-- DAHA Wallet withdrawal service fee (2%): **D2.00**
-- Total wallet debit: **D102.00**
+Illustrative examples (delivery fare D25):
 
-The fee is not charged on a deposit, a product purchase, the marketplace checkout total or the rider's delivery charge. It is independent of the marketplace 5% commission.
+| Component | Qualifying affiliate | No affiliate |
+|---|---:|---:|
+| Merchandise subtotal | D100.00 | D100.00 |
+| Marketplace commission pool (5%) | D5.00 | D5.00 |
+| Vendor payout | D95.00 | D95.00 |
+| Affiliate payout | D2.00 | D0.00 |
+| MarketLink retained commission | D3.00 | D5.00 |
+| Rider delivery payout | D25.00 | D25.00 |
+| Payout-cost recovery base | D122.00 | D120.00 |
+| Customer-funded recovery at 2% | D2.44 | D2.40 |
+| **Customer all-in total** | **D127.44** | **D127.40** |
 
-## Modem Pay payout cost and MarketLink margin
+The recovery percentage is configurable by Admin from 0% to 10%. The percentage and amount are recorded on each new order. The amount is recognized in the platform earnings ledger only when the order is paid and successfully delivered. Existing orders keep their original pricing; previous orders are not recalculated.
 
-Before initiating a supported transfer, MarketLink requests a payout-fee quote from Modem Pay. The quote and the fee returned by a completed transfer are kept separately from the DAHA service fee.
+## 3. DAHA Wallet withdrawals
 
-MarketLink's payout margin is calculated as:
+The DAHA Wallet withdrawal service fee remains **2% by default for customers, vendors, riders and affiliates** (Admin can change the percentage within the existing 0%–10% control). It applies to cash-outs, including funds that were deposited directly and withdrawn without a marketplace purchase. There is no DAHA withdrawal fee on deposits or product purchases.
 
-`DAHA withdrawal service fee - Modem Pay transfer fee`
+The fee is shown transparently in the withdrawal review before the user enters their PIN. For example, to receive D100, a user pays D2 DAHA service fee and the wallet debit is D102. The fee is calculated on the amount the recipient receives, not on the fee-inclusive debit.
 
-A positive value is the amount left with MarketLink before other operating costs. A negative value means the payout partner's cost exceeded the 2% service fee and the difference is absorbed by MarketLink, not deducted from the user's requested payout or the vendor's merchandise proceeds.
+The customer-funded order provision in section 2 is separate: it helps offset actual outgoing provider transfer costs when vendor, rider or affiliate funds are later withdrawn. It does not replace the DAHA service fee.
 
-The Admin finance page reconciles DAHA service fees, Modem Pay payout fees and MarketLink's resulting margin. Where the provider's completed transfer does not return a separate fee, the pre-transfer quote is retained and labelled as a quote estimate.
+## 4. Provider transfer fee reconciliation
 
-## Payout confirmation and wallet safety
+Modem Pay fee quotes and returned provider fees are recorded separately from the DAHA withdrawal service fee and the customer-funded order provision. Admin Finance reconciles:
 
-A withdrawal request is reserved against the user's available wallet balance, including the service fee. No wallet debit occurs just because the user submits a request. The payout and service fee are debited only after a matching provider-confirmed transfer. A failed or unaccepted transfer releases the full reservation. If a completed transfer is later reversed by the provider, the payout amount and DAHA service fee are returned to the user's wallet.
+- DAHA wallet withdrawal service fees collected;
+- customer-funded payout-cost recovery recognized from completed orders;
+- Modem Pay provider fees quoted/charged; and
+- the net recovery or shortfall.
 
-The existing D50 minimum payout, 4-digit MarketLink PIN confirmation, request-specific beneficiary details, provider reference checks and transfer idempotency remain in place.
+A positive net is retained by MarketLink. If the actual provider fee exceeds the amounts recovered, MarketLink bears the shortfall; it is not silently deducted from the vendor's merchandise payout or the rider's delivery fare. Fee quote data is labelled as an estimate when Modem Pay has not returned an actual fee.
 
-## Supported payout methods
+Wave and AfriMoney are the configured outgoing mobile-money rails in the current integration. QMoney and APS remain visible as disabled options until outgoing payout support is confirmed and enabled. No production test transfer is assumed by this policy.
 
-Wave and AfriMoney are the active mobile-money withdrawal methods in the current detailed Modem Pay payout contract.
+## 5. Rider-controlled delivery pricing
 
-QMoney and APS are shown in the withdrawal method picker as clearly disabled options until Modem Pay confirms their outgoing-transfer API support for this merchant account. Their appearance in a deposit or collection selector does not by itself prove that a payout is supported.
+Riders can save:
+- a default base delivery fee;
+- a per-kilometre amount;
+- a minimum fare; and
+- fixed origin-area to destination-area fares for routes they serve regularly.
 
-## Customer delivery charges
+For a route without a matching fixed fare, the server calculates:
 
-Delivery remains a separate amount from the product subtotal and marketplace commission. The current production order-creation source still uses a server-side base delivery fee; a rider-controlled location/distance fare system is a separate required change and must not be represented as complete until rider rates can be saved, quoted before order placement and locked to the order.
+`max(minimum fare, base fee + estimated road kilometres × rider's per-kilometre rate)`
+
+For a matching saved route pair, the rider's fixed fare overrides the calculator. Prices are stored in the rider tariff table.
+
+The checkout route estimate uses the vendor's saved pickup GPS and the customer's saved delivery-address GPS. The current road-distance estimate applies a configurable distance factor (default 1.25) to straight-line GPS distance. It is an estimate, not live turn-by-turn navigation or a guaranteed road-route calculation.
+
+Each rider quote is specific to the customer, vendor, saved address, cart, coupon/referral, relevant commission settings, delivery fare and rider. Quotes expire after 15 minutes. The full all-in customer total is calculated server-side and fingerprinted with the quote; if cart prices, discounts or commission settings change before order placement, the customer must refresh the quote and review the revised total. Once the order is placed, the selected rider and delivery fare are locked to that order.
+
+A rider reserved by a placed order is excluded from further quotes and new assignments until that order is completed or cancelled. Vendors cannot silently replace the rider with a different fare.
+
+Checkout displays the customer’s single all-in payable amount. The payment service, including DAHA Wallet, uses the order total saved by the server. The checkout does not add a second payment-step surcharge.
+
+## 6. Settlement controls
+
+Vendor, rider and qualifying affiliate wallet credits occur only after confirmed payment and successful delivery. The server validates the commission record, payout recovery snapshot, locked rider and order amounts before changing balances. A pending withdrawal reserves the full wallet debit (recipient payout plus DAHA withdrawal service fee). Failed payouts release the reserve; completed-payout reversals restore the full wallet debit.
+
+No production transfer or customer charge should be initiated as a test without explicit authorization and a confirmed test merchant account.
