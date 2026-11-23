@@ -4465,7 +4465,7 @@ async function loadRiderLiveData(){
       id:d.id,order_id:d.order_id,from:d.vendor_name||'Vendor',to:'Customer delivery',
       dist:d.distance_km!=null?(Number(d.distance_km).toFixed(1)+' km'):'—',
       pay:Number(d.earning||0),eta:d.estimated_minutes!=null?(d.estimated_minutes+' min'):'—',
-      status:d.status,assignmentStatus:d.assignment_status||'pending',order_number:d.order_number,total:d.order_total,
+      status:d.status,assignmentStatus:d.assignment_status||'pending',orderStatus:d.order_status||null,order_number:d.order_number,total:d.order_total,
       paymentMethod:d.payment_method||null,paymentId:d.cod_payment_id||null,codPaymentAmount:Number(d.cod_payment_amount||0),codRemittanceStatus:d.cod_remittance_status||null,codRemittanceNote:d.cod_remittance_review_note||null,codRemittanceReference:d.cod_remittance_reference||null,codRemittanceMethod:d.cod_remittance_method||null
     };});
     var activeDelivery=S.rDeliveries.find(function(d){
@@ -4487,7 +4487,8 @@ function renderRDash(){
   }
   var content='';
   var riderRequests=(S.rDeliveries||[]).filter(function(d){
-    return String(d.status).toLowerCase()==='assigned'&&String(d.assignmentStatus||'pending').toLowerCase()!=='accepted';
+    return String(d.status).toLowerCase()==='assigned'&&String(d.assignmentStatus||'pending').toLowerCase()!=='accepted'&&
+      ['awaiting_rider','rider_assigned'].indexOf(String(d.orderStatus||'').toLowerCase())>=0;
   });
 
   if(S.rSubTab==='requests'){
@@ -4501,7 +4502,8 @@ function renderRDash(){
       content='<div style="text-align:center;padding:40px 20px;">'+
         '<div style="font-size:44px;margin-bottom:11px;">🛵</div>'+
         '<div style="color:var(--tx);font-size:14px;font-weight:600;">Waiting for requests…</div>'+
-        '<div style="color:var(--mu);font-size:12px;margin-top:4px;">New deliveries will appear here</div></div>';
+        '<div style="color:var(--mu);font-size:12px;margin-top:4px;">New deliveries appear when the vendor has prepared the order and marked it ready.</div>'+
+        '<button class="btn btn-pu" style="margin-top:13px" onclick="loadRiderLiveData()">↻ Refresh requests</button></div>';
     } else {
       riderRequests.forEach(function(d){
         content+='<div style="background:var(--sf);border-radius:13px;padding:13px;border:1.5px solid rgba(124,58,237,0.4);margin-bottom:11px;">'+
@@ -4691,7 +4693,7 @@ async function rSaveDeliveryPricing(){
   try{
     var response=await ML_API.riders.saveDeliveryPricing(payload);
     S.rDeliveryPricing=response&&response.data||response;
-    toast('Your delivery prices have been saved. Customers can now receive your quote when you are online.','success');
+    toast(payload.enabled?'Your prices are saved. Customers can see your delivery quote when you are online and the vendor marks the order ready.':'Your prices are saved but currently disabled. Enable them before going online.','success');
     renderRDash();
   }catch(error){
     toast(error.error||'Could not save your delivery prices. Check the route amounts and try again.','error');
