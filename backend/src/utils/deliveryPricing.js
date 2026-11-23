@@ -4,6 +4,9 @@ const EARTH_RADIUS_KM = 6371;
 const DEFAULT_ROAD_DISTANCE_FACTOR = 1.25;
 
 function finiteCoordinate(value, min, max) {
+  // Number(null) and Number('') both become zero, which is a valid latitude
+  // or longitude but is not a supplied GPS coordinate.
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
   const number = Number(value);
   return Number.isFinite(number) && number >= min && number <= max ? number : null;
 }
