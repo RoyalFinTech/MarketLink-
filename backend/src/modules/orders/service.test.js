@@ -212,7 +212,7 @@ describe('order creation ownership safeguards', () => {
       if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.45',longitude:'-16.58'}]};
       if(sql.includes('FROM delivery_fee_quotes'))return{rows:[{
         id:'quote-1',rider_id:'rider-1',pickup_lat:'13.44',pickup_lng:'-16.57',
-        dropoff_lat:'13.45',dropoff_lng:'-16.58',delivery_fee_gmd:'25.00',
+        dropoff_lat:'13.45',dropoff_lng:'-16.58',route_distance_km:'1.50',delivery_fee_gmd:'25.00',
         estimated_customer_total:'127.36',payout_fee_recovery_pct:'2.00',
         checkout_fingerprint:fingerprint
       }]};
@@ -242,7 +242,7 @@ describe('order creation ownership safeguards', () => {
     const deliveryInsert=clientQuery.mock.calls.find(([sql])=>/INSERT INTO deliveries/i.test(sql));
     expect(deliveryInsert).toBeDefined();
     expect(deliveryInsert[0]).toContain('dropoff_lat,dropoff_lng');
-    expect(deliveryInsert[1]).toEqual(['order-configured-split','rider-1','13.44','-16.57','13.45','-16.58',undefined]);
+    expect(deliveryInsert[1]).toEqual(['order-configured-split','rider-1','13.44','-16.57','13.45','-16.58','1.50']);
   });
 
   test('rejects a quote if the product price or checkout total changed after the rider quote', async()=>{
@@ -250,7 +250,7 @@ describe('order creation ownership safeguards', () => {
       if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.45',longitude:'-16.58'}]};
       if(sql.includes('FROM delivery_fee_quotes'))return{rows:[{
         id:'quote-1',rider_id:'rider-1',pickup_lat:'13.44',pickup_lng:'-16.57',
-        dropoff_lat:'13.45',dropoff_lng:'-16.58',delivery_fee_gmd:'25.00',
+        dropoff_lat:'13.45',dropoff_lng:'-16.58',route_distance_km:'1.50',delivery_fee_gmd:'25.00',
         estimated_customer_total:'127.36',payout_fee_recovery_pct:'2.00',
         checkout_fingerprint:'not-the-current-cart-fingerprint'
       }]};
