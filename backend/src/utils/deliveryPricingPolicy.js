@@ -45,7 +45,15 @@ function normaliseDeliveryPricingPolicy(value) {
 }
 
 function validateDeliveryPricingPolicy(input = {}) {
-  const policy = normaliseDeliveryPricingPolicy(input);
+  let policy;
+  try {
+    policy = normaliseDeliveryPricingPolicy(input);
+  } catch (cause) {
+    const error = new Error(cause.message || 'Enter a valid delivery pricing policy.');
+    error.statusCode = 400;
+    error.code = 'INVALID_DELIVERY_PRICING_POLICY';
+    throw error;
+  }
   if (policy.minimumFeeGmd < policy.minimumAllowedFeeGmd || policy.minimumFeeGmd > policy.maximumFeeGmd ||
       policy.baseFeeGmd > policy.maximumFeeGmd) {
     const error = new Error('The default base and minimum delivery fares must stay inside the administrator-approved fee range.');
