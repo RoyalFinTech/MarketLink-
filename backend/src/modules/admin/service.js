@@ -491,7 +491,7 @@ async function getAffiliateDirectory({page=1,limit=50,search}={}) {
   const params=[],where=[];
   if(search){params.push('%'+String(search).trim().slice(0,120)+'%');where.push('(u.full_name ILIKE $1 OR u.phone ILIKE $1 OR u.email ILIKE $1 OR a.affiliate_code ILIKE $1)');}
   const whereSql=where.length?'WHERE '+where.join(' AND '):'';
-  const {rows}=await query(`SELECT a.user_id,a.affiliate_code,a.commission_pct,a.total_clicks,a.total_orders,
+  const {rows}=await query(`SELECT a.user_id,a.affiliate_code,a.commission_pct,a.marketer_status,a.marketer_approved_at,a.total_clicks,a.total_orders,
       a.total_earnings,a.created_at,u.full_name,u.phone,u.email,u.status,
       coalesce(w.balance,0) AS wallet_balance,
       coalesce((SELECT count(*)::int FROM orders o WHERE o.affiliate_user_id=a.user_id AND o.status='delivered' AND o.payment_status='confirmed'),0) AS delivered_orders,

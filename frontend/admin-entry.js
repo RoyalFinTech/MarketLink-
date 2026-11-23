@@ -808,6 +808,61 @@
   window.__ML_ADMIN_AI_TEST=adminAiTest;
 
 
+  async function adminAffiliateMarketerQueue(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">PARTNER VERIFICATION</div><h3>Affiliate Marketer applications</h3><p>Loading private KYC applications…</p></div>';
+    try{
+      var data=await adminRequest('/admin/affiliate-marketer-applications?page=1&limit=100&status=all','GET');
+      var rows=Array.isArray(data.items)?data.items:[];
+      function docButton(id,label){
+        if(!id)return '<span class="ml-affiliate-footnote">'+label+': Not supplied</span>';
+        var url=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'')+'/api/v1/uploads/'+encodeURIComponent(id)+'/content';
+        return '<button type="button" class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_VIEW_AFFILIATE_DOC(\''+adminSafe(id)+'\',\''+adminSafe(label)+'\')">'+adminSafe(label)+'</button>';
+      }
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">PARTNER VERIFICATION · KYC</div><h3>Affiliate Marketer applications</h3><p>Review identity documents and approve only verified professional marketers.</p></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_AFFILIATE_QUEUE()">↻ Refresh</button></div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Applications</div><div class="ml-stat-value">'+rows.length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Pending review</div><div class="ml-stat-value">'+rows.filter(function(x){return x.status==='pending';}).length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Approved</div><div class="ml-stat-value">'+rows.filter(function(x){return x.status==='approved';}).length+'</div></div></div>'+
+        (rows.length?rows.map(function(x){
+          var channels=Array.isArray(x.marketing_channels)?x.marketing_channels.join(', '):'—';
+          var socials=x.social_links&&typeof x.social_links==='object'?Object.keys(x.social_links).map(function(k){return '<a href="'+adminSafe(x.social_links[k])+'" target="_blank" rel="noopener noreferrer">'+adminSafe(k)+'</a>';}).join(' · '):'—';
+          var actions=x.status==='pending'
+            ?'<button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_AFFILIATE_REVIEW(\''+adminSafe(x.id)+'\',\'approved\')">Approve marketer</button><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_AFFILIATE_REVIEW(\''+adminSafe(x.id)+'\',\'rejected\')">Reject with reason</button>'
+            :x.status==='approved'
+              ?'<button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_AFFILIATE_REVIEW(\''+adminSafe(x.id)+'\',\'suspended\')">Suspend access</button>'
+              :x.status==='suspended'
+                ?'<button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_AFFILIATE_REVIEW(\''+adminSafe(x.id)+'\',\'reinstated\')">Reinstate</button>'
+                :'<span class="ml-affiliate-footnote">Rejected · may reapply</span>';
+          return '<article class="ml-profile-card" style="padding:15px;margin:12px 0"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b>'+adminSafe(x.legal_name||x.full_name||'Applicant')+'</b><div class="ml-affiliate-footnote">'+adminSafe(x.phone||'')+' · '+adminSafe(x.email||'')+'</div></div><span class="ml-status-pill">'+adminSafe(x.status)+'</span></div>'+
+            '<p><b>Address:</b> '+adminSafe(x.residential_address||'—')+'</p><p><b>Channels:</b> '+adminSafe(channels)+'</p><p><b>Social links:</b> '+(socials||'—')+'</p><p><b>Marketing plan:</b><br>'+adminSafe(x.marketing_plan||'—')+'</p>'+
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+docButton(x.identity_document_file_id,'Identity document')+docButton(x.selfie_file_id,'Selfie')+docButton(x.address_proof_file_id,'Proof of address')+'</div>'+
+            '<div class="ml-affiliate-footnote">Submitted: '+adminFormatDate(x.submitted_at)+' · Applicant account: '+adminSafe(x.account_status||'—')+'</div>'+
+            (x.rejection_reason?'<p><b>Previous review note:</b> '+adminSafe(x.rejection_reason)+'</p>':'')+
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+actions+'</div></article>';
+        }).join(''):'<div class="ml-empty"><b>No Affiliate Marketer applications</b><span>New applications will appear here for Admin verification.</span></div>')+'</div>';
+    }catch(error){
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>Could not load Affiliate Marketer applications</b><span>'+adminSafe(error.message||'Please try again.')+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_AFFILIATE_QUEUE()">Retry</button></div></div>';
+    }
+  }
+  window.__ML_ADMIN_AFFILIATE_QUEUE=adminAffiliateMarketerQueue;
+  window.__ML_ADMIN_VIEW_AFFILIATE_DOC=function(id,label){
+    var url=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'')+'/api/v1/uploads/'+encodeURIComponent(id)+'/content';
+    viewApplicationDocument(url,label||'Affiliate KYC document');
+  };
+  window.__ML_ADMIN_AFFILIATE_REVIEW=async function(id,decision){
+    var reason='';
+    if(decision==='rejected'){
+      reason=window.prompt('Enter the reason for rejecting this application:','');
+      if(reason===null)return;
+      if(!String(reason).trim()){if(window.toast)window.toast('A rejection reason is required.','warning');return;}
+    }else if(decision==='suspended'){
+      reason=window.prompt('Optional reason for suspending this marketer:','')||'';
+    }
+    try{
+      await adminRequest('/admin/affiliate-marketer-applications/'+encodeURIComponent(id)+'/review','POST',{decision:decision,reason:reason});
+      if(window.toast)window.toast('Affiliate Marketer application updated.','success');
+      await adminAffiliateMarketerQueue();
+    }catch(error){if(window.toast)window.toast(error.message||'Could not update this application.','error');}
+  };
+
   async function adminAffiliateDirectory(){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">PARTNER NETWORK</div><h3>Affiliate partners</h3><p>Loading affiliate accounts and settled rewards…</p></div>';
@@ -816,12 +871,12 @@
       var rows=Array.isArray(data.items)?data.items:(Array.isArray(data)?data:[]);
       var totals=rows.reduce(function(a,x){a.clicks+=Number(x.total_clicks||0);a.orders+=Number(x.delivered_orders||0);a.earned+=Number(x.settled_commission||0);a.wallet+=Number(x.wallet_balance||0);return a;},{clicks:0,orders:0,earned:0,wallet:0});
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">PARTNER NETWORK · FINANCE</div><h3>Affiliate partners</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_AFFILIATES()">↻ Refresh</button></div>'+
-      '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px"><b>Affiliate programme guide:</b> The current reward is 2% of eligible discounted merchandise, funded from MarketLink’s 5% platform commission. It is not added to the customer’s bill. Rewards are credited to the affiliate’s DAHA Wallet only after successful delivery and confirmed payment. Withdrawals remain subject to the normal payout review and minimum withdrawal rules.</div>'+
-      '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Affiliate accounts</div><div class="ml-stat-value">'+Number(data.total||rows.length)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Tracked clicks (listed)</div><div class="ml-stat-value">'+totals.clicks+'</div></div><div class="ml-stat"><div class="ml-stat-label">Delivered referred orders</div><div class="ml-stat-value">'+totals.orders+'</div></div><div class="ml-stat"><div class="ml-stat-label">Settled affiliate rewards</div><div class="ml-stat-value">D '+totals.earned.toFixed(2)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Affiliate wallet balances</div><div class="ml-stat-value">D '+totals.wallet.toFixed(2)+'</div></div></div>'+
+      '<div class="ml-wallet-note" style="margin:8px 0 14px;padding:12px;border-radius:12px"><b>Programme separation:</b> Customer Referrers share links for discovery and tracking only; they do not earn commissions or cash rewards. Only Admin-approved Affiliate Marketers earn the configured commission on eligible delivered orders with confirmed payment. Eligible rewards are credited to DAHA Wallet; delivery fees are excluded.</div>'+
+      '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Referral profiles</div><div class="ml-stat-value">'+Number(data.total||rows.length)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Tracked clicks (listed)</div><div class="ml-stat-value">'+totals.clicks+'</div></div><div class="ml-stat"><div class="ml-stat-label">Delivered referred orders</div><div class="ml-stat-value">'+totals.orders+'</div></div><div class="ml-stat"><div class="ml-stat-label">Settled affiliate rewards</div><div class="ml-stat-value">D '+totals.earned.toFixed(2)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Affiliate wallet balances</div><div class="ml-stat-value">D '+totals.wallet.toFixed(2)+'</div></div></div>'+
       (rows.length?'<div class="ml-profile-card" style="margin-top:14px">'+rows.map(function(x){
         var name=adminSafe(x.full_name||'Affiliate partner'),code=adminSafe(x.affiliate_code||'');
-        return '<div class="ml-profile-row"><div class="ico">🔗</div><div class="copy"><b>'+name+'</b><span>Code: '+code+' · '+adminSafe(x.phone||x.email||'No contact details')+'</span><small>'+Number(x.total_clicks||0)+' clicks · '+Number(x.delivered_orders||0)+' delivered orders · Rate '+Number(x.commission_pct||0)+'%</small><small>Settled rewards D '+Number(x.settled_commission||0).toFixed(2)+' · Wallet D '+Number(x.wallet_balance||0).toFixed(2)+' · Account '+adminSafe(x.status||'active')+'</small><button class="ml-btn ml-btn-secondary" style="margin-top:7px;font-size:10px;padding:6px 9px" onclick="window.__ML_ADMIN_AFFILIATE_COPY(&quot;'+code+'&quot;)">Copy referral link</button></div></div>';
-      }).join('')+'</div>':'<div class="ml-empty"><b>No affiliate accounts yet</b><span>Affiliate users will appear here after they activate the programme from their MarketLink profile. No commissions have been generated from orders yet.</span></div>')+
+        return '<div class="ml-profile-row"><div class="ico">🔗</div><div class="copy"><b>'+name+'</b><span>Code: '+code+' · '+adminSafe(x.phone||x.email||'No contact details')+'</span><small>'+Number(x.total_clicks||0)+' clicks · '+Number(x.delivered_orders||0)+' delivered orders · Programme: '+adminSafe(x.marketer_status==='approved'?'Approved Affiliate Marketer':x.marketer_status==='suspended'?'Suspended Marketer':'Customer Referrer · no commission')+'</small><small>Settled rewards D '+Number(x.settled_commission||0).toFixed(2)+' · Wallet D '+Number(x.wallet_balance||0).toFixed(2)+' · Account '+adminSafe(x.status||'active')+'</small><button class="ml-btn ml-btn-secondary" style="margin-top:7px;font-size:10px;padding:6px 9px" onclick="window.__ML_ADMIN_AFFILIATE_COPY(&quot;'+code+'&quot;)">Copy referral link</button></div></div>';
+      }).join('')+'</div>':'<div class="ml-empty"><b>No affiliate accounts yet</b><span>Customer referral profiles and approved Affiliate Marketers appear here. Submitters must be approved in the Affiliate Marketer KYC queue before earning commissions.</span></div>')+
       '<div class="ml-wallet-note" style="margin-top:12px;padding:12px;border-radius:12px">Admin control: use the DAHA ledger and Withdrawals pages to inspect actual wallet credits and payout requests. This directory is a reporting view; it does not manually create, approve or pay commissions.</div></div>';
     }catch(e){
       root.innerHTML='<div class="ml-empty"><b>Affiliate directory unavailable</b><span>'+adminSafe(e.error||e.message||'Could not load affiliate records.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.__ML_ADMIN_AFFILIATES()">Retry</button></div>';
@@ -967,6 +1022,7 @@
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
       promotions: adminPromotionsView,
       affiliates: adminAffiliateDirectory,
+      affiliateApplications: adminAffiliateMarketerQueue,
       analytics: function () { if (api.refreshAdminAnalytics) api.refreshAdminAnalytics(); },
       revenue: function () { if (api.refreshAdminRevenue) api.refreshAdminRevenue(); },
       payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
@@ -1033,6 +1089,7 @@
       '<button data-ml-admin-route="riders"><span>🛵</span>Rider approvals</button>' +
       '<button data-ml-admin-route="promotions"><span>🎯</span>Promotions</button>' +
       '<button data-ml-admin-route="affiliates"><span>🔗</span>Affiliate partners</button>' +
+      '<button data-ml-admin-route="affiliateApplications"><span>🪪</span>Affiliate Marketer KYC</button>' +
       '<div class="ml-admin-side-label">📈 INSIGHTS & FINANCE</div>' +
       '<button data-ml-admin-route="analytics"><span>📊</span>Analytics</button>' +
       '<button data-ml-admin-route="revenue"><span>💹</span>Revenue reports</button>' +

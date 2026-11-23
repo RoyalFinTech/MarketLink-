@@ -51,7 +51,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
 
     const { rows: [vendor] } = await client.query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
     const { rows: [rider] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1', [userId]);
-    const { rows: [affiliate] } = await client.query('SELECT user_id FROM affiliates WHERE user_id=$1', [userId]);
+    const { rows: [affiliate] } = await client.query("SELECT user_id FROM affiliates WHERE user_id=$1 AND marketer_status IN ('approved','suspended')", [userId]);
     let saved = null;
     if (vendor) {
       const { rows: [profile] } = await client.query(
