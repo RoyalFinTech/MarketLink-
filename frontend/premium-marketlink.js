@@ -2049,7 +2049,7 @@
       wave:'Use Wave from checkout. Enter your full nine-digit Gambian mobile-money number and follow the payment step shown by the provider.',
       afrimoney:'Use AfriMoney from checkout. Enter your full nine-digit Gambian mobile-money number and follow the provider confirmation step.',
       qmoney:'Use QMoney from checkout. Enter your full nine-digit Gambian mobile-money number and follow the provider instructions.',
-      modempay:'Continue to the secure Modem Pay checkout and choose a method enabled for MarketLink.'
+      modempay:'Continue to the secure secure mobile-money checkout checkout and choose a method enabled for MarketLink.'
     };
     var icons={cod:'💵',wallet:'👛',wave:'📱',afrimoney:'📲',qmoney:'💳',modempay:'🔐'};
     var cards=options.map(function(option){
@@ -2058,7 +2058,7 @@
       return '<button type="button" class="ml-profile-row ml-payment-option ml-payment-setting-choice" aria-pressed="'+(selected?'true':'false')+'" onclick="window.ML_Premium.choosePaymentFromSettings(\''+esc(label)+'\')"><span class="ico">'+(icons[method]||'💳')+'</span><span class="copy"><b>'+esc(title)+'</b><span>'+esc(descriptions[method]||'Choose this method at checkout.')+'</span></span><span class="ml-payment-setting-action">'+(selected?'Selected':'Choose')+'</span></button>';
     }).join('');
     var providerNote=!caps.configured
-      ?'<div class="ml-wallet-note"><b>Other mobile-money methods are not activated yet.</b><p>'+esc(caps.setupReason||'Wave, AfriMoney, QMoney and hosted Modem Pay options will appear when the merchant payment configuration is enabled.')+'</p></div>'
+      ?'<div class="ml-wallet-note"><b>Other mobile-money methods are not activated yet.</b><p>'+esc(caps.setupReason||'Wave, AfriMoney, QMoney and hosted secure mobile-money checkout options will appear when the merchant payment configuration is enabled.')+'</p></div>'
       :'<div class="ml-wallet-note"><b>Mobile-money payment is available.</b><p>'+esc(caps.directMobileMoney?'Choose an enabled mobile-money option above; the nine-digit account details are collected securely at checkout.':'Continue through the secure hosted payment option shown above.')+'</p></div>';
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div>'+
       '<div class="ml-profile-card"><div class="ml-section-head"><h3>Choose how to pay</h3><span style="font-size:10px;color:#91A4B4">GMD · Gambian Dalasi</span></div>'+cards+'</div>'+
