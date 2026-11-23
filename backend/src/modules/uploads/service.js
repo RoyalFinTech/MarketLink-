@@ -381,7 +381,8 @@ async function deleteFile(fileId, requesterId, roles) {
     const {rows:[attached]}=await client.query(
       "SELECT (EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$2) " +
       "OR EXISTS(SELECT 1 FROM vendors WHERE id_document_url LIKE '%' || $1 || '/content' OR shop_photo_url=$2 OR logo_url=$2) " +
-      "OR EXISTS(SELECT 1 FROM riders WHERE id_document_url LIKE '%' || $1 || '/content' OR license_document_url LIKE '%' || $1 || '/content' OR vehicle_photo_url=$2 OR profile_photo_url=$2)) AS in_use",
+      "OR EXISTS(SELECT 1 FROM riders WHERE id_document_url LIKE '%' || $1 || '/content' OR license_document_url LIKE '%' || $1 || '/content' OR vehicle_photo_url=$2 OR profile_photo_url=$2) " +
+      "OR EXISTS(SELECT 1 FROM affiliate_marketer_applications WHERE identity_document_file_id=$1::uuid OR selfie_file_id=$1::uuid OR address_proof_file_id=$1::uuid)) AS in_use",
       [String(fileId), f.file_url]);
     if(attached && attached.in_use) throw new AppError('This file is attached to a customer profile or a vendor/rider application and must be retained for account and KYC records.',409,'FILE_IN_USE');
     if(f.storage_backend==='database') {
@@ -408,9 +409,10 @@ async function deleteFileByUrl(url, requesterId) {
     const {rows:[refs]}=await client.query(
       "SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, " +
       "EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1 OR vehicle_photo_url=$1 OR id_document_url LIKE '%' || $2 || '/content' OR license_document_url LIKE '%' || $2 || '/content') AS rider_ref, " +
-      "EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1 OR shop_photo_url=$1 OR id_document_url LIKE '%' || $2 || '/content') AS vendor_ref",
+      "EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1 OR shop_photo_url=$1 OR id_document_url LIKE '%' || $2 || '/content') AS vendor_ref, " +
+      "EXISTS(SELECT 1 FROM affiliate_marketer_applications WHERE identity_document_file_id=$2::uuid OR selfie_file_id=$2::uuid OR address_proof_file_id=$2::uuid) AS affiliate_ref",
       [url,String(f.id)]);
-    if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref)) return {deleted:false,reason:'STILL_IN_USE'};
+    if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref || refs.affiliate_ref)) return {deleted:false,reason:'STILL_IN_USE'};
     if(f.storage_backend==='database') await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
     else {
       await storageDelete(f.file_url);
