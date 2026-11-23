@@ -262,13 +262,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
        VALUES ($1,$2,$3,'manual','pending')`,
       [delivery.id,deliveryQuote.rider_id,customerId]
     );
-    await client.query(
-      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
-       VALUES ($1,'delivery_assigned','New delivery request 🛵',$2,'delivery',$3)`,
-      [deliveryQuote.rider_id,
-       'A customer selected your delivery price for order '+order.order_number+'. Accept or decline this request in your Rider Dashboard.',
-       delivery.id]
-    );
+    // The quoted rider is reserved now; notify them only after the vendor marks the order ready for pickup.
     const { rows: [consumedQuote] } = await client.query(
       `UPDATE delivery_fee_quotes SET status='consumed',order_id=$1,consumed_at=now()
        WHERE id=$2 AND status='quoted' AND expires_at>now() RETURNING id`,
@@ -562,6 +556,21 @@ async function updateStatus(orderId,status,userId,roles,note){
       await client.query("UPDATE deliveries SET status='delivered',delivered_at=now() WHERE order_id=$1",[orderId]);
     }
     if(status==='rider_assigned')await client.query("UPDATE deliveries SET status='assigned' WHERE order_id=$1",[orderId]);
+    if(status==='awaiting_rider'){
+      const { rows: [delivery] } = await client.query(
+        `SELECT d.id AS delivery_id,d.rider_id,o.order_number
+         FROM deliveries d JOIN orders o ON o.id=d.order_id
+         WHERE d.order_id=$1 FOR UPDATE OF d`,
+        [orderId]
+      );
+      if(delivery&&delivery.rider_id){
+        await client.query(
+          `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+           VALUES ($1,'delivery_assigned','Your delivery request is ready 🛵',$2,'delivery',$3)`,
+          [delivery.rider_id,'The vendor has prepared order '+delivery.order_number+' and marked it ready. Accept or decline the delivery request in your Rider Dashboard.',delivery.delivery_id]
+        );
+      }
+    }
     if(status==='picked_up')await client.query("UPDATE deliveries SET status='picked_up',picked_up_at=now() WHERE order_id=$1",[orderId]);
     if(status==='on_the_way')await client.query("UPDATE deliveries SET status='in_transit' WHERE order_id=$1",[orderId]);
     if(status==='cancelled'){
