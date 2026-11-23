@@ -21,6 +21,14 @@ router.post('/users/:id/reinstate', authenticate, authorize(...ADMIN),
 router.get('/analytics',   authenticate, authorize(...ADMIN),
   [query('period').optional().isIn(['7d','30d','90d'])], validate, ctrl.analytics);
 router.get('/commission-settings', authenticate, authorize(...ADMIN), ctrl.commissionSettings);
+router.get('/delivery-pricing-settings', authenticate, authorize(...ADMIN), ctrl.deliveryPricingSettings);
+router.put('/delivery-pricing-settings', authenticate, authorize(...ADMIN), [
+  body('baseFeeGmd').isFloat({min:0,max:2000}),
+  body('perKmFeeGmd').isFloat({min:0,max:500}),
+  body('minimumFeeGmd').isFloat({min:0.01,max:5000}),
+  body('minimumAllowedFeeGmd').isFloat({min:0.01,max:5000}),
+  body('maximumFeeGmd').isFloat({min:0.01,max:5000}),
+], validate, ctrl.updateDeliveryPricingSettings);
 router.put('/commission-settings', authenticate, authorize(...ADMIN), [
   body('marketplaceCommissionPct').isFloat({min:0,max:20}),
   body('affiliateCommissionPct').isFloat({min:0,max:20}),
