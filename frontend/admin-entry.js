@@ -832,6 +832,121 @@
     else window.prompt('Copy affiliate link:',link);
   };
 
+  async function adminPricingManagementView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Pricing management</h3><p>Loading rider, vendor and payment controls…</p></div>';
+    try{
+      var riderSearch=String((document.getElementById('ml-admin-rider-pricing-search')||{}).value||'').trim();
+      var productSearch=String((document.getElementById('ml-admin-product-pricing-search')||{}).value||'').trim();
+      var queryRiders=new URLSearchParams({page:'1',limit:'50'});if(riderSearch)queryRiders.set('search',riderSearch);
+      var queryProducts=new URLSearchParams({page:'1',limit:'50'});if(productSearch)queryProducts.set('search',productSearch);
+      var results=await Promise.all([
+        adminRequest('/admin/rider-pricing?'+queryRiders.toString(),'GET'),
+        adminRequest('/admin/vendor-product-pricing?'+queryProducts.toString(),'GET'),
+        adminRequest('/admin/payment-readiness','GET')
+      ]);
+      var riderData=results[0]||{},productData=results[1]||{},payment=results[2]||{},riders=Array.isArray(riderData.items)?riderData.items:[],products=Array.isArray(productData.items)?productData.items:[];
+      function routeEditorRows(routes){
+        routes=Array.isArray(routes)?routes:[];
+        if(!routes.length)routes=[{}];
+        return routes.slice(0,20).map(function(route){
+          return '<div data-admin-route-row style="display:grid;grid-template-columns:1fr 1fr minmax(110px,.6fr) auto;gap:7px;align-items:end;margin:7px 0">'+
+            '<label style="font-size:11px;color:var(--mu)">Pickup area<input data-route-origin class="inp" maxlength="120" value="'+adminSafe(route.originArea||route.origin_area||'')+'" placeholder="Serrekunda" style="display:block;width:100%;margin-top:4px"></label>'+
+            '<label style="font-size:11px;color:var(--mu)">Destination<input data-route-destination class="inp" maxlength="120" value="'+adminSafe(route.destinationArea||route.destination_area||'')+'" placeholder="Brikama" style="display:block;width:100%;margin-top:4px"></label>'+
+            '<label style="font-size:11px;color:var(--mu)">Fixed fare (GMD)<input data-route-fee class="inp" type="number" min="150" max="5000" step=".01" value="'+(route.fixedFeeGmd==null?(route.fixed_fee_gmd==null?'':Number(route.fixed_fee_gmd).toFixed(2)):Number(route.fixedFeeGmd).toFixed(2))+'" placeholder="150.00" style="display:block;width:100%;margin-top:4px"></label>'+
+            '<button type="button" class="ml-btn ml-btn-secondary" onclick="this.closest(\\'[data-admin-route-row]\\').remove()" style="padding:9px">Remove</button></div>';
+        }).join('');
+      }
+      var riderHtml=riders.length?riders.map(function(r){
+        var override=r.admin_delivery_pricing_override||{};
+        var active=r.adminOverrideActive||r.admin_delivery_pricing_override!=null;
+        var base=active?override.baseFeeGmd:r.delivery_base_fee_gmd;
+        var per=active?override.perKmFeeGmd:r.delivery_per_km_fee_gmd;
+        var minimum=active?override.minimumFeeGmd:r.delivery_min_fee_gmd;
+        var enabled=active?override.enabled:r.delivery_pricing_enabled;
+        var routes=active?(override.routeRates||[]):(r.route_rates||[]);
+        return '<article class="ml-profile-card" id="ml-admin-rider-price-'+adminSafe(r.user_id)+'" style="padding:15px;margin:10px 0">'+
+          '<div class="ml-section-head"><div><b style="font-size:14px">'+adminSafe(r.full_name||'MarketLink Rider')+'</b><p style="margin:4px 0;color:var(--mu);font-size:11px">'+adminSafe(r.phone||'No phone')+' · '+adminSafe(r.vehicle_type||'Vehicle not set')+' · '+adminSafe(r.kyc_status||'pending')+' · '+(r.is_online?'Online':'Offline')+'</p></div><span class="ml-access-assigned">'+(active?'Admin override active':'Rider tariff')+'</span></div>'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin:12px 0">'+
+            '<label style="font-size:11px;color:var(--mu)">Base fee (GMD)<input data-rider-base class="inp" type="number" min="0" max="5000" step=".01" value="'+(base==null?'150.00':Number(base).toFixed(2))+'" style="display:block;width:100%;margin-top:5px"></label>'+
+            '<label style="font-size:11px;color:var(--mu)">Per kilometre (GMD)<input data-rider-km class="inp" type="number" min="0" max="500" step=".01" value="'+(per==null?'10.00':Number(per).toFixed(2))+'" style="display:block;width:100%;margin-top:5px"></label>'+
+            '<label style="font-size:11px;color:var(--mu)">Minimum fare (GMD)<input data-rider-min class="inp" type="number" min="150" max="5000" step=".01" value="'+(minimum==null?'150.00':Number(minimum).toFixed(2))+'" style="display:block;width:100%;margin-top:5px"></label>'+
+          '</div>'+
+          '<label style="display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px"><input data-rider-enabled type="checkbox" '+(enabled?'checked':'')+'> Allow this rider to receive new delivery quotes</label>'+
+          '<div style="margin-top:12px"><div class="ml-section-head"><b>Admin fixed routes</b><button type="button" class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_RIDER_ROUTE_ADD(\\''+adminSafe(r.user_id)+'\\')">＋ Add route</button></div><div data-rider-routes>'+routeEditorRows(routes)+'</div><small style="color:var(--mu)">Up to 20 routes. Admin fares must be within the current permitted range (D150–D5000). These prices are used for new quotes; already accepted orders stay locked.</small></div>'+
+          '<label style="display:block;font-size:11px;color:var(--mu);margin-top:10px">Reason for Admin override<input data-rider-note class="inp" maxlength="500" value="'+adminSafe(override.note||'')+'" placeholder="Why are you setting this rider tariff?" style="display:block;width:100%;margin-top:5px"></label>'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_RIDER_PRICE_SAVE(\\''+adminSafe(r.user_id)+'\\')">Save Admin rider prices</button>'+(active?'<button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_RIDER_PRICE_CLEAR(\\''+adminSafe(r.user_id)+'\\')">Restore rider’s own prices</button>':'')+'</div>'+
+        '</article>';
+      }).join(''):'<div class="ml-empty"><b>No rider profiles found</b><span>There are no matching riders in the protected rider directory.</span></div>';
+      var productHtml=products.length?products.map(function(p){
+        var active=Boolean(p.admin_price_override_enabled),effective=Number(p.effective_customer_price==null?p.vendor_listed_price:p.effective_customer_price);
+        return '<article class="ml-profile-card" id="ml-admin-product-price-'+adminSafe(p.id)+'" style="padding:15px;margin:10px 0">'+
+          '<div class="ml-section-head"><div><b style="font-size:14px">'+adminSafe(p.name||'Product')+'</b><p style="margin:4px 0;color:var(--mu);font-size:11px">'+adminSafe(p.vendor_name||'Vendor')+' · '+adminSafe(p.status||'')+' · Stock '+adminSafe(p.stock==null?'—':p.stock)+'</p></div><span class="ml-access-assigned">'+(active?'Admin price active':'Vendor price')+'</span></div>'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin:10px 0"><div><small style="color:var(--mu)">Vendor-listed price</small><b style="display:block">D '+Number(p.vendor_listed_price||0).toFixed(2)+'</b></div><div><small style="color:var(--mu)">Customer price now</small><b style="display:block">D '+effective.toFixed(2)+'</b></div><div><small style="color:var(--mu)">Product code</small><b style="display:block">'+adminSafe(p.sku||'—')+'</b></div></div>'+
+          '<label style="display:block;font-size:11px;color:var(--mu)">Admin customer price (GMD)<input data-product-price class="inp" type="number" min=".01" max="1000000" step=".01" value="'+(active?Number(p.admin_price_override).toFixed(2):effective.toFixed(2))+'" style="display:block;width:100%;margin-top:5px"></label>'+
+          '<label style="display:block;font-size:11px;color:var(--mu);margin-top:8px">Reason for price control<input data-product-note class="inp" maxlength="500" value="'+adminSafe(p.admin_price_override_note||'')+'" placeholder="Enter reason (required)" style="display:block;width:100%;margin-top:5px"></label>'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_PRODUCT_PRICE_SAVE(\\''+adminSafe(p.id)+'\\')">Apply Admin price</button>'+(active?'<button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_PRODUCT_PRICE_CLEAR(\\''+adminSafe(p.id)+'\\')">Restore vendor price</button>':'')+'</div>'+
+        '</article>';
+      }).join(''):'<div class="ml-empty"><b>No products found</b><span>Try a different product or vendor search.</span></div>';
+      var cfg=payment.configuration||{};
+      function status(ok){return '<span style="font-weight:800;color:'+(ok?'#15803d':'#b45309')+'">'+(ok?'Ready':'Not configured')+'</span>';}
+      root.innerHTML='<div class="ml-premium-home">'+
+        '<div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK · COMMERCIAL CONTROL</div><h3>Pricing & provider readiness</h3><p style="margin:5px 0;color:var(--mu)">Admin price controls for individual riders and vendor products. Changes are audited. Previously quoted or confirmed orders are not repriced.</p></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_PRICING()">↻ Refresh</button></div>'+
+        '<section class="ml-profile-card" style="padding:15px;margin:12px 0"><div class="ml-section-head"><div><div class="ml-eyebrow">PAYMENT INTEGRATION · '+adminSafe(payment.provider||'Modem Pay')+'</div><h3>'+adminSafe(payment.mode||'Provider status')+' · '+adminSafe(payment.currency||'GMD')+'</h3></div><span class="ml-access-assigned">'+(cfg.mobileMoneyCheckoutReady?'Mobile money configured':'Payment setup incomplete')+'</span></div>'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0">'+
+            '<div><small>API key</small><div>'+status(cfg.apiKeyConfigured)+'</div></div><div><small>Webhook signature</small><div>'+status(cfg.webhookSecretConfigured)+'</div></div><div><small>H2H approval</small><div>'+status(cfg.h2hApproved)+'</div></div><div><small>Callback URL</small><div>'+status(cfg.callbackUrlConfigured)+'</div></div><div><small>DAHA wallet</small><div>'+status(cfg.walletCheckoutReady)+'</div></div><div><small>Cash on delivery</small><div>'+status(cfg.cashOnDeliveryEnabled)+'</div></div>'+
+          '</div><p style="font-size:12px;color:var(--mu);line-height:1.5">'+adminSafe(cfg.note||'Provider configuration status is shown without displaying credentials.')+'</p><small style="display:block;color:var(--mu);margin-top:8px">A green configuration status does not replace test-mode collection, signed webhook, duplicate-event, refund/failure and payout tests. Do not use live money until provider tests pass.</small>'+
+          '<div style="margin-top:10px"><b style="font-size:12px">Recent payment records (last 30 days)</b>'+(Array.isArray(payment.recentPayments)&&payment.recentPayments.length?'<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;margin-top:7px;font-size:12px"><thead><tr><th style="text-align:left;padding:7px">Method</th><th style="text-align:left;padding:7px">Status</th><th style="text-align:right;padding:7px">Count</th></tr></thead><tbody>'+payment.recentPayments.map(function(row){return '<tr><td style="padding:7px;border-top:1px solid var(--bd)">'+adminSafe(row.method)+'</td><td style="padding:7px;border-top:1px solid var(--bd)">'+adminSafe(row.status)+'</td><td style="padding:7px;border-top:1px solid var(--bd);text-align:right">'+Number(row.total||0)+'</td></tr>';}).join('')+'</tbody></table></div>':'<p style="font-size:12px;color:var(--mu);margin-top:7px">No payment records returned for the last 30 days.</p>')+'</div>'+
+        '</section>'+
+        '<section style="margin-top:18px"><div class="ml-section-head"><div><div class="ml-eyebrow">RIDER DELIVERY PRICES</div><h3>Individual rider overrides</h3></div></div>'+
+          '<div class="ml-profile-card" style="padding:12px;margin:10px 0"><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ml-admin-rider-pricing-search" class="inp" maxlength="120" value="'+adminSafe(riderSearch)+'" placeholder="Search rider name, phone or area" style="flex:1;min-width:190px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_RIDER_SEARCH()">Search riders</button></div></div>'+
+          riderHtml+'</section>'+
+        '<section style="margin-top:22px"><div class="ml-section-head"><div><div class="ml-eyebrow">VENDOR PRODUCT PRICES</div><h3>Marketplace retail-price management</h3></div></div>'+
+          '<div class="ml-profile-card" style="padding:12px;margin:10px 0"><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ml-admin-product-pricing-search" class="inp" maxlength="120" value="'+adminSafe(productSearch)+'" placeholder="Search product, SKU or vendor" style="flex:1;min-width:190px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_PRODUCT_SEARCH()">Search products</button></div></div>'+
+          '<p style="font-size:11px;color:var(--mu);margin:5px 0 10px">Applying an Admin price does not erase the vendor-listed amount. Clearing the override immediately restores the vendor’s current price for new customer views and new checkouts.</p>'+
+          productHtml+'</section></div>';
+      var riderInput=document.getElementById('ml-admin-rider-pricing-search');if(riderInput)riderInput.addEventListener('keydown',function(e){if(e.key==='Enter')window.__ML_ADMIN_RIDER_SEARCH();});
+      var productInput=document.getElementById('ml-admin-product-pricing-search');if(productInput)productInput.addEventListener('keydown',function(e){if(e.key==='Enter')window.__ML_ADMIN_PRODUCT_SEARCH();});
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Pricing controls unavailable</b><span>'+adminSafe(e.message||'Could not load Admin pricing controls.')+'</span><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_PRICING()">Retry</button></div>';}
+  }
+  window.__ML_ADMIN_PRICING=adminPricingManagementView;
+  window.__ML_ADMIN_RIDER_SEARCH=adminPricingManagementView;
+  window.__ML_ADMIN_PRODUCT_SEARCH=adminPricingManagementView;
+  window.__ML_ADMIN_RIDER_ROUTE_ADD=function(id){
+    var card=document.getElementById('ml-admin-rider-price-'+id),wrap=card&&card.querySelector('[data-rider-routes]');if(!wrap)return;
+    if(wrap.querySelectorAll('[data-admin-route-row]').length>=20){if(window.toast)window.toast('An Admin rider override can contain up to 20 fixed routes.','error');return;}
+    var row=document.createElement('div');row.setAttribute('data-admin-route-row','');row.style.cssText='display:grid;grid-template-columns:1fr 1fr minmax(110px,.6fr) auto;gap:7px;align-items:end;margin:7px 0';
+    row.innerHTML='<label style="font-size:11px;color:var(--mu)">Pickup area<input data-route-origin class="inp" maxlength="120" placeholder="Serrekunda" style="display:block;width:100%;margin-top:4px"></label><label style="font-size:11px;color:var(--mu)">Destination<input data-route-destination class="inp" maxlength="120" placeholder="Brikama" style="display:block;width:100%;margin-top:4px"></label><label style="font-size:11px;color:var(--mu)">Fixed fare (GMD)<input data-route-fee class="inp" type="number" min="150" max="5000" step=".01" placeholder="150.00" style="display:block;width:100%;margin-top:4px"></label><button type="button" class="ml-btn ml-btn-secondary" onclick="this.closest(\\'[data-admin-route-row]\\').remove()" style="padding:9px">Remove</button>';
+    wrap.appendChild(row);
+  };
+  window.__ML_ADMIN_RIDER_PRICE_SAVE=async function(id){
+    var card=document.getElementById('ml-admin-rider-price-'+id);if(!card)return;
+    var value=function(sel){var el=card.querySelector(sel);return el?el.value:'';};
+    var routes=Array.from(card.querySelectorAll('[data-admin-route-row]')).map(function(row){return {originArea:row.querySelector('[data-route-origin]').value.trim(),destinationArea:row.querySelector('[data-route-destination]').value.trim(),fixedFeeGmd:Number(row.querySelector('[data-route-fee]').value)};}).filter(function(r){return r.originArea||r.destinationArea||Number.isFinite(r.fixedFeeGmd);});
+    var payload={enabled:Boolean(card.querySelector('[data-rider-enabled]').checked),baseFeeGmd:Number(value('[data-rider-base]')),perKmFeeGmd:Number(value('[data-rider-km]')),minimumFeeGmd:Number(value('[data-rider-min]')),routeRates:routes,note:String(value('[data-rider-note]')||'').trim()};
+    if(!Number.isFinite(payload.baseFeeGmd)||!Number.isFinite(payload.perKmFeeGmd)||!Number.isFinite(payload.minimumFeeGmd)||!payload.note){if(window.toast)window.toast('Enter all three GMD prices and a reason for the Admin override.','error');return;}
+    if(routes.some(function(r){return !r.originArea||!r.destinationArea||!Number.isFinite(r.fixedFeeGmd);})){if(window.toast)window.toast('Complete the pickup area, destination and fixed fare on every route, or remove the empty row.','error');return;}
+    try{await adminRequest('/admin/rider-pricing/'+encodeURIComponent(id)+'/override','PUT',payload);if(window.toast)window.toast('Admin rider pricing saved and audited. New quotes will use the override.','success');await adminPricingManagementView();}
+    catch(e){if(window.toast)window.toast(e.message||'Could not save rider pricing override.','error');}
+  };
+  window.__ML_ADMIN_RIDER_PRICE_CLEAR=async function(id){
+    if(!window.confirm('Restore this rider’s own saved delivery prices? New quotes will use the rider tariff again.'))return;
+    try{await adminRequest('/admin/rider-pricing/'+encodeURIComponent(id)+'/override','DELETE');if(window.toast)window.toast('Admin override cleared. Rider’s original prices are restored.','success');await adminPricingManagementView();}
+    catch(e){if(window.toast)window.toast(e.message||'Could not restore rider prices.','error');}
+  };
+  window.__ML_ADMIN_PRODUCT_PRICE_SAVE=async function(id){
+    var card=document.getElementById('ml-admin-product-price-'+id);if(!card)return;
+    var price=Number(card.querySelector('[data-product-price]').value),note=String(card.querySelector('[data-product-note]').value||'').trim();
+    if(!Number.isFinite(price)||price<0.01||price>1000000||!note){if(window.toast)window.toast('Enter a valid customer price in GMD and a reason for the override.','error');return;}
+    try{await adminRequest('/admin/vendor-product-pricing/'+encodeURIComponent(id)+'/override','PUT',{enabled:true,price:price,note:note});if(window.toast)window.toast('Admin retail price saved. New product views and checkouts use this price.','success');await adminPricingManagementView();}
+    catch(e){if(window.toast)window.toast(e.message||'Could not save Admin product price.','error');}
+  };
+  window.__ML_ADMIN_PRODUCT_PRICE_CLEAR=async function(id){
+    if(!window.confirm('Restore the vendor-listed product price for new customers and checkouts?'))return;
+    try{await adminRequest('/admin/vendor-product-pricing/'+encodeURIComponent(id)+'/override','PUT',{enabled:false});if(window.toast)window.toast('Vendor product price restored.','success');await adminPricingManagementView();}
+    catch(e){if(window.toast)window.toast(e.message||'Could not restore the vendor price.','error');}
+  };
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
@@ -852,6 +967,7 @@
       payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
       reconciliation: function () { if (api.refreshFinancialReconciliation) api.refreshFinancialReconciliation(); },
       commission: adminCommissionSettingsView,
+      pricing: adminPricingManagementView,
       ledger: function () { if (api.refreshAdminTransactions) api.refreshAdminTransactions(1); },
       exceptions: function () { if (api.refreshAdminFailedPayments) api.refreshAdminFailedPayments(1); },
       users: function () { if (api.adminUsers) api.adminUsers(); },
@@ -918,6 +1034,7 @@
       '<button data-ml-admin-route="payouts"><span>💸</span>Withdrawals</button>' +
       '<button data-ml-admin-route="reconciliation"><span>🧾</span>Reconciliation</button>' +
       '<button data-ml-admin-route="commission"><span>⚖️</span>Commission control</button>' +
+      '<button data-ml-admin-route="pricing"><span>🏷️</span>Pricing & overrides</button>' +
       '<button data-ml-admin-route="ledger"><span>📒</span>DAHA ledger</button>' +
       '<button data-ml-admin-route="exceptions"><span>🚨</span>Payment exceptions</button>' +
       '<div class="ml-admin-side-label">🛠️ MANAGEMENT</div>' +
