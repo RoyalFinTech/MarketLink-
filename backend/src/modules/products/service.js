@@ -22,10 +22,13 @@ async function list({ page=1, limit=20, search, categoryId, vendorId, minPrice, 
   if (minPrice)   { conds.push(`(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)>=$${pi++}`); params.push(minPrice); }
   if (maxPrice)   { conds.push(`(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)<=$${pi++}`); params.push(maxPrice); }
   const effectivePrice = '(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)';
+  const priceProjection = includeAllStatuses
+    ? `p.price AS price,${effectivePrice} AS effective_customer_price,p.admin_price_override_enabled AS admin_pricing_adjusted`
+    : `${effectivePrice} AS price`;
   const orderMap = { newest:'p.created_at DESC', price_asc:effectivePrice+' ASC', price_desc:effectivePrice+' DESC', top_rated:'p.rating_avg DESC' };
   const ob = orderMap[sort]||'p.created_at DESC', wh = conds.length ? 'WHERE '+conds.join(' AND ') : '';
   const [d,c] = await Promise.all([
-    query(`SELECT p.id,p.vendor_id,p.name,p.slug,(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END) AS price,p.price AS vendor_listed_price,p.admin_price_override,p.admin_price_override_enabled,p.admin_price_override_note,p.compare_at_price,p.status,p.rating_avg,p.rating_count,p.sold_count,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,(SELECT image_url FROM product_images WHERE product_id=p.id AND is_primary=TRUE LIMIT 1) AS primary_image,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL ${wh} ORDER BY ${ob} LIMIT $${pi++} OFFSET $${pi++}`, [...params, safeLimit, off]),
+    query(`SELECT p.id,p.vendor_id,p.name,p.slug,${priceProjection},p.compare_at_price,p.status,p.rating_avg,p.rating_count,p.sold_count,c.name AS category_name,v.business_name AS vendor_name,v.whatsapp_number AS vendor_whatsapp,(SELECT image_url FROM product_images WHERE product_id=p.id AND is_primary=TRUE LIMIT 1) AS primary_image,inv.quantity AS stock FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL ${wh} ORDER BY ${ob} LIMIT $${pi++} OFFSET $${pi++}`, [...params, safeLimit, off]),
     query(`SELECT count(*) FROM products p LEFT JOIN vendors v ON v.user_id=p.vendor_id ${wh}`, params),
   ]);
   return { items: d.rows, total: parseInt(c.rows[0].count), page:safePage, limit:safeLimit, totalPages: Math.ceil(parseInt(c.rows[0].count)/safeLimit) };
@@ -35,7 +38,15 @@ async function getById(id) {
   if (!rows.length) throw new AppError('Product not found.',404,'PRODUCT_NOT_FOUND');
   const product=rows[0];
   product.price=Number(product.effective_customer_price);
-  product.vendor_listed_price=Number(product.vendor_listed_price);
+  // Admin override amounts, audit notes and actor identifiers are private.
+  // Public product details return only the final customer price.
+  delete product.admin_price_override;
+  delete product.admin_price_override_enabled;
+  delete product.admin_price_override_by;
+  delete product.admin_price_override_at;
+  delete product.admin_price_override_note;
+  delete product.vendor_listed_price;
+  delete product.effective_customer_price;
   return product;
 }
 async function create({ vendorId, categoryId, brandId, name, description, price, compareAtPrice, sku, imageUrl }) {
