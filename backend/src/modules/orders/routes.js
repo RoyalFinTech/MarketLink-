@@ -7,6 +7,11 @@ const ctrl = require('./controller');
 router.post('/delivery-quotes', authenticate, authorize('customer'), [
   body('vendorId').isUUID(),
   body('deliveryAddressId').isUUID(),
+  body('items').isArray({min:1}),
+  body('items.*.productId').isUUID(),
+  body('items.*.quantity').isInt({min:1}),
+  body('couponCode').optional().isString().isLength({max:80}),
+  body('affiliateCode').optional().isString().isLength({max:80}),
 ], validate, ctrl.deliveryQuotes);
 router.post('/', authenticate, authorize('customer'), [body('vendorId').isUUID(), body('deliveryAddressId').isUUID().withMessage('Select a saved delivery address before placing your order.'), body('items').isArray({min:1}), body('items.*.productId').isUUID(), body('items.*.quantity').isInt({min:1}), body('deliveryFeeQuoteId').isUUID().withMessage('Select a current rider delivery price before placing your order.'), body('paymentMethod').notEmpty()], validate, ctrl.place);
 router.get('/my', authenticate, [
