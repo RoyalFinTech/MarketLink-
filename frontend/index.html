@@ -87,7 +87,7 @@
   var resolvedIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(resolved);
 
   window.MARKETLINK_CONFIG = CONFIG;
-  window.MARKETLINK_PRICING = { PLATFORM_COMMISSION_PCT: 5, BASE_DELIVERY_FEE_GMD: 25 };
+  window.MARKETLINK_PRICING = { PLATFORM_COMMISSION_PCT: 5 };
   window.ML_API_URL = resolved;
   // True when we're clearly on a public deployment but still pointed at a
   // localhost backend — the exact "Cannot reach server" cause described in
@@ -1534,6 +1534,7 @@ var ML_API = (function(){
 
   // ── ORDERS ───────────────────────────────────────────────────
   var orders = {
+    deliveryQuotes: function(d){ return post('/orders/delivery-quotes', d); },
     place:     function(d){ return post('/orders', d); },
     getById:   function(id){ return get('/orders/'+id); },
     myOrders:  function(qs){ return get('/orders/my', qs); },
@@ -1717,6 +1718,8 @@ var ML_API = (function(){
     getById:           function(id){    return get('/riders/'+id); },
     register:          function(d){    return post('/riders/register', d); },
     updateProfile:     function(d){    return put('/riders/profile', d); },
+    getDeliveryPricing: function(){ return get('/riders/me/delivery-pricing'); },
+    saveDeliveryPricing: function(d){ return put('/riders/me/delivery-pricing', d); },
     myEarnings:        function(qs){    return get('/riders/me/earnings', qs); },
     myDeliveries:      function(qs){    return get('/riders/me/deliveries', qs); },
     withdrawals:       function(qs){    return get('/riders/me/withdrawals', qs); },
@@ -4446,9 +4449,10 @@ async function loadRiderLiveData(){
   if(!ML_API.auth.isAuthenticated() || (S.roles||[]).indexOf('rider')<0 || S._riderLoading) return;
   S._riderLoading=true; S.rDeliveries=[]; renderRDash();
   try{
-    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||''),ML_API.riders.withdrawals({page:1,limit:50}),ML_API.payments.codRemittanceInstructions()].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
+    var riderResults=await Promise.all([ML_API.delivery.myDeliveries({page:1,limit:50}),ML_API.riders.myEarnings({period:'30d',page:1,limit:100}),ML_API.riders.getById(S.user&&S.user.id||''),ML_API.riders.withdrawals({page:1,limit:50}),ML_API.payments.codRemittanceInstructions(),ML_API.riders.getDeliveryPricing()].map(function(p){return Promise.resolve(p).catch(function(){return {data:null};});}));
     var res=riderResults[0],earnings=riderResults[1]&&riderResults[1].data,profile=riderResults[2]&&riderResults[2].data,wd=riderResults[3]&&riderResults[3].data;
     S.codRemittanceInstructions=riderResults[4]&&riderResults[4].data||null;
+    S.rDeliveryPricing=riderResults[5]&&riderResults[5].data||null;
     var rows=res&&res.data&&Array.isArray(res.data)?res.data:(res&&res.data&&Array.isArray(res.data.items)?res.data.items:[]);
     S.rEarningsSummary=earnings&&earnings.summary||{};
     S.rEarningsEntries=earnings&&earnings.entries||[];
@@ -4546,6 +4550,29 @@ function renderRDash(){
           '<div style="color:#F5A623;font-size:13px;margin-top:4px;">+D '+d.pay+' earned</div></div>')+
         '</div>';
     }
+  } else if(S.rSubTab==='pricing'){
+    var pricing=S.rDeliveryPricing||{};
+    var savedRates=Array.isArray(pricing.routeRates)?pricing.routeRates:[];
+    var routeRows=savedRates.map(function(rate,index){
+      return '<div class="ml-rider-route-row">'+
+        '<label><span>Pickup area</span><input class="ml-daha-input" data-route-origin value="'+sanitizeText(rate.originArea||'')+'" maxlength="120" placeholder="e.g. Serrekunda"></label>'+
+        '<label><span>Drop-off area</span><input class="ml-daha-input" data-route-destination value="'+sanitizeText(rate.destinationArea||'')+'" maxlength="120" placeholder="e.g. Brikama"></label>'+
+        '<label><span>Fixed fare (GMD)</span><input class="ml-daha-input" data-route-fee type="number" min="0.01" max="5000" step="0.01" value="'+Number(rate.fixedFee||0).toFixed(2)+'" placeholder="e.g. 65.00"></label>'+
+        '<button type="button" class="ml-btn ml-btn-secondary ml-rider-route-remove" onclick="rRemoveDeliveryRouteRow(this)" aria-label="Remove route price">Remove</button></div>';
+    }).join('');
+    if(!savedRates.length)routeRows='<div class="ml-rider-route-row"><label><span>Pickup area</span><input class="ml-daha-input" data-route-origin maxlength="120" placeholder="e.g. Serrekunda"></label><label><span>Drop-off area</span><input class="ml-daha-input" data-route-destination maxlength="120" placeholder="e.g. Brikama"></label><label><span>Fixed fare (GMD)</span><input class="ml-daha-input" data-route-fee type="number" min="0.01" max="5000" step="0.01" placeholder="e.g. 65.00"></label><button type="button" class="ml-btn ml-btn-secondary ml-rider-route-remove" onclick="rRemoveDeliveryRouteRow(this)" aria-label="Remove route price">Remove</button></div>';
+    content='<section class="ml-rider-pricing-card">'+
+      '<div class="ml-rider-pricing-head"><span>YOUR DELIVERY TARIFF</span><h3>Set your delivery prices</h3><p>Choose a standard fare for any route, then add fixed prices for routes you regularly serve. Your price is shown to the customer before they pay.</p></div>'+
+      '<label class="ml-rider-pricing-toggle"><input id="rider-pricing-enabled" type="checkbox" '+(pricing.enabled?'checked':'')+'><span><b>Accept requests using these prices</b><small>Turn this off to stop new customers from receiving quotes at your tariff.</small></span></label>'+
+      '<div class="ml-rider-pricing-grid">'+
+      '<label><span>Base fee (GMD)</span><input id="rider-base-fee" class="ml-daha-input" type="number" min="0" max="2000" step="0.01" value="'+(pricing.baseFee==null?'':Number(pricing.baseFee).toFixed(2))+'" placeholder="e.g. 15.00"></label>'+
+      '<label><span>Per kilometre (GMD)</span><input id="rider-per-km-fee" class="ml-daha-input" type="number" min="0" max="500" step="0.01" value="'+(pricing.perKmFee==null?'':Number(pricing.perKmFee).toFixed(2))+'" placeholder="e.g. 5.00"></label>'+
+      '<label><span>Minimum fare (GMD)</span><input id="rider-minimum-fee" class="ml-daha-input" type="number" min="0.01" max="5000" step="0.01" value="'+(pricing.minimumFee==null?'':Number(pricing.minimumFee).toFixed(2))+'" placeholder="e.g. 25.00"></label></div>'+
+      '<div class="ml-rider-pricing-subhead"><div><b>Fixed area-to-area prices</b><small>A fixed route fare overrides your per-kilometre calculator when both area names match.</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="rAddDeliveryRouteRow()">＋ Add route</button></div>'+
+      '<div id="rider-route-rates">'+routeRows+'</div>'+
+      '<button type="button" class="ml-btn ml-btn-primary ml-rider-pricing-save" onclick="rSaveDeliveryPricing()">Save delivery prices</button>'+
+      '<p class="ml-rider-pricing-note">When there is no matching fixed route, MarketLink calculates: max(minimum fare, base fee + estimated route kilometres × your per-kilometre rate). The estimate uses vendor pickup GPS and customer saved GPS with a road-distance factor; it is a pricing estimate, not live turn-by-turn navigation. You can update your prices at any time. Prices already accepted by customers stay locked to that order.</p>'+
+      '</section>';
   } else if(S.rSubTab==='wallet'){
     var total30=Number(S.rEarningsSummary&&S.rEarningsSummary.total_earnings||0);
     var pending30=Number(S.rEarningsSummary&&S.rEarningsSummary.pending_earnings||0);
@@ -4598,7 +4625,7 @@ function renderRDash(){
     });
     }
 
-  var subTabs=[['requests','📩 Requests'],['active','🛵 Active'],['wallet','💰 Wallet'],['history','📋 History']];
+  var subTabs=[['requests','📩 Requests'],['active','🛵 Active'],['pricing','📍 Pricing'],['wallet','💰 Wallet'],['history','📋 History']];
   el.innerHTML=
     '<div style="background:linear-gradient(160deg,#1a0a2e,#4C1D95);padding:50px 16px 18px;position:relative;">'+
     '<div class="fb" style="position:absolute;top:0;left:0;right:0;"><div class="g"></div><div class="r"></div><div class="b"></div></div>'+
@@ -4624,10 +4651,70 @@ function renderRDash(){
     '<div style="padding:13px;">'+content+'</div>';
 }
 
+function rAddDeliveryRouteRow(){
+  var holder=G('rider-route-rates');
+  if(!holder)return;
+  if(holder.querySelectorAll('.ml-rider-route-row').length>=20){toast('You can save up to 20 fixed routes.','warning');return;}
+  var row=document.createElement('div');
+  row.className='ml-rider-route-row';
+  row.innerHTML='<label><span>Pickup area</span><input class="ml-daha-input" data-route-origin maxlength="120" placeholder="e.g. Serrekunda"></label>'+
+    '<label><span>Drop-off area</span><input class="ml-daha-input" data-route-destination maxlength="120" placeholder="e.g. Brikama"></label>'+
+    '<label><span>Fixed fare (GMD)</span><input class="ml-daha-input" data-route-fee type="number" min="0.01" max="5000" step="0.01" placeholder="e.g. 65.00"></label>'+
+    '<button type="button" class="ml-btn ml-btn-secondary ml-rider-route-remove" onclick="rRemoveDeliveryRouteRow(this)" aria-label="Remove route price">Remove</button>';
+  holder.appendChild(row);
+}
+function rRemoveDeliveryRouteRow(button){
+  var row=button&&button.closest?button.closest('.ml-rider-route-row'):null;
+  if(row)row.remove();
+}
+async function rSaveDeliveryPricing(){
+  var baseField=G('rider-base-fee'),perKmField=G('rider-per-km-fee'),minimumField=G('rider-minimum-fee');
+  if(!baseField||!perKmField||!minimumField){toast('The delivery pricing form is not ready. Refresh and try again.','error');return;}
+  var routeRates=[],invalidRoute=false;
+  var rows=Array.from(document.querySelectorAll('#rider-route-rates .ml-rider-route-row'));
+  rows.forEach(function(row){
+    var origin=String(row.querySelector('[data-route-origin]')&&row.querySelector('[data-route-origin]').value||'').trim();
+    var destination=String(row.querySelector('[data-route-destination]')&&row.querySelector('[data-route-destination]').value||'').trim();
+    var feeText=String(row.querySelector('[data-route-fee]')&&row.querySelector('[data-route-fee]').value||'').trim();
+    if(!origin&&!destination&&!feeText)return;
+    if(!origin||!destination||!feeText){invalidRoute=true;return;}
+    routeRates.push({originArea:origin,destinationArea:destination,fixedFee:Number(feeText)});
+  });
+  if(invalidRoute){toast('Complete all three fields for each fixed route, or remove the empty row.','error');return;}
+  var payload={
+    enabled:!!(G('rider-pricing-enabled')&&G('rider-pricing-enabled').checked),
+    baseFee:Number(baseField.value),perKmFee:Number(perKmField.value),minimumFee:Number(minimumField.value),
+    routeRates:routeRates
+  };
+  var saveButton=document.querySelector('.ml-rider-pricing-save');
+  if(saveButton){saveButton.disabled=true;saveButton.textContent='Saving your prices…';}
+  try{
+    var response=await ML_API.riders.saveDeliveryPricing(payload);
+    S.rDeliveryPricing=response&&response.data||response;
+    toast('Your delivery prices have been saved. Customers can now receive your quote when you are online.','success');
+    renderRDash();
+  }catch(error){
+    toast(error.error||'Could not save your delivery prices. Check the route amounts and try again.','error');
+    if(saveButton){saveButton.disabled=false;saveButton.textContent='Save delivery prices';}
+  }
+}
+
 async function rToggleOnline(){
   if(!ML_API.auth.isAuthenticated()){toast('Please sign in first.','error');return;}
   var next=!S.rOnline;
-  try{await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You\'re online! Ready for deliveries 🛵':'You\'re offline');}
+  try{
+    if(next){
+      var pricingResponse=await ML_API.riders.getDeliveryPricing();
+      var pricing=pricingResponse&&pricingResponse.data||pricingResponse||{};
+      S.rDeliveryPricing=pricing;
+      if(!pricing.enabled||pricing.baseFee==null||pricing.perKmFee==null||pricing.minimumFee==null){
+        S.rSubTab='pricing';renderRDash();
+        toast('Set and save your delivery prices before going online.','warning');
+        return;
+      }
+    }
+    await ML_API.delivery.setAvailability(next);S.rOnline=next;renderRDash();toast(next?'You\'re online! Ready for deliveries 🛵':'You\'re offline');
+  }
   catch(e){toast(e.error||'Could not change availability.','error');}
 }
 
