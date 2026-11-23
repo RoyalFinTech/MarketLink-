@@ -339,16 +339,43 @@ async function acceptDelivery(deliveryId, riderId) {
 }
 async function declineDelivery(deliveryId, riderId) {
   return withTransaction(async (client) => {
-    const { rows:[d] } = await client.query('SELECT * FROM deliveries WHERE id=$1 FOR UPDATE',[deliveryId]);
-    if(!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    // Preserve the same lock order used by vendor status updates, assignment
+    // and rider acceptance: order first, delivery second.
+    const { rows:[snapshot] } = await client.query(
+      'SELECT order_id FROM deliveries WHERE id=$1',[deliveryId]
+    );
+    if(!snapshot)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const { rows:[order] } = await client.query(
+      'SELECT id,status,vendor_id FROM orders WHERE id=$1 FOR UPDATE',[snapshot.order_id]
+    );
+    if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+    const { rows:[d] } = await client.query(
+      'SELECT * FROM deliveries WHERE id=$1 AND order_id=$2 FOR UPDATE',
+      [deliveryId,snapshot.order_id]
+    );
+    if(!d)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
     if(d.status!=='assigned'||String(d.rider_id)!==String(riderId))
       throw new AppError('You can only decline a delivery assigned to you.',403,'FORBIDDEN');
-    await client.query("UPDATE rider_assignments SET status='declined',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
-    await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[riderId,deliveryId]);
-    const {rows:[updated]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 RETURNING *",[deliveryId]);
-    await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[d.order_id]);
-    const {rows:[order]}=await client.query('SELECT vendor_id FROM orders WHERE id=$1',[d.order_id]);
-    if(order) await client.query("INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_declined','Rider declined delivery','The assigned rider cannot take this delivery. Please choose another rider.','delivery',$2)",[order.vendor_id,deliveryId]);
+    await client.query(
+      "UPDATE rider_assignments SET status='declined',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",
+      [deliveryId,riderId]
+    );
+    await client.query(
+      "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",
+      [riderId,deliveryId]
+    );
+    const { rows:[updated] } = await client.query(
+      "UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 RETURNING *",
+      [deliveryId]
+    );
+    await client.query(
+      "UPDATE orders SET status='awaiting_rider' WHERE id=$1",
+      [d.order_id]
+    );
+    await client.query(
+      "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_declined','Rider declined delivery','The assigned rider cannot take this delivery. Please choose another rider.','delivery',$2)",
+      [order.vendor_id,deliveryId]
+    );
     return updated;
   });
 }
