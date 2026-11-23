@@ -258,6 +258,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
       [deliveryFeeQuoteId, customerId, vendorId, deliveryAddressId]
     );
     if (!deliveryQuote) throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
+    if (deliveryQuote.estimated_customer_total == null || deliveryQuote.payout_fee_recovery_pct == null || !deliveryQuote.checkout_fingerprint) throw new AppError('Your selected rider price needs refreshing before checkout. Request a fresh total and try again.',409,'CHECKOUT_QUOTE_REFRESH_REQUIRED');
     if (Number(deliveryQuote.dropoff_lat) !== Number(deliveryAddress.latitude) ||
         Number(deliveryQuote.dropoff_lng) !== Number(deliveryAddress.longitude)) {
       throw new AppError('Your saved delivery coordinates changed. Request a fresh delivery price.', 409, 'DELIVERY_ADDRESS_CHANGED');
@@ -335,13 +336,24 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     const platformNetFee = parseFloat(Math.max(0,platFee-affiliateAmount).toFixed(2));
     const vendorPayout = parseFloat((discountedSubtotal-platFee).toFixed(2));
     const riderPayout = parseFloat(fee.toFixed(2));
+    const configuredPayoutRecoveryPct=payoutFeeRecoveryPctFromRows(commissionSettingRows);
+    const quotePayoutRecoveryPct=Number(deliveryQuote.payout_fee_recovery_pct);
+    if(!Number.isFinite(quotePayoutRecoveryPct)||Math.abs(configuredPayoutRecoveryPct-quotePayoutRecoveryPct)>0.001) throw new AppError('MarketLink checkout pricing changed while your rider price was open. Refresh delivery prices to confirm the latest total.',409,'CHECKOUT_PRICING_SETTINGS_CHANGED');
     const payoutRecovery = calculatePayoutFeeRecovery({
       vendorPayout,
       riderPayout,
       affiliatePayout: affiliateAmount,
-      pct: payoutFeeRecoveryPctFromRows(commissionSettingRows),
+      pct: quotePayoutRecoveryPct,
     });
     const total = parseFloat((discountedSubtotal+fee+payoutRecovery.payoutFeeRecoveryAmount).toFixed(2));
+    const checkoutFingerprint=buildCheckoutFingerprint({
+      customerId,vendorId,deliveryAddressId,riderId:deliveryQuote.rider_id,
+      items:lines.map(line=>({productId:line.productId,qty:line.qty,unitPrice:line.price})),
+      couponId:coupon?.id||null,discount,marketplaceCommissionPct:commPct,
+      affiliateUserId:affiliate?.user_id||null,affiliateCommissionPct:affiliatePct,
+      payoutFeeRecoveryPct:quotePayoutRecoveryPct,deliveryFee:fee,
+    });
+    if(checkoutFingerprint!==String(deliveryQuote.checkout_fingerprint)||Math.abs(total-Number(deliveryQuote.estimated_customer_total))>0.01) throw new AppError('Your cart prices or discount changed after the delivery quote. Refresh the rider prices and review the new total before paying.',409,'CHECKOUT_TOTAL_CHANGED');
 
     const { rows:[order] } = await client.query(
       "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,delivery_fee_quote_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_fee,payout_fee_recovery_pct,payout_fee_recovery_amount,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending','pending') RETURNING *",
