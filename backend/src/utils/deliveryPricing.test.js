@@ -35,6 +35,13 @@ describe('delivery pricing calculator', () => {
     expect(lane.fixed_fee).toBe('65.00');
   });
 
+  test('matches a locality within a full pickup or customer address', () => {
+    const lane = matchingRouteRate([
+      { origin_area: 'Serrekunda', destination_area: 'Brikama', fixed_fee: '65.00' }
+    ], 'Kairaba Avenue, Serrekunda, The Gambia', 'Brikama New Town, West Coast Region');
+    expect(lane.fixed_fee).toBe('65.00');
+  });
+
   test('uses a rider route price before the per-kilometre formula', () => {
     expect(calculateDeliveryFare({ fixedFee: 65, baseFee: 20, perKmFee: 5, minimumFee: 25, distanceKm: 8 })).toBe(65);
   });
