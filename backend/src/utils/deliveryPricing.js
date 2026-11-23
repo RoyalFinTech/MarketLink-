@@ -54,7 +54,7 @@ function areaMatches(configuredArea, actualAddress) {
   // or saved customer address may contain a street plus that locality.
   const boundedActual = ' ' + actual + ' ';
   const boundedConfigured = ' ' + configured + ' ';
-  return boundedActual.includes(boundedConfigured);
+  return boundedActual.includes(boundedConfigured) || boundedConfigured.includes(boundedActual);
 }
 
 function matchingRouteRate(routeRates, originArea, destinationArea) {
