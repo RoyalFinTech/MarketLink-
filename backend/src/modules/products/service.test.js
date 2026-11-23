@@ -1,6 +1,6 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 const {query}=require('../../config/db');
-const {list}=require('./service');
+const {list,getById,update}=require('./service');
 
 describe('product category filtering',()=>{
  beforeEach(()=>jest.clearAllMocks());
@@ -69,12 +69,54 @@ describe('product category filtering',()=>{
   expect(query).not.toHaveBeenCalled();
  });
 
- test('public product listing exposes Admin customer price while retaining vendor-listed price',async()=>{
-  query.mockResolvedValueOnce({rows:[{id:'product-1',price:'125.00',vendor_listed_price:'100.00',admin_price_override_enabled:true}]}).mockResolvedValueOnce({rows:[{count:'1'}]});
+ test('public product listing returns only the effective customer price, not Admin or vendor-private data',async()=>{
+  query.mockResolvedValueOnce({rows:[{id:'product-1',price:'125.00'}]}).mockResolvedValueOnce({rows:[{count:'1'}]});
   const result=await list({page:1,limit:20});
-  expect(result.items[0]).toMatchObject({price:'125.00',vendor_listed_price:'100.00',admin_price_override_enabled:true});
-  expect(query.mock.calls[0][0]).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END) AS price');
-  expect(query.mock.calls[0][0]).toContain('p.price AS vendor_listed_price');
+  expect(result.items[0]).toMatchObject({price:'125.00'});
+  expect(result.items[0]).not.toHaveProperty('vendor_listed_price');
+  expect(result.items[0]).not.toHaveProperty('admin_price_override');
+  expect(result.items[0]).not.toHaveProperty('admin_price_override_enabled');
+  expect(result.items[0]).not.toHaveProperty('admin_price_override_note');
+  const sql=query.mock.calls[0][0];
+  expect(sql).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END) AS price');
+  expect(sql).not.toContain('p.price AS vendor_listed_price');
+  expect(sql).not.toContain('p.admin_price_override_note');
+ });
+
+ test('vendor-owned product listing keeps the vendor price separate from the customer price',async()=>{
+  query.mockResolvedValueOnce({rows:[{id:'product-1',price:'100.00',effective_customer_price:'125.00',admin_pricing_adjusted:true}]}).mockResolvedValueOnce({rows:[{count:'1'}]});
+  const result=await list({vendorId:'vendor-1',includeAllStatuses:true});
+  expect(result.items[0]).toMatchObject({price:'100.00',effective_customer_price:'125.00',admin_pricing_adjusted:true});
+  expect(query.mock.calls[0][0]).toContain('p.price AS price');
+  expect(query.mock.calls[0][0]).toContain('AS effective_customer_price');
+  expect(query.mock.calls[0][0]).toContain('AS admin_pricing_adjusted');
+  expect(query.mock.calls[0][0]).not.toContain('admin_price_override_note');
+ });
+
+ test('public product details strip Admin override metadata and vendor base price',async()=>{
+  query.mockResolvedValueOnce({rows:[{
+    id:'product-1',price:'100.00',effective_customer_price:'125.00',vendor_listed_price:'100.00',
+    admin_price_override:'125.00',admin_price_override_enabled:true,admin_price_override_by:'admin-id',
+    admin_price_override_at:'2026-11-23T16:00:00.000Z',admin_price_override_note:'Private reason'
+  }]});
+  const product=await getById('product-1');
+  expect(product.price).toBe(125);
+  for(const key of ['vendor_listed_price','effective_customer_price','admin_price_override','admin_price_override_enabled','admin_price_override_by','admin_price_override_at','admin_price_override_note']){
+    expect(product).not.toHaveProperty(key);
+  }
+ });
+
+ test('vendor product edits return their listed price and effective customer price without Admin audit fields',async()=>{
+  query.mockResolvedValueOnce({rows:[{vendor_id:'vendor-1'}]}).mockResolvedValueOnce({rows:[{
+   id:'product-1',vendor_id:'vendor-1',price:'100.00',admin_price_override:'125.00',
+   admin_price_override_enabled:true,admin_price_override_by:'admin-id',
+   admin_price_override_at:'2026-11-23T16:00:00.000Z',admin_price_override_note:'Private reason'
+  }]});
+  const result=await update('product-1','vendor-1',false,{name:'Rice Plus'});
+  expect(result).toMatchObject({price:'100.00',effective_customer_price:125,admin_pricing_adjusted:true});
+  for(const key of ['admin_price_override','admin_price_override_enabled','admin_price_override_by','admin_price_override_at','admin_price_override_note']){
+   expect(result).not.toHaveProperty(key);
+  }
  });
 
 

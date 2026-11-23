@@ -2,7 +2,22 @@ jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
-const {addAddress,updateAddress}=require('./service');
+const {addAddress,updateAddress,getWishlist}=require('./service');
+
+describe('customer wishlist price privacy',()=>{
+ const customerId='77777777-7777-4777-8777-777777777777';
+ beforeEach(()=>jest.clearAllMocks());
+ test('returns Admin-effective price without vendor raw price or override audit metadata',async()=>{
+  query.mockResolvedValueOnce({rows:[{product_id:'product-1',name:'Rice',price:'125.00'}]});
+  const result=await getWishlist(customerId,{page:1,limit:20});
+  expect(result[0]).toMatchObject({price:'125.00'});
+  expect(result[0]).not.toHaveProperty('vendor_listed_price');
+  const sql=query.mock.calls[0][0];
+  expect(sql).toContain('CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price');
+  expect(sql).not.toContain('p.price AS vendor_listed_price');
+  expect(sql).not.toContain('admin_price_override_note');
+ });
+});
 
 describe('customer saved delivery addresses',()=>{
  const customerId='77777777-7777-4777-8777-777777777777';
