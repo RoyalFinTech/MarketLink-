@@ -201,7 +201,7 @@ async function upload(file, purpose, uploaderId) {
   let stored;
   if(provider==='database') {
     const publicBanner=['banner','vendor-logo','rider-photo','product-image'].includes(safePurpose(purpose));
-    const privateOnboardingDoc=['vendor-document','rider-document','license-document','cod-remittance-document'].includes(safePurpose(purpose));
+    const privateOnboardingDoc=['vendor-document','rider-document','license-document','cod-remittance-document','affiliate-document'].includes(safePurpose(purpose));
     if(!isProfilePhoto(purpose)&&!publicBanner&&!privateOnboardingDoc) {
       throw new AppError('Secure cloud storage is not configured for this type of file. Please contact MarketLink support.',503,'STORAGE_NOT_CONFIGURED');
     }
