@@ -26,7 +26,11 @@ async function storeOtp(destination,channel,purpose,otp,userId=null){
 }
 async function issueOtp(destination,purpose,otp,userId=null){
  const otpId=await storeOtp(destination,'sms',purpose,otp,userId);
- if(String(process.env.OTP_DEV_MODE||'').trim().toLowerCase()==='true')return{devOtp:otp,deliveryMode:'development'};
+ const devOtpEnabled=String(process.env.OTP_DEV_MODE||'').trim().toLowerCase()==='true';
+ const isProduction=String(process.env.NODE_ENV||'').trim().toLowerCase()==='production' ||
+   String(process.env.RENDER||'').trim().toLowerCase()==='true';
+ if(devOtpEnabled && !isProduction)return{devOtp:otp,deliveryMode:'development'};
+ if(devOtpEnabled && isProduction)logger.warn('OTP_DEV_MODE was ignored in production',{purpose});
  const minutes=parseInt(process.env.OTP_EXPIRY_MINUTES,10)||5,label=purpose==='pin_reset'?'PIN reset':'verification';
  const delivery=await notificationsService.sendSms({to:destination,message:'MarketLink '+label+' code: '+otp+'. Expires in '+minutes+' minutes. Do not share this code.'});
  if(!delivery||!delivery.sent){

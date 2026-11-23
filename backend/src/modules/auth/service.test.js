@@ -5,10 +5,18 @@ const {query}=require('../../config/db'),notifications=require('../notifications
 const {registerInitiate,requestPinReset}=require('./service');
 describe('OTP delivery mode',()=>{
  const oldEnv={...process.env};
- beforeEach(()=>{jest.clearAllMocks();process.env.OTP_EXPIRY_MINUTES='5';query.mockImplementation(async sql=>{if(sql.startsWith('SELECT id FROM users WHERE phone=$1'))return{rows:[]};if(sql.startsWith('INSERT INTO otp_verifications'))return{rows:[{id:'otp-id'}]};return{rows:[]};});});
+ beforeEach(()=>{jest.clearAllMocks();process.env.OTP_EXPIRY_MINUTES='5';process.env.NODE_ENV='test';process.env.RENDER='false';query.mockImplementation(async sql=>{if(sql.startsWith('SELECT id FROM users WHERE phone=$1'))return{rows:[]};if(sql.startsWith('INSERT INTO otp_verifications'))return{rows:[{id:'otp-id'}]};return{rows:[]};});});
  afterAll(()=>{process.env=oldEnv;});
  test('dev mode returns dashboard OTP and sends no SMS',async()=>{
   process.env.OTP_DEV_MODE='true';const r=await registerInitiate({fullName:'Test',phone:'871234567'});expect(r.devOtp).toMatch(/^\d{6}$/);expect(notifications.sendSms).not.toHaveBeenCalled();
+ });
+ test('production never returns a development OTP even when the flag is left enabled',async()=>{
+  process.env.OTP_DEV_MODE='true';process.env.NODE_ENV='production';process.env.RENDER='true';
+  notifications.sendSms.mockResolvedValue({sent:true,provider:'twilio'});
+  const result=await registerInitiate({fullName:'Test',phone:'871234567'});
+  expect(result).not.toHaveProperty('devOtp');
+  expect(result.message).toBe('OTP sent by SMS.');
+  expect(notifications.sendSms).toHaveBeenCalledTimes(1);
  });
  test('when dev mode is off it sends and hides OTP',async()=>{
   process.env.OTP_DEV_MODE='false';notifications.sendSms.mockResolvedValue({sent:true,provider:'twilio'});const r=await registerInitiate({fullName:'Test',phone:'871234567'});expect(r).not.toHaveProperty('devOtp');expect(notifications.sendSms).toHaveBeenCalledWith(expect.objectContaining({to:'+220871234567',message:expect.stringMatching(/\d{6}/)}));
