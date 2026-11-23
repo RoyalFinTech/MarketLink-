@@ -459,7 +459,7 @@ async function getDeliveryPricing(userId) {
     // They must still save and enable the tariff before becoming quote-eligible.
     baseFee: rider.delivery_base_fee_gmd == null ? policy.baseFeeGmd : Number(rider.delivery_base_fee_gmd),
     perKmFee: rider.delivery_per_km_fee_gmd == null ? policy.perKmFeeGmd : Number(rider.delivery_per_km_fee_gmd),
-    minimumFee: rider.delivery_min_fee_gmd == null ? policy.minimumFeeGmd : Number(rider.delivery_min_fee_gmd),
+    minimumFee: rider.delivery_min_fee_gmd == null ? policy.minimumFeeGmd : Math.max(policy.minimumAllowedFeeGmd, Number(rider.delivery_min_fee_gmd)),
     adminPolicy: policy,
     routeRates: routeRates.map(rate => ({
       id: rate.id,
