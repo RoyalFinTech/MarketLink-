@@ -31,7 +31,7 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,deliveryAddr
   for(const item of items){
     if(!item||!item.productId||!Number.isInteger(Number(item.quantity))||Number(item.quantity)<1)throw new AppError('Each cart item must have a valid product and positive integer quantity.',400,'INVALID_ORDER_ITEM');
     const {rows:[product]}=await client.query(
-      'SELECT p.id,p.vendor_id,p.name,COALESCE(p.admin_price_override,p.price) AS price,p.price AS vendor_listed_price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1',
+      'SELECT p.id,p.vendor_id,p.name,CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price,p.price AS vendor_listed_price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1',
       [item.productId]
     );
     if(!product||product.status!=='active'||product.vendor_kyc_status!=='approved')throw new AppError('A product in your cart is no longer available.',409,'PRODUCT_UNAVAILABLE');
