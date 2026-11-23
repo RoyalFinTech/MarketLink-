@@ -57,6 +57,6 @@ describe('vendor application registration and approval',()=>{
   expect(query.mock.calls[1][0]).toContain("SET kyc_status = 'approved'");
   expect(query.mock.calls[1][1]).toEqual([adminId,'Documents reviewed',userId]);
   expect(query.mock.calls[2][0]).toContain('vendor_approved');
-  expect(query.mock.calls[3][0]).toContain('vendor.approved');
+  expect(query.mock.calls[3][1][2]).toBe('vendor.approved');
  });
 });
