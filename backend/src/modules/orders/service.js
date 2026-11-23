@@ -332,7 +332,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     let affiliate=null;
     let affiliatePct=0;
     if (affiliateCode) {
-      const { rows:[a] } = await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1 AND marketer_status='approved'',[String(affiliateCode).trim().toUpperCase()]);
+      const { rows:[a] } = await client.query("SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1 AND marketer_status='approved'",[String(affiliateCode).trim().toUpperCase()]);
       if (a && a.user_id !== customerId) {
         affiliate=a;
         affiliatePct=affiliateDefaultPct;
