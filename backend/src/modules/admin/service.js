@@ -762,6 +762,7 @@ async function updateAdminRiderPricingOverride(riderId,input={},actor) {
   const {rows:[policyRow]}=await query("SELECT value FROM system_settings WHERE key=$1",['delivery_pricing_policy']);
   const policy=normaliseDeliveryPricingPolicy(policyRow?.value);
   const clear=input.clearOverride===true;
+  if(!clear&&!String(input.note||'').trim()){const e=new Error('Enter a reason for this Admin rider pricing override.');e.status=400;e.code='ADMIN_PRICE_REASON_REQUIRED';throw e;}
   const override=clear?null:validateRiderDeliveryOverride(input,policy);
   return withTransaction(async client=>{
     const {rows:[rider]}=await client.query(
