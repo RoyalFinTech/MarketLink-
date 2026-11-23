@@ -782,8 +782,12 @@
     }catch(e){toast(e.error||e.message||'Could not reject this application.','error');}
   }
   async function approveAdmin(id,kind){
-    try{if(kind==='vendor')await ML_API.vendors.approve(id,{notes:'Approved from MarketLink Admin Control Center'});else await ML_API.riders.approve(id,{notes:'Approved from MarketLink Admin Control Center'});toast('Application approved ✓');loadAdminDashboard();}
-    catch(e){toast(e.error||'Approval failed.','error');}
+    try{
+      if(kind==='vendor')await ML_API.vendors.approve(id,{notes:'Approved from MarketLink Admin Control Center'});
+      else await ML_API.riders.approve(id,{notes:'Approved from MarketLink Admin Control Center'});
+      toast('Application approved ✓');
+      await adminApprovals(kind);
+    }catch(e){toast(e.error||'Approval failed.','error');}
   }
   async function adminUsers(){
     try{

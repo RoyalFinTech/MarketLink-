@@ -1,0 +1,45 @@
+jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
+jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
+
+const {query,withTransaction}=require('../../config/db');
+const {addAddress,updateAddress}=require('./service');
+
+describe('customer saved delivery addresses',()=>{
+ const customerId='77777777-7777-4777-8777-777777777777';
+ const addressId='88888888-8888-4888-8888-888888888888';
+ let clientQuery;
+ beforeEach(()=>{
+  jest.clearAllMocks();
+  clientQuery=jest.fn();
+  withTransaction.mockImplementation(callback=>callback({query:clientQuery}));
+ });
+ test('saves the selected Gambian place pin and preserves a valid zero coordinate',async()=>{
+  const saved={id:addressId,customer_id:customerId,full_address:'Banjul, The Gambia',latitude:'0',longitude:'-16.58',is_default:true};
+  clientQuery
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[saved]});
+  const result=await addAddress(customerId,{
+   label:'Home',fullAddress:'Banjul, The Gambia',area:'Banjul',
+   latitude:0,longitude:-16.58,isDefault:true
+  });
+  expect(result).toEqual(saved);
+  expect(clientQuery.mock.calls[0][0]).toContain('SET is_default = FALSE');
+  expect(clientQuery.mock.calls[1][0]).toContain('latitude, longitude, is_default');
+  expect(clientQuery.mock.calls[1][1]).toEqual([customerId,'Home','Banjul, The Gambia','Banjul',0,-16.58,true]);
+ });
+ test('updates a saved delivery address pin only for the authenticated customer owner',async()=>{
+  const updated={id:addressId,customer_id:customerId,latitude:'13.27',longitude:'-16.65'};
+  clientQuery
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[updated]});
+  const result=await updateAddress(customerId,addressId,{latitude:13.27,longitude:-16.65,isDefault:true});
+  expect(result).toEqual(updated);
+  expect(clientQuery.mock.calls[1][0]).toContain('WHERE id = $3 AND customer_id = $4 RETURNING *');
+  expect(clientQuery.mock.calls[1][1]).toEqual([13.27,-16.65,true,addressId,customerId]);
+ });
+ test('does not change a different customer’s saved address',async()=>{
+  clientQuery.mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]});
+  await expect(updateAddress(customerId,addressId,{latitude:13.27,longitude:-16.65}))
+   .rejects.toMatchObject({statusCode:404,code:'ADDRESS_NOT_FOUND'});
+ });
+});

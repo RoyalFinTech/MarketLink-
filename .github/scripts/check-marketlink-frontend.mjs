@@ -351,3 +351,13 @@ assert.match(premiumJs, /function useCurrentAddressLocation/, 'Customers must be
 assert.match(premiumJs, /latitude:latitude,longitude:longitude/, 'Saved addresses must send selected GPS coordinates to the backend');
 assert.match(premiumJs, /function choosePaymentFromSettings/, 'Payment Methods must route selected choices into checkout');
 assert.match(premiumJs, /ml-payment-setting-choice/, 'Cash on Delivery and DAHA Wallet must be rendered as clickable payment choices');
+
+const vendorServiceTests = fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/service.test.js'), 'utf8');
+const riderServiceTests = fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/service.test.js'), 'utf8');
+const customerServiceTests = fs.readFileSync(path.join(root, '..', 'backend/src/modules/customers/service.test.js'), 'utf8');
+assert.match(vendorServiceTests, /stores a pending vendor application, assigns the role, creates a wallet and alerts admins/, 'Vendor application tests must cover persistence, role assignment and Admin notification');
+assert.match(vendorServiceTests, /admin approval changes KYC state, notifies the vendor and writes an audit entry/, 'Vendor approval tests must cover state, notification and audit');
+assert.match(riderServiceTests, /stores the rider application as pending, assigns the role, creates a wallet and alerts admins/, 'Rider application tests must cover persistence, role assignment and Admin notification');
+assert.match(riderServiceTests, /admin approval changes KYC state and sends the rider an approval notification/, 'Rider approval tests must cover state and applicant notification');
+assert.match(customerServiceTests, /saves the selected Gambian place pin and preserves a valid zero coordinate/, 'Customer address tests must cover coordinate persistence including valid zero values');
+

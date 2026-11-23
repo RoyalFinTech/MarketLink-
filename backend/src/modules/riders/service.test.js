@@ -4,7 +4,7 @@ jest.mock('../notifications/service',()=>({pushToUser:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const notificationsService=require('../notifications/service');
-const {getDeliveryHistory,updateLocation}=require('./service');
+const {getDeliveryHistory,updateLocation,register,approve}=require('./service');
 
 describe('rider delivery history cash reconciliation data',()=>{
  beforeEach(()=>jest.clearAllMocks());
@@ -96,4 +96,58 @@ describe('rider live GPS and arrival alerts', () => {
     expect(clientQuery.mock.calls.some(([sql])=>/INSERT INTO notifications/i.test(sql))).toBe(false);
     expect(notificationsService.pushToUser).not.toHaveBeenCalled();
   });
+});
+
+
+describe('rider application registration and approval',()=>{
+ const userId='33333333-3333-4333-8333-333333333333';
+ const adminId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ let clientQuery;
+ beforeEach(()=>{
+  jest.clearAllMocks();
+  clientQuery=jest.fn();
+  withTransaction.mockImplementation(callback=>callback({query:clientQuery}));
+ });
+ test('stores the rider application as pending, assigns the role, creates a wallet and alerts admins',async()=>{
+  query.mockResolvedValueOnce({rows:[]});
+  clientQuery
+   .mockResolvedValueOnce({rows:[{user_id:userId,kyc_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]});
+  const result=await register(userId,{
+   vehicleType:'motorbike',plateNumber:'KM-1234',licenseNumber:'DL-12345',
+   mobileNumber:'+220871234567',whatsappNumber:'+220831234567',
+   address:'Bakoteh, Kanifing Municipality',profilePhotoUrl:'https://api.marketlink.test/photo.jpg',
+   idDocumentUrl:'https://api.marketlink.test/id.pdf',licenseDocumentUrl:'https://api.marketlink.test/license.pdf'
+  });
+  expect(result).toMatchObject({user_id:userId,kyc_status:'pending'});
+  expect(clientQuery.mock.calls[0][0]).toContain("VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE)");
+  expect(clientQuery.mock.calls[0][1]).toContain('+220871234567');
+  expect(clientQuery.mock.calls[0][1]).toContain('+220831234567');
+  expect(clientQuery.mock.calls[1][0]).toContain("name = 'rider'");
+  expect(clientQuery.mock.calls[2][0]).toContain('INSERT INTO wallets');
+  expect(clientQuery.mock.calls[3][0]).toContain('rider_application_submitted');
+  expect(clientQuery.mock.calls[3][0]).toContain("r.name IN ('admin','super_admin','moderator')");
+ });
+ test('rejects a non-migrated or invalid Gambian rider mobile number before creating a record',async()=>{
+  await expect(register(userId,{mobileNumber:'+2201234567',whatsappNumber:'+220871234567'}))
+   .rejects.toMatchObject({statusCode:400,code:'INVALID_PHONE'});
+  expect(query).not.toHaveBeenCalled();
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+ test('admin approval changes KYC state and sends the rider an approval notification',async()=>{
+  const before={user_id:userId,kyc_status:'pending'};
+  const updated={user_id:userId,kyc_status:'approved'};
+  query
+   .mockResolvedValueOnce({rows:[before]})
+   .mockResolvedValueOnce({rows:[updated]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]});
+  const result=await approve(userId,{id:adminId,role:'admin'},'Documents reviewed');
+  expect(result).toEqual(updated);
+  expect(query.mock.calls[1][0]).toContain("SET kyc_status = 'approved'");
+  expect(query.mock.calls[1][1]).toEqual([adminId,'Documents reviewed',userId]);
+  expect(query.mock.calls[2][0]).toContain('rider_approved');
+ });
 });
