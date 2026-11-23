@@ -2,14 +2,137 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const { SETTING_KEYS, commissionSettingsFromRows } = require('../../utils/marketplaceCommission');
+const { haversineKm, estimateRoadDistanceKm, matchingRouteRate, calculateDeliveryFare, roundGmd } = require('../../utils/deliveryPricing');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
-async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paymentMethod, couponCode, affiliateCode }) {
+async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId }) {
+  if (!vendorId || !deliveryAddressId) throw new AppError('Choose a vendor and saved delivery address before requesting delivery prices.', 400, 'DELIVERY_QUOTE_INPUT_REQUIRED');
+  return withTransaction(async client => {
+    const { rows: [address] } = await client.query(
+      'SELECT id,full_address,area,latitude,longitude FROM delivery_addresses WHERE id=$1 AND customer_id=$2',
+      [deliveryAddressId, customerId]
+    );
+    if (!address) throw new AppError('The selected delivery address does not belong to your account.', 403, 'DELIVERY_ADDRESS_FORBIDDEN');
+    const { rows: [vendor] } = await client.query(
+      "SELECT user_id,business_name,business_address,latitude,longitude,kyc_status FROM vendors WHERE user_id=$1",
+      [vendorId]
+    );
+    if (!vendor || vendor.kyc_status !== 'approved') throw new AppError('This vendor is not available for delivery quotes.', 404, 'VENDOR_NOT_AVAILABLE');
+    const pickup = { latitude: vendor.latitude, longitude: vendor.longitude };
+    const dropoff = { latitude: address.latitude, longitude: address.longitude };
+    const straightLine = haversineKm(pickup, dropoff);
+    if (straightLine === null || straightLine < 0.01) {
+      throw new AppError('GPS coordinates are required for both the vendor pickup and your saved delivery address. Update the address or vendor location before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
+    }
+    const factor = Number(process.env.MARKETLINK_ROAD_DISTANCE_FACTOR || 1.25);
+    let routeDistance;
+    try { routeDistance = estimateRoadDistanceKm(pickup, dropoff, factor); }
+    catch (error) { throw new AppError('Delivery route distance configuration is invalid.', 500, 'DELIVERY_ROUTE_CONFIG_ERROR'); }
+
+    // Release expired, unused quotes for this customer before creating the next set.
+    await client.query(
+      "UPDATE delivery_fee_quotes SET status='expired' WHERE customer_id=$1 AND status='quoted' AND expires_at<=now()",
+      [customerId]
+    );
+    const { rows: riders } = await client.query(
+      `SELECT r.user_id AS rider_id,r.vehicle_type,r.rating_avg,r.rating_count,
+              r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,
+              u.full_name
+       FROM riders r JOIN users u ON u.id=r.user_id
+       WHERE r.kyc_status='approved' AND r.is_online=TRUE AND r.delivery_pricing_enabled=TRUE
+         AND r.delivery_base_fee_gmd IS NOT NULL
+         AND r.delivery_per_km_fee_gmd IS NOT NULL
+         AND r.delivery_min_fee_gmd IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM deliveries active
+           WHERE active.rider_id=r.user_id AND active.status IN ('assigned','picked_up','in_transit')
+         )
+       ORDER BY r.rating_avg DESC,r.rating_count DESC
+       LIMIT 20`
+    );
+    if (!riders.length) {
+      return {
+        origin: vendor.business_address || vendor.business_name,
+        destination: address.area || address.full_address,
+        straightLineDistanceKm: roundGmd(straightLine),
+        estimatedRouteDistanceKm: routeDistance,
+        quoteExpiresInMinutes: 15,
+        quotes: [],
+      };
+    }
+    const riderIds = riders.map(row => row.rider_id);
+    const { rows: lanes } = await client.query(
+      'SELECT rider_id,origin_area,destination_area,fixed_fee_gmd FROM rider_delivery_rates WHERE rider_id=ANY($1::uuid[]) AND is_active=TRUE',
+      [riderIds]
+    );
+    const originArea = vendor.business_address || vendor.business_name;
+    const destinationArea = address.area || address.full_address;
+    const laneMap = new Map();
+    for (const lane of lanes) {
+      if (!laneMap.has(lane.rider_id)) laneMap.set(lane.rider_id, []);
+      laneMap.get(lane.rider_id).push(lane);
+    }
+    const quotes = [];
+    for (const rider of riders) {
+      const lane = matchingRouteRate(laneMap.get(rider.rider_id), originArea, destinationArea);
+      let fee;
+      try {
+        fee = calculateDeliveryFare({
+          fixedFee: lane ? lane.fixed_fee_gmd : null,
+          baseFee: rider.delivery_base_fee_gmd,
+          perKmFee: rider.delivery_per_km_fee_gmd,
+          minimumFee: rider.delivery_min_fee_gmd,
+          distanceKm: routeDistance,
+        });
+      } catch (error) {
+        logger.warn('Rider delivery pricing skipped because the saved tariff is invalid', { riderId: rider.rider_id, error: error.message });
+        continue;
+      }
+      const { rows: [quote] } = await client.query(
+        `INSERT INTO delivery_fee_quotes
+          (customer_id,vendor_id,delivery_address_id,rider_id,origin_area,destination_area,
+           pickup_lat,pickup_lng,dropoff_lat,dropoff_lng,straight_line_distance_km,
+           route_distance_km,pricing_mode,base_fee_gmd,per_km_fee_gmd,minimum_fee_gmd,delivery_fee_gmd)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         RETURNING id,delivery_fee_gmd,route_distance_km,pricing_mode,expires_at`,
+        [customerId,vendorId,deliveryAddressId,rider.rider_id,originArea,destinationArea,
+         Number(vendor.latitude),Number(vendor.longitude),Number(address.latitude),Number(address.longitude),
+         Math.max(0.01,roundGmd(straightLine)),routeDistance,lane?'route_fixed':'per_kilometre',
+         lane?null:Number(rider.delivery_base_fee_gmd),lane?null:Number(rider.delivery_per_km_fee_gmd),
+         lane?null:Number(rider.delivery_min_fee_gmd),fee]
+      );
+      quotes.push({
+        quoteId: quote.id,
+        riderId: rider.rider_id,
+        riderName: rider.full_name || 'MarketLink Rider',
+        vehicleType: rider.vehicle_type || 'Delivery rider',
+        rating: Number(rider.rating_avg || 0),
+        ratingCount: Number(rider.rating_count || 0),
+        deliveryFee: Number(quote.delivery_fee_gmd),
+        estimatedRouteDistanceKm: Number(quote.route_distance_km),
+        pricingMode: quote.pricing_mode,
+        expiresAt: quote.expires_at,
+      });
+    }
+    quotes.sort((a,b) => a.deliveryFee - b.deliveryFee || b.rating - a.rating);
+    return {
+      origin: vendor.business_address || vendor.business_name,
+      destination: address.area || address.full_address,
+      straightLineDistanceKm: roundGmd(straightLine),
+      estimatedRouteDistanceKm: routeDistance,
+      quoteExpiresInMinutes: 15,
+      quotes,
+    };
+  });
+}
+
+async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deliveryFeeQuoteId, paymentMethod, couponCode, affiliateCode }) {
   paymentMethod=String(paymentMethod||'').toLowerCase();
   if(!['cod','wallet','wave','afrimoney','qmoney','modempay'].includes(paymentMethod))throw new AppError('Choose an enabled MarketLink payment method.',400,'UNSUPPORTED_PAYMENT_METHOD');
   if (!Array.isArray(items) || !items.length) throw new AppError('Order must contain at least one item.',400,'EMPTY_ORDER');
   if (!vendorId) throw new AppError('Vendor is required.',400,'VENDOR_REQUIRED');
   if (!deliveryAddressId) throw new AppError('Select a saved delivery address before placing your order.',400,'DELIVERY_ADDRESS_REQUIRED');
+  if (!deliveryFeeQuoteId) throw new AppError('Select an available rider price before placing your order.',400,'DELIVERY_QUOTE_REQUIRED');
   for (const item of items) {
     if (!item || !item.productId || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
       throw new AppError('Each order item must have a valid product and positive integer quantity.',400,'INVALID_ORDER_ITEM');
@@ -26,6 +149,33 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
       if (!address) throw new AppError('The selected delivery address does not belong to your account.',403,'DELIVERY_ADDRESS_FORBIDDEN');
       deliveryAddress = address;
     }
+    if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
+      throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
+    }
+    const { rows: [deliveryQuote] } = await client.query(
+      `SELECT * FROM delivery_fee_quotes
+       WHERE id=$1 AND customer_id=$2 AND vendor_id=$3 AND delivery_address_id=$4
+         AND status='quoted' AND expires_at>now()
+       FOR UPDATE`,
+      [deliveryFeeQuoteId, customerId, vendorId, deliveryAddressId]
+    );
+    if (!deliveryQuote) throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
+    if (Number(deliveryQuote.dropoff_lat) !== Number(deliveryAddress.latitude) ||
+        Number(deliveryQuote.dropoff_lng) !== Number(deliveryAddress.longitude)) {
+      throw new AppError('Your saved delivery coordinates changed. Request a fresh delivery price.', 409, 'DELIVERY_ADDRESS_CHANGED');
+    }
+    const { rows: [lockedRider] } = await client.query(
+      "SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE AND delivery_pricing_enabled=TRUE FOR UPDATE",
+      [deliveryQuote.rider_id]
+    );
+    if (!lockedRider) throw new AppError('The selected rider is no longer online. Refresh delivery prices and choose another rider.', 409, 'RIDER_QUOTE_NO_LONGER_AVAILABLE');
+    const { rows: [busyRider] } = await client.query(
+      "SELECT id FROM deliveries WHERE rider_id=$1 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+      [deliveryQuote.rider_id]
+    );
+    if (busyRider) throw new AppError('The selected rider has just accepted another delivery. Refresh delivery prices and choose another rider.', 409, 'RIDER_QUOTE_NO_LONGER_AVAILABLE');
+    const fee = Number(deliveryQuote.delivery_fee_gmd);
+    if (!Number.isFinite(fee) || fee <= 0) throw new AppError('The selected rider quote has an invalid delivery fee.', 500, 'DELIVERY_QUOTE_INVALID');
     let sub=0; const lines=[];
     const lockedProductIds = new Set();
     for (const item of items) {
@@ -60,7 +210,6 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     }
 
     // Transparent marketplace pricing: vendor sets retail price; MarketLink commission is not added to checkout.
-    const fee = Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD || 25);
     const { rows: commissionSettingRows } = await client.query(
       "SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",
       [[SETTING_KEYS.marketplace, SETTING_KEYS.affiliate]]
@@ -68,7 +217,6 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     const commissionSettings = commissionSettingsFromRows(commissionSettingRows);
     const commPct = commissionSettings.marketplaceCommissionPct;
     const affiliateDefaultPct = commissionSettings.affiliateCommissionPct;
-    if (!Number.isFinite(fee) || fee < 0) throw new AppError('Invalid delivery fee configuration.',500,'FEE_CONFIG_ERROR');
     if (!Number.isFinite(commPct) || commPct < 0 || commPct > 20) throw new AppError('Invalid platform commission configuration.',500,'FEE_CONFIG_ERROR');
     if (affiliateDefaultPct > commPct) throw new AppError('Platform commission must cover the affiliate reward.',500,'FEE_CONFIG_ERROR');
 
@@ -92,8 +240,8 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     const total = parseFloat((discountedSubtotal+fee).toFixed(2));
 
     const { rows:[order] } = await client.query(
-      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_fee,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'pending','pending') RETURNING *",
-      [genNum(),customerId,vendorId,deliveryAddressId||null,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
+      "INSERT INTO orders (order_number,customer_id,vendor_id,delivery_address_id,delivery_fee_quote_id,payment_method,subtotal,delivery_fee,discount_amount,platform_fee,platform_fee_pct,vendor_payout,rider_payout,total,coupon_id,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_fee,payment_status,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending','pending') RETURNING *",
+      [genNum(),customerId,vendorId,deliveryAddressId,deliveryFeeQuoteId,paymentMethod,sub,fee,discount,platFee,commPct,vendorPayout,riderPayout,total,coupon?.id||null,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
     for (const li of lines) await client.query("INSERT INTO order_items (order_id,product_id,product_name_snapshot,unit_price_snapshot,quantity,line_total) VALUES($1,$2,$3,$4,$5,$6)",[order.id,li.productId,li.name,li.price,li.qty,li.lt]);
     for (const item of items) {
       const { rows:[updated] } = await client.query("UPDATE inventory SET quantity=quantity-$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity>=$1 RETURNING quantity",[Number(item.quantity),item.productId]);
@@ -102,10 +250,31 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     if (coupon) await client.query("INSERT INTO coupon_redemptions (coupon_id,customer_id,order_id) VALUES($1,$2,$3)",[coupon.id,customerId,order.id]);
     // total_orders is a settled-order metric; it is incremented only by settleOrderFinancials().
     await client.query("INSERT INTO order_status_history (order_id,status,note) VALUES($1,'pending','Order placed')",[order.id]);
-    await client.query(
-      "INSERT INTO deliveries (order_id,status,dropoff_lat,dropoff_lng) VALUES($1,'unassigned',$2,$3)",
-      [order.id, deliveryAddress?.latitude ?? null, deliveryAddress?.longitude ?? null]
+    const { rows: [delivery] } = await client.query(
+      `INSERT INTO deliveries
+        (order_id,rider_id,pickup_lat,pickup_lng,dropoff_lat,dropoff_lng,distance_km,status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'assigned') RETURNING id`,
+      [order.id,deliveryQuote.rider_id,deliveryQuote.pickup_lat,deliveryQuote.pickup_lng,
+       deliveryQuote.dropoff_lat,deliveryQuote.dropoff_lng,deliveryQuote.route_distance_km]
     );
+    await client.query(
+      `INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status)
+       VALUES ($1,$2,$3,'manual','pending')`,
+      [delivery.id,deliveryQuote.rider_id,customerId]
+    );
+    await client.query(
+      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'delivery_assigned','New delivery request 🛵',$2,'delivery',$3)`,
+      [deliveryQuote.rider_id,
+       'A customer selected your delivery price for order '+order.order_number+'. Accept or decline this request in your Rider Dashboard.',
+       delivery.id]
+    );
+    const { rows: [consumedQuote] } = await client.query(
+      `UPDATE delivery_fee_quotes SET status='consumed',order_id=$1,consumed_at=now()
+       WHERE id=$2 AND status='quoted' AND expires_at>now() RETURNING id`,
+      [order.id,deliveryFeeQuoteId]
+    );
+    if (!consumedQuote) throw new AppError('The selected rider quote expired before the order was secured. Please refresh checkout.',409,'DELIVERY_QUOTE_EXPIRED');
     await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout,rider_payout,platform_fee_pct,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_amount) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",[order.id,vendorId,total,commPct,platFee,vendorPayout,riderPayout,commPct,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
     return { order, lineItems: lines };
   });
@@ -418,4 +587,4 @@ async function vendorAccept(orderId,vendorUserId,roles){return updateStatus(orde
 async function vendorReject(orderId,vendorUserId,roles,reason){return updateStatus(orderId,'cancelled',vendorUserId,roles,reason||'Rejected by vendor');}
 async function cancel(orderId,userId,roles,reason){return updateStatus(orderId,'cancelled',userId,roles,reason||'Cancelled');}
 
-module.exports={placeOrder,getById,listForCustomer,listForVendor,updateStatus,vendorAccept,vendorReject,cancel,settleOrderFinancials};
+module.exports={quoteDeliveryOptions,placeOrder,getById,listForCustomer,listForVendor,updateStatus,vendorAccept,vendorReject,cancel,settleOrderFinancials};
