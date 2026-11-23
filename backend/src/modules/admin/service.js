@@ -1,6 +1,7 @@
 // src/modules/admin/service.js
 'use strict';
 const { query, withTransaction } = require('../../config/db');
+const { SETTING_KEYS, commissionSettingsFromRows, validateCommissionSettings } = require('../../utils/marketplaceCommission');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -245,6 +246,23 @@ async function getAnalytics({ period='30d' }) {
     totals:{orders:totalOrders,deliveredOrders,signups:totalSignups},
     insights:{summary:deliveredOrders===0?'The selected period has no confirmed delivered sales. Operational and customer activity should be reviewed before drawing revenue conclusions.':'The summary is based on delivered orders with confirmed payments, with GMV and MarketLink net commission tracked separately.',items:insights,method:'Automated, rules-based analysis of live MarketLink records; no external AI model or estimated revenue is used.'}
   };
+}
+
+async function getMarketplaceCommissionSettings(){
+  const {rows}=await query("SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",[[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate]]);
+  return {...commissionSettingsFromRows(rows),baseDeliveryFeeGmd:Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD||25),customerGatewayFeeEnabled:false,appliesTo:'future_orders_only'};
+}
+async function updateMarketplaceCommissionSettings(input,actor){
+  const settings=validateCommissionSettings(input);
+  return withTransaction(async client=>{
+    const {rows:beforeRows}=await client.query("SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",[[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate]]);
+    const before=commissionSettingsFromRows(beforeRows);
+    for(const [key,value] of [[SETTING_KEYS.marketplace,settings.marketplaceCommissionPct],[SETTING_KEYS.affiliate,settings.affiliateCommissionPct]]){
+      await client.query("INSERT INTO system_settings(key,value,category,updated_by) VALUES($1,$2::jsonb,'finance',$3) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,category='finance',updated_by=EXCLUDED.updated_by,updated_at=now()",[key,JSON.stringify(value),actor.id]);
+    }
+    await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,'finance.commission_settings_updated','commission_settings',NULL,$3,$4)",[actor.id,actor.role||'admin',JSON.stringify(before),JSON.stringify(settings)]);
+    return {...settings,baseDeliveryFeeGmd:Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD||25),customerGatewayFeeEnabled:false,appliesTo:'future_orders_only'};
+  });
 }
 
 async function getSystemSettings() {
@@ -498,7 +516,7 @@ async function getCrmProfile(userId){
   query(`SELECT business_name,business_category,business_category_group,business_address,phone,email,whatsapp_number,
                 description,logo_url,banner_url,services_offered,working_days,opening_time,closing_time,
                 return_policy,min_order_value,delivery_time_min,delivery_time_max,is_open,vacation_mode,
-                commission_pct,rating_avg,rating_count,total_sales,total_revenue,kyc_status,created_at,updated_at
+                rating_avg,rating_count,total_sales,total_revenue,kyc_status,created_at,updated_at
          FROM vendors WHERE user_id=$1`,[userId]),
   query(`SELECT full_name,email,address,mobile_number,whatsapp_number,profile_photo_url,vehicle_type,plate_number,
                 emergency_contact,delivery_zone,kyc_status,is_online,location_sharing_enabled,
@@ -655,4 +673,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
