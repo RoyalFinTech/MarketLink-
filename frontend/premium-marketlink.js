@@ -1883,7 +1883,82 @@
       '<section class="ml-affiliate-hero"><div class="ml-affiliate-hero-copy"><span class="ml-affiliate-label">YOUR CUSTOMER REFERRAL</span><h4>Help friends discover local businesses on MarketLink.</h4><p>Share your personal referral link with friends and family. Your referral activity helps more people discover trusted vendors and delivery services across The Gambia.</p><small>Customer referrals are for sharing and tracking only. Referrers do not earn commissions or cash rewards.</small></div><div class="ml-affiliate-hero-art ml-affiliate-hero-photo"><img class="ml-affiliate-hero-image" src="./assets/promo-shopping.webp" alt="Customers discovering products at a local supermarket" loading="lazy" decoding="async" onerror="this.onerror=null;this.style.display=&quot;none&quot;;this.parentElement.classList.add(&quot;ml-affiliate-hero-photo-failed&quot;)"><div class="ml-affiliate-art-label"><b>Share</b><span>MARKETLINK WITH FRIENDS</span></div></div></section>'+
       '<div class="ml-stat-grid ml-affiliate-stats"><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(S.affiliateClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referred orders</div><div class="ml-stat-value">'+Number(S.affiliateOrders||0)+'</div></div></div>'+
       '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your personal referral link</b><span>Share it on WhatsApp or with friends and family.</span></div><span>🔗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Customer referral link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><div class="ml-affiliate-footnote">This customer referral link does not generate commissions, wallet credits or cash payouts. Only approved MarketLink Affiliate Marketers participate in the paid affiliate programme.</div></div>'+
-      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Want to earn as an official marketer?</b><span>Apply separately to become a MarketLink Affiliate Marketer. Approved marketers receive access to a dedicated workspace and eligible commission tools.</span></div><span>↗</span></div><button type="button" class="ml-btn ml-btn-primary" onclick="toast(&quot;The Affiliate Marketer application form is being prepared. No application has been submitted yet.&quot;,&quot;info&quot;)">Affiliate Marketer application coming soon</button></div></div>';
+      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Want to earn as an official marketer?</b><span>Apply separately to become a MarketLink Affiliate Marketer. Approved marketers receive access to a dedicated workspace and eligible commission tools.</span></div><span>↗</span></div><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openProfilePage('affiliate-marketer')">Affiliate Marketer application coming soon</button></div></div>';
+  }
+
+  async function renderPremiumAffiliateMarketerPage(root){
+    if(!apiOk()){root.innerHTML='<div class="ml-profile-shell"><p>Please sign in to access the Affiliate Marketer programme.</p></div>';return;}
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK PARTNER PROGRAMME</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Affiliate Marketer workspace</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div><div class="ml-loading">Checking your application status…</div></div>';
+    try{
+      var statusResponse=await ML_API.affiliates.marketerStatus();
+      var statusData=statusResponse&&statusResponse.data||statusResponse||{};
+      var state=String(statusData.marketerStatus||'not_applied');
+      if(state==='approved'){
+        var dashResponse=await ML_API.affiliates.marketerDashboard();
+        var d=dashResponse&&dashResponse.data||dashResponse||{};
+        var link=(typeof buildAffiliateShareLink==='function'&&buildAffiliateShareLink())||'';
+        root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">APPROVED AFFILIATE MARKETER</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Your partner dashboard</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div>'+
+          '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(d.referralClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Qualifying orders</div><div class="ml-stat-value">'+Number(d.qualifyingOrders||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Lifetime earned</div><div class="ml-stat-value">'+money(d.lifetimeEarned||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">DAHA Wallet</div><div class="ml-stat-value">'+money(d.walletBalance||0)+'</div></div></div>'+
+          '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your official marketer link</b><span>Share this tracked link on WhatsApp, social media and your community channels.</span></div><span>↗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Official affiliate marketer link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><p class="ml-affiliate-footnote">Only eligible delivered orders with confirmed payment count. Commissions are funded from MarketLink’s platform commission and credited to DAHA Wallet after settlement. Delivery fees are excluded.</p><button class="ml-btn ml-btn-primary" type="button" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Open DAHA Wallet</button></div>'+
+          '<div class="ml-wallet-note">Keep your promotional content accurate and respectful. Fake accounts, self-referrals, spam, misleading claims and manipulated orders are prohibited.</div></div>';
+        return;
+      }
+      if(state==='pending'){
+        root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">APPLICATION RECEIVED</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Your documents are with our Admin team.</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div><div class="ml-wallet-note">Your Affiliate Marketer application is pending verification. You can continue using your normal customer account and Referrer link while we review it. Paid commissions are not enabled until approval.</div></div>';
+        return;
+      }
+      if(state==='suspended'){
+        root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Affiliate Marketer access suspended</h3><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div><div class="ml-wallet-note">Your paid marketer tools are temporarily unavailable. Contact MarketLink Support if you need help. Any existing wallet balance remains visible in DAHA Wallet.</div></div>';
+        return;
+      }
+      var rejection=statusData.application&&statusData.application.rejectionReason||'';
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">BECOME AN OFFICIAL PARTNER</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Apply as an Affiliate Marketer</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div>'+
+        (state==='rejected'?'<div class="ml-wallet-note" style="margin-bottom:12px"><b>Previous application not approved.</b><p>'+esc(rejection||'Please review your documents and application details before resubmitting.')+'</p></div>':'')+
+        '<p class="ml-affiliate-footnote">This is a separate professional programme. You must submit identity verification and a short marketing plan. Your application is reviewed by MarketLink Admin. You will not earn commissions before approval.</p>'+
+        '<form id="ml-affiliate-marketer-form" class="ml-profile-card" style="padding:16px;display:grid;gap:12px">'+
+        '<label>Full legal name<input name="legalName" required maxlength="150" autocomplete="name" placeholder="Name as shown on your ID"></label>'+
+        '<label>Residential address<textarea name="residentialAddress" required maxlength="500" rows="2" placeholder="Your current address in The Gambia"></textarea></label>'+
+        '<div><b>Where will you promote MarketLink?</b><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px">'+
+        [['whatsapp','WhatsApp'],['facebook','Facebook'],['instagram','Instagram'],['tiktok','TikTok'],['youtube','YouTube'],['website','Website'],['community','Community groups'],['other','Other']].map(function(x){return '<label style="display:flex;align-items:center;gap:7px;font-size:12px"><input type="checkbox" name="marketingChannels" value="'+x[0]+'"> '+x[1]+'</label>';}).join('')+
+        '</div></div>'+
+        '<label>Facebook profile/page link<input name="facebook" type="url" placeholder="https://..."></label><label>Instagram link<input name="instagram" type="url" placeholder="https://..."></label><label>TikTok link<input name="tiktok" type="url" placeholder="https://..."></label><label>YouTube link<input name="youtube" type="url" placeholder="https://..."></label><label>Website (optional)<input name="website" type="url" placeholder="https://..."></label>'+
+        '<label>How will you promote MarketLink?<textarea name="marketingPlan" required minlength="30" maxlength="3000" rows="4" placeholder="Describe your audience, promotion channels and how you plan to introduce MarketLink to them."></textarea></label>'+
+        '<label>Identity document (PDF, JPG or PNG)<input name="identityDocument" type="file" accept="application/pdf,image/jpeg,image/png" required></label><label>Recent selfie (JPG or PNG)<input name="selfie" type="file" accept="image/jpeg,image/png" required></label><label>Proof of address (optional)<input name="addressProof" type="file" accept="application/pdf,image/jpeg,image/png"></label>'+
+        '<button class="ml-btn ml-btn-primary" type="submit">Submit for Admin verification</button><small class="ml-affiliate-footnote">Your identity documents are private and visible only to authorised MarketLink reviewers. Maximum file size: 10 MB per document.</small></form></div>';
+      var form=root.querySelector('#ml-affiliate-marketer-form');
+      if(form)form.addEventListener('submit',async function(event){
+        event.preventDefault();
+        var button=form.querySelector('button[type="submit"]');
+        var getFile=function(name){var el=form.querySelector('[name="'+name+'"]');return el&&el.files&&el.files[0]||null;};
+        var identity=getFile('identityDocument'),selfie=getFile('selfie'),proof=getFile('addressProof');
+        if(!identity||!selfie){toast('Please upload your identity document and selfie.','warning');return;}
+        if([identity,selfie,proof].filter(Boolean).some(function(file){return file.size>10*1024*1024;})){toast('Each KYC document must be 10 MB or smaller.','warning');return;}
+        var channels=Array.from(form.querySelectorAll('input[name="marketingChannels"]:checked')).map(function(el){return el.value;});
+        if(!channels.length){toast('Choose at least one marketing channel.','warning');return;}
+        button.disabled=true;button.textContent='Uploading private KYC documents…';
+        try{
+          var identityUpload=await ML_API.uploads.upload(identity,'affiliate_document');
+          var selfieUpload=await ML_API.uploads.upload(selfie,'affiliate_document');
+          var proofUpload=proof?await ML_API.uploads.upload(proof,'affiliate_document'):null;
+          button.textContent='Submitting application…';
+          var payload={
+            legalName:form.elements.legalName.value,
+            residentialAddress:form.elements.residentialAddress.value,
+            marketingChannels:channels,
+            marketingPlan:form.elements.marketingPlan.value,
+            socialLinks:{facebook:form.elements.facebook.value,instagram:form.elements.instagram.value,tiktok:form.elements.tiktok.value,youtube:form.elements.youtube.value,website:form.elements.website.value},
+            identityDocumentUrl:identityUpload.url,
+            selfieUrl:selfieUpload.url,
+            addressProofUrl:proofUpload&&proofUpload.url||null
+          };
+          await ML_API.affiliates.applyMarketer(payload);
+          toast('Application submitted. MarketLink Admin will review your documents.','success');
+          await renderPremiumAffiliateMarketerPage(root);
+        }catch(error){toast(error.error||error.message||'Could not submit your Affiliate Marketer application.','error');button.disabled=false;button.textContent='Submit for Admin verification';}
+      });
+    }catch(error){
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-empty"><b>Could not load Affiliate Marketer status</b><span>'+esc(error.error||error.message||'Please try again.')+'</span><button class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openProfilePage(\'affiliate-marketer\')">Retry</button></div></div>';
+    }
   }
 
   function renderPremiumPolicyPage(root,key){
@@ -2423,6 +2498,7 @@
     var root=G('profile-body');if(!root)return;
     if(S.profilePage==='terms'||S.profilePage==='privPolicy'||S.profilePage==='deliveryPolicy'){openProfilePage(S.profilePage);return;}
     if(S.profilePage==='wallet'){await renderPremiumWalletPage(root);return;}
+    if(S.profilePage==='affiliate-marketer'){await renderPremiumAffiliateMarketerPage(root);return;}
     if(S.profilePage==='payments'){renderPremiumPaymentsPage(root);return;}
     if(S.profilePage==='notifSet'){await renderPremiumNotificationsPage(root);return;}
     if(S.profilePage==='privacy'){renderPremiumPrivacySettings(root);return;}
@@ -3541,7 +3617,7 @@
   window.openAffiliateMarketerApply=function(){
     if(!ML_API.auth.isAuthenticated()){goAuth();return;}
     if(window.ML_Premium&&typeof window.ML_Premium.openProfilePage==='function'){
-      window.ML_Premium.openProfilePage('affiliate');
+      window.ML_Premium.openProfilePage('affiliate-marketer');
     }else{
       toast('Please open your Profile to continue with the Affiliate Marketer application.','info');
     }
