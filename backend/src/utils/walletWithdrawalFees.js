@@ -7,10 +7,16 @@ function validateWithdrawalFeePct(value,statusCode=500){
  return Number(pct.toFixed(2));
 }
 function roundGmd(value){return Math.round((Number(value)+Number.EPSILON)*100)/100;}
+function resolveWithdrawalServiceFeePct({isMarketplacePayee=false,configuredFeePct}={}){
+ // Vendor, rider and affiliate earnings already carry the order-funded
+ // provider-cost recovery. Do not charge those recipients a second time.
+ if(isMarketplacePayee===true)return 0;
+ return validateWithdrawalFeePct(configuredFeePct,500);
+}
 function calculateWithdrawalDebit(payoutAmount,feePct){
  const amount=roundGmd(payoutAmount);
  if(!Number.isFinite(amount)||amount<=0){const error=new Error('Withdrawal amount must be greater than zero.');error.statusCode=400;error.status=400;error.code='INVALID_AMOUNT';throw error;}
  const pct=validateWithdrawalFeePct(feePct,400),feeAmount=roundGmd(amount*pct/100);
  return {payoutAmount:amount,serviceFeePct:pct,serviceFeeAmount:feeAmount,walletDebitAmount:roundGmd(amount+feeAmount)};
 }
-module.exports={DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,MAX_WITHDRAWAL_SERVICE_FEE_PCT,validateWithdrawalFeePct,roundGmd,calculateWithdrawalDebit};
+module.exports={DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,MAX_WITHDRAWAL_SERVICE_FEE_PCT,validateWithdrawalFeePct,resolveWithdrawalServiceFeePct,roundGmd,calculateWithdrawalDebit};
