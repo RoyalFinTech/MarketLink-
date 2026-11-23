@@ -1,4 +1,5 @@
 'use strict';
+const crypto = require('crypto');
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const { SETTING_KEYS, commissionSettingsFromRows, payoutFeeRecoveryPctFromRows } = require('../../utils/marketplaceCommission');
@@ -7,9 +8,24 @@ const { haversineKm, estimateRoadDistanceKm, matchingRouteRate, calculateDeliver
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
 
-async function calculateCheckoutPreview(client,{customerId,vendorId,items,couponCode,affiliateCode}) {
+function buildCheckoutFingerprint({customerId,vendorId,deliveryAddressId,riderId,items,couponId,discount,marketplaceCommissionPct,affiliateUserId,affiliateCommissionPct,payoutFeeRecoveryPct,deliveryFee}) {
+  const payload={
+    customerId:String(customerId),vendorId:String(vendorId),deliveryAddressId:String(deliveryAddressId),riderId:String(riderId),
+    items:(items||[]).map(item=>({productId:String(item.productId),quantity:Number(item.qty==null?item.quantity:item.qty),unitPrice:roundGmd(item.unitPrice==null?item.price:item.unitPrice)})).sort((a,b)=>a.productId.localeCompare(b.productId)),
+    couponId:couponId?String(couponId):null,discount:roundGmd(discount||0),
+    marketplaceCommissionPct:roundGmd(marketplaceCommissionPct||0),
+    affiliateUserId:affiliateUserId?String(affiliateUserId):null,
+    affiliateCommissionPct:roundGmd(affiliateCommissionPct||0),
+    payoutFeeRecoveryPct:roundGmd(payoutFeeRecoveryPct||0),
+    deliveryFee:roundGmd(deliveryFee||0),
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+async function calculateCheckoutPreview(client,{customerId,vendorId,deliveryAddressId,items,couponCode,affiliateCode}) {
   if(!Array.isArray(items)||!items.length)throw new AppError('Add products to your cart before requesting a delivery total.',400,'EMPTY_ORDER');
   let subtotal=0;
+  const previewItems=[];
   const seen=new Set();
   for(const item of items){
     if(!item||!item.productId||!Number.isInteger(Number(item.quantity))||Number(item.quantity)<1)throw new AppError('Each cart item must have a valid product and positive integer quantity.',400,'INVALID_ORDER_ITEM');
@@ -24,8 +40,9 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,items,coupon
     const {rows:[inventory]}=await client.query('SELECT quantity FROM inventory WHERE product_id=$1 AND variant_id IS NULL',[product.id]);
     if(!inventory||inventory.quantity==null||Number(inventory.quantity)<Number(item.quantity))throw new AppError('A product in your cart does not have enough available stock.',409,'INSUFFICIENT_STOCK');
     subtotal+=Number(product.price)*Number(item.quantity);
+    previewItems.push({productId:String(product.id),qty:Number(item.quantity),unitPrice:Number(product.price)});
   }
-  let discount=0;
+  let discount=0,couponId=null;
   if(couponCode){
     const {rows:[coupon]}=await client.query(
       "SELECT * FROM coupons WHERE code=$1 AND is_active=TRUE AND starts_at<=now() AND (expires_at IS NULL OR expires_at>now())",
@@ -40,6 +57,7 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,items,coupon
     );
     if(coupon.max_uses!==null&&Number(usage.total)>=Number(coupon.max_uses))throw new AppError('This coupon has reached its usage limit.',400,'COUPON_MAX_USES');
     if(Number(usage.customer_total)>=Number(coupon.max_uses_per_user||1))throw new AppError('You have already used this coupon the maximum number of times.',400,'COUPON_USER_LIMIT');
+    couponId=coupon.id;
     discount=coupon.discount_type==='percent'?Number((subtotal*Number(coupon.discount_value)/100).toFixed(2)):Math.min(Number(coupon.discount_value),subtotal);
   }
   const {rows:settingRows}=await client.query(
@@ -47,10 +65,11 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,items,coupon
     [[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate,SETTING_KEYS.payoutRecovery]]
   );
   const settings=commissionSettingsFromRows(settingRows);
-  let affiliateAmount=0;
+  let affiliateAmount=0,affiliateUserId=null;
   if(affiliateCode){
     const {rows:[affiliate]}=await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
     if(affiliate&&String(affiliate.user_id)!==String(customerId)){
+      affiliateUserId=affiliate.user_id;
       affiliateAmount=Number((Math.max(0,subtotal-discount)*settings.affiliateCommissionPct/100).toFixed(2));
     }
   }
@@ -62,13 +81,19 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,items,coupon
     vendorPayout,
     affiliatePayout:affiliateAmount,
     payoutFeeRecoveryPct:payoutFeeRecoveryPctFromRows(settingRows),
+    marketplaceCommissionPct:settings.marketplaceCommissionPct,
+    affiliateCommissionPct:affiliateUserId?settings.affiliateCommissionPct:0,
+    affiliateUserId,
+    couponId,
+    discount,
+    items:previewItems,
   };
 }
 
 async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, items, couponCode, affiliateCode }) {
   if (!vendorId || !deliveryAddressId) throw new AppError('Choose a vendor and saved delivery address before requesting delivery prices.', 400, 'DELIVERY_QUOTE_INPUT_REQUIRED');
   return withTransaction(async client => {
-    const checkoutPreview=await calculateCheckoutPreview(client,{customerId,vendorId,items,couponCode,affiliateCode});
+    const checkoutPreview=await calculateCheckoutPreview(client,{customerId,vendorId,deliveryAddressId,items,couponCode,affiliateCode});
     const { rows: [address] } = await client.query(
       'SELECT id,full_address,area,latitude,longitude FROM delivery_addresses WHERE id=$1 AND customer_id=$2',
       [deliveryAddressId, customerId]
@@ -160,14 +185,18 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
         `INSERT INTO delivery_fee_quotes
           (customer_id,vendor_id,delivery_address_id,rider_id,origin_area,destination_area,
            pickup_lat,pickup_lng,dropoff_lat,dropoff_lng,straight_line_distance_km,
-           route_distance_km,pricing_mode,base_fee_gmd,per_km_fee_gmd,minimum_fee_gmd,delivery_fee_gmd)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-         RETURNING id,delivery_fee_gmd,route_distance_km,pricing_mode,expires_at`,
+           route_distance_km,pricing_mode,base_fee_gmd,per_km_fee_gmd,minimum_fee_gmd,delivery_fee_gmd,
+           estimated_customer_total,payout_fee_recovery_pct,checkout_fingerprint)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+         RETURNING id,delivery_fee_gmd,estimated_customer_total,payout_fee_recovery_pct,checkout_fingerprint,route_distance_km,pricing_mode,expires_at`,
         [customerId,vendorId,deliveryAddressId,rider.rider_id,originArea,destinationArea,
          Number(vendor.latitude),Number(vendor.longitude),Number(address.latitude),Number(address.longitude),
          Math.max(0.01,roundGmd(straightLine)),routeDistance,lane?'route_fixed':'per_kilometre',
          lane?null:Number(rider.delivery_base_fee_gmd),lane?null:Number(rider.delivery_per_km_fee_gmd),
-         lane?null:Number(rider.delivery_min_fee_gmd),fee]
+         lane?null:Number(rider.delivery_min_fee_gmd),fee,
+         roundGmd(checkoutPreview.discountedSubtotal+fee+calculatePayoutFeeRecovery({vendorPayout:checkoutPreview.vendorPayout,riderPayout:fee,affiliatePayout:checkoutPreview.affiliatePayout,pct:checkoutPreview.payoutFeeRecoveryPct}).payoutFeeRecoveryAmount),
+         checkoutPreview.payoutFeeRecoveryPct,
+         buildCheckoutFingerprint({customerId,vendorId,deliveryAddressId,riderId:rider.rider_id,items:checkoutPreview.items,couponId:checkoutPreview.couponId,discount:checkoutPreview.discount,marketplaceCommissionPct:checkoutPreview.marketplaceCommissionPct,affiliateUserId:checkoutPreview.affiliateUserId,affiliateCommissionPct:checkoutPreview.affiliateCommissionPct,payoutFeeRecoveryPct:checkoutPreview.payoutFeeRecoveryPct,deliveryFee:fee})]
       );
       quotes.push({
         quoteId: quote.id,
@@ -177,7 +206,7 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
         rating: Number(rider.rating_avg || 0),
         ratingCount: Number(rider.rating_count || 0),
         deliveryFee: Number(quote.delivery_fee_gmd),
-        estimatedCustomerTotal: roundGmd(checkoutPreview.discountedSubtotal+Number(quote.delivery_fee_gmd)+calculatePayoutFeeRecovery({vendorPayout:checkoutPreview.vendorPayout,riderPayout:Number(quote.delivery_fee_gmd),affiliatePayout:checkoutPreview.affiliatePayout,pct:checkoutPreview.payoutFeeRecoveryPct}).payoutFeeRecoveryAmount),
+        estimatedCustomerTotal: Number(quote.estimated_customer_total),
         estimatedRouteDistanceKm: Number(quote.route_distance_km),
         pricingMode: quote.pricing_mode,
         expiresAt: quote.expires_at,
