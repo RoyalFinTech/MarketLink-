@@ -78,6 +78,30 @@ describe('administrator delivery pricing policy', () => {
     },policy)).toThrow(expect.objectContaining({code:'DUPLICATE_RIDER_PRICING_ROUTE'}));
   });
 
+  test('re-clamps saved rider and Admin fixed-route tariffs after global price guardrails change', () => {
+    const policy={baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:200,maximumFeeGmd:800,allowRiderOverrides:true};
+    const rider={
+      delivery_pricing_enabled:true,delivery_base_fee_gmd:0,delivery_per_km_fee_gmd:10,delivery_min_fee_gmd:150,
+      admin_delivery_pricing_override:{
+        enabled:true,baseFeeGmd:0,perKmFeeGmd:10,minimumFeeGmd:150,
+        routeRates:[{originArea:'Serrekunda',destinationArea:'Brikama',fixedFeeGmd:1000}]
+      }
+    };
+    const effective=resolveRiderDeliveryTariff(rider,[],policy);
+    expect(effective.baseFeeGmd).toBe(0);
+    expect(effective.minimumFeeGmd).toBe(200);
+    expect(effective.routeRates[0].fixed_fee_gmd).toBe(800);
+  });
+
+  test('clamps rider-owned saved route rates when Admin raises the permitted minimum', () => {
+    const policy={baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:200,minimumAllowedFeeGmd:200,maximumFeeGmd:5000,allowRiderOverrides:true};
+    const rider={delivery_pricing_enabled:true,delivery_base_fee_gmd:0,delivery_per_km_fee_gmd:10,delivery_min_fee_gmd:150};
+    const effective=resolveRiderDeliveryTariff(rider,[{origin_area:'Serrekunda',destination_area:'Brikama',fixed_fee_gmd:'125.00',is_active:true}],policy);
+    expect(effective.baseFeeGmd).toBe(0);
+    expect(effective.minimumFeeGmd).toBe(200);
+    expect(effective.routeRates[0].fixed_fee_gmd).toBe(200);
+  });
+
   test('global policy can switch rider self-service pricing off without changing Admin overrides', () => {
     const policy={baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:150,maximumFeeGmd:5000,allowRiderOverrides:false};
     const rider={delivery_pricing_enabled:true,delivery_base_fee_gmd:220,delivery_per_km_fee_gmd:14,delivery_min_fee_gmd:180};
