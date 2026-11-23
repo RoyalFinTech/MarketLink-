@@ -327,6 +327,8 @@
       var data=await adminRequest('/admin/commission-settings','GET');
       var pool=Number(data.marketplaceCommissionPct||0),affiliate=Number(data.affiliateCommissionPct||0),withdrawalFee=Number(data.withdrawalServiceFeePct==null?2:data.withdrawalServiceFeePct),payoutRecovery=Number(data.payoutFeeRecoveryPct==null?2:data.payoutFeeRecoveryPct);
       var retained=Number(data.marketlinkRetainedPct||0),vendor=Number(data.vendorPayoutPct||0),delivery=Number(data.baseDeliveryFeeGmd||25);
+      var deliveryPolicy={};try{deliveryPolicy=await adminRequest('/admin/delivery-pricing-settings','GET')||{};}catch(deliveryPolicyError){}
+      var deliveryBase=Number(deliveryPolicy.baseFeeGmd==null?150:deliveryPolicy.baseFeeGmd),deliveryPerKm=Number(deliveryPolicy.perKmFeeGmd==null?10:deliveryPolicy.perKmFeeGmd),deliveryMinimum=Number(deliveryPolicy.minimumFeeGmd==null?150:deliveryPolicy.minimumFeeGmd),deliveryAllowedMinimum=Number(deliveryPolicy.minimumAllowedFeeGmd==null?1:deliveryPolicy.minimumAllowedFeeGmd),deliveryMaximum=Number(deliveryPolicy.maximumFeeGmd==null?5000:deliveryPolicy.maximumFeeGmd);
       var feeReport={};try{feeReport=await adminRequest('/admin/withdrawal-fees','GET')||{};}catch(feeReportError){}
       var feeSummary=feeReport.summary||{},feeRows=Array.isArray(feeReport.items)?feeReport.items:[];
       root.innerHTML='<div class="ml-premium-home">'+
@@ -351,6 +353,16 @@
           '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center"><button class="ml-btn ml-btn-primary" id="ml-commission-save" onclick="window.__ML_ADMIN_COMMISSION_SAVE()">Save commission settings</button><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">Discard changes</button></div>'+
           '<small style="display:block;margin-top:10px;color:var(--mu)">Changes apply to future orders only. Existing orders keep the commission percentages recorded when they were placed.</small>'+
         '</div>'+
+        '<section class="ml-profile-card" style="margin-top:14px;padding:18px;border:1px solid rgba(213,172,82,.28)"><div class="ml-section-head"><div><div class="ml-eyebrow">ADMIN DELIVERY TARIFF</div><h3>Delivery price controls</h3><p style="margin:5px 0;color:var(--mu)">Sets the starter price used in rider profiles and the allowed range for all vendor-to-customer delivery quotes. Rider-specific distance and route prices remain available inside these limits.</p></div></div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">'+
+          '<label>Default base fare (GMD)<input id="ml-delivery-base" type="number" min="0" max="2000" step="0.01" value="'+deliveryBase.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
+          '<label>Default per kilometre (GMD)<input id="ml-delivery-per-km" type="number" min="0" max="500" step="0.01" value="'+deliveryPerKm.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
+          '<label>Default minimum fare (GMD)<input id="ml-delivery-minimum" type="number" min="0.01" max="5000" step="0.01" value="'+deliveryMinimum.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
+          '<label>Lowest permitted fare (GMD)<input id="ml-delivery-allowed-min" type="number" min="0.01" max="5000" step="0.01" value="'+deliveryAllowedMinimum.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
+          '<label>Highest permitted fare (GMD)<input id="ml-delivery-maximum" type="number" min="0.01" max="5000" step="0.01" value="'+deliveryMaximum.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
+        '</div>'+
+        '<div class="ml-wallet-note" style="margin:13px 0">Starter tariff: <b>D 150.00 + D 10.00 per estimated kilometre, with a D 150.00 minimum.</b> Riders can edit their own rate and add fixed routes; the Admin-approved minimum and maximum are enforced when customers receive quotes.</div>'+
+        '<div style="display:flex;gap:9px;flex-wrap:wrap"><button class="ml-btn ml-btn-primary" id="ml-delivery-policy-save" onclick="window.__ML_ADMIN_DELIVERY_SAVE()">Save delivery price controls</button><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">Discard changes</button></div></section>'+
         '<section class="ml-profile-card" style="margin-top:14px;padding:16px"><div class="ml-section-head"><div><div class="ml-eyebrow">PAYOUT COST CONTROL</div><h3>DAHA withdrawal fee reconciliation</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">Refresh</button></div>'+
         '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">DAHA wallet cash-out fees</div><div class="ml-stat-value">D '+Number(feeSummary.service_fees_earned||0).toFixed(2)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Order payout recovery</div><div class="ml-stat-value">D '+Number(feeSummary.payout_fee_recovery_earned||0).toFixed(2)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Modem Pay payout fees</div><div class="ml-stat-value">D '+Number(feeSummary.provider_fees_paid||0).toFixed(2)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Net recovery after provider fees</div><div class="ml-stat-value">D '+Number(feeSummary.platform_net_margin||0).toFixed(2)+'</div></div></div>'+
         (feeRows.length?'<div class="ml-profile-card" style="margin-top:10px">'+feeRows.slice(0,12).map(function(x){return '<div class="ml-profile-row"><div class="copy"><b>'+adminSafe(x.account_name||'Wallet user')+' · '+adminSafe(String(x.payout_method||'').toUpperCase())+'</b><span>Payout D '+Number(x.amount||0).toFixed(2)+' · DAHA fee D '+Number(x.service_fee_amount||0).toFixed(2)+'</span><small>Provider fee '+(x.provider_fee_amount==null?'not returned':('D '+Number(x.provider_fee_amount).toFixed(2)))+' · MarketLink margin '+(x.platform_fee_margin==null?'pending':('D '+Number(x.platform_fee_margin).toFixed(2)))+' · '+adminSafe(String(x.provider_fee_source||'fee quote pending').replace(/_/g,' '))+'</small></div><strong>'+adminSafe(String(x.status||'').replace(/_/g,' '))+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><span>No DAHA withdrawal fee records yet. Completed payouts will appear here after the first real payout.</span></div>')+
@@ -387,6 +399,34 @@
       if(window.toast)window.toast('Finance settings saved. The marketplace pool and order payout recovery apply to new orders; customer DAHA cash-out fees apply to new withdrawals.','success');
       await adminCommissionSettingsView();
     }catch(e){if(window.toast)window.toast(e.message||'Could not save commission settings.','error');if(button){button.disabled=false;button.textContent='Save commission settings';}}
+  };
+  window.__ML_ADMIN_DELIVERY_SAVE=async function(){
+    var read=function(id){var el=document.getElementById(id);return el?Number(el.value):NaN;};
+    var payload={
+      baseFeeGmd:read('ml-delivery-base'),
+      perKmFeeGmd:read('ml-delivery-per-km'),
+      minimumFeeGmd:read('ml-delivery-minimum'),
+      minimumAllowedFeeGmd:read('ml-delivery-allowed-min'),
+      maximumFeeGmd:read('ml-delivery-maximum')
+    };
+    if(!Object.keys(payload).every(function(key){return Number.isFinite(payload[key]);})||
+       payload.baseFeeGmd<0||payload.baseFeeGmd>2000||payload.perKmFeeGmd<0||payload.perKmFeeGmd>500||
+       payload.minimumFeeGmd<=0||payload.minimumAllowedFeeGmd<=0||
+       payload.maximumFeeGmd<payload.minimumAllowedFeeGmd||payload.maximumFeeGmd>5000||
+       payload.minimumFeeGmd<payload.minimumAllowedFeeGmd||payload.minimumFeeGmd>payload.maximumFeeGmd||
+       payload.baseFeeGmd>payload.maximumFeeGmd){
+      if(window.toast)window.toast('Check the GMD amounts. Defaults and rider fares must stay inside the permitted minimum and maximum.','error');
+      return;
+    }
+    var button=document.getElementById('ml-delivery-policy-save');if(button){button.disabled=true;button.textContent='Saving delivery controls…';}
+    try{
+      await adminRequest('/admin/delivery-pricing-settings','PUT',payload);
+      if(window.toast)window.toast('Delivery pricing controls saved. New quotes will use the updated policy.','success');
+      await adminCommissionSettingsView();
+    }catch(e){
+      if(window.toast)window.toast(e.message||'Could not save delivery pricing controls.','error');
+      if(button){button.disabled=false;button.textContent='Save delivery price controls';}
+    }
   };
   window.__ML_ADMIN_COMMISSION=adminCommissionSettingsView;
 
