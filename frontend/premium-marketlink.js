@@ -1878,22 +1878,14 @@
     }
   }
   function renderPremiumAffiliatePage(root,affiliateData){
-    var link=(typeof buildAffiliateShareLink==='function'&&buildAffiliateShareLink())||'Your personal link will appear after your affiliate profile is available.';
-    var pct=Number(affiliateData&&affiliateData.commissionPct!=null?affiliateData.commissionPct:2);
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK AFFILIATE</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Share value. Earn rewards.</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div>'+
-      '<section class="ml-affiliate-hero"><div class="ml-affiliate-hero-copy"><span class="ml-affiliate-label">YOUR REFERRAL REWARD</span><div class="ml-affiliate-big">'+pct+'<span>%</span></div><h4>Earn 2% of eligible merchandise.</h4><p>Share your unique MarketLink link. When someone places a qualifying order through your link, you can earn 2% of the eligible discounted merchandise subtotal after successful delivery.</p><small>Rewards are funded from MarketLink’s platform commission, not added to the customer’s price.</small></div><div class="ml-affiliate-hero-art ml-affiliate-hero-photo"><img class="ml-affiliate-hero-image" src="./assets/promo-shopping.webp" alt="Customers discovering products at a local supermarket" loading="lazy" decoding="async" onerror="this.onerror=null;this.style.display=&quot;none&quot;;this.parentElement.classList.add(&quot;ml-affiliate-hero-photo-failed&quot;)"><div class="ml-affiliate-art-label"><b>2%</b><span>ON ELIGIBLE ORDERS</span></div></div></section>'+
-      '<div class="ml-stat-grid ml-affiliate-stats"><div class="ml-stat"><div class="ml-stat-label">Total rewards</div><div class="ml-stat-value">'+money(S.affiliateEarnings||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(S.affiliateClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referred orders</div><div class="ml-stat-value">'+Number(S.affiliateOrders||0)+'</div></div></div>'+
-      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your personal affiliate link</b><span>Share it on WhatsApp or with friends and family.</span></div><span>🔗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Affiliate referral link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><div class="ml-affiliate-footnote">The 2% reward applies to eligible discounted merchandise subtotal on qualifying purchases attributed to your link, after successful delivery. Delivery fees are excluded. Your live statistics above come from your MarketLink account.</div></div>'+
-      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Affiliate rewards are paid into DAHA Wallet</b><span>Eligible 2% rewards are credited after the referred order is delivered and payment is confirmed. View your DAHA ledger and request a Wave or AfriMoney withdrawal there.</span></div><span>💳</span></div><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Open DAHA Wallet ↗</button></div>'+
-      '<section class="ml-affiliate-rules"><div class="ml-eyebrow">PROGRAM RULES</div><h4>How your 2% reward works</h4><ul>'+
-      '<li><b>Reward rate:</b> Earn 2% of the eligible discounted merchandise subtotal for a qualifying order attributed to your unique affiliate link.</li>'+
-      '<li><b>Funded by MarketLink:</b> The reward comes from MarketLink’s standard 5% platform commission; it is not added to the customer’s price. MarketLink retains 3% gross platform commission before payment-processing and operating costs.</li>'+
-      '<li><b>When it qualifies:</b> The order must be successfully delivered. Cancelled, failed, undelivered, refunded or fraudulent orders do not qualify; adjustments may be made if an order is later refunded.</li>'+
-      '<li><b>What is excluded:</b> Delivery fees and other non-merchandise charges are not included in the commission calculation.</li>'+
-      '<li><b>Fair use:</b> Do not use fake accounts, self-referrals, misleading claims, spam or manipulated orders. MarketLink may withhold disputed rewards and suspend abusive accounts following review.</li>'+
-      '<li><b>Tracking and payout:</b> Share your own unique link. Clicks and qualifying orders are recorded by MarketLink; only verified commission records count toward rewards. Payout availability and processing status are shown in your account when supported.</li>'+
-      '</ul><p>These rules explain the current 2% affiliate model. MarketLink may update the program rules with notice where required.</p></section></div>';
+    var link=(typeof buildAffiliateShareLink==='function'&&buildAffiliateShareLink())||'Your personal referral link will appear when your profile is ready.';
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK REFERRER</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Share MarketLink with your community.</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div>'+
+      '<section class="ml-affiliate-hero"><div class="ml-affiliate-hero-copy"><span class="ml-affiliate-label">YOUR CUSTOMER REFERRAL</span><h4>Help friends discover local businesses on MarketLink.</h4><p>Share your personal referral link with friends and family. Your referral activity helps more people discover trusted vendors and delivery services across The Gambia.</p><small>Customer referrals are for sharing and tracking only. Referrers do not earn commissions or cash rewards.</small></div><div class="ml-affiliate-hero-art ml-affiliate-hero-photo"><img class="ml-affiliate-hero-image" src="./assets/promo-shopping.webp" alt="Customers discovering products at a local supermarket" loading="lazy" decoding="async" onerror="this.onerror=null;this.style.display=&quot;none&quot;;this.parentElement.classList.add(&quot;ml-affiliate-hero-photo-failed&quot;)"><div class="ml-affiliate-art-label"><b>Share</b><span>MARKETLINK WITH FRIENDS</span></div></div></section>'+
+      '<div class="ml-stat-grid ml-affiliate-stats"><div class="ml-stat"><div class="ml-stat-label">Referral clicks</div><div class="ml-stat-value">'+Number(S.affiliateClicks||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Referred orders</div><div class="ml-stat-value">'+Number(S.affiliateOrders||0)+'</div></div></div>'+
+      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Your personal referral link</b><span>Share it on WhatsApp or with friends and family.</span></div><span>🔗</span></div><div class="ml-affiliate-link-field"><input readonly aria-label="Customer referral link" value="'+esc(link)+'"><button class="ml-btn ml-btn-primary" onclick="copyAffiliateLink()">Copy link</button></div><div class="ml-affiliate-footnote">This customer referral link does not generate commissions, wallet credits or cash payouts. Only approved MarketLink Affiliate Marketers participate in the paid affiliate programme.</div></div>'+
+      '<div class="ml-profile-card ml-affiliate-link-card"><div class="ml-affiliate-link-head"><div><b>Want to earn as an official marketer?</b><span>Apply separately to become a MarketLink Affiliate Marketer. Approved marketers receive access to a dedicated workspace and eligible commission tools.</span></div><span>↗</span></div><button type="button" class="ml-btn ml-btn-primary" onclick="toast(&quot;The Affiliate Marketer application form is being prepared. No application has been submitted yet.&quot;,&quot;info&quot;)">Affiliate Marketer application coming soon</button></div></div>';
   }
+
   function renderPremiumPolicyPage(root,key){
     var policies={
       terms:{title:'Terms of Service',sections:[
@@ -3546,6 +3538,14 @@
   }
   function continueOtpLive(){closeSheet('sh-otp-reveal');}
   function adminGoToLiveSafe(tab){adminGoToLive(tab);}
+  window.openAffiliateMarketerApply=function(){
+    if(!ML_API.auth.isAuthenticated()){goAuth();return;}
+    if(window.ML_Premium&&typeof window.ML_Premium.openProfilePage==='function'){
+      window.ML_Premium.openProfilePage('affiliate');
+    }else{
+      toast('Please open your Profile to continue with the Affiliate Marketer application.','info');
+    }
+  };
   window.goOnboard=goOnboardPremium;
   window.renderOnboard=function(){renderPremiumOnboarding(true);};
   window.obNext=obNextLive;
