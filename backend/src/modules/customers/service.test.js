@@ -34,7 +34,7 @@ describe('customer saved delivery addresses',()=>{
    .mockResolvedValueOnce({rows:[updated]});
   const result=await updateAddress(customerId,addressId,{latitude:13.27,longitude:-16.65,isDefault:true});
   expect(result).toEqual(updated);
-  expect(clientQuery.mock.calls[1][0]).toContain('WHERE id = $3 AND customer_id = $4 RETURNING *');
+  expect(clientQuery.mock.calls[1][0]).toContain('WHERE id = $4 AND customer_id = $5 RETURNING *');
   expect(clientQuery.mock.calls[1][1]).toEqual([13.27,-16.65,true,addressId,customerId]);
  });
  test('does not change a different customer’s saved address',async()=>{

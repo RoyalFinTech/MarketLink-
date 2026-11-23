@@ -39,9 +39,7 @@ describe('vendor application registration and approval',()=>{
   expect(clientQuery.mock.calls[3][0]).toContain("r.name IN ('admin','super_admin','moderator')");
  });
  test('blocks duplicate vendor applications for the same account',async()=>{
-  query
-   .mockResolvedValueOnce({rows:[]})
-   .mockResolvedValueOnce({rows:[{user_id:userId}]});
+  query.mockResolvedValueOnce({rows:[{user_id:userId}]});
   await expect(register(userId,{businessName:'Another Shop',phone:'+220871234567'}))
    .rejects.toMatchObject({statusCode:409,code:'VENDOR_EXISTS'});
   expect(withTransaction).not.toHaveBeenCalled();

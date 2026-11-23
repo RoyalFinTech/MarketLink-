@@ -359,5 +359,6 @@ assert.match(vendorServiceTests, /stores a pending vendor application, assigns t
 assert.match(vendorServiceTests, /admin approval changes KYC state, notifies the vendor and writes an audit entry/, 'Vendor approval tests must cover state, notification and audit');
 assert.match(riderServiceTests, /stores the rider application as pending, assigns the role, creates a wallet and alerts admins/, 'Rider application tests must cover persistence, role assignment and Admin notification');
 assert.match(riderServiceTests, /admin approval changes KYC state and sends the rider an approval notification/, 'Rider approval tests must cover state and applicant notification');
+assert.match(premiumJs, /await adminApprovals\(kind\)/, 'Admin approval must refresh the live pending queue after an applicant is approved');
 assert.match(customerServiceTests, /saves the selected Gambian place pin and preserves a valid zero coordinate/, 'Customer address tests must cover coordinate persistence including valid zero values');
 
