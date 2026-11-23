@@ -4,6 +4,7 @@ const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const { SETTING_KEYS, commissionSettingsFromRows, payoutFeeRecoveryPctFromRows } = require('../../utils/marketplaceCommission');
 const { calculatePayoutFeeRecovery } = require('../../utils/payoutFeeRecovery');
+const { normaliseDeliveryPricingPolicy, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
 const { haversineKm, estimateRoadDistanceKm, matchingRouteRate, calculateDeliveryFare, roundGmd } = require('../../utils/deliveryPricing');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
@@ -115,6 +116,11 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
     try { routeDistance = estimateRoadDistanceKm(pickup, dropoff, factor); }
     catch (error) { throw new AppError('Delivery route distance configuration is invalid.', 500, 'DELIVERY_ROUTE_CONFIG_ERROR'); }
 
+    const { rows: [deliveryPolicyRow] } = await client.query(
+      "SELECT value FROM system_settings WHERE key=$1", ['delivery_pricing_policy']
+    );
+    const deliveryPolicy = normaliseDeliveryPricingPolicy(deliveryPolicyRow?.value);
+
     // Release expired, unused quotes for this customer before creating the next set.
     await client.query(
       "UPDATE delivery_fee_quotes SET status='expired' WHERE customer_id=$1 AND status='quoted' AND expires_at<=now()",
@@ -170,13 +176,13 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
       const lane = matchingRouteRate(laneMap.get(rider.rider_id), originArea, destinationArea);
       let fee;
       try {
-        fee = calculateDeliveryFare({
+        fee = applyDeliveryPricingLimits(calculateDeliveryFare({
           fixedFee: lane ? lane.fixed_fee_gmd : null,
           baseFee: rider.delivery_base_fee_gmd,
           perKmFee: rider.delivery_per_km_fee_gmd,
           minimumFee: rider.delivery_min_fee_gmd,
           distanceKm: routeDistance,
-        });
+        }), deliveryPolicy);
       } catch (error) {
         logger.warn('Rider delivery pricing skipped because the saved tariff is invalid', { riderId: rider.rider_id, error: error.message });
         continue;
