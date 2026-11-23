@@ -1,6 +1,6 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 const {query}=require('../../config/db');
-const {list,getById}=require('./service');
+const {list,getById,update}=require('./service');
 
 describe('product category filtering',()=>{
  beforeEach(()=>jest.clearAllMocks());
@@ -103,6 +103,19 @@ describe('product category filtering',()=>{
   expect(product.price).toBe(125);
   for(const key of ['vendor_listed_price','effective_customer_price','admin_price_override','admin_price_override_enabled','admin_price_override_by','admin_price_override_at','admin_price_override_note']){
     expect(product).not.toHaveProperty(key);
+  }
+ });
+
+ test('vendor product edits return their listed price and effective customer price without Admin audit fields',async()=>{
+  query.mockResolvedValueOnce({rows:[{vendor_id:'vendor-1'}]}).mockResolvedValueOnce({rows:[{
+   id:'product-1',vendor_id:'vendor-1',price:'100.00',admin_price_override:'125.00',
+   admin_price_override_enabled:true,admin_price_override_by:'admin-id',
+   admin_price_override_at:'2026-11-23T16:00:00.000Z',admin_price_override_note:'Private reason'
+  }]});
+  const result=await update('product-1','vendor-1',false,{name:'Rice Plus'});
+  expect(result).toMatchObject({price:'100.00',effective_customer_price:125,admin_pricing_adjusted:true});
+  for(const key of ['admin_price_override','admin_price_override_enabled','admin_price_override_by','admin_price_override_at','admin_price_override_note']){
+   expect(result).not.toHaveProperty(key);
   }
  });
 
