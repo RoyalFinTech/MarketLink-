@@ -356,28 +356,45 @@ async function declineDelivery(deliveryId, riderId) {
   });
 }
 async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
-  // Serialize status changes on the delivery row. The transition must be
-  // checked after acquiring the lock, not against a stale pre-transaction read.
+  // Lock order before delivery to match cancellation and rider-accept flows.
+  // This gives every delivery state change the same concurrency boundary.
   const result = await withTransaction(async (client) => {
-    const { rows: [d] } = await client.query(
-      'SELECT * FROM deliveries WHERE id = $1 FOR UPDATE', [deliveryId]
+    const { rows: [snapshot] } = await client.query(
+      'SELECT order_id FROM deliveries WHERE id=$1', [deliveryId]
     );
-    if (!d) throw new AppError('Delivery not found.', 404, 'DELIVERY_NOT_FOUND');
+    if (!snapshot) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const { rows: [order] } = await client.query(
+      'SELECT id,status FROM orders WHERE id=$1 FOR UPDATE', [snapshot.order_id]
+    );
+    if (!order) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+    const { rows: [d] } = await client.query(
+      'SELECT * FROM deliveries WHERE id=$1 AND order_id=$2 FOR UPDATE',
+      [deliveryId,snapshot.order_id]
+    );
+    if (!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
 
     const isAdmin = (roles||[]).some(r => ['admin','super_admin'].includes(r));
     const isRider = String(d.rider_id || '') === String(actorId || '');
-    if (!isAdmin && !isRider) throw new AppError('Not authorised.', 403, 'FORBIDDEN');
+    if (!isAdmin && !isRider) throw new AppError('Not authorised.',403,'FORBIDDEN');
 
     // A previous delivery update may have committed while financial
-    // settlement failed. Repeating "delivered" is therefore a safe retry
-    // path; settlement itself is idempotent and locks its commission record.
+    // settlement failed. Repeating "delivered" is a safe idempotent retry.
     if (newStatus === 'delivered' && d.status === 'delivered') {
       return { ...d, settlementRetry: true };
     }
 
     const allowed = VALID_TRANSITIONS[d.status] || [];
     if (!allowed.includes(newStatus)) {
-      throw new AppError(`Cannot transition from ${d.status} to ${newStatus}.`, 400, 'INVALID_TRANSITION');
+      throw new AppError(`Cannot transition from ${d.status} to ${newStatus}.`,400,'INVALID_TRANSITION');
+    }
+    if (newStatus === 'picked_up' && order.status !== 'rider_assigned') {
+      throw new AppError('The vendor must mark the order ready and the rider must accept it before pickup.',409,'ORDER_NOT_READY_FOR_PICKUP');
+    }
+    if (newStatus === 'in_transit' && order.status !== 'picked_up') {
+      throw new AppError('Confirm pickup before starting the delivery journey.',409,'PICKUP_NOT_CONFIRMED');
+    }
+    if (newStatus === 'delivered' && order.status !== 'on_the_way') {
+      throw new AppError('Start the delivery journey before marking the order delivered.',409,'DELIVERY_NOT_IN_TRANSIT');
     }
 
     const now = new Date();
@@ -391,7 +408,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
     const { rows: [updated] } = await client.query(
       `UPDATE deliveries SET ${updates.join(', ')} WHERE id = $${pi} RETURNING *`, params
     );
-    if (!updated) throw new AppError('Delivery changed before the status could be saved. Refresh and try again.', 409, 'DELIVERY_STATE_CHANGED');
+    if (!updated) throw new AppError('Delivery changed before the status could be saved. Refresh and try again.',409,'DELIVERY_STATE_CHANGED');
 
     const orderStatusMap = {
       picked_up: 'picked_up', in_transit: 'on_the_way',
@@ -401,7 +418,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
     if (orderStatus) {
       await client.query(
         `UPDATE orders SET status = $1 ${newStatus === 'delivered' ? ', delivered_at = now()' : ''}
-         WHERE id = $2`, [orderStatus, d.order_id]
+         WHERE id = $2`, [orderStatus,d.order_id]
       );
       const historyNotes = {
         picked_up: 'Rider picked up the order.',
@@ -411,7 +428,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
       };
       await client.query(
         'INSERT INTO order_status_history (order_id,status,note) VALUES ($1,$2,$3)',
-        [d.order_id, orderStatus, historyNotes[newStatus] || 'Delivery status updated.']
+        [d.order_id,orderStatus,historyNotes[newStatus] || 'Delivery status updated.']
       );
     }
 
@@ -422,27 +439,25 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
     };
     if (custMsgs[newStatus]) {
       const { rows: [o] } = await client.query(
-        'SELECT customer_id FROM orders WHERE id = $1', [d.order_id]
+        'SELECT customer_id FROM orders WHERE id = $1',[d.order_id]
       );
       if (o) await client.query(
-        `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
+        `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
          VALUES ($1,$2,$3,$4,'order',$5)`,
-        [o.customer_id, 'delivery_update', 'Order Update', custMsgs[newStatus], d.order_id]
+        [o.customer_id,'delivery_update','Order Update',custMsgs[newStatus],d.order_id]
       );
     }
 
     if (['delivered','failed','cancelled'].includes(newStatus) && d.rider_id) {
       await client.query(
         "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",
-        [d.rider_id, deliveryId]
+        [d.rider_id,deliveryId]
       );
     }
     return updated;
   });
 
-  // Settlement is separately idempotent: it locks the order and commission
-  // record, and exits when the commission has already been paid. This also
-  // retries a prior failed settlement when the rider repeats the delivered action.
+  // Settlement is separately idempotent and only runs after confirmed payment.
   if (newStatus === 'delivered') await ordersService.settleOrderFinancials(result.order_id);
   if (result.settlementRetry) delete result.settlementRetry;
   return result;
