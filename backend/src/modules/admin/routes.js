@@ -74,6 +74,17 @@ router.put('/settings/:key', authenticate, authorize(...SA),
 router.get('/audit-logs',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
   validate, ctrl.auditLogs);
+router.get('/affiliate-marketer-applications', authenticate, authorize(...ADMIN), [
+  query('page').optional().isInt({min:1}),
+  query('limit').optional().isInt({min:1,max:100}),
+  query('status').optional().isIn(['pending','approved','rejected','suspended','all']),
+  query('search').optional().isString().isLength({max:120}),
+], validate, ctrl.affiliateMarketerApplications);
+router.post('/affiliate-marketer-applications/:id/review', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(),
+  body('decision').isIn(['approved','rejected','suspended','reinstated']),
+  body('reason').optional().isString().isLength({max:1000}),
+], validate, ctrl.reviewAffiliateMarketerApplication);
 router.get('/affiliates', authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100}), query('search').optional().isString().isLength({max:120})],
   validate, ctrl.affiliates);
