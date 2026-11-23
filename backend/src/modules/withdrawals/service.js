@@ -48,9 +48,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
 
     // Saved payout profiles are defaults, not mandatory login-number matches.
     // A number provided in this withdrawal request always takes priority.
-    const { rows: [vendor] } = await client.query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
-    const { rows: [rider] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1', [userId]);
-    const { rows: [affiliate] } = await client.query('SELECT user_id FROM affiliates WHERE user_id=$1', [userId]);
+
     let saved = null;
     if (vendor) {
       const { rows: [profile] } = await client.query(
@@ -77,11 +75,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
     if (!beneficiaryName || beneficiaryName.length > 150) throw new AppError('Enter the account holder name for the payout.', 400, 'BENEFICIARY_REQUIRED');
 
     const { rows: [feeSetting] } = await client.query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1", ['withdrawal_service_fee_pct']);
-    const configuredFeePct = validateWithdrawalFeePct(feeSetting ? feeSetting.value : DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, 500);
-    // New marketplace orders already include the customer-funded payout-cost
-    // recovery. Do not collect the same 2% a second time from seller, rider or
-    // affiliate wallet withdrawals. Customer cash-outs retain the DAHA fee.
-    const feePct = (vendor || rider || affiliate) ? 0 : configuredFeePct;
+    const feePct = validateWithdrawalFeePct(feeSetting ? feeSetting.value : DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, 500);
     const debit = calculateWithdrawalDebit(amount, feePct);
     const { rows: [wallet] } = await client.query('SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE', [userId]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
