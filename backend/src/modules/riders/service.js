@@ -367,7 +367,7 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
   const { rows } = await query(
     `SELECT d.id, d.order_id, d.status, d.distance_km, d.estimated_minutes,
             d.picked_up_at, d.delivered_at, d.created_at,
-            o.order_number, o.total AS order_total, o.payment_method,
+            o.order_number, o.total AS order_total, o.payment_method, o.status AS order_status,
             p.id AS cod_payment_id, p.amount AS cod_payment_amount,
             ccr.status AS cod_remittance_status,
             ccr.review_note AS cod_remittance_review_note,
