@@ -4,7 +4,11 @@ const { body, param, query } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
-router.post('/', authenticate, authorize('customer'), [body('vendorId').isUUID(), body('deliveryAddressId').isUUID().withMessage('Select a saved delivery address before placing your order.'), body('items').isArray({min:1}), body('items.*.productId').isUUID(), body('items.*.quantity').isInt({min:1}), body('paymentMethod').notEmpty()], validate, ctrl.place);
+router.post('/delivery-quotes', authenticate, authorize('customer'), [
+  body('vendorId').isUUID(),
+  body('deliveryAddressId').isUUID(),
+], validate, ctrl.deliveryQuotes);
+router.post('/', authenticate, authorize('customer'), [body('vendorId').isUUID(), body('deliveryAddressId').isUUID().withMessage('Select a saved delivery address before placing your order.'), body('items').isArray({min:1}), body('items.*.productId').isUUID(), body('items.*.quantity').isInt({min:1}), body('deliveryFeeQuoteId').isUUID().withMessage('Select a current rider delivery price before placing your order.'), body('paymentMethod').notEmpty()], validate, ctrl.place);
 router.get('/my', authenticate, [
   query('page').optional().isInt({min:1}),
   query('limit').optional().isInt({min:1,max:100}),
