@@ -18,7 +18,8 @@ const PROFILE_IMAGE_MIN_DIMENSION = 512;
 function imageDimensions(buffer, mime) {
   if (!Buffer.isBuffer(buffer)) return null;
   if (mime === 'image/png' && buffer.length >= 24 &&
-      buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) {
+      buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) &&
+      buffer.toString('ascii',12,16) === 'IHDR') {
     return {width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};
   }
   if (mime === 'image/jpeg' && buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
@@ -38,6 +39,15 @@ function imageDimensions(buffer, mime) {
   }
   return null;
 }
+function detectFileMimeType(buffer) {
+  if (!Buffer.isBuffer(buffer)) return null;
+  if (buffer.length >= 8 && buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return 'image/png';
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.length >= 12 && buffer.toString('ascii',0,4) === 'RIFF' && buffer.toString('ascii',8,12) === 'WEBP') return 'image/webp';
+  if (buffer.length >= 6 && ['GIF87a','GIF89a'].includes(buffer.toString('ascii',0,6))) return 'image/gif';
+  if (buffer.length >= 5 && buffer.toString('ascii',0,5) === '%PDF-') return 'application/pdf';
+  return null;
+}
 function isProfilePhoto(purpose) {
   const p=String(purpose||'').toLowerCase().replace(/_/g,'-').replace(/\s+/g,'-');
   return p==='profile-photo'||p==='profile-image'||p==='avatar';
@@ -51,6 +61,13 @@ function validateFile(file, purpose) {
   if(!allowed.includes(file.mimetype)) throw new AppError(profilePhoto?'Profile photos must be JPG/JPEG or PNG.':'This file type is not supported for this upload.',400,'INVALID_FILE_TYPE');
   if(!Number.isFinite(Number(file.size))||file.size<=0) throw new AppError('The selected file is empty or invalid.',400,'INVALID_FILE');
   if(file.size>maxSize) throw new AppError('File is too large. Maximum size is '+(maxSize/1024/1024)+' MB.',400,'FILE_TOO_LARGE');
+  if(!Buffer.isBuffer(file.buffer) || file.buffer.length !== Number(file.size)) {
+    throw new AppError('The uploaded file is incomplete or invalid. Please select it again.',400,'INVALID_FILE');
+  }
+  const detectedMime=detectFileMimeType(file.buffer);
+  if(detectedMime !== file.mimetype) {
+    throw new AppError('The file content does not match its declared type. Please choose a valid file.',400,'INVALID_FILE_SIGNATURE');
+  }
   if(profilePhoto) {
     const dimensions=imageDimensions(file.buffer,file.mimetype);
     if(!dimensions) throw new AppError('MarketLink could not read this image. Please choose a valid JPG or PNG file.',400,'INVALID_IMAGE');

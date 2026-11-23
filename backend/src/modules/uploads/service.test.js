@@ -61,12 +61,13 @@ describe('vendor and rider onboarding uploads',()=>{
   if(previous.api===undefined)delete process.env.API_PUBLIC_URL;else process.env.API_PUBLIC_URL=previous.api;
  });
  test('stores a vendor logo in the durable database fallback and serves its public image URL',async()=>{
+  const logo=Buffer.from([137,80,78,71,13,10,26,10]);
   query.mockImplementation(async(sql,params)=>{
    if(sql.includes('INSERT INTO file_uploads'))return{rows:[{id:params[0],uploaded_by:params[1],file_url:params[2],file_type:params[3],purpose:params[4],content_bytes:params[6],content_type:params[7],storage_backend:params[8]}]};
-   if(sql.includes('SELECT content_bytes'))return{rows:[{content_bytes:Buffer.from('logo'),content_type:'image/png',purpose:'vendor-logo',file_type:'image'}]};
+   if(sql.includes('SELECT content_bytes'))return{rows:[{content_bytes:logo,content_type:'image/png',purpose:'vendor-logo',file_type:'image'}]};
    return{rows:[]};
   });
-  const file={mimetype:'image/png',size:4,buffer:Buffer.from('logo'),originalname:'shop-logo.png'};
+  const file={mimetype:'image/png',size:logo.length,buffer:logo,originalname:'shop-logo.png'};
   const result=await upload(file,'vendor-logo',riderId);
   expect(result.url).toContain('/api/v1/uploads/');
   expect(result.url.endsWith('/profile-content')).toBe(true);
@@ -75,19 +76,34 @@ describe('vendor and rider onboarding uploads',()=>{
   expect(image).toMatchObject({contentType:'image/png'});
   expect(image.buffer.toString()).toBe('logo');
  });
+ test('rejects a spoofed browser MIME type before storing content',async()=>{
+  query.mockClear();
+  const buffer=Buffer.from('not-an-image');
+  await expect(upload({mimetype:'image/png',size:buffer.length,buffer,originalname:'fake.png'},'vendor-logo',riderId))
+   .rejects.toMatchObject({statusCode:400,code:'INVALID_FILE_SIGNATURE'});
+  expect(query).not.toHaveBeenCalled();
+ });
+ test('rejects a size that does not match the received buffer',async()=>{
+  query.mockClear();
+  const buffer=Buffer.from([137,80,78,71,13,10,26,10]);
+  await expect(upload({mimetype:'image/png',size:buffer.length+3,buffer,originalname:'logo.png'},'vendor-logo',riderId))
+   .rejects.toMatchObject({statusCode:400,code:'INVALID_FILE'});
+  expect(query).not.toHaveBeenCalled();
+ });
  test.each(['vendor-document','rider-document','license-document'])('%s stays private and can be retrieved by its owner',async purpose=>{
+  const pdf=Buffer.from('%PDF-1.7\\nidentity-pdf');
   query.mockImplementation(async(sql,params)=>{
    if(sql.includes('INSERT INTO file_uploads'))return{rows:[{id:params[0],uploaded_by:params[1],file_url:params[2],file_type:params[3],purpose:params[4],content_bytes:params[6],content_type:params[7],storage_backend:params[8]}]};
-   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[{id:fileId,uploaded_by:riderId,content_bytes:Buffer.from('identity-pdf'),content_type:'application/pdf',purpose,file_type:'document'}]};
+   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[{id:fileId,uploaded_by:riderId,content_bytes:pdf,content_type:'application/pdf',purpose,file_type:'document'}]};
    return{rows:[]};
   });
-  const file={mimetype:'application/pdf',size:12,buffer:Buffer.from('identity-pdf'),originalname:'identity.pdf'};
+  const file={mimetype:'application/pdf',size:pdf.length,buffer:pdf,originalname:'identity.pdf'};
   const result=await upload(file,purpose,riderId);
   expect(result.url).toContain('/api/v1/uploads/');
   expect(result.url.endsWith('/content')).toBe(true);
   expect(result.record.storage_backend).toBe('database');
   const downloaded=await getFile(result.record.id,riderId,['rider']);
-  expect(downloaded.buffer.toString()).toBe('identity-pdf');
+  expect(downloaded.buffer.toString()).toBe(pdf.toString());
   expect(downloaded.contentType).toBe('application/pdf');
  });
 });
@@ -99,6 +115,7 @@ describe('customer profile photo upload',()=>{
  const png=Buffer.alloc(24);
  beforeAll(()=>{
   Buffer.from([137,80,78,71,13,10,26,10]).copy(png,0);
+  png.write('IHDR',12,'ascii');
   png.writeUInt32BE(512,16);png.writeUInt32BE(512,20);
  });
  beforeEach(()=>{
