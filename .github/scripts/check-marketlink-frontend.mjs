@@ -262,6 +262,7 @@ assert.doesNotMatch(authService, /Array\.isArray\(userType\).*userType/, 'Client
 assert.match(premiumJs, /function updateCustomerTrackingMap\(/, 'Customer order tracking must render an interactive live rider map');
 assert.match(premiumJs, /L\.tileLayer\('https:\/\/\{s\}\.tile\.openstreetmap\.org\//, 'Customer tracking map must use real OpenStreetMap street tiles');
 assert.match(premiumJs, /function animateCustomerRiderMarker\(/, 'The rider marker must animate smoothly between GPS updates');
+assert.match(premiumJs, /function checkCustomerArrivalNotification\(/, 'Customers viewing an active order must receive an in-app alert for a new rider-arrival notification');
 assert.match(premiumJs, /ml-customer-tracking-map-host/, 'The customer order page must include the persistent live map container');
 assert.match(html, /style-src 'self' 'unsafe-inline' https:\/\/cdnjs\.cloudflare\.com/, 'Content security policy must permit the Leaflet map stylesheet');
 

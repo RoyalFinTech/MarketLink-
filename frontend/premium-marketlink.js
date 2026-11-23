@@ -1004,6 +1004,25 @@
       root.innerHTML='<div class="ml-empty"><div style="font-size:32px">📦</div><b>Order history unavailable</b><span>'+esc(e.error||e.message||'MarketLink could not load your order history.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Retry</button></div>';
     }
   }
+  var mlSeenCustomerArrivalAlerts=Object.create(null);
+  function checkCustomerArrivalNotification(deliveryId){
+    if(!deliveryId||typeof syncServerNotifications!=='function')return;
+    syncServerNotifications().then(function(items){
+      if(!Array.isArray(items))return;
+      var alert=items.find(function(item){
+        return String(item.type||'').toLowerCase()==='rider_arriving'&&
+          String(item.reference_type||'').toLowerCase()==='delivery'&&
+          String(item.reference_id||'')===String(deliveryId);
+      });
+      if(!alert||alert.read_at)return;
+      var created=alert.created_at?new Date(alert.created_at):null;
+      if(!created||Number.isNaN(created.getTime())||Date.now()-created.getTime()>60*60*1000)return;
+      var alertId=String(alert.id);
+      if(mlSeenCustomerArrivalAlerts[alertId])return;
+      mlSeenCustomerArrivalAlerts[alertId]=true;
+      if(!document.hidden)toast('Your rider is nearby. Please get ready to receive your order.','success');
+    }).catch(function(){});
+  }
   var mlCustomerTrackingMapState={deliveryId:null,map:null,marker:null,destination:null,trail:null,lastPosition:null,animation:null};
   var mlLeafletLoader=null;
   function destroyCustomerTrackingMap(){
@@ -1178,6 +1197,7 @@
         if(preservedTrackingMap&&mapPlaceholder)mapPlaceholder.replaceWith(preservedTrackingMap);
         updateCustomerTrackingMap(locationTrail,dropoffLat,dropoffLng,String(o.delivery_id||id));
       }
+      if(!terminal&&o.delivery_id)checkCustomerArrivalNotification(o.delivery_id);
       var cancelButton=G('ml-cancel-order');
       if(cancelButton)cancelButton.addEventListener('click',function(){cancelCustomerOrder(id);});
       if(terminal)stopCustomerOrderDetailPolling();else startCustomerOrderDetailPolling(id);
