@@ -4334,9 +4334,17 @@ async function vReqRider(id){
   var order=S.vOrders.find(function(o){return String(o.id)===String(id);});
   if(!order||!order.deliveryId){toast('Delivery details are not loaded yet. Refresh the vendor dashboard and try again.','error');return;}
   try{
+    var readyResult=null;
     if(order.rawStatus==='preparing'||order.status==='Preparing'){
-      await ML_API.orders.updateStatus(id,'awaiting_rider','Vendor requested an available rider.');
+      readyResult=await ML_API.orders.updateStatus(id,'awaiting_rider','Vendor marked the order ready and requested its customer-approved rider.');
+      var readyData=readyResult&&readyResult.data||{};
       order.status='Awaiting Rider';order.rawStatus='awaiting_rider';
+      if(readyData.delivery_status==='assigned'&&readyData.delivery_rider_id){
+        order.rider='Customer-selected rider';
+        renderVDash();
+        toast('Order ready. Your customer-selected rider is online and has been notified. The quoted delivery price remains locked.','success');
+        return;
+      }
     }
     renderVDash();
     await vManualAssign(id);
@@ -4362,7 +4370,7 @@ async function vManualAssign(orderId){
       AVAILABLE_RIDERS.map(function(r){
         var distance=r.distance_km==null?'Distance unavailable':Number(r.distance_km).toFixed(1)+' km away';
         var gps=r.location_fresh?'📍 Recent GPS':'📍 GPS may be out of date';
-        return '<div style="padding:12px;background:var(--sfl);border-radius:12px;margin-bottom:9px;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.08);"><div style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(245,166,35,.12);font-size:20px;">🛵</div><div style="flex:1;min-width:0;"><div style="color:var(--tx);font-size:12px;font-weight:800;">'+sanitizeText(r.full_name||'MarketLink Rider')+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(r.vehicle_type||'Delivery rider')+' · '+sanitizeText(r.delivery_zone||'Zone not set')+'</div><div style="color:var(--mu);font-size:10px;margin-top:3px;">'+distance+' · '+gps+(r.rating_avg?' · ⭐ '+Number(r.rating_avg).toFixed(1):'')+'</div></div><button class="btn btn-p btn-sm" onclick="vConfirmManualAssign(\''+String(r.id)+'\')">Assign</button></div>';
+        return '<div style="padding:12px;background:var(--sfl);border-radius:12px;margin-bottom:9px;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.08);"><div style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(245,166,35,.12);font-size:20px;">🛵</div><div style="flex:1;min-width:0;"><div style="color:var(--tx);font-size:12px;font-weight:800;">'+sanitizeText(r.full_name||'MarketLink Rider')+'</div><div style="color:var(--mu);font-size:10.5px;margin-top:3px;">'+sanitizeText(r.vehicle_type||'Delivery rider')+' · '+sanitizeText(r.delivery_zone||'Zone not set')+'</div><div style="color:var(--mu);font-size:10px;margin-top:3px;">'+distance+' · '+gps+(r.rating_avg?' · ⭐ '+Number(r.rating_avg).toFixed(1):'')+'</div>'+(r.delivery_fee!=null?'<div style="color:#e8c978;font-size:10px;font-weight:800;margin-top:4px;">Locked delivery price: D '+Number(r.delivery_fee).toFixed(2)+'</div>':'')+'</div><button class="btn btn-p btn-sm" onclick="vConfirmManualAssign(\''+String(r.id)+'\')">Assign</button></div>';
       }).join('');
   }catch(e){
     el.innerHTML='<div style="color:var(--tx);font-size:14px;font-weight:800;margin-bottom:6px;">Could not load riders</div><div style="color:var(--mu);font-size:12px;line-height:1.5;margin-bottom:12px;">'+sanitizeText(e.error||'Check your connection and try again.')+'</div><button class="btn btn-p" style="width:100%;" onclick="vManualAssign(\''+String(orderId)+'\')">Retry</button>';
