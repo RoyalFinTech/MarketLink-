@@ -341,3 +341,13 @@ assert.match(withdrawalTests, /clamps customer withdrawal history pagination/, '
 
 
 
+
+const addressIndex = JSON.parse(fs.readFileSync(path.join(root, 'data', 'gambia-address-index.json'), 'utf8'));
+assert.equal(addressIndex.places.length, 2347, 'The customer address index must include the full Gambian place inventory');
+assert.match(premiumJs, /async function loadGambiaAddressIndex/, 'Saved-address form must load the local Gambian place index');
+assert.match(premiumJs, /function searchGambiaAddressSuggestions/, 'Saved-address entry must show local suggestions as customers type');
+assert.match(premiumJs, /Maria Makunda/, 'Address autocomplete must account for the common Maria Makunda spelling');
+assert.match(premiumJs, /function useCurrentAddressLocation/, 'Customers must be able to save their exact current GPS location');
+assert.match(premiumJs, /latitude:latitude,longitude:longitude/, 'Saved addresses must send selected GPS coordinates to the backend');
+assert.match(premiumJs, /function choosePaymentFromSettings/, 'Payment Methods must route selected choices into checkout');
+assert.match(premiumJs, /ml-payment-setting-choice/, 'Cash on Delivery and DAHA Wallet must be rendered as clickable payment choices');

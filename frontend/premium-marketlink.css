@@ -2163,3 +2163,26 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-tracking-map-unavailable{display:grid;place-items:center;min-height:245px;padding:20px;text-align:center;background:#edf4f5}
 .lm .ml-tracking-map-caption,.lm .ml-tracking-map-unavailable{color:#526975}
 @media(max-width:480px){#ml-customer-tracking-map-host,#ml-customer-tracking-map{height:250px;min-height:230px}}
+
+/* Gambian address suggestions and GPS-pin controls */
+.ml-address-autocomplete{position:relative;z-index:8}
+#ml-addr-label,#ml-addr-full,#ml-addr-area{display:block;width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.12);border-radius:11px;padding:12px;color:#F5F8FA;font:inherit;font-size:13px;outline:none}
+#ml-addr-label:focus,#ml-addr-full:focus,#ml-addr-area:focus{border-color:rgba(66,210,201,.7);box-shadow:0 0 0 3px rgba(66,210,201,.08)}
+.ml-address-suggestions{display:none;position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:120;max-height:290px;overflow:auto;background:#102234;border:1px solid rgba(148,163,184,.28);border-radius:13px;box-shadow:0 16px 36px rgba(0,0,0,.38);padding:5px}
+.ml-address-suggestion{display:flex;width:100%;align-items:center;gap:10px;text-align:left;padding:10px 9px;border:0;border-bottom:1px solid rgba(148,163,184,.1);background:transparent;color:#E9F2F7;border-radius:9px;cursor:pointer}
+.ml-address-suggestion:last-child{border-bottom:0}
+.ml-address-suggestion:hover,.ml-address-suggestion:focus{background:rgba(66,210,201,.1);outline:none}
+.ml-address-suggestion-pin{font-size:18px;flex:0 0 25px}
+.ml-address-suggestion-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.ml-address-suggestion-copy b{font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.ml-address-suggestion-copy small{font-size:10px;color:#9BB0BF}
+.ml-address-suggestion-arrow{color:#42D2C9}
+.ml-address-suggestion-empty{padding:12px;color:#AFC0CB;font-size:11px;line-height:1.5}
+.ml-address-attribution{font-size:9px;color:#8FA4B3;line-height:1.5;margin-top:7px}
+.ml-address-attribution a{color:#54D7C6;text-decoration:underline}
+.ml-address-pin-actions{display:flex;align-items:flex-start;gap:9px;flex-wrap:wrap;margin-top:12px}
+.ml-address-pin-actions>span{flex:1;min-width:150px;color:#91A4B4;font-size:10px;line-height:1.5;padding-top:7px}
+.ml-address-saved-pin{display:block;color:#42D2C9;font-size:9px;margin-top:7px;line-height:1.5;overflow-wrap:anywhere}
+.ml-payment-setting-choice{display:flex!important;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(255,255,255,.09)!important;margin:7px 0}
+.ml-payment-setting-choice[aria-pressed="true"]{border-color:rgba(66,210,201,.65)!important;background:rgba(13,115,119,.13)!important}
+.ml-payment-setting-action{flex:0 0 auto;color:#42D2C9;font-size:10px;font-weight:800;padding:7px 10px;border:1px solid rgba(66,210,201,.28);border-radius:8px}

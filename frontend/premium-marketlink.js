@@ -1430,6 +1430,13 @@
     S.selPay=method==='cod'?'Cash on Delivery':method==='wallet'?'DAHA Wallet':method==='modempay'?'Secure mobile-money checkout':method==='afrimoney'?'AfriMoney':method==='qmoney'?'QMoney':'Wave';
     renderLiveCart();
   }
+  function choosePaymentFromSettings(label){
+    var method=normalizePaymentChoice(label),allowed=livePaymentOptions(S.paymentCapabilities).some(function(option){return option[1]===method;});
+    if(!allowed){toast('That payment method is not currently enabled. Refresh checkout to check availability.','warning');return;}
+    S.selPay=method==='cod'?'Cash on Delivery':method==='wallet'?'DAHA Wallet':method==='modempay'?'Secure mobile-money checkout':method==='afrimoney'?'AfriMoney':method==='qmoney'?'QMoney':'Wave';
+    toast('Payment method selected. Review it in checkout before placing your order.','success');
+    switchTab('cart');
+  }
   function setCoupon(){var el=G('ml-cart-coupon'),code=el&&el.value.trim().toUpperCase();S.appliedCoupon=code?{code:code}:null;toast(code?'Coupon will be validated securely at order placement.':'Coupon removed.','info');renderLiveCart();}
   function manageAddresses(){switchTab('profile');renderAddresses();}
   async function loadProfile(){
@@ -2024,22 +2031,39 @@
     toast('Review the payout details, then authorize with your 4-digit MarketLink PIN.','info');
   }
   async function renderPremiumPaymentsPage(root){
+    if(!root)return;
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div><div class="ml-loading">Checking available payment options…</div></div>';
-    var caps={configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false};
+    var caps={configured:false,mode:'merchant',directMobileMoney:false,hostedCheckout:false,setupReason:''};
     try{
       var response=await ML_API.payments.methods();
       var data=response&&response.data?response.data:response;
       caps={configured:Boolean(data&&data.configured),mode:String(data&&data.mode||'merchant'),directMobileMoney:Boolean(data&&data.directMobileMoney),hostedCheckout:Boolean(data&&data.hostedCheckout),setupReason:String(data&&data.setupReason||'')};
       S.paymentCapabilities=caps;
-    }catch(e){}
-    var providerStatus=!caps.configured?(caps.setupReason||'Mobile-money payments are still being set up. They will become selectable in checkout after mobile-money activation.'):caps.directMobileMoney?'Direct mobile-money checkout is configured. Select Wave, AfriMoney or QMoney in your cart, enter the local number, and follow the provider instructions shown on the next screen.':'secure hosted checkout is available. Continue to the secure payment page to choose an activated method.';
-    var methodCards=caps.directMobileMoney
-      ? '<div class="ml-profile-row"><div class="ico">📱</div><div class="copy"><b>Wave</b><span>Enter your local Wave number in checkout and follow the next step from the payment service.</span></div></div><div class="ml-profile-row"><div class="ico">📲</div><div class="copy"><b>AfriMoney</b><span>Enter your local number, approve the phone prompt, then confirm you have approved it in MarketLink.</span></div></div><div class="ml-profile-row"><div class="ico">💳</div><div class="copy"><b>QMoney</b><span>Enter your local number and provide the temporary code only if requested for this payment.</span></div></div>'
-      : '<div class="ml-profile-row"><div class="ico">🔐</div><div class="copy"><b>Secure mobile-money checkout</b><span>'+(caps.configured?'Choose one of the payment options activated for the MarketLink merchant account on the secure payment page.':'Available after provider setup is complete.')+'</span></div></div>';
+    }catch(e){S.paymentCapabilities=caps;}
+    var options=livePaymentOptions(caps);
+    var current=normalizePaymentChoice(S.selPay||'Cash on Delivery');
+    if(!options.some(function(option){return option[1]===current;})){S.selPay='Cash on Delivery';current='cod';}
+    var descriptions={
+      cod:'Pay on Delivery (Cash on Delivery). Give the rider the cash when your order arrives. MarketLink records the order as unpaid until the cash is reconciled.',
+      wallet:'Pay from your DAHA Wallet balance. The backend checks your available balance and records the debit and order payment together.',
+      wave:'Use Wave from checkout. Enter your full nine-digit Gambian mobile-money number and follow the payment step shown by the provider.',
+      afrimoney:'Use AfriMoney from checkout. Enter your full nine-digit Gambian mobile-money number and follow the provider confirmation step.',
+      qmoney:'Use QMoney from checkout. Enter your full nine-digit Gambian mobile-money number and follow the provider instructions.',
+      modempay:'Continue to the secure Modem Pay checkout and choose a method enabled for MarketLink.'
+    };
+    var icons={cod:'💵',wallet:'👛',wave:'📱',afrimoney:'📲',qmoney:'💳',modempay:'🔐'};
+    var cards=options.map(function(option){
+      var label=option[0],method=option[1],selected=method===current;
+      var title=method==='cod'?'Pay on Delivery · Cash on Delivery':method==='wallet'?'DAHA Wallet':label;
+      return '<button type="button" class="ml-profile-row ml-payment-option ml-payment-setting-choice" aria-pressed="'+(selected?'true':'false')+'" onclick="window.ML_Premium.choosePaymentFromSettings(\''+esc(label)+'\')"><span class="ico">'+(icons[method]||'💳')+'</span><span class="copy"><b>'+esc(title)+'</b><span>'+esc(descriptions[method]||'Choose this method at checkout.')+'</span></span><span class="ml-payment-setting-action">'+(selected?'Selected':'Choose')+'</span></button>';
+    }).join('');
+    var providerNote=!caps.configured
+      ?'<div class="ml-wallet-note"><b>Other mobile-money methods are not activated yet.</b><p>'+esc(caps.setupReason||'Wave, AfriMoney, QMoney and hosted Modem Pay options will appear when the merchant payment configuration is enabled.')+'</p></div>'
+      :'<div class="ml-wallet-note"><b>Mobile-money payment is available.</b><p>'+esc(caps.directMobileMoney?'Choose an enabled mobile-money option above; the nine-digit account details are collected securely at checkout.':'Continue through the secure hosted payment option shown above.')+'</p></div>';
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>Payment Methods</h3></div>'+
-      '<div class="ml-profile-card"><div class="ml-profile-row"><div class="ico">💵</div><div class="copy"><b>Pay on Delivery</b><span>Pay when your order arrives, where this option is available for the order and delivery area.</span></div></div>'+methodCards+'</div>'+
-      '<div class="ml-wallet-note ml-payment-availability-note">'+paymentBrandMarkup()+'<b>'+ (caps.configured?'Mobile-money checkout: available':'Mobile-money checkout: setup pending')+'</b><p>'+esc(providerStatus)+'</p></div>'+
-      '<div class="ml-wallet-note">MarketLink confirms payment only after the provider reports a verified completed transaction. If the status is pending, check it before trying to pay again. Never share your MarketLink PIN with a vendor, rider or support agent.</div>'+
+      '<div class="ml-profile-card"><div class="ml-section-head"><h3>Choose how to pay</h3><span style="font-size:10px;color:#91A4B4">GMD · Gambian Dalasi</span></div>'+cards+'</div>'+
+      providerNote+
+      '<div class="ml-wallet-note">'+paymentBrandMarkup()+'<p>Selecting a method here prepares your next checkout. MarketLink sends the selected method to the backend when you place the order; no payment is taken just by choosing an option. Cash on Delivery remains pending until delivered cash is verified. DAHA Wallet is debited only after the backend confirms the order and available balance.</p></div>'+
       '<button type="button" class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="switchTab(\'cart\')">Go to cart and checkout →</button>'+
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span></footer></div>';
   }
@@ -2292,19 +2316,133 @@
       '<footer class="ml-app-footer"><span>MarketLink Gambia · Powered by <strong>Royal FinTech Company</strong></span><div><button type="button" onclick="window.ML_Premium.openProfilePage(\'terms\')">Terms of Service</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'privPolicy\')">Privacy Policy</button><button type="button" onclick="window.ML_Premium.openProfilePage(\'deliveryPolicy\')">Delivery & Returns</button></div></footer></div>';
   }
   var liveAddresses=[];
+  var liveAddressPinDraft=null;
+  var gambiaAddressIndex=null;
+  var gambiaAddressIndexPromise=null;
+  var addressSuggestionResults=[];
+  var GAMBIA_ADDRESS_FALLBACK_LANDMARKS=[
+    {name:'Westfield Junction Traffic Lights',aliases:['Traffic Lights','Westfield Traffic Lights','West Field Junction','Westfield Junction'],zone:'KMC',region:'Kanifing Municipality',kind:'junction',lat:13.445044,lng:-16.675303},
+    {name:'Sukuta Traffic Light',aliases:['Sukuta Traffic Lights','Traffic Lights Sukuta'],zone:'WCR',region:'West Coast Region',kind:'junction',lat:13.39713,lng:-16.70628},
+    {name:'Tipa Garage, Bakoteh (Serrekunda)',aliases:['Tipa Garage','Tippa Garage','Tipa Garage Brikama Road'],zone:'KMC',region:'Kanifing Municipality',kind:'transport landmark',lat:13.43313,lng:-16.69101},
+    {name:'Brikama Market',aliases:['Market Brikama','Brikama Town Market'],zone:'WCR',region:'West Coast Region',kind:'market',lat:13.27272,lng:-16.64828}
+  ];
+  async function loadGambiaAddressIndex(){
+    if(gambiaAddressIndex)return gambiaAddressIndex;
+    if(!gambiaAddressIndexPromise){
+      gambiaAddressIndexPromise=fetch('./data/gambia-address-index.json',{cache:'force-cache'})
+        .then(function(response){if(!response.ok)throw new Error('Gambia place index is unavailable.');return response.json();})
+        .then(function(data){
+          if(!data||!Array.isArray(data.places))throw new Error('Gambia place index has an invalid format.');
+          gambiaAddressIndex=data;
+          return data;
+        })
+        .catch(function(error){
+          console.warn('[MarketLink] Using the local fallback landmark list:',error&&error.message||error);
+          gambiaAddressIndex={places:[],landmarks:GAMBIA_ADDRESS_FALLBACK_LANDMARKS};
+          return gambiaAddressIndex;
+        });
+    }
+    return gambiaAddressIndexPromise;
+  }
+  function normalizeGambiaAddressSearch(value){
+    var text=String(value||'').toLowerCase();
+    try{text=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'');}catch(e){}
+    return text.replace(/[^a-z0-9]+/g,'');
+  }
+  function searchGambiaAddressSuggestions(value){
+    var host=G('ml-addr-suggestions'),raw=String(value||'').trim();
+    if(!host)return;
+    var q=normalizeGambiaAddressSearch(raw);
+    if(q.length<2){host.innerHTML='';host.style.display='none';addressSuggestionResults=[];return;}
+    if(!gambiaAddressIndex){
+      host.innerHTML='<div class="ml-address-suggestion-empty">Loading mapped Gambian places…</div>';
+      host.style.display='block';
+      loadGambiaAddressIndex().then(function(){searchGambiaAddressSuggestions(raw);});
+      return;
+    }
+    var entries=(gambiaAddressIndex.places||[]).concat(gambiaAddressIndex.landmarks||[]);
+    var zonePriority={WCR:0,KMC:1,BJL:2,NBR:3,CRR:4,LRR:5,URR:6};
+    var matches=[];
+    entries.forEach(function(item){
+      if(!item||!Number.isFinite(Number(item.lat))||!Number.isFinite(Number(item.lng)))return;
+      var names=[item.name].concat(Array.isArray(item.aliases)?item.aliases:[]);
+      var score=0;
+      names.forEach(function(name){
+        var key=normalizeGambiaAddressSearch(name);
+        if(!key)return;
+        if(key===q)score=Math.max(score,120);
+        else if(key.indexOf(q)===0)score=Math.max(score,100-Math.min(20,key.length-q.length));
+        else if(key.indexOf(q)>=0)score=Math.max(score,55);
+      });
+      if(score)matches.push({item:item,score:score,zonePriority:zonePriority[item.zone]===undefined?9:zonePriority[item.zone]});
+    });
+    matches.sort(function(a,b){return b.score-a.score||a.zonePriority-b.zonePriority||String(a.item.name).localeCompare(String(b.item.name));});
+    addressSuggestionResults=matches.slice(0,10).map(function(match){return match.item;});
+    if(!addressSuggestionResults.length){
+      host.innerHTML='<div class="ml-address-suggestion-empty">No mapped match yet. Keep the full address and use GPS to add the exact delivery pin.</div>';
+      host.style.display='block';return;
+    }
+    host.innerHTML=addressSuggestionResults.map(function(item,index){
+      var kind=String(item.kind||'place').replace(/_/g,' ');
+      return '<button type="button" class="ml-address-suggestion" data-ml-address-choice="'+index+'"><span class="ml-address-suggestion-pin">📍</span><span class="ml-address-suggestion-copy"><b>'+esc(item.name||'Gambian place')+'</b><small>'+esc(item.region||'The Gambia')+' · '+esc(kind)+'</small></span><span class="ml-address-suggestion-arrow">↗</span></button>';
+    }).join('');
+    host.style.display='block';
+    host.querySelectorAll('[data-ml-address-choice]').forEach(function(button){
+      button.addEventListener('click',function(){selectGambiaAddressSuggestion(Number(button.getAttribute('data-ml-address-choice')));});
+    });
+  }
+  function selectGambiaAddressSuggestion(index){
+    var item=addressSuggestionResults[Number(index)];
+    if(!item)return;
+    var full=G('ml-addr-full'),area=G('ml-addr-area');
+    if(full)full.value=String(item.name||'')+', '+String(item.region||'The Gambia')+', The Gambia';
+    if(area)area.value=String(item.region||'');
+    liveAddressPinDraft={latitude:Number(item.lat),longitude:Number(item.lng),source:'mapped-place-centre',name:item.name||''};
+    var host=G('ml-addr-suggestions');if(host){host.innerHTML='';host.style.display='none';}
+    var status=G('ml-addr-pin-status');
+    if(status)status.textContent='Approximate pin saved for '+String(item.name||'this place')+'. Use “Use my GPS location” for the exact house or gate.';
+  }
+  function useCurrentAddressLocation(){
+    if(!navigator.geolocation){toast('This browser does not support GPS location. Enter your address and select a mapped place instead.','error');return;}
+    var status=G('ml-addr-pin-status');
+    if(status)status.textContent='Requesting permission to read your current location…';
+    navigator.geolocation.getCurrentPosition(function(position){
+      liveAddressPinDraft={latitude:Number(position.coords.latitude),longitude:Number(position.coords.longitude),source:'device-gps',name:'Current device location'};
+      var full=G('ml-addr-full');
+      if(full&&!full.value.trim())full.value='My current location (GPS pin)';
+      var exact=Number(position.coords.accuracy);
+      if(status)status.textContent='Exact device GPS pin saved'+(Number.isFinite(exact)?' · reported accuracy about '+Math.round(exact)+' m':'')+'. The pin will be stored with this address.';
+      toast('Your current GPS location has been added to this address.','success');
+    },function(error){
+      var message=error&&error.code===1?'Location permission was denied. Allow location access in your browser settings and try again.':'MarketLink could not read your GPS location. Check device location services or select a mapped place.';
+      if(status)status.textContent=message;
+      toast(message,'error');
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+  }
   async function renderAddresses(){
     var root=G('profile-body');if(!root)return;
-    try{var r=await ML_API.customers.getAddresses();liveAddresses=Array.isArray(r.data)?r.data:[];}catch(e){toast(e.error||'Could not load saved addresses.','error');return;}
+    try{var r=await ML_API.customers.getAddresses();liveAddresses=Array.isArray(r.data)?r.data:[];}
+    catch(e){toast(e.error||'Could not load saved addresses.','error');return;}
+    liveAddressPinDraft=null;
     var cards=liveAddresses.map(function(a){
-      var id=String(a.id);
-      return '<div class="ml-profile-card" style="padding:15px;margin-top:10px"><div style="display:flex;align-items:flex-start;gap:10px"><div class="ico" style="width:38px;height:38px">📍</div><div style="flex:1"><b style="color:#EAF2F5;font-size:12px">'+esc(a.label||'Address')+'</b><div style="color:#91A4B4;font-size:11px;line-height:1.5;margin-top:4px">'+esc(a.full_address||'')+'</div>'+(a.area?'<div style="color:#718897;font-size:10px;margin-top:3px">'+esc(a.area)+'</div>':'')+'</div>'+(a.is_default?'<span style="font-size:9px;padding:4px 7px;border-radius:99px;background:rgba(13,115,119,.15);color:#42D2C9">Default</span>':'')+'</div><div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap"><button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.editAddress(\''+esc(id)+'\')">Edit</button>'+(!a.is_default?'<button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.setDefaultAddress(\''+esc(id)+'\')">Set default</button>':'')+'<button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.deleteAddress(\''+esc(id)+'\')">Delete</button></div></div>';
+      var id=String(a.id),hasPin=a.latitude!==null&&a.latitude!==undefined&&a.longitude!==null&&a.longitude!==undefined;
+      return '<div class="ml-profile-card" style="padding:15px;margin-top:10px"><div style="display:flex;align-items:flex-start;gap:10px"><div class="ico" style="width:38px;height:38px">📍</div><div style="flex:1"><b style="color:#EAF2F5;font-size:12px">'+esc(a.label||'Address')+'</b><div style="color:#91A4B4;font-size:11px;line-height:1.5;margin-top:4px">'+esc(a.full_address||'')+'</div>'+(a.area?'<div style="color:#718897;font-size:10px;margin-top:3px">'+esc(a.area)+'</div>':'')+'<small class="ml-address-saved-pin">'+(hasPin?'GPS pin saved · '+Number(a.latitude).toFixed(5)+', '+Number(a.longitude).toFixed(5):'No GPS pin · add one for more accurate rider navigation')+'</small></div>'+(a.is_default?'<span style="font-size:9px;padding:4px 7px;border-radius:99px;background:rgba(13,115,119,.15);color:#42D2C9">Default</span>':'')+'</div><div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap"><button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.editAddress(\''+esc(id)+'\')">Edit</button>'+(!a.is_default?'<button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.setDefaultAddress(\''+esc(id)+'\')">Set default</button>':'')+'<button class="ml-btn ml-btn-secondary" style="flex:1;padding:9px" onclick="window.ML_Premium.deleteAddress(\''+esc(id)+'\')">Delete</button></div></div>';
     }).join('');
-    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Saved addresses</h3><button onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button></div><div class="ml-empty" style="text-align:left;margin-bottom:12px"><b>Delivery locations</b><span>These addresses are stored securely in your MarketLink account and are used for checkout.</span></div><div class="ml-profile-card" style="padding:15px"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin-bottom:6px">Label</label><input id="ml-addr-label" placeholder="Home, Work, Shop" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin:12px 0 6px">Full address</label><input id="ml-addr-full" placeholder="Street, area, city" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><label style="display:block;color:#9DB0BC;font-size:10px;font-weight:700;margin:12px 0 6px">Area (optional)</label><input id="ml-addr-area" placeholder="e.g. Serrekunda" style="width:100%;box-sizing:border-box;background:#0B1A27;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:12px;color:#fff"><button class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="window.ML_Premium.addAddress()">Save address</button></div>'+cards+'</div>';
+    root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><h3>Saved addresses</h3><button onclick="S.profilePage=null;window.ML_Premium.openProfilePage(null)">← Profile</button></div><div class="ml-empty" style="text-align:left;margin-bottom:12px"><b>Delivery locations across The Gambia</b><span>Start typing a village, town, suburb or landmark. Select a mapped match, then add your compound or nearby landmark. For the most accurate delivery point, save your current GPS location.</span></div><div class="ml-profile-card" style="padding:15px"><label class="ml-field-label" for="ml-addr-label">Label</label><input id="ml-addr-label" placeholder="Home, Work, Shop" autocomplete="off"><label class="ml-field-label" for="ml-addr-full" style="margin-top:12px">Full delivery address</label><div class="ml-address-autocomplete"><input id="ml-addr-full" placeholder="Type e.g. Maria Makunda, Traffic Lights, Brikama…" autocomplete="street-address" oninput="window.ML_Premium.searchAddressSuggestions(this.value)" onfocus="window.ML_Premium.searchAddressSuggestions(this.value)"><div id="ml-addr-suggestions" class="ml-address-suggestions" role="listbox" aria-label="Gambian place suggestions"></div></div><div class="ml-address-attribution">Place index: N-Ways Addressing for The Gambia · OpenStreetMap and GeoNames. <a href="https://github.com/n-ways/open-addresses-gambia" target="_blank" rel="noopener noreferrer">Data source & attribution</a>.</div><label class="ml-field-label" for="ml-addr-area" style="margin-top:12px">Area / region (optional)</label><input id="ml-addr-area" placeholder="e.g. Serrekunda, Brikama, Banjul" autocomplete="address-level2"><div class="ml-address-pin-actions"><button class="ml-btn ml-btn-secondary" type="button" onclick="window.ML_Premium.useCurrentAddressLocation()">📍 Use my GPS location</button><span id="ml-addr-pin-status">Mapped places provide approximate area pins. Use GPS for your exact house or gate.</span></div><button class="ml-btn ml-btn-primary" style="width:100%;margin-top:14px" onclick="window.ML_Premium.addAddress()">Save address</button></div>'+cards+'</div>';
+    loadGambiaAddressIndex().then(function(){var input=G('ml-addr-full');if(input&&input.value)searchGambiaAddressSuggestions(input.value);});
   }
   async function addAddress(){
     var label=G('ml-addr-label')&&G('ml-addr-label').value.trim(),full=G('ml-addr-full')&&G('ml-addr-full').value.trim(),area=G('ml-addr-area')&&G('ml-addr-area').value.trim();
-    if(!label||!full){toast('Enter a label and full address.','error');return;}
-    try{await ML_API.customers.addAddress({label:label,fullAddress:full,area:area||undefined,isDefault:liveAddresses.length===0});toast('Address saved ✓');await renderAddresses();}catch(e){toast(e.error||'Could not save address.','error');}
+    if(!label||!full){toast('Enter an address label and full delivery address.','error');return;}
+    var latitude=liveAddressPinDraft?Number(liveAddressPinDraft.latitude):null;
+    var longitude=liveAddressPinDraft?Number(liveAddressPinDraft.longitude):null;
+    if(liveAddressPinDraft&&(!Number.isFinite(latitude)||!Number.isFinite(longitude))){toast('The selected GPS pin is invalid. Select a place or read your GPS location again.','error');return;}
+    try{
+      await ML_API.customers.addAddress({label:label,fullAddress:full,area:area||undefined,latitude:latitude,longitude:longitude,isDefault:liveAddresses.length===0});
+      liveAddressPinDraft=null;
+      toast('Address saved to your MarketLink account'+(latitude!==null?' with its GPS pin.':'.'),'success');
+      await renderAddresses();
+    }catch(e){toast(e.error||'Could not save address. Please check the connection and try again.','error');}
   }
   async function editAddress(id){
     var a=liveAddresses.find(function(x){return String(x.id)===String(id);});
@@ -3202,7 +3340,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,selectDahaDepositMethod:selectDahaDepositMethod,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(period){return renderLiveAdminAnalytics(period||'30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
+    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,searchAddressSuggestions:searchGambiaAddressSuggestions,selectAddressSuggestion:selectGambiaAddressSuggestion,useCurrentAddressLocation:useCurrentAddressLocation,choosePaymentFromSettings:choosePaymentFromSettings,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},submitDahaDeposit:submitDahaDeposit,selectDahaDepositMethod:selectDahaDepositMethod,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(period){return renderLiveAdminAnalytics(period||'30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;

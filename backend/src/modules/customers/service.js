@@ -80,7 +80,7 @@ async function addAddress(customerId, data) {
          (customer_id, label, full_address, area, latitude, longitude, is_default)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [customerId, label || 'Home', fullAddress.trim(), area || null,
-       latitude || null, longitude || null, isDefault]
+       latitude == null ? null : Number(latitude), longitude == null ? null : Number(longitude), isDefault]
     );
     return addr;
   });

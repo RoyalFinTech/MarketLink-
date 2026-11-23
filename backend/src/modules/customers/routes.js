@@ -28,7 +28,15 @@ router.post('/me/addresses',   authenticate, [
   body('longitude').optional({ nullable: true }).isFloat({ min: -180, max: 180 }),
   body('isDefault').optional().isBoolean(),
 ], validate, ctrl.addAddress);
-router.put('/me/addresses/:addressId',    authenticate, [param('addressId').isUUID()], validate, ctrl.updateAddress);
+router.put('/me/addresses/:addressId', authenticate, [
+  param('addressId').isUUID(),
+  body('label').optional().trim().isLength({ max: 50 }),
+  body('fullAddress').optional().trim().notEmpty().isLength({ max: 500 }),
+  body('area').optional({ nullable: true }).trim().isLength({ max: 120 }),
+  body('latitude').optional({ nullable: true }).isFloat({ min: -90, max: 90 }),
+  body('longitude').optional({ nullable: true }).isFloat({ min: -180, max: 180 }),
+  body('isDefault').optional().isBoolean(),
+], validate, ctrl.updateAddress);
 router.delete('/me/addresses/:addressId', authenticate, [param('addressId').isUUID()], validate, ctrl.deleteAddress);
 
 // Wishlist
