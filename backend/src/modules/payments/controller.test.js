@@ -43,7 +43,7 @@ describe('payment controller provider readiness and webhook body',()=>{
   modemPay.isH2H.mockReturnValue(false);
   modemPay.isH2HApproved.mockReturnValue(true);
   const res=response();
-  await controller.methods({},{...res},jest.fn());
+  await controller.methods({},res,jest.fn());
   expect(res.body.data).toMatchObject({configured:false,hostedCheckout:false,directMobileMoney:false,methods:[]});
   expect(JSON.stringify(res.body)).not.toContain('webhookSecret');
  });
