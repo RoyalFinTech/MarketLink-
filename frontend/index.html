@@ -4168,6 +4168,24 @@ function renderVDash(){
           '</div></div></div>';
       });
     }
+  } else if(S.vSubTab==='pickup'){
+    var pickupProfile=S.vProfile||{};
+    var pickupLat=pickupProfile.latitude,pickupLng=pickupProfile.longitude;
+    var pickupIsSaved=pickupLat!==null&&pickupLat!==undefined&&pickupLng!==null&&pickupLng!==undefined;
+    content='<section class="ml-vendor-pickup-card">'+
+      '<div class="ml-vendor-pickup-eyebrow">DELIVERY PICKUP POINT</div>'+
+      '<h3>Shop address and GPS pin</h3>'+
+      '<p>MarketLink uses this exact pickup pin with the customer’s saved delivery pin to estimate the route and calculate the rider’s price. Capture the GPS while you are physically at your shop.</p>'+
+      '<label for="v-pickup-address">Shop pickup address</label>'+
+      '<textarea id="v-pickup-address" class="inp" rows="2" maxlength="500" placeholder="Business name, street, locality, region">'+sanitizeText(pickupProfile.business_address||'')+'</textarea>'+
+      '<div class="ml-vendor-pickup-status '+(pickupIsSaved?'saved':'missing')+'">'+
+        '<b>'+(pickupIsSaved?'✓ GPS pickup pin saved':'GPS pickup pin not saved')+'</b>'+
+        '<span id="v-pickup-gps-status">'+(pickupIsSaved?'Saved coordinates: '+Number(pickupLat).toFixed(6)+', '+Number(pickupLng).toFixed(6):'Capture the pin at your shop before saving the location.')+'</span>'+
+      '</div>'+
+      '<button type="button" id="v-pickup-capture" class="btn btn-s" style="width:100%;margin-top:11px;" onclick="vCapturePickupGPS()">📍 Capture shop GPS</button>'+
+      '<button type="button" id="v-pickup-save" class="btn btn-pu" style="width:100%;margin-top:9px;" onclick="vSavePickupLocation()">Save pickup location</button>'+
+      '<small>Changing the written address requires capturing GPS again. Customer delivery fees are calculated from the saved shop pin and the customer’s selected saved address.</small>'+
+    '</section>';
   } else if(S.vSubTab==='products'){
     content='<div style="background:var(--sf);border-radius:13px;padding:13px;border:1px solid rgba(255,255,255,0.07);margin-bottom:13px;">'+
       '<div style="color:var(--tx);font-size:12px;font-weight:800;margin-bottom:10px;">➕ Add a product to your shop</div>'+
@@ -4266,8 +4284,8 @@ function renderVDash(){
   }
 
   if(S.vSubTab==='promo'&&!S._vendorPromotionsLoaded&&!S._vendorPromotionsLoading&&!S._vendorPromotionsError)loadVendorPromotions();
-  var tabs=['orders','products','analytics','wallet','promo'];
-  var tabLabels=['📋 Orders','🛍️ Products','📊 Analytics','💰 Wallet','📣 Promotions'];
+  var tabs=['orders','products','pickup','analytics','wallet','promo'];
+  var tabLabels=['📋 Orders','🛍️ Products','📍 Pickup GPS','📊 Analytics','💰 Wallet','📣 Promotions'];
   el.innerHTML=
     '<div style="background:linear-gradient(160deg,#0F1923,#0A5C60);padding:50px 16px 18px;position:relative;">'+
     '<div class="fb" style="position:absolute;top:0;left:0;right:0;"><div class="g"></div><div class="r"></div><div class="b"></div></div>'+
@@ -4409,7 +4427,62 @@ function vSaveProdEdit(id){
   renderVDash(); toast('Product updated ✅');
 }
 function vRemoveProd(id){S.vProds=S.vProds.filter(function(p){return p.id!==id;});renderVDash();toast('Product removed.');}
-async function vToggleOnline(){
+async async function vCapturePickupGPS(){
+  if(!navigator.geolocation){toast('This browser does not provide GPS. Enter a shop address and use a GPS-enabled device to capture the pickup pin.','error');return;}
+  var button=G('v-pickup-capture');
+  if(button){button.disabled=true;button.textContent='Reading shop GPS…';}
+  navigator.geolocation.getCurrentPosition(function(pos){
+    S.vPickupCoords={
+      latitude:Number(pos.coords.latitude.toFixed(7)),
+      longitude:Number(pos.coords.longitude.toFixed(7)),
+      accuracy:Number.isFinite(pos.coords.accuracy)?Math.round(pos.coords.accuracy):null
+    };
+    var status=G('v-pickup-gps-status');
+    if(status)status.textContent='Pickup pin captured: '+S.vPickupCoords.latitude+', '+S.vPickupCoords.longitude+
+      (S.vPickupCoords.accuracy!==null?' · accuracy about '+S.vPickupCoords.accuracy+' m':'');
+    if(button){button.disabled=false;button.textContent='↻ Capture shop GPS again';}
+    toast('Shop pickup GPS captured. Save this location to use distance-based delivery prices.','success');
+  },function(error){
+    if(button){button.disabled=false;button.textContent='📍 Capture shop GPS';}
+    toast(error&&error.code===1?'Location permission was denied. Enable it in browser settings and try again.':'Could not read the shop GPS. Check device location services.','error');
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+}
+async function vSavePickupLocation(){
+  var addressField=G('v-pickup-address');
+  var address=String(addressField&&addressField.value||'').trim();
+  var oldAddress=String(S.vProfile&&S.vProfile.business_address||'').trim();
+  if(!address){toast('Enter your shop pickup address first.','error');return;}
+  var coords=S.vPickupCoords||null;
+  if(!coords&&address.toLowerCase()!==oldAddress.toLowerCase()){
+    toast('You changed the pickup address. Capture the shop GPS again so the pin matches the new address.','error');
+    return;
+  }
+  if(!coords){
+    var lat=Number(S.vProfile&&S.vProfile.latitude),lng=Number(S.vProfile&&S.vProfile.longitude);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng)){toast('Capture the shop GPS before saving your pickup location.','error');return;}
+    coords={latitude:lat,longitude:lng};
+  }
+  var button=G('v-pickup-save');
+  if(button){button.disabled=true;button.textContent='Saving pickup location…';}
+  try{
+    var response=await ML_API.vendors.updateProfile({
+      businessAddress:address,
+      latitude:coords.latitude,
+      longitude:coords.longitude
+    });
+    S.vProfile=response&&response.data||S.vProfile||{};
+    S.vProfile.business_address=S.vProfile.business_address||address;
+    S.vProfile.latitude=S.vProfile.latitude==null?coords.latitude:S.vProfile.latitude;
+    S.vProfile.longitude=S.vProfile.longitude==null?coords.longitude:S.vProfile.longitude;
+    S.vPickupCoords=null;
+    renderVDash();
+    toast('Your shop pickup address and GPS pin have been saved. New delivery quotes will use this location.','success');
+  }catch(error){
+    toast(error&&error.error||'Could not save the shop pickup location. Check your connection and try again.','error');
+    if(button){button.disabled=false;button.textContent='Save pickup location';}
+  }
+}
+function vToggleOnline(){
   if(!ML_API.auth.isAuthenticated()){toast('Please sign in first.','error');return;}
   var next=!S.vOnline;
   try{
