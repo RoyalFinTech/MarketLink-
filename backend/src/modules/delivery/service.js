@@ -158,7 +158,7 @@ async function assignRider(deliveryId, riderId, actor) {
     await assertRiderMatchesLockedQuote(client,d.order_id,riderId);
 
     const {rows:[busy]}=await client.query(
-      "SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+      "SELECT d.id FROM deliveries d JOIN orders reserved_order ON reserved_order.id=d.order_id WHERE d.rider_id=$1 AND d.id<>$2 AND (d.status IN ('assigned','picked_up','in_transit') OR (d.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned'))) LIMIT 1",
       [riderId,deliveryId]
     );
     if(busy)throw new AppError('This rider already has an active delivery. Choose another available rider.',409,'RIDER_HAS_ACTIVE_DELIVERY');
@@ -218,7 +218,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
       "ELSE NULL END AS distance_km "+
     "FROM riders r JOIN users u ON u.id=r.user_id "+
     "WHERE r.kyc_status=$5 AND r.is_online=TRUE "+
-    "AND NOT EXISTS (SELECT 1 FROM deliveries active WHERE active.rider_id=r.user_id AND active.status IN ('assigned','picked_up','in_transit')) "+
+    "AND NOT EXISTS (SELECT 1 FROM deliveries active JOIN orders reserved_order ON reserved_order.id=active.order_id WHERE active.rider_id=r.user_id AND (active.status IN ('assigned','picked_up','in_transit') OR (active.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned')))) "+
     "AND NOT EXISTS (SELECT 1 FROM rider_assignments declined WHERE declined.delivery_id=$4 AND declined.rider_id=r.user_id AND declined.status='declined') "+
     "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
     [hasPickup,delivery.pickup_lat,delivery.pickup_lng,deliveryId,'approved']
@@ -297,7 +297,7 @@ async function acceptDelivery(deliveryId, riderId) {
     if(!rider) throw new AppError('Only an approved rider can accept a delivery.',403,'RIDER_UNAVAILABLE');
     if(!rider.is_online) throw new AppError('Go online before accepting a delivery.',403,'RIDER_OFFLINE');
     const {rows:[busy]}=await client.query(
-      "SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+      "SELECT d.id FROM deliveries d JOIN orders reserved_order ON reserved_order.id=d.order_id WHERE d.rider_id=$1 AND d.id<>$2 AND (d.status IN ('assigned','picked_up','in_transit') OR (d.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned'))) LIMIT 1",
       [riderId,deliveryId]
     );
     if(busy)throw new AppError('You already have an active delivery. Complete it before accepting another request.',409,'RIDER_HAS_ACTIVE_DELIVERY');
