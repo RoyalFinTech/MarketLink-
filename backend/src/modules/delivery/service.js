@@ -192,13 +192,14 @@ async function assignRider(deliveryId, riderId, actor) {
 
 async function listAvailableRiders(deliveryId, actorId, roles) {
   const {rows:[delivery]}=await query(
-    'SELECT d.id,d.order_id,d.status,d.distance_km,o.vendor_id,o.delivery_fee,o.delivery_fee_quote_id,COALESCE(d.pickup_lat,v.latitude) AS pickup_lat,COALESCE(d.pickup_lng,v.longitude) AS pickup_lng FROM deliveries d JOIN orders o ON o.id=d.order_id JOIN vendors v ON v.user_id=o.vendor_id WHERE d.id=$1',
+    'SELECT d.id,d.order_id,d.status,d.distance_km,o.vendor_id,o.delivery_fee,o.delivery_fee_quote_id,o.status AS order_status,COALESCE(d.pickup_lat,v.latitude) AS pickup_lat,COALESCE(d.pickup_lng,v.longitude) AS pickup_lng FROM deliveries d JOIN orders o ON o.id=d.order_id JOIN vendors v ON v.user_id=o.vendor_id WHERE d.id=$1',
     [deliveryId]
   );
   if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
   const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
   if(!isAdmin&&String(delivery.vendor_id)!==String(actorId))throw new AppError('You can only find riders for your own orders.',403,'FORBIDDEN');
   if(!['unassigned','failed'].includes(delivery.status))throw new AppError('Riders can only be searched before pickup and before assignment. Refresh the order status and try again.',409,'INVALID_STATUS');
+  if(delivery.delivery_fee_quote_id&&!['awaiting_rider','rider_assigned'].includes(String(delivery.order_status)))throw new AppError('The vendor must mark this order ready before searching for a replacement rider.',409,'DELIVERY_NOT_READY');
   const hasPickup=delivery.pickup_lat!==null&&delivery.pickup_lng!==null;
   const {rows}=await query(
     "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,"+
