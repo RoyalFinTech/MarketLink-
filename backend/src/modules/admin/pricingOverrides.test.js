@@ -101,7 +101,9 @@ describe('Admin pricing overrides',()=>{
     apiKeyConfigured:true,webhookSecretConfigured:true,h2hApproved:true,
     callbackUrlConfigured:false,mobileMoneyCheckoutReady:false
   });
-  expect(JSON.stringify(result)).not.toMatch(/api[_ -]?key.{0,20}[A-Za-z0-9]{20,}/i);
+  expect(result.configuration).not.toHaveProperty('apiKey');
+  expect(result.configuration).not.toHaveProperty('webhookSecret');
+  expect(result.configuration).toMatchObject({apiKeyConfigured:true,webhookSecretConfigured:true});
  });
 
 });
