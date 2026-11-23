@@ -8,6 +8,7 @@ const logger = require('../../utils/logger');
 const { assertOwnedUploadReference } = require('../uploads/service');
 const notificationsService = require('../notifications/service');
 const { normalizePhone } = require('../../utils/phone');
+const { normaliseDeliveryPricingPolicy } = require('../../utils/deliveryPricingPolicy');
 function normalizeGambianContact(value, label) {
   if (value == null || String(value).trim() === '') return null;
   try {
@@ -444,15 +445,22 @@ async function getDeliveryPricing(userId) {
      FROM riders WHERE user_id=$1`, [userId]
   );
   if (!rider) throw new AppError('Rider profile not found.', 404, 'RIDER_NOT_FOUND');
+  const { rows: [policyRow] } = await query(
+    "SELECT value FROM system_settings WHERE key=$1", ['delivery_pricing_policy']
+  );
+  const policy = normaliseDeliveryPricingPolicy(policyRow?.value);
   const { rows: routeRates } = await query(
     `SELECT id,origin_area,destination_area,fixed_fee_gmd,is_active
      FROM rider_delivery_rates WHERE rider_id=$1 ORDER BY origin_area,destination_area`, [userId]
   );
   return {
     enabled: Boolean(rider.delivery_pricing_enabled),
-    baseFee: rider.delivery_base_fee_gmd == null ? null : Number(rider.delivery_base_fee_gmd),
-    perKmFee: rider.delivery_per_km_fee_gmd == null ? null : Number(rider.delivery_per_km_fee_gmd),
-    minimumFee: rider.delivery_min_fee_gmd == null ? null : Number(rider.delivery_min_fee_gmd),
+    // New and not-yet-configured riders see the admin's GMD starter tariff.
+    // They must still save and enable the tariff before becoming quote-eligible.
+    baseFee: rider.delivery_base_fee_gmd == null ? policy.baseFeeGmd : Number(rider.delivery_base_fee_gmd),
+    perKmFee: rider.delivery_per_km_fee_gmd == null ? policy.perKmFeeGmd : Number(rider.delivery_per_km_fee_gmd),
+    minimumFee: rider.delivery_min_fee_gmd == null ? policy.minimumFeeGmd : Number(rider.delivery_min_fee_gmd),
+    adminPolicy: policy,
     routeRates: routeRates.map(rate => ({
       id: rate.id,
       originArea: rate.origin_area,
@@ -468,10 +476,21 @@ async function updateDeliveryPricing(userId, data = {}) {
   const baseFee = Number(data.baseFee);
   const perKmFee = Number(data.perKmFee);
   const minimumFee = Number(data.minimumFee);
+  const { rows: [policyRow] } = await query(
+    "SELECT value FROM system_settings WHERE key=$1", ['delivery_pricing_policy']
+  );
+  const policy = normaliseDeliveryPricingPolicy(policyRow?.value);
   if (![baseFee, perKmFee, minimumFee].every(Number.isFinite) ||
-      baseFee < 0 || baseFee > 2000 || perKmFee < 0 || perKmFee > 500 ||
-      minimumFee <= 0 || minimumFee > 5000) {
-    throw new AppError('Enter valid GMD rates: base D0–D2,000, per kilometre D0–D500, and minimum D0.01–D5,000.', 400, 'INVALID_DELIVERY_PRICING');
+      baseFee < 0 || baseFee > 2000 || baseFee > policy.maximumFeeGmd ||
+      perKmFee < 0 || perKmFee > 500 ||
+      minimumFee < policy.minimumAllowedFeeGmd || minimumFee > policy.maximumFeeGmd) {
+    throw new AppError(
+      'Enter valid GMD rates inside the administrator-approved limits. The current rider defaults are D' +
+      policy.baseFeeGmd.toFixed(2) + ' base, D' + policy.perKmFeeGmd.toFixed(2) +
+      ' per kilometre and D' + policy.minimumFeeGmd.toFixed(2) + ' minimum.',
+      400,
+      'INVALID_DELIVERY_PRICING'
+    );
   }
   const rawRates = data.routeRates === undefined ? [] : data.routeRates;
   if (!Array.isArray(rawRates) || rawRates.length > 20) {
@@ -483,8 +502,13 @@ async function updateDeliveryPricing(userId, data = {}) {
     const destinationArea = String(rate && rate.destinationArea || '').trim();
     const fixedFee = Number(rate && rate.fixedFee);
     if (!originArea || !destinationArea || originArea.length > 120 || destinationArea.length > 120 ||
-        !Number.isFinite(fixedFee) || fixedFee <= 0 || fixedFee > 5000) {
-      throw new AppError('Each saved route needs a pickup area, destination area and valid fixed fee.', 400, 'INVALID_ROUTE_RATE');
+        !Number.isFinite(fixedFee) || fixedFee < policy.minimumAllowedFeeGmd || fixedFee > policy.maximumFeeGmd) {
+      throw new AppError(
+        'Each saved route needs a pickup area, destination area and a fare between D' +
+        policy.minimumAllowedFeeGmd.toFixed(2) + ' and D' + policy.maximumFeeGmd.toFixed(2) + '.',
+        400,
+        'INVALID_ROUTE_RATE'
+      );
     }
     const key = originArea.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ') +
       '|' + destinationArea.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
