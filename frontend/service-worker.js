@@ -1,7 +1,7 @@
 /* MarketLink Gambia PWA service worker. Keep app shell available offline without caching API responses. */
-// v43: vendor and rider onboarding now offer separate device-file and camera pickers.
+// v44: cache the Gambian place index for offline saved-address autocomplete.
 'use strict';
-const CACHE_NAME = 'marketlink-shell-v62';
+const CACHE_NAME = 'marketlink-shell-v63';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   './premium-marketlink.js?v=marketlink-premium-canonical-r55',
   './marketlink-i18n.js?v=marketlink-locale-r2',
   './manifest.webmanifest',
+  './data/gambia-address-index.json',
   './assets/marketlink-logo.png',
   './assets/favicon-32.png',
   './assets/apple-touch-icon-180.png',
