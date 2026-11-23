@@ -3546,6 +3546,14 @@
   }
   function continueOtpLive(){closeSheet('sh-otp-reveal');}
   function adminGoToLiveSafe(tab){adminGoToLive(tab);}
+  window.openAffiliateMarketerApply=function(){
+    if(!ML_API.auth.isAuthenticated()){goAuth();return;}
+    if(window.ML_Premium&&typeof window.ML_Premium.openProfilePage==='function'){
+      window.ML_Premium.openProfilePage('affiliate');
+    }else{
+      toast('Please open your Profile to continue with the Affiliate Marketer application.','info');
+    }
+  };
   window.goOnboard=goOnboardPremium;
   window.renderOnboard=function(){renderPremiumOnboarding(true);};
   window.obNext=obNextLive;
