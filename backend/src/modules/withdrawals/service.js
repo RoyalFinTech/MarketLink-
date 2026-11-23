@@ -49,6 +49,8 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
     // Saved payout profiles are defaults, not mandatory login-number matches.
     // A number provided in this withdrawal request always takes priority.
 
+    const { rows: [vendor] } = await client.query('SELECT user_id FROM vendors WHERE user_id=$1', [userId]);
+    const { rows: [rider] } = await client.query('SELECT user_id FROM riders WHERE user_id=$1', [userId]);
     let saved = null;
     if (vendor) {
       const { rows: [profile] } = await client.query(
