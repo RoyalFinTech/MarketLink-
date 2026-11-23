@@ -1,9 +1,11 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 jest.mock('../notifications/service',()=>({pushToUser:jest.fn()}));
+jest.mock('../uploads/service',()=>({assertOwnedUploadReference:jest.fn().mockResolvedValue(true)}));
 
 const {query,withTransaction}=require('../../config/db');
 const notificationsService=require('../notifications/service');
+const {assertOwnedUploadReference}=require('../uploads/service');
 const {getDeliveryHistory,updateLocation,register,approve,updateProfile}=require('./service');
 
 describe('rider profile updates',()=>{
@@ -134,6 +136,8 @@ describe('rider application registration and approval',()=>{
    idDocumentUrl:'https://api.marketlink.test/id.pdf',licenseDocumentUrl:'https://api.marketlink.test/license.pdf'
   });
   expect(result).toMatchObject({user_id:userId,kyc_status:'pending'});
+  expect(assertOwnedUploadReference).toHaveBeenCalledWith('https://api.marketlink.test/id.pdf',userId,'rider-document','document','Rider identity document');
+  expect(assertOwnedUploadReference).toHaveBeenCalledWith('https://api.marketlink.test/license.pdf',userId,'license-document','document','Rider driving licence');
   expect(clientQuery.mock.calls[0][0]).toContain("VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE)");
   expect(clientQuery.mock.calls[0][1]).toContain('+220871234567');
   expect(clientQuery.mock.calls[0][1]).toContain('+220831234567');

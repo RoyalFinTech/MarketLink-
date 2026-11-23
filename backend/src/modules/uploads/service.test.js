@@ -2,7 +2,7 @@ jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
-const {deleteFile,deleteFileByUrl,upload,uploadProfilePhoto,getFile,getPublicProfileContent}=require('./service');
+const {deleteFile,deleteFileByUrl,upload,uploadProfilePhoto,getFile,getPublicProfileContent,assertOwnedUploadReference}=require('./service');
 
 const fileId='66666666-6666-4666-8666-666666666666';
 const riderId='33333333-3333-4333-8333-333333333333';
@@ -157,5 +157,23 @@ describe('customer profile photo upload',()=>{
   });
   await expect(uploadProfilePhoto({mimetype:'image/png',size:png.length,buffer:png,originalname:'profile.png'},customerId))
    .rejects.toMatchObject({statusCode:404,code:'CUSTOMER_NOT_FOUND'});
+ });
+});
+
+describe('applicant upload ownership validation',()=>{
+ beforeEach(()=>jest.clearAllMocks());
+ test('accepts a file owned by the applicant and with the expected KYC purpose',async()=>{
+  query.mockResolvedValueOnce({rows:[{id:fileId,uploaded_by:riderId,purpose:'rider-document',file_type:'document',file_url:file.file_url}]});
+  const result=await assertOwnedUploadReference(file.file_url,riderId,'rider-document','document','Rider identity document');
+  expect(result).toMatchObject({id:fileId,uploaded_by:riderId,purpose:'rider-document'});
+  expect(query.mock.calls[0][1]).toEqual([fileId]);
+ });
+ test('rejects a file belonging to another account',async()=>{
+  query.mockResolvedValueOnce({rows:[{id:fileId,uploaded_by:'another-user',purpose:'rider-document',file_type:'document'}]});
+  await expect(assertOwnedUploadReference(file.file_url,riderId,'rider-document','document','Rider identity document')).rejects.toMatchObject({statusCode:403,code:'UPLOAD_NOT_OWNED'});
+ });
+ test('rejects an image used as an identity document',async()=>{
+  query.mockResolvedValueOnce({rows:[{id:fileId,uploaded_by:riderId,purpose:'rider-photo',file_type:'image'}]});
+  await expect(assertOwnedUploadReference(file.file_url,riderId,'rider-document','document','Rider identity document')).rejects.toMatchObject({statusCode:400,code:'UPLOAD_PURPOSE_MISMATCH'});
  });
 });

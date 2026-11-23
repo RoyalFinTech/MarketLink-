@@ -5,6 +5,7 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { assertOwnedUploadReference } = require('../uploads/service');
 const notificationsService = require('../notifications/service');
 const { normalizePhone } = require('../../utils/phone');
 function normalizeGambianContact(value, label) {
@@ -37,6 +38,15 @@ async function register(userId, data) {
           licenseDocumentUrl, vehiclePhotoUrl, profilePhotoUrl, emergencyContact, address, deliveryZone,
           mobileNumber, whatsappNumber, latitude, longitude } = data;
   const normalizedMobileNumber = normalizeGambianContact(mobileNumber, 'Rider mobile number');
+  const riderFiles = [
+    [idDocumentUrl, 'rider-document', 'document', 'Rider identity document'],
+    [licenseDocumentUrl, 'license-document', 'document', 'Rider driving licence'],
+    [vehiclePhotoUrl, 'rider-photo', 'image', 'Rider vehicle photo'],
+    [profilePhotoUrl, 'profile-photo', 'image', 'Rider profile photo'],
+  ];
+  for (const [url, purpose, type, label] of riderFiles) {
+    if (url) await assertOwnedUploadReference(url, userId, purpose, type, label);
+  }
   const normalizedWhatsapp = normalizeGambianContact(whatsappNumber, 'Rider WhatsApp contact');
 
   const { rows: existing } = await query(
@@ -173,6 +183,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, isOnline, zone, i
 
 // ── UPDATE PROFILE ───────────────────────────────────────────────────
 async function updateProfile(userId, data) {
+  if (data.profilePhotoUrl !== undefined) await assertOwnedUploadReference(data.profilePhotoUrl,userId,'profile-photo','image','Rider profile photo');
   const allowed = {
     vehicleType: 'vehicle_type', plateNumber: 'plate_number',
     licenseNumber: 'license_number', emergencyContact: 'emergency_contact',

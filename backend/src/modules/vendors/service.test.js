@@ -1,7 +1,9 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
+jest.mock('../uploads/service',()=>({assertOwnedUploadReference:jest.fn().mockResolvedValue(true)}));
 
 const {query,withTransaction}=require('../../config/db');
+const {assertOwnedUploadReference}=require('../uploads/service');
 const {register,approve,updateProfile,updateAdminProfile}=require('./service');
 
 describe('vendor application registration and approval',()=>{
@@ -29,6 +31,8 @@ describe('vendor application registration and approval',()=>{
    latitude:13.43313,longitude:-16.69101
   });
   expect(result).toMatchObject({user_id:userId,kyc_status:'pending'});
+  expect(assertOwnedUploadReference).toHaveBeenCalledWith('https://api.marketlink.test/id.pdf',userId,'vendor-document','document','Vendor identity document');
+  expect(assertOwnedUploadReference).toHaveBeenCalledWith('https://api.marketlink.test/shop.jpg',userId,'vendor-logo','image','Vendor shop photo');
   expect(clientQuery.mock.calls[0][0]).toContain("VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending')");
   expect(clientQuery.mock.calls[0][1]).toContain('+220871234567');
   expect(clientQuery.mock.calls[0][1]).toContain('+220831234567');

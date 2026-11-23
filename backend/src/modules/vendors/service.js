@@ -5,6 +5,7 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { assertOwnedUploadReference } = require('../uploads/service');
 const { normalizePhone } = require('../../utils/phone');
 function normalizeGambianContact(value, label) {
   if (value == null || String(value).trim() === '') return null;
@@ -36,6 +37,18 @@ async function register(userId, data) {
           description, servicesOffered, workingDays, openingTime, closingTime, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
 
   if (!businessName?.trim()) throw new AppError('Business name is required.', 400, 'VALIDATION_ERROR');
+  const vendorFiles = [
+    [idDocumentUrl, 'vendor-document', 'document', 'Vendor identity document'],
+    [shopPhotoUrl, 'vendor-logo', 'image', 'Vendor shop photo'],
+    [logoUrl, 'vendor-logo', 'image', 'Vendor logo'],
+  ];
+  const checkedVendorUrls = new Set();
+  for (const [url, purpose, type, label] of vendorFiles) {
+    if (url && !checkedVendorUrls.has(String(url))) {
+      checkedVendorUrls.add(String(url));
+      await assertOwnedUploadReference(url, userId, purpose, type, label);
+    }
+  }
   const normalizedBusinessPhone = normalizeGambianContact(phone, 'Business phone');
   const normalizedWhatsapp = normalizeGambianContact(whatsappNumber, 'WhatsApp contact');
   let resolvedBusinessCategory = businessCategory ? String(businessCategory).trim() : null;
@@ -210,6 +223,8 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
 
 // ── UPDATE STORE PROFILE ─────────────────────────────────────────────
 async function updateProfile(userId, data) {
+  if (data.logoUrl !== undefined) await assertOwnedUploadReference(data.logoUrl,userId,'vendor-logo','image','Vendor logo');
+  if (data.bannerUrl !== undefined) await assertOwnedUploadReference(data.bannerUrl,userId,'banner','image','Vendor banner');
   const allowed = {
     businessName: 'business_name', businessCategory: 'business_category',
     businessCategoryGroup: 'business_category_group', whatsappNumber: 'whatsapp_number',

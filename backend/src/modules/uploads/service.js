@@ -241,6 +241,37 @@ async function uploadProfilePhoto(file, uploaderId) {
   }
 }
 
+async function assertOwnedUploadReference(url, uploaderId, expectedPurpose, expectedFileType, label) {
+  if (url == null || String(url).trim() === '') return null;
+  const value = String(url).trim();
+  let fileId = null;
+  try {
+    const pathname = new URL(value, publicApiBase()).pathname;
+    const parts = pathname.split('/').filter(Boolean);
+    const uploadsAt = parts.lastIndexOf('uploads');
+    if (uploadsAt >= 0 && parts[uploadsAt + 1] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parts[uploadsAt + 1])) {
+      fileId = parts[uploadsAt + 1];
+    }
+  } catch (e) {}
+  const result = fileId
+    ? await query('SELECT id,uploaded_by,purpose,file_type,deleted_at,file_url FROM file_uploads WHERE id=$1 AND deleted_at IS NULL LIMIT 1', [fileId])
+    : await query('SELECT id,uploaded_by,purpose,file_type,deleted_at,file_url FROM file_uploads WHERE file_url=$1 AND deleted_at IS NULL LIMIT 1', [value]);
+  const file = result.rows[0];
+  if (!file) throw new AppError((label || 'Uploaded file') + ' was not found. Upload it again before submitting.', 400, 'UPLOAD_NOT_FOUND');
+  if (String(file.uploaded_by) !== String(uploaderId)) {
+    throw new AppError((label || 'Uploaded file') + ' must belong to your MarketLink account.', 403, 'UPLOAD_NOT_OWNED');
+  }
+  const actualPurpose = String(file.purpose || '').toLowerCase().replace(/_/g, '-');
+  const allowedPurposes = Array.isArray(expectedPurpose) ? expectedPurpose : [expectedPurpose];
+  if (!allowedPurposes.map(x => String(x).toLowerCase().replace(/_/g, '-')).includes(actualPurpose)) {
+    throw new AppError((label || 'Uploaded file') + ' has the wrong upload category.', 400, 'UPLOAD_PURPOSE_MISMATCH');
+  }
+  if (expectedFileType && file.file_type !== expectedFileType) {
+    throw new AppError((label || 'Uploaded file') + ' has the wrong file type.', 400, 'UPLOAD_TYPE_MISMATCH');
+  }
+  return file;
+}
+
 async function getPublicProfileContent(fileId) {
   const {rows:[f]}=await query("SELECT content_bytes,content_type,purpose,file_type FROM file_uploads WHERE id=$1 AND deleted_at IS NULL",[fileId]);
   const purpose=String(f&&f.purpose||'').toLowerCase().replace(/_/g,'-');
@@ -347,6 +378,12 @@ async function deleteFile(fileId, requesterId, roles) {
       "SELECT EXISTS(SELECT 1 FROM cod_cash_remittances WHERE proof_url LIKE '%' || $1 || '/content') AS in_use",
       [String(fileId)]);
     if(reference && reference.in_use) throw new AppError('This receipt is attached to a cash remittance and must be retained for payment audit records.',409,'FILE_IN_USE');
+    const {rows:[attached]}=await client.query(
+      "SELECT (EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$2) " +
+      "OR EXISTS(SELECT 1 FROM vendors WHERE id_document_url LIKE '%' || $1 || '/content' OR shop_photo_url=$2 OR logo_url=$2) " +
+      "OR EXISTS(SELECT 1 FROM riders WHERE id_document_url LIKE '%' || $1 || '/content' OR license_document_url LIKE '%' || $1 || '/content' OR vehicle_photo_url=$2 OR profile_photo_url=$2)) AS in_use",
+      [String(fileId), f.file_url]);
+    if(attached && attached.in_use) throw new AppError('This file is attached to a customer profile or a vendor/rider application and must be retained for account and KYC records.',409,'FILE_IN_USE');
     if(f.storage_backend==='database') {
       await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[fileId]);
     } else {
@@ -369,10 +406,10 @@ async function deleteFileByUrl(url, requesterId) {
       [String(f.id)]);
     if(reference && reference.in_use) return {deleted:false,reason:'STILL_IN_USE'};
     const {rows:[refs]}=await client.query(
-      'SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, ' +
-      'EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1) AS rider_ref, ' +
-      'EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1) AS vendor_ref',
-      [url]);
+      "SELECT EXISTS(SELECT 1 FROM customers WHERE profile_photo_url=$1) AS customer_ref, " +
+      "EXISTS(SELECT 1 FROM riders WHERE profile_photo_url=$1 OR vehicle_photo_url=$1 OR id_document_url LIKE '%' || $2 || '/content' OR license_document_url LIKE '%' || $2 || '/content') AS rider_ref, " +
+      "EXISTS(SELECT 1 FROM vendors WHERE logo_url=$1 OR shop_photo_url=$1 OR id_document_url LIKE '%' || $2 || '/content') AS vendor_ref",
+      [url,String(f.id)]);
     if(refs && (refs.customer_ref || refs.rider_ref || refs.vendor_ref)) return {deleted:false,reason:'STILL_IN_USE'};
     if(f.storage_backend==='database') await client.query('UPDATE file_uploads SET deleted_at=now(),content_bytes=NULL WHERE id=$1',[f.id]);
     else {
@@ -393,4 +430,4 @@ async function removeProfilePhoto(requesterId) {
   }
   return {removed:true,profilePhotoUrl:null};
 }
-module.exports={upload,uploadProfilePhoto,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,getPublicProfileContent,validateFile};
+module.exports={upload,uploadProfilePhoto,deleteFile,deleteFileByUrl,removeProfilePhoto,getFile,getPublicProfileContent,assertOwnedUploadReference,validateFile};
