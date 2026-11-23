@@ -329,6 +329,7 @@
       var retained=Number(data.marketlinkRetainedPct||0),vendor=Number(data.vendorPayoutPct||0),delivery=Number(data.baseDeliveryFeeGmd==null?150:data.baseDeliveryFeeGmd);
       var deliveryPolicy={};try{deliveryPolicy=await adminRequest('/admin/delivery-pricing-settings','GET')||{};}catch(deliveryPolicyError){}
       var deliveryBase=Number(deliveryPolicy.baseFeeGmd==null?150:deliveryPolicy.baseFeeGmd),deliveryPerKm=Number(deliveryPolicy.perKmFeeGmd==null?10:deliveryPolicy.perKmFeeGmd),deliveryMinimum=Number(deliveryPolicy.minimumFeeGmd==null?150:deliveryPolicy.minimumFeeGmd),deliveryAllowedMinimum=Number(deliveryPolicy.minimumAllowedFeeGmd==null?150:deliveryPolicy.minimumAllowedFeeGmd),deliveryMaximum=Number(deliveryPolicy.maximumFeeGmd==null?5000:deliveryPolicy.maximumFeeGmd);
+      var allowRiderOverrides=deliveryPolicy.allowRiderOverrides!==false;
       var feeReport={};try{feeReport=await adminRequest('/admin/withdrawal-fees','GET')||{};}catch(feeReportError){}
       var feeSummary=feeReport.summary||{},feeRows=Array.isArray(feeReport.items)?feeReport.items:[];
       root.innerHTML='<div class="ml-premium-home">'+
@@ -361,6 +362,7 @@
           '<label>Lowest permitted fare (GMD)<input id="ml-delivery-allowed-min" type="number" min="0.01" max="5000" step="0.01" value="'+deliveryAllowedMinimum.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
           '<label>Highest permitted fare (GMD)<input id="ml-delivery-maximum" type="number" min="0.01" max="5000" step="0.01" value="'+deliveryMaximum.toFixed(2)+'" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"></label>'+
         '</div>'+
+        '<label style="display:flex;align-items:center;gap:9px;margin:12px 0;padding:12px;border:1px solid var(--bd);border-radius:12px"><input id="ml-delivery-rider-self-service" type="checkbox" '+(allowRiderOverrides?'checked':'')+'> <span><b>Allow riders to edit their own tariffs</b><small style="display:block;color:var(--mu);margin-top:3px">Turn this off to require Admin to set every rider’s base, kilometre and fixed-route prices. An active individual Admin override always takes priority.</small></span></label>'+
         '<div class="ml-wallet-note" style="margin:13px 0">Starter tariff: <b>D 150.00 + D 10.00 per estimated kilometre, with a D 150.00 minimum.</b> Riders can edit their own rate and add fixed routes; the Admin-approved minimum and maximum are enforced when customers receive quotes.</div>'+
         '<div style="display:flex;gap:9px;flex-wrap:wrap"><button class="ml-btn ml-btn-primary" id="ml-delivery-policy-save" onclick="window.__ML_ADMIN_DELIVERY_SAVE()">Save delivery price controls</button><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">Discard changes</button></div></section>'+
         '<section class="ml-profile-card" style="margin-top:14px;padding:16px"><div class="ml-section-head"><div><div class="ml-eyebrow">PAYOUT COST CONTROL</div><h3>DAHA withdrawal fee reconciliation</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">Refresh</button></div>'+
@@ -407,7 +409,8 @@
       perKmFeeGmd:read('ml-delivery-per-km'),
       minimumFeeGmd:read('ml-delivery-minimum'),
       minimumAllowedFeeGmd:read('ml-delivery-allowed-min'),
-      maximumFeeGmd:read('ml-delivery-maximum')
+      maximumFeeGmd:read('ml-delivery-maximum'),
+      allowRiderOverrides:Boolean(document.getElementById('ml-delivery-rider-self-service')&&document.getElementById('ml-delivery-rider-self-service').checked)
     };
     if(!Object.keys(payload).every(function(key){return Number.isFinite(payload[key]);})||
        payload.baseFeeGmd<0||payload.baseFeeGmd>2000||payload.perKmFeeGmd<0||payload.perKmFeeGmd>500||
@@ -843,9 +846,10 @@
       var results=await Promise.all([
         adminRequest('/admin/rider-pricing?'+queryRiders.toString(),'GET'),
         adminRequest('/admin/vendor-product-pricing?'+queryProducts.toString(),'GET'),
-        adminRequest('/admin/payment-readiness','GET')
+        adminRequest('/admin/payment-readiness','GET'),
+        adminRequest('/admin/delivery-pricing-settings','GET')
       ]);
-      var riderData=results[0]||{},productData=results[1]||{},payment=results[2]||{},riders=Array.isArray(riderData.items)?riderData.items:[],products=Array.isArray(productData.items)?productData.items:[];
+      var riderData=results[0]||{},productData=results[1]||{},payment=results[2]||{},pricePolicy=results[3]||{},riders=Array.isArray(riderData.items)?riderData.items:[],products=Array.isArray(productData.items)?productData.items:[];
       function routeEditorRows(routes){
         routes=Array.isArray(routes)?routes:[];
         if(!routes.length)routes=[{}];
@@ -853,10 +857,11 @@
           return '<div data-admin-route-row style="display:grid;grid-template-columns:1fr 1fr minmax(110px,.6fr) auto;gap:7px;align-items:end;margin:7px 0">'+
             '<label style="font-size:11px;color:var(--mu)">Pickup area<input data-route-origin class="inp" maxlength="120" value="'+adminSafe(route.originArea||route.origin_area||'')+'" placeholder="Serrekunda" style="display:block;width:100%;margin-top:4px"></label>'+
             '<label style="font-size:11px;color:var(--mu)">Destination<input data-route-destination class="inp" maxlength="120" value="'+adminSafe(route.destinationArea||route.destination_area||'')+'" placeholder="Brikama" style="display:block;width:100%;margin-top:4px"></label>'+
-            '<label style="font-size:11px;color:var(--mu)">Fixed fare (GMD)<input data-route-fee class="inp" type="number" min="150" max="5000" step=".01" value="'+(route.fixedFeeGmd==null?(route.fixed_fee_gmd==null?'':Number(route.fixed_fee_gmd).toFixed(2)):Number(route.fixedFeeGmd).toFixed(2))+'" placeholder="150.00" style="display:block;width:100%;margin-top:4px"></label>'+
+            '<label style="font-size:11px;color:var(--mu)">Fixed fare (GMD)<input data-route-fee class="inp" type="number" min="'+adminRouteMin.toFixed(2)+'" max="'+adminRouteMax.toFixed(2)+'" step=".01" value="'+(route.fixedFeeGmd==null?(route.fixed_fee_gmd==null?'':Number(route.fixed_fee_gmd).toFixed(2)):Number(route.fixedFeeGmd).toFixed(2))+'" placeholder="150.00" style="display:block;width:100%;margin-top:4px"></label>'+
             '<button type="button" class="ml-btn ml-btn-secondary" onclick="this.closest(\'[data-admin-route-row]\').remove()" style="padding:9px">Remove</button></div>';
         }).join('');
       }
+      var adminRouteMin=Number(pricePolicy.minimumAllowedFeeGmd==null?150:pricePolicy.minimumAllowedFeeGmd),adminRouteMax=Number(pricePolicy.maximumFeeGmd==null?5000:pricePolicy.maximumFeeGmd);
       var riderHtml=riders.length?riders.map(function(r){
         var override=r.admin_delivery_pricing_override||{};
         var active=r.adminOverrideActive||r.admin_delivery_pricing_override!=null;
@@ -873,7 +878,7 @@
             '<label style="font-size:11px;color:var(--mu)">Minimum fare (GMD)<input data-rider-min class="inp" type="number" min="150" max="5000" step=".01" value="'+(minimum==null?'150.00':Number(minimum).toFixed(2))+'" style="display:block;width:100%;margin-top:5px"></label>'+
           '</div>'+
           '<label style="display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px"><input data-rider-enabled type="checkbox" '+(enabled?'checked':'')+'> Allow this rider to receive new delivery quotes</label>'+
-          '<div style="margin-top:12px"><div class="ml-section-head"><b>Admin fixed routes</b><button type="button" class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_RIDER_ROUTE_ADD(\''+adminSafe(r.user_id)+'\')">＋ Add route</button></div><div data-rider-routes>'+routeEditorRows(routes)+'</div><small style="color:var(--mu)">Up to 20 routes. Admin fares must be within the current permitted range (D150–D5000). These prices are used for new quotes; already accepted orders stay locked.</small></div>'+
+          '<div style="margin-top:12px"><div class="ml-section-head"><b>Admin fixed routes</b><button type="button" class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_RIDER_ROUTE_ADD(\''+adminSafe(r.user_id)+'\')">＋ Add route</button></div><div data-rider-routes>'+routeEditorRows(routes)+'</div><small style="color:var(--mu)">Up to 20 routes. Admin fares must be within the current permitted range (D'+adminRouteMin.toFixed(2)+'–D'+adminRouteMax.toFixed(2)+'). These prices are used for new quotes; already accepted orders stay locked.</small></div>'+
           '<label style="display:block;font-size:11px;color:var(--mu);margin-top:10px">Reason for Admin override<input data-rider-note class="inp" maxlength="500" value="'+adminSafe(override.note||'')+'" placeholder="Why are you setting this rider tariff?" style="display:block;width:100%;margin-top:5px"></label>'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="ml-btn ml-btn-primary" onclick="window.__ML_ADMIN_RIDER_PRICE_SAVE(\''+adminSafe(r.user_id)+'\')">Save Admin rider prices</button>'+(active?'<button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_RIDER_PRICE_CLEAR(\''+adminSafe(r.user_id)+'\')">Restore rider’s own prices</button>':'')+'</div>'+
         '</article>';
@@ -922,7 +927,7 @@
   window.__ML_ADMIN_RIDER_PRICE_SAVE=async function(id){
     var card=document.getElementById('ml-admin-rider-price-'+id);if(!card)return;
     var value=function(sel){var el=card.querySelector(sel);return el?el.value:'';};
-    var routes=Array.from(card.querySelectorAll('[data-admin-route-row]')).map(function(row){return {originArea:row.querySelector('[data-route-origin]').value.trim(),destinationArea:row.querySelector('[data-route-destination]').value.trim(),fixedFeeGmd:Number(row.querySelector('[data-route-fee]').value)};}).filter(function(r){return r.originArea||r.destinationArea||Number.isFinite(r.fixedFeeGmd);});
+    var routes=Array.from(card.querySelectorAll('[data-admin-route-row]')).map(function(row){var originArea=row.querySelector('[data-route-origin]').value.trim(),destinationArea=row.querySelector('[data-route-destination]').value.trim(),feeText=row.querySelector('[data-route-fee]').value.trim();return {originArea:originArea,destinationArea:destinationArea,fixedFeeGmd:feeText===''?NaN:Number(feeText),feeEntered:feeText!==''};}).filter(function(r){return r.originArea||r.destinationArea||r.feeEntered;});
     var payload={enabled:Boolean(card.querySelector('[data-rider-enabled]').checked),baseFeeGmd:Number(value('[data-rider-base]')),perKmFeeGmd:Number(value('[data-rider-km]')),minimumFeeGmd:Number(value('[data-rider-min]')),routeRates:routes,note:String(value('[data-rider-note]')||'').trim()};
     if(!Number.isFinite(payload.baseFeeGmd)||!Number.isFinite(payload.perKmFeeGmd)||!Number.isFinite(payload.minimumFeeGmd)||!payload.note){if(window.toast)window.toast('Enter all three GMD prices and a reason for the Admin override.','error');return;}
     if(routes.some(function(r){return !r.originArea||!r.destinationArea||!Number.isFinite(r.fixedFeeGmd);})){if(window.toast)window.toast('Complete the pickup area, destination and fixed fare on every route, or remove the empty row.','error');return;}
