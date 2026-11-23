@@ -4638,7 +4638,7 @@ function renderRDash(){
     var pricing=S.rDeliveryPricing||{};
     var savedRates=Array.isArray(pricing.routeRates)?pricing.routeRates:[];
     var pricingPolicy=pricing.adminPolicy||{};
-    var routeMin=Number(pricingPolicy.minimumAllowedFeeGmd||1),routeMax=Number(pricingPolicy.maximumFeeGmd||5000);
+    var routeMin=Number(pricingPolicy.minimumAllowedFeeGmd||150),routeMax=Number(pricingPolicy.maximumFeeGmd||5000);
     var routeRows=savedRates.map(function(rate,index){
       return '<div class="ml-rider-route-row">'+
         '<label><span>Pickup area</span><input class="ml-daha-input" data-route-origin value="'+sanitizeText(rate.originArea||'')+'" maxlength="120" placeholder="e.g. Serrekunda"></label>'+
