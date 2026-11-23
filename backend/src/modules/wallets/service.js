@@ -5,7 +5,7 @@ const { query } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const modemPay = require('../../integrations/modempay');
 const withdrawalsService = require('../withdrawals/service');
-const {validateWithdrawalFeePct,DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT}=require('../../utils/walletWithdrawalFees');
+const {validateWithdrawalFeePct,resolveWithdrawalServiceFeePct,DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT}=require('../../utils/walletWithdrawalFees');
 
 const DEPOSIT_METHODS = ['modempay', 'wave', 'afrimoney', 'qmoney'];
 const PAYOUT_METHODS = ['wave', 'afrimoney'];
@@ -31,8 +31,16 @@ async function getWallet(userId) {
     [userId]
   );
   const held = Number(pending?.amount || 0);
-  const {rows:[feeSetting]}=await query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1",['withdrawal_service_fee_pct']);
-  const withdrawalServiceFeePct=validateWithdrawalFeePct(feeSetting?feeSetting.value:DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,500);
+  const [{rows:[feeSetting]},{rows:[payeeRole]}]=await Promise.all([
+    query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1",['withdrawal_service_fee_pct']),
+    query(`SELECT EXISTS(SELECT 1 FROM vendors WHERE user_id=$1) AS is_vendor,
+                  EXISTS(SELECT 1 FROM riders WHERE user_id=$1) AS is_rider,
+                  EXISTS(SELECT 1 FROM affiliates WHERE user_id=$1) AS is_affiliate`,[userId])
+  ]);
+  const withdrawalServiceFeePct=resolveWithdrawalServiceFeePct({
+    isMarketplacePayee:Boolean(payeeRole&&(payeeRole.is_vendor||payeeRole.is_rider||payeeRole.is_affiliate)),
+    configuredFeePct:feeSetting?feeSetting.value:DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT
+  });
   return {...wallet,balance:Number(wallet.balance),reserved_balance:held,available_balance:Math.max(0,Number(wallet.balance)-held),withdrawal_service_fee_pct:withdrawalServiceFeePct};
 }
 
