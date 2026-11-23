@@ -117,7 +117,7 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
     if (!wallet) throw new AppError('DAHA Wallet is not available for this account.', 404, 'WALLET_NOT_FOUND');
 
     const { rows: [pending] } = await client.query(
-      "SELECT COALESCE(SUM(amount),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
+      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
       [customerId]
     );
     const available = Number(wallet.balance) - Number(pending?.amount || 0);

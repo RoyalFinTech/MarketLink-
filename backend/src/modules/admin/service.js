@@ -1,7 +1,8 @@
 // src/modules/admin/service.js
 'use strict';
 const { query, withTransaction } = require('../../config/db');
-const { SETTING_KEYS, commissionSettingsFromRows, validateCommissionSettings } = require('../../utils/marketplaceCommission');
+const { SETTING_KEYS, commissionSettingsFromRows, validateCommissionSettings, withdrawalFeePctFromRows } = require('../../utils/marketplaceCommission');
+const { validateWithdrawalFeePct } = require('../../utils/walletWithdrawalFees');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -249,20 +250,30 @@ async function getAnalytics({ period='30d' }) {
 }
 
 async function getMarketplaceCommissionSettings(){
-  const {rows}=await query("SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",[[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate]]);
-  return {...commissionSettingsFromRows(rows),baseDeliveryFeeGmd:Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD||25),customerGatewayFeeEnabled:false,appliesTo:'future_orders_only'};
+  const {rows}=await query("SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",[[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate,SETTING_KEYS.withdrawal]]);
+  return {...commissionSettingsFromRows(rows),withdrawalServiceFeePct:withdrawalFeePctFromRows(rows),baseDeliveryFeeGmd:Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD||25),customerGatewayFeeEnabled:false,appliesTo:'future_orders_only'};
 }
 async function updateMarketplaceCommissionSettings(input,actor){
   const settings=validateCommissionSettings(input);
   return withTransaction(async client=>{
-    const {rows:beforeRows}=await client.query("SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",[[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate]]);
-    const before=commissionSettingsFromRows(beforeRows);
-    for(const [key,value] of [[SETTING_KEYS.marketplace,settings.marketplaceCommissionPct],[SETTING_KEYS.affiliate,settings.affiliateCommissionPct]]){
+    const {rows:beforeRows}=await client.query("SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",[[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate,SETTING_KEYS.withdrawal]]);
+    const before={...commissionSettingsFromRows(beforeRows),withdrawalServiceFeePct:withdrawalFeePctFromRows(beforeRows)};
+    const withdrawalServiceFeePct=validateWithdrawalFeePct(input.withdrawalServiceFeePct===undefined?before.withdrawalServiceFeePct:input.withdrawalServiceFeePct,400);
+    for(const [key,value] of [[SETTING_KEYS.marketplace,settings.marketplaceCommissionPct],[SETTING_KEYS.affiliate,settings.affiliateCommissionPct],[SETTING_KEYS.withdrawal,withdrawalServiceFeePct]]){
       await client.query("INSERT INTO system_settings(key,value,category,updated_by) VALUES($1,$2::jsonb,'finance',$3) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,category='finance',updated_by=EXCLUDED.updated_by,updated_at=now()",[key,JSON.stringify(value),actor.id]);
     }
-    await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,'finance.commission_settings_updated','commission_settings',NULL,$3,$4)",[actor.id,actor.role||'admin',JSON.stringify(before),JSON.stringify(settings)]);
-    return {...settings,baseDeliveryFeeGmd:Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD||25),customerGatewayFeeEnabled:false,appliesTo:'future_orders_only'};
+    const after={...settings,withdrawalServiceFeePct};
+    await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,'finance.commission_settings_updated','commission_settings',NULL,$3,$4)",[actor.id,actor.role||'admin',JSON.stringify(before),JSON.stringify(after)]);
+    return {...after,baseDeliveryFeeGmd:Number(process.env.MARKETLINK_BASE_DELIVERY_FEE_GMD||25),customerGatewayFeeEnabled:false,appliesTo:'future_orders_only'};
   });
+}
+async function getWithdrawalFeeReport({page=1,limit=50}={}){
+ const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||50,1),100),offset=(page_-1)*limit_;
+ const [summary,rows]=await Promise.all([
+  query(`SELECT count(*)::int AS total,coalesce(sum(service_fee_amount) FILTER(WHERE status='completed'),0) AS service_fees_earned,coalesce(sum(COALESCE(provider_fee_amount,provider_fee_quote)) FILTER(WHERE status='completed' OR provider_status='reversed'),0) AS provider_fees_paid,coalesce(sum(platform_fee_margin) FILTER(WHERE status='completed' OR provider_status='reversed'),0) AS platform_net_margin,coalesce(sum(wallet_debit_amount) FILTER(WHERE status='completed'),0) AS wallet_debits,coalesce(sum(amount) FILTER(WHERE status='completed'),0) AS payouts_sent FROM withdrawals`),
+  query(`SELECT w.id,w.user_id,u.full_name AS account_name,w.payout_method,w.amount,w.service_fee_pct,w.service_fee_amount,w.wallet_debit_amount,w.provider_fee_quote,w.provider_fee_amount,w.provider_fee_source,w.platform_fee_margin,w.provider_status,w.status,w.created_at,w.processed_at FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC LIMIT $1 OFFSET $2`,[limit_,offset])
+ ]);
+ return {summary:summary.rows[0],items:rows.rows,total:Number(summary.rows[0]?.total||0),page:page_,limit:limit_};
 }
 
 async function getSystemSettings() {
@@ -673,4 +684,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getWithdrawalFeeReport, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };

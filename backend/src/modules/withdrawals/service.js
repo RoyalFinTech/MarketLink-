@@ -7,6 +7,7 @@ const modemPay = require('../../integrations/modempay');
 // a row lock (SELECT ... FOR UPDATE) to prevent concurrent double-withdrawals.
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
+const { calculateWithdrawalDebit, validateWithdrawalFeePct, DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, roundGmd } = require('../../utils/walletWithdrawalFees');
 
 const MIN_WITHDRAWAL = 50; // GMD — floor to avoid churn on tiny payout requests
 
@@ -14,7 +15,7 @@ async function getBalance(userId) {
   const { rows: [w] } = await query('SELECT id,balance,currency FROM wallets WHERE user_id=$1', [userId]);
   if (!w) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
   const { rows: [pending] } = await query(
-    "SELECT COALESCE(SUM(amount),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
+    "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
     [userId]
   );
   const reserved = Number(pending && pending.amount || 0);
@@ -74,17 +75,22 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
     }
     if (!beneficiaryName || beneficiaryName.length > 150) throw new AppError('Enter the account holder name for the payout.', 400, 'BENEFICIARY_REQUIRED');
 
+    const { rows: [feeSetting] } = await client.query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1", ['withdrawal_service_fee_pct']);
+    const feePct = validateWithdrawalFeePct(feeSetting ? feeSetting.value : DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, 500);
+    const debit = calculateWithdrawalDebit(amount, feePct);
     const { rows: [wallet] } = await client.query('SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE', [userId]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
     const { rows: [pendingRow] } = await client.query(
-      "SELECT COALESCE(SUM(amount),0) AS pending FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')", [userId]);
+      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS pending FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')", [userId]);
     const available = Number(wallet.balance) - Number(pendingRow.pending || 0);
-    if (amount - available > 0.0001) {
-      throw new AppError('Insufficient available balance. Available: ' + Math.max(0,available).toFixed(2) + ', requested: ' + amount.toFixed(2) + '.', 400, 'INSUFFICIENT_BALANCE');
+    if (debit.walletDebitAmount - available > 0.0001) {
+      throw new AppError('Insufficient available balance. Available: D ' + Math.max(0,available).toFixed(2) +
+        '. Wallet debit including the ' + feePct.toFixed(2) + '% DAHA service fee is D ' + debit.walletDebitAmount.toFixed(2) + '.',400,'INSUFFICIENT_BALANCE');
     }
     const { rows: [wd] } = await client.query(
-      "INSERT INTO withdrawals (user_id,wallet_id,amount,payout_method,payout_details,status) VALUES ($1,$2,$3,$4,$5,'processing') RETURNING *",
-      [userId, wallet.id, amount, payoutMethod, JSON.stringify({ account_number: accountNumber, beneficiary_name: beneficiaryName })]);
+      "INSERT INTO withdrawals (user_id,wallet_id,amount,wallet_debit_amount,service_fee_pct,service_fee_amount,payout_method,payout_details,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'processing') RETURNING *",
+      [userId,wallet.id,debit.payoutAmount,debit.walletDebitAmount,debit.serviceFeePct,debit.serviceFeeAmount,payoutMethod,
+       JSON.stringify({account_number:accountNumber,beneficiary_name:beneficiaryName})]);
     return wd;
   });
 }
@@ -158,10 +164,11 @@ async function approve(withdrawalId, adminUserId) {
       'SELECT id,balance FROM wallets WHERE id=$1 FOR UPDATE', [wd.wallet_id]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
     const { rows: [otherPending] } = await client.query(
-      "SELECT COALESCE(SUM(amount),0) AS amount FROM withdrawals WHERE user_id=$1 AND id<>$2 AND status IN ('processing','payout_pending')",
+      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND id<>$2 AND status IN ('processing','payout_pending')",
       [wd.user_id, wd.id]);
     const available = Number(wallet.balance) - Number(otherPending.amount || 0);
-    if (Number(wd.amount) - available > 0.0001) {
+    const requiredWalletDebit = Number(wd.wallet_debit_amount || (Number(wd.amount) + Number(wd.service_fee_amount || 0)));
+    if (requiredWalletDebit - available > 0.0001) {
       throw new AppError('The available DAHA balance is no longer sufficient for this withdrawal.', 409, 'INSUFFICIENT_BALANCE');
     }
 
@@ -173,6 +180,20 @@ async function approve(withdrawalId, adminUserId) {
 
   const wd = reservation.withdrawal;
   const idempotencyKey = 'marketlink-withdrawal-' + wd.id;
+  try {
+    const feeQuote = await modemPay.quoteTransferFee({amount:Number(wd.amount),currency:'GMD',network:reservation.network});
+    const feeData = feeQuote && feeQuote.data ? feeQuote.data : (feeQuote || {});
+    const quotedFee = Number(feeData.fee);
+    if (!Number.isFinite(quotedFee) || quotedFee < 0 || String(feeData.currency || 'GMD').toUpperCase() !== 'GMD' ||
+        String(feeData.network || reservation.network).toLowerCase() !== reservation.network) {
+      throw new Error('Modem Pay returned an invalid GMD payout fee quote.');
+    }
+    await query("UPDATE withdrawals SET provider_fee_quote=$1,provider_fee_quoted_at=now(),provider_status='fee_quoted',updated_at=now() WHERE id=$2 AND status='payout_pending'",[roundGmd(quotedFee),wd.id]);
+  } catch (err) {
+    await query("UPDATE withdrawals SET status='processing',provider_status='fee_quote_failed',provider_response=$1,updated_at=now() WHERE id=$2 AND status='payout_pending'",
+      [JSON.stringify({feeQuoteFailed:true,error:String(err && (err.code || err.message) || 'fee_quote_failed').slice(0,160)}),wd.id]).catch(()=>null);
+    throw new AppError('MarketLink could not verify the Modem Pay payout fee. No money was sent; your withdrawal remains reserved for Admin retry.',503,'PAYOUT_FEE_QUOTE_FAILED');
+  }
   let transfer;
   try {
     transfer = await modemPay.initiateTransfer({
@@ -250,47 +271,44 @@ async function approve(withdrawalId, adminUserId) {
 
 async function completeProviderWithdrawal(withdrawalId, transfer = {}) {
   return withTransaction(async (client) => {
-    const { rows: [wd] } = await client.query(
-      'SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [withdrawalId]);
-    if (!wd) throw new AppError('Withdrawal not found.', 404, 'WITHDRAWAL_NOT_FOUND');
-    if (wd.status === 'completed') return wd;
-    if (wd.status !== 'payout_pending') return { ignored: true, reason: 'withdrawal_not_pending' };
+    const { rows: [wd] } = await client.query('SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE',[withdrawalId]);
+    if (!wd) throw new AppError('Withdrawal not found.',404,'WITHDRAWAL_NOT_FOUND');
+    if (wd.status==='completed') return wd;
+    if (wd.status!=='payout_pending') return {ignored:true,reason:'withdrawal_not_pending'};
+    const metadata=transfer.metadata||{};
+    if(metadata.withdrawal_id&&String(metadata.withdrawal_id)!==String(wd.id))return {ignored:true,reason:'withdrawal_metadata_mismatch'};
+    const refs=[transfer.id,transfer.transfer_reference,transfer.transaction_reference,transfer.reference].filter(Boolean).map(String);
+    if(!wd.provider_ref||!refs.includes(String(wd.provider_ref)))return {ignored:true,reason:'provider_reference_mismatch'};
+    const providerAmount=Number(transfer.amount);
+    if(!Number.isFinite(providerAmount)||Math.abs(providerAmount-Number(wd.amount))>0.01)return {ignored:true,reason:'amount_mismatch'};
+    if(String(transfer.currency||'').toUpperCase()!=='GMD')return {ignored:true,reason:'currency_mismatch'};
+    if(!['completed','succeeded','success'].includes(String(transfer.status||'').toLowerCase()))return {ignored:true,reason:'transfer_not_confirmed'};
 
-    const metadata = transfer.metadata || {};
-    if (metadata.withdrawal_id && String(metadata.withdrawal_id) !== String(wd.id)) {
-      return { ignored: true, reason: 'withdrawal_metadata_mismatch' };
-    }
-    const references = [
-      transfer.id, transfer.transfer_reference, transfer.transaction_reference, transfer.reference,
-    ].filter(Boolean).map(String);
-    if (!wd.provider_ref || !references.includes(String(wd.provider_ref))) {
-      return { ignored: true, reason: 'provider_reference_mismatch' };
-    }
-    const providerAmount = Number(transfer.amount);
-    if (!Number.isFinite(providerAmount) || Math.abs(providerAmount - Number(wd.amount)) > 0.01) {
-      return { ignored: true, reason: 'amount_mismatch' };
-    }
-    if (String(transfer.currency || '').toUpperCase() !== 'GMD') {
-      return { ignored: true, reason: 'currency_mismatch' };
-    }
-    if (!['completed','succeeded','success'].includes(String(transfer.status || '').toLowerCase())) {
-      return { ignored: true, reason: 'transfer_not_confirmed' };
-    }
+    const payoutAmount=Number(wd.amount),serviceFeeAmount=Number(wd.service_fee_amount||0);
+    const walletDebitAmount=Number(wd.wallet_debit_amount||(payoutAmount+serviceFeeAmount));
+    const feeValue=transfer.fee??transfer.provider_fee??transfer.fees?.total;
+    const providerFee=feeValue==null||feeValue===''?(wd.provider_fee_quote==null?NaN:Number(wd.provider_fee_quote)):Number(feeValue);
+    const feeKnown=Number.isFinite(providerFee)&&providerFee>=0;
+    const margin=feeKnown?roundGmd(serviceFeeAmount-providerFee):null;
+    const feeSource=feeValue==null||feeValue===''?(feeKnown?'provider_quote_estimate':'missing'):'confirmed_transfer_response';
 
-    const { rows: [wallet] } = await client.query(
+    const {rows:[wallet]}=await client.query(
       'UPDATE wallets SET balance=balance-$1,updated_at=now() WHERE id=$2 AND balance >= $1 RETURNING id,balance',
-      [wd.amount, wd.wallet_id]);
-    if (!wallet) throw new AppError('Wallet balance is insufficient after provider confirmation.', 409, 'INSUFFICIENT_BALANCE');
-
+      [walletDebitAmount,wd.wallet_id]);
+    if(!wallet)throw new AppError('Wallet balance is insufficient after provider confirmation.',409,'INSUFFICIENT_BALANCE');
+    const payoutBalanceAfter=roundGmd(Number(wallet.balance)+serviceFeeAmount);
     await client.query(
-      "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','withdrawal',$2,$3,'withdrawal',$4,'DAHA withdrawal confirmed by payment partner')",
-      [wallet.id, wd.amount, wallet.balance, wd.id]);
-    const { rows: [updated] } = await client.query(
-      "UPDATE withdrawals SET status='completed',provider_status='completed',provider_response=$1,processed_at=now(),updated_at=now() WHERE id=$2 RETURNING *",
-      [JSON.stringify(transfer), wd.id]);
+      "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','withdrawal',$2,$3,'withdrawal',$4,'DAHA Wallet payout confirmed by Modem Pay')",
+      [wallet.id,payoutAmount,payoutBalanceAfter,wd.id]);
+    if(serviceFeeAmount>0)await client.query(
+      "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','withdrawal_service_fee',$2,$3,'withdrawal',$4,'DAHA Wallet withdrawal service fee')",
+      [wallet.id,serviceFeeAmount,wallet.balance,wd.id]);
+    const {rows:[updated]}=await client.query(
+      "UPDATE withdrawals SET status='completed',provider_status='completed',provider_fee_amount=$2,provider_fee_source=$3,platform_fee_margin=$4,provider_response=$5,processed_at=now(),updated_at=now() WHERE id=$1 RETURNING *",
+      [wd.id,feeKnown?roundGmd(providerFee):null,feeSource,margin,JSON.stringify(transfer)]);
     await client.query(
       "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_completed','DAHA withdrawal completed',$2,'withdrawal',$3)",
-      [wd.user_id, 'Your DAHA Wallet withdrawal of D ' + Number(wd.amount).toFixed(2) + ' has been confirmed by our payment partner.', wd.id]);
+      [wd.user_id,'Your DAHA Wallet payout of D '+payoutAmount.toFixed(2)+' was confirmed. DAHA withdrawal service fee: D '+serviceFeeAmount.toFixed(2)+'. Total wallet debit: D '+walletDebitAmount.toFixed(2)+'.',wd.id]);
     return updated;
   });
 }
@@ -425,15 +443,21 @@ async function processProviderWebhook(event) {
         return { processed:true, data:updated, fundsDebited:false };
       }
       if (wd.status !== 'completed') return { ignored:true, reason:'withdrawal_not_reversible' };
+      const payoutAmount=Number(wd.amount),serviceFeeAmount=Number(wd.service_fee_amount||0);
+      const walletDebitAmount=Number(wd.wallet_debit_amount||(payoutAmount+serviceFeeAmount));
       const { rows: [wallet] } = await client.query(
         'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING id,balance',
-        [wd.amount,wd.wallet_id]);
+        [walletDebitAmount,wd.wallet_id]);
       if (!wallet) throw new AppError('Wallet not found while reversing a payout.',404,'WALLET_NOT_FOUND');
+      const balanceAfterPayoutRefund=roundGmd(Number(wallet.balance)-serviceFeeAmount);
       await client.query(
-        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','withdrawal_reversal',$2,$3,'withdrawal',$4,'DAHA withdrawal reversed by payment partner')",
-        [wallet.id,wd.amount,wallet.balance,wd.id]);
+        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','withdrawal_reversal',$2,$3,'withdrawal',$4,'DAHA payout reversed by payment partner')",
+        [wallet.id,payoutAmount,balanceAfterPayoutRefund,wd.id]);
+      if(serviceFeeAmount>0)await client.query(
+        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'credit','withdrawal_fee_reversal',$2,$3,'withdrawal',$4,'DAHA service fee returned after payout reversal')",
+        [wallet.id,serviceFeeAmount,wallet.balance,wd.id]);
       const { rows: [updated] } = await client.query(
-        "UPDATE withdrawals SET status='rejected',provider_status='reversed',provider_response=$1,processed_at=now(),updated_at=now() WHERE id=$2 RETURNING *",
+        "UPDATE withdrawals SET status='rejected',provider_status='reversed',platform_fee_margin=-COALESCE(provider_fee_amount,provider_fee_quote,0),provider_response=$1,processed_at=now(),updated_at=now() WHERE id=$2 RETURNING *",
         [JSON.stringify(payload),wd.id]);
       await client.query(
         "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_reversed','DAHA withdrawal reversed','The payment partner reversed the payout. The amount has been returned to your DAHA Wallet.','withdrawal',$2)",

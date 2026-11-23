@@ -2186,3 +2186,30 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-payment-setting-choice{display:flex!important;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(255,255,255,.09)!important;margin:7px 0}
 .ml-payment-setting-choice[aria-pressed="true"]{border-color:rgba(66,210,201,.65)!important;background:rgba(13,115,119,.13)!important}
 .ml-payment-setting-action{flex:0 0 auto;color:#42D2C9;font-size:10px;font-weight:800;padding:7px 10px;border:1px solid rgba(66,210,201,.28);border-radius:8px}
+
+
+/* DAHA Wallet payout-provider logos and withdrawal rail picker. */
+.ml-payout-brand-picker{position:relative;width:100%;z-index:12}
+.ml-payout-brand-trigger{display:flex!important;align-items:center;justify-content:flex-start;gap:11px;width:100%;min-height:48px;padding:8px 12px!important;text-align:left!important;cursor:pointer;color:inherit!important;background:#102637!important;border:1px solid #718B9B!important;border-radius:11px!important}
+.ml-payout-brand-trigger>span:nth-child(2){flex:1;font-weight:800;font-size:13px}
+.ml-payout-brand-chevron{margin-left:auto;color:#D8C18D;font-size:15px}
+.ml-payout-brand-logo{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;overflow:hidden;background:#fff;border:1px solid rgba(20,45,60,.12);border-radius:9px;padding:3px;box-sizing:border-box}
+.ml-payout-brand-logo img{display:block;max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}
+.ml-payout-brand-logo [hidden]{display:none!important}
+.ml-payout-brand-logo span{place-items:center;width:100%;height:100%;font-size:11px;font-weight:900;color:#17313D}
+.ml-payout-brand-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:1200;display:grid;gap:5px;padding:7px;background:#0D2030;border:1px solid rgba(244,198,104,.32);border-radius:13px;box-shadow:0 18px 42px rgba(0,0,0,.38)}
+.ml-payout-brand-menu[hidden]{display:none!important}
+.ml-payout-brand-option{display:flex;align-items:center;gap:10px;width:100%;min-height:54px;padding:7px 9px;text-align:left;color:#F2F6F8;background:transparent;border:1px solid transparent;border-radius:9px;cursor:pointer}
+.ml-payout-brand-option:not(:disabled):hover,.ml-payout-brand-option:not(:disabled):focus-visible{background:rgba(244,198,104,.1);border-color:rgba(244,198,104,.25);outline:none}
+.ml-payout-brand-option.selected{background:rgba(13,115,119,.2);border-color:rgba(66,210,201,.38)}
+.ml-payout-brand-option:disabled{opacity:.48;cursor:not-allowed}
+.ml-payout-brand-copy{display:grid;gap:2px;flex:1;min-width:0}
+.ml-payout-brand-copy b{font-size:12px}
+.ml-payout-brand-copy small{color:#AFC0CB;font-size:10px;line-height:1.35}
+.ml-payout-brand-status{font-size:10px;font-weight:800;color:#E8C778}
+.ml-daha-review-total{border-top:1px solid rgba(244,198,104,.32);padding-top:12px;margin-top:5px}
+.ml-daha-review-total strong{font-size:16px;color:#FFD778}
+.lm .ml-payout-brand-trigger{color:#172B36!important;background:#FFFFFF!important;border-color:#829BA7!important}
+.lm .ml-payout-brand-menu{background:#FFFFFF;border-color:#CCD8DE;box-shadow:0 15px 35px rgba(16,42,54,.18)}
+.lm .ml-payout-brand-option{color:#17313D}
+.lm .ml-payout-brand-copy small{color:#536A75}

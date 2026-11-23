@@ -24,6 +24,7 @@ exports.affiliates = wrap(async (req,res) => res.json({ success:true, data: awai
 const financialReconciliationSvc = require('./financialReconciliation');
 exports.financialReconciliation = wrap(async (req,res) => res.json({ success:true, data: await financialReconciliationSvc.getFinancialReconciliation(req.query) }));
 exports.transactions = wrap(async (req,res) => res.json({ success:true, data: await svc.getAdminTransactions(req.query) }));
+exports.withdrawalFeeReport = wrap(async (req,res) => res.json({ success:true, data: await svc.getWithdrawalFeeReport(req.query) }));
 exports.failedPayments = wrap(async (req,res) => res.json({ success:true, data: await svc.getFailedPayments(req.query) }));
 
 exports.retryFinancialSettlement = wrap(async (req,res) => {

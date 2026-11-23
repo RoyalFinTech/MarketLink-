@@ -171,6 +171,14 @@ async function initiateTransfer({ amount, currency='GMD', network, accountNumber
   });
 }
 
+async function quoteTransferFee({ amount, currency='GMD', network } = {}) {
+  const value = Number(amount);
+  const rail = String(network || '').trim().toLowerCase();
+  if (!Number.isFinite(value) || value <= 0 || !['wave','afrimoney'].includes(rail)) throw new AppError('A valid GMD payout amount and supported network are required for fee quotation.',400,'INVALID_PAYOUT_FEE_QUOTE');
+  const response = await modemRequest('/transfers/fees',{method:'POST',body:{amount:value,currency:String(currency||'GMD').toUpperCase(),network:rail}});
+  return response?.data || response;
+}
+
 function verifyWebhookSignature(rawBody, signature, canonicalBody) {
   const crypto = require('crypto');
   if (!signature || !rawBody) return false;
@@ -197,5 +205,5 @@ function verifyWebhookSignature(rawBody, signature, canonicalBody) {
 
 module.exports = {
   createPaymentIntent, confirmCharge, finalizeCharge, getTransaction,
-  initiateTransfer, verifyWebhookSignature, isH2H, isConfigured, isWebhookConfigured, isH2HApproved,
+  initiateTransfer, quoteTransferFee, verifyWebhookSignature, isH2H, isConfigured, isWebhookConfigured, isH2HApproved,
 };

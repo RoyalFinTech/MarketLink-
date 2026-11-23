@@ -5,6 +5,7 @@ const { query } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const modemPay = require('../../integrations/modempay');
 const withdrawalsService = require('../withdrawals/service');
+const {validateWithdrawalFeePct,DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT}=require('../../utils/walletWithdrawalFees');
 
 const DEPOSIT_METHODS = ['modempay', 'wave', 'afrimoney', 'qmoney'];
 const PAYOUT_METHODS = ['wave', 'afrimoney'];
@@ -26,16 +27,13 @@ async function ensureWallet(userId) {
 async function getWallet(userId) {
   const wallet = await ensureWallet(userId);
   const { rows: [pending] } = await query(
-    "SELECT COALESCE(SUM(amount),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
+    "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
     [userId]
   );
   const held = Number(pending?.amount || 0);
-  return {
-    ...wallet,
-    balance: Number(wallet.balance),
-    reserved_balance: held,
-    available_balance: Math.max(0, Number(wallet.balance) - held),
-  };
+  const {rows:[feeSetting]}=await query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1",['withdrawal_service_fee_pct']);
+  const withdrawalServiceFeePct=validateWithdrawalFeePct(feeSetting?feeSetting.value:DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,500);
+  return {...wallet,balance:Number(wallet.balance),reserved_balance:held,available_balance:Math.max(0,Number(wallet.balance)-held),withdrawal_service_fee_pct:withdrawalServiceFeePct};
 }
 
 async function listTransactions(userId, { page = 1, limit = 30 } = {}) {

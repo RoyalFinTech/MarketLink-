@@ -5,11 +5,13 @@ const crypto = require('crypto');
 describe('Modem Pay configuration and webhook verification', () => {
   const original = {};
   const keys = ['MODEM_PAY_API_KEY','MODEM_PAY_API_MODE','MODEM_PAY_CALLBACK_URL','MODEM_PAY_WEBHOOK_SECRET','MODEM_WEBHOOK_SECRET','MODEM_PAY_SECRET_HASH'];
+  const originalFetch = global.fetch;
   beforeEach(() => {
     for (const key of keys) { original[key] = process.env[key]; delete process.env[key]; }
     jest.resetModules();
   });
   afterEach(() => {
+    global.fetch = originalFetch;
     for (const key of keys) {
       if (original[key] === undefined) delete process.env[key];
       else process.env[key] = original[key];
@@ -68,6 +70,33 @@ describe('Modem Pay configuration and webhook verification', () => {
     const signature = crypto.createHmac('sha512', secret).update(canonical).digest('hex');
     const modemPay = require('./modempay');
     expect(modemPay.verifyWebhookSignature(raw, signature, canonical)).toBe(true);
+  });
+
+  test('quotes a GMD mobile-money payout fee before sending money', async () => {
+    process.env.MODEM_PAY_API_KEY = 'sk_test_marketlink_quote';
+    const responseBody = { data: { fee: 1.25, currency: 'GMD', network: 'wave', amount: 100 } };
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(responseBody),
+    });
+    global.fetch = fetchMock;
+    const modemPay = require('./modempay');
+    const quote = await modemPay.quoteTransferFee({ amount: 100, currency: 'GMD', network: 'wave' });
+    expect(quote).toEqual(responseBody.data);
+    expect(fetchMock).toHaveBeenCalledWith('https://api.modempay.com/v1/transfers/fees', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ amount: 100, currency: 'GMD', network: 'wave' }),
+    }));
+  });
+
+  test('rejects unsupported payout rails before calling Modem Pay', async () => {
+    process.env.MODEM_PAY_API_KEY = 'sk_test_marketlink_quote';
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const modemPay = require('./modempay');
+    await expect(modemPay.quoteTransferFee({ amount: 100, currency: 'GMD', network: 'qmoney' }))
+      .rejects.toMatchObject({ code: 'INVALID_PAYOUT_FEE_QUOTE' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test('fails closed when no webhook signing secret is configured', () => {

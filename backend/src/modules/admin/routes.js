@@ -24,6 +24,7 @@ router.get('/commission-settings', authenticate, authorize(...ADMIN), ctrl.commi
 router.put('/commission-settings', authenticate, authorize(...ADMIN), [
   body('marketplaceCommissionPct').isFloat({min:0,max:20}),
   body('affiliateCommissionPct').isFloat({min:0,max:20}),
+  body('withdrawalServiceFeePct').optional().isFloat({min:0,max:10}),
 ], validate, ctrl.updateCommissionSettings);
 router.get('/settings',    authenticate, authorize(...SA), ctrl.settings);
 router.put('/settings/:key', authenticate, authorize(...SA),
@@ -63,6 +64,8 @@ router.post('/financial-reconciliation/orders/:id/retry-settlement',
   ],
   validate, ctrl.retryFinancialSettlement);
 
+router.get('/withdrawal-fees', authenticate, authorize(...ADMIN),
+  [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})], validate, ctrl.withdrawalFeeReport);
 router.get('/withdrawals',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
   validate, ctrl.pendingWithdrawals);
