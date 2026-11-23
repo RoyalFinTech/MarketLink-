@@ -215,11 +215,24 @@ async function updateProfile(userId, data) {
 async function setAvailability(userId, isOnline) {
   return withTransaction(async (client) => {
     const {rows:[rider]}=await client.query(
-      "SELECT user_id,delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
+      "SELECT user_id,delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd,admin_delivery_pricing_override FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
     if(!rider)throw new AppError('Only approved riders can toggle availability.',403,'NOT_APPROVED');
-    if(Boolean(isOnline) && (!rider.delivery_pricing_enabled ||
-       rider.delivery_base_fee_gmd===null || rider.delivery_per_km_fee_gmd===null || rider.delivery_min_fee_gmd===null)) {
-      throw new AppError('Save your delivery prices in Rider Dashboard → Pricing before going online.',409,'DELIVERY_PRICING_REQUIRED');
+    if(Boolean(isOnline)) {
+      const {rows:[policyRow]}=await client.query("SELECT value FROM system_settings WHERE key=$1",['delivery_pricing_policy']);
+      const policy=normaliseDeliveryPricingPolicy(policyRow?.value);
+      const effective=resolveRiderDeliveryTariff(rider,[],policy);
+      const hasSavedRiderTariff=[rider.delivery_base_fee_gmd,rider.delivery_per_km_fee_gmd,rider.delivery_min_fee_gmd].every(value=>value!==null&&value!==undefined);
+      const adminOverrideActive=rider.admin_delivery_pricing_override!=null;
+      if(!effective.enabled||(!adminOverrideActive&&!hasSavedRiderTariff)) {
+        throw new AppError(
+          adminOverrideActive
+            ? 'MarketLink Admin has disabled new delivery quotes for your rider account. Contact Admin if you think this is incorrect.'
+            : (!policy.allowRiderOverrides
+              ? 'Your delivery prices are managed by MarketLink Admin. Ask Admin to set and enable your rider tariff before going online.'
+              : 'Save your delivery prices in Rider Dashboard → Pricing before going online.'),
+          409,'DELIVERY_PRICING_REQUIRED'
+        );
+      }
     }
     if(!isOnline) {
       const {rows:[active]}=await client.query(
