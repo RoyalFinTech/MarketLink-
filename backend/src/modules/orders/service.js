@@ -253,7 +253,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     const { rows: [delivery] } = await client.query(
       `INSERT INTO deliveries
         (order_id,rider_id,pickup_lat,pickup_lng,dropoff_lat,dropoff_lng,distance_km,status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'assigned') RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'unassigned') RETURNING id`,
       [order.id,deliveryQuote.rider_id,deliveryQuote.pickup_lat,deliveryQuote.pickup_lng,
        deliveryQuote.dropoff_lat,deliveryQuote.dropoff_lng,deliveryQuote.route_distance_km]
     );
@@ -558,16 +558,43 @@ async function updateStatus(orderId,status,userId,roles,note){
     if(status==='rider_assigned')await client.query("UPDATE deliveries SET status='assigned' WHERE order_id=$1",[orderId]);
     if(status==='awaiting_rider'){
       const { rows: [delivery] } = await client.query(
-        `SELECT d.id AS delivery_id,d.rider_id,o.order_number
+        `SELECT d.id AS delivery_id,d.rider_id,o.order_number,
+                r.kyc_status,r.is_online,
+                EXISTS(
+                  SELECT 1 FROM deliveries active
+                  WHERE active.rider_id=d.rider_id AND active.id<>d.id
+                    AND active.status IN ('assigned','picked_up','in_transit')
+                ) AS rider_busy
          FROM deliveries d JOIN orders o ON o.id=d.order_id
+         LEFT JOIN riders r ON r.user_id=d.rider_id
          WHERE d.order_id=$1 FOR UPDATE OF d`,
         [orderId]
       );
-      if(delivery&&delivery.rider_id){
+      if(delivery&&delivery.rider_id&&delivery.kyc_status==='approved'&&delivery.is_online&&!delivery.rider_busy){
+        await client.query(
+          "UPDATE deliveries SET status='assigned' WHERE id=$1 AND status='unassigned'",
+          [delivery.delivery_id]
+        );
         await client.query(
           `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
            VALUES ($1,'delivery_assigned','Your delivery request is ready 🛵',$2,'delivery',$3)`,
           [delivery.rider_id,'The vendor has prepared order '+delivery.order_number+' and marked it ready. Accept or decline the delivery request in your Rider Dashboard.',delivery.delivery_id]
+        );
+      }else if(delivery&&delivery.rider_id){
+        // The quote remains locked, but the first-choice rider is no longer
+        // available. Let the vendor reassign to a rider with the same tariff.
+        await client.query(
+          "UPDATE rider_assignments SET status='reassigned',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",
+          [delivery.delivery_id,delivery.rider_id]
+        );
+        await client.query(
+          "UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1",
+          [delivery.delivery_id]
+        );
+        await client.query(
+          `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+           VALUES ($1,'delivery_rider_unavailable','Selected rider unavailable','The customer-selected rider is no longer online or is busy. Please assign another rider with the same approved delivery fee.','order',$2)`,
+          [updatedOrder.vendor_id,orderId]
         );
       }
     }
