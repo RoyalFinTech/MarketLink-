@@ -132,6 +132,16 @@ function resolveRiderDeliveryTariff(rider, riderRouteRates = [], policyValue) {
     }
     return Number(Math.min(policy.maximumFeeGmd, Math.max(policy.minimumAllowedFeeGmd, number)).toFixed(2));
   };
+  const clampBaseFee = (value, fallback) => {
+    const number = value == null ? Number(fallback) : Number(value);
+    if (!Number.isFinite(number) || number < 0) {
+      const error = new Error('A saved rider base tariff contains an invalid amount.');
+      error.statusCode = 409;
+      error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+      throw error;
+    }
+    return Number(Math.min(policy.maximumFeeGmd, number).toFixed(2));
+  };
   const parseRouteRates = routes => {
     if (!Array.isArray(routes) || routes.length > 20) {
       const error = new Error('A saved rider delivery tariff contains an invalid route list.');
@@ -167,7 +177,7 @@ function resolveRiderDeliveryTariff(rider, riderRouteRates = [], policyValue) {
     const routeInput = Array.isArray(override.routeRates) ? override.routeRates : [];
     const safeOverride = {
       enabled: override.enabled !== false,
-      baseFeeGmd: clampFee(override.baseFeeGmd, policy.baseFeeGmd),
+      baseFeeGmd: clampBaseFee(override.baseFeeGmd, policy.baseFeeGmd),
       perKmFeeGmd: Number(override.perKmFeeGmd),
       minimumFeeGmd: clampFee(override.minimumFeeGmd, policy.minimumFeeGmd),
       routeRates: parseRouteRates(routeInput).map(rate => ({
@@ -209,7 +219,7 @@ function resolveRiderDeliveryTariff(rider, riderRouteRates = [], policyValue) {
   }
   return {
     enabled: Boolean(rider && rider.delivery_pricing_enabled && policy.allowRiderOverrides),
-    baseFeeGmd: clampFee(rawBase, policy.baseFeeGmd),
+    baseFeeGmd: clampBaseFee(rawBase, policy.baseFeeGmd),
     perKmFeeGmd,
     minimumFeeGmd: clampFee(rawMinimum, policy.minimumFeeGmd),
     routeRates: parseRouteRates(riderRouteRates || []),
