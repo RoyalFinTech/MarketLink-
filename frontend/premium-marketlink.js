@@ -301,6 +301,7 @@
     S.pendingPayment=null;
     S.paymentAccountNumber='';
     S.appliedCoupon=null;
+    S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';
     S.cart={};CART_ITEMS={};
     updateCartBadge();saveCartToStorage();
     clearPendingPaymentSession();
@@ -336,7 +337,7 @@
     }
     if(payMethod==='cod'&&status==='pending'){
       toast('Order placed — Pay on Delivery selected ✓','success');
-      S.appliedCoupon=null;S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();
+      S.appliedCoupon=null;S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';S.cart={};CART_ITEMS={};updateCartBadge();saveCartToStorage();
       switchTab('orders');startOrderTracking();
       return true;
     }
@@ -371,6 +372,15 @@
       try{var ar=await ML_API.customers.getAddresses(),addresses=normalizeProducts(ar.data),def=addresses.find(function(x){return x.is_default;});if(def){addressId=String(def.id);S.delivAddressId=addressId;S.deliveryAddressId=addressId;S.delivAddr=def.full_address||S.delivAddr||'';}}catch(e){}
     }
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
+    var expectedQuoteKey=vendors[0]+'|'+addressId;
+    var quoteCache=S.deliveryQuoteCache||null;
+    var chosenQuote=quoteCache&&quoteCache.key===expectedQuoteKey&&Array.isArray(quoteCache.options)
+      ?quoteCache.options.find(function(q){return String(q.quoteId)===String(S.selectedDeliveryQuoteId||'');}):null;
+    if(!chosenQuote||!chosenQuote.expiresAt||new Date(chosenQuote.expiresAt).getTime()<=Date.now()){
+      S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';
+      toast('Select a current rider delivery price. MarketLink is refreshing the available prices.','warning');
+      renderLiveCart();return;
+    }
     var payLabel=S.selPay||'Cash on Delivery',payMethod=normalizePaymentChoice(payLabel);
     var activePaymentCaps=S.paymentCapabilities||{configured:false,directMobileMoney:false,hostedCheckout:false};
     var allowedPayment=livePaymentOptions(activePaymentCaps).some(function(option){return option[1]===payMethod;});
@@ -382,11 +392,33 @@
       if(!['87','83','86'].includes(checkoutPrefix)||checkoutSubscriber.length!==7){toast('Choose your mobile network and enter the 7 digits after its prefix (9 digits total).','error');if(G('ml-checkout-mobile-number'))G('ml-checkout-mobile-number').focus();return;}
       accountNumber=checkoutPrefix+checkoutSubscriber;
     }
+    var estimatedSubtotal=ids.reduce(function(total,id){
+      var product=CART_ITEMS[id];
+      return total+Number(product&&product.price||0)*Number(S.cart[id]||0);
+    },0);
+    // Wallet preflight is a convenience only; the payment API rechecks the
+    // real available balance atomically. Skip it when a coupon may reduce total.
+    if(payMethod==='wallet'&&!(S.appliedCoupon&&S.appliedCoupon.code)){
+      try{
+        var walletResponse=await ML_API.wallet.getBalance();
+        var walletData=walletResponse&&walletResponse.data||walletResponse||{};
+        var availableWallet=Number(walletData.available_balance==null?walletData.balance||0:walletData.available_balance);
+        var expectedDebit=Number((estimatedSubtotal+Number(chosenQuote.deliveryFee||0)).toFixed(2));
+        if(availableWallet+0.001<expectedDebit){
+          toast('Your DAHA Wallet needs a top-up. Your cart and selected rider price are saved.','info');
+          setTimeout(function(){openProfilePage('wallet');},200);
+          return;
+        }
+      }catch(walletCheckError){
+        toast(walletCheckError.error||'MarketLink could not verify your DAHA balance. Refresh your wallet or choose another payment method.','error');
+        return;
+      }
+    }
     var cartSnapshot=Object.assign({},S.cart||{}),cartItemsSnapshot=Object.assign({},CART_ITEMS||{});
-    var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
+    var payload={vendorId:vendors[0],items:items.map(function(x){return {productId:x.productId,quantity:x.quantity};}),deliveryAddressId:addressId,deliveryFeeQuoteId:chosenQuote.quoteId,paymentMethod:payMethod,couponCode:S.appliedCoupon&&S.appliedCoupon.code||undefined,affiliateCode:S.referredAffiliateCode||undefined};
     var placeBtn=document.querySelector('#cart-body button[data-ml-place-order]');
     var walletPaymentCompleted=false;
-    if(placeBtn){placeBtn.disabled=true;placeBtn.textContent='Creating secure order…';}
+    if(placeBtn){placeBtn.disabled=true;placeBtn.textContent='Securing rider price and order…';}
     try{
       var orderRes=await ML_API.orders.place(payload),order=orderRes&&orderRes.data&&orderRes.data.order?orderRes.data.order:orderRes.data;
       if(!order||!order.id)throw {error:'The backend did not return a valid order.'};
@@ -437,6 +469,8 @@
       if(placeBtn){placeBtn.disabled=false;placeBtn.textContent='Place Order';}
       toast(e.error||'Could not place your order.','error');
       if(payMethod==='wallet'&&e&&e.code==='INSUFFICIENT_WALLET_BALANCE'){
+        S.deliveryQuoteCache=null;S.selectedDeliveryQuoteId='';
+        toast('Your wallet balance changed before payment. Your cart is saved; top up DAHA Wallet and refresh rider prices when you return.','warning');
         setTimeout(function(){openProfilePage('wallet');},250);
       }
     }
@@ -3489,7 +3523,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,searchAddressSuggestions:searchGambiaAddressSuggestions,selectAddressSuggestion:selectGambiaAddressSuggestion,useCurrentAddressLocation:useCurrentAddressLocation,cancelEditAddress:cancelEditAddress,choosePaymentFromSettings:choosePaymentFromSettings,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},toggleWithdrawalNetwork:toggleDahaPayoutNetwork,selectWithdrawalNetwork:selectDahaPayoutNetwork,submitDahaDeposit:submitDahaDeposit,selectDahaDepositMethod:selectDahaDepositMethod,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(period){return renderLiveAdminAnalytics(period||'30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
+    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,searchAddressSuggestions:searchGambiaAddressSuggestions,selectAddressSuggestion:selectGambiaAddressSuggestion,useCurrentAddressLocation:useCurrentAddressLocation,cancelEditAddress:cancelEditAddress,choosePaymentFromSettings:choosePaymentFromSettings,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},toggleWithdrawalNetwork:toggleDahaPayoutNetwork,selectWithdrawalNetwork:selectDahaPayoutNetwork,submitDahaDeposit:submitDahaDeposit,selectDahaDepositMethod:selectDahaDepositMethod,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:renderLiveCart,refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(period){return renderLiveAdminAnalytics(period||'30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectDeliveryQuote:selectDeliveryQuote,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
