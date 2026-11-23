@@ -214,8 +214,12 @@ async function updateProfile(userId, data) {
 async function setAvailability(userId, isOnline) {
   return withTransaction(async (client) => {
     const {rows:[rider]}=await client.query(
-      "SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
+      "SELECT user_id,delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
     if(!rider)throw new AppError('Only approved riders can toggle availability.',403,'NOT_APPROVED');
+    if(Boolean(isOnline) && (!rider.delivery_pricing_enabled ||
+       rider.delivery_base_fee_gmd===null || rider.delivery_per_km_fee_gmd===null || rider.delivery_min_fee_gmd===null)) {
+      throw new AppError('Save your delivery prices in Rider Dashboard → Pricing before going online.',409,'DELIVERY_PRICING_REQUIRED');
+    }
     if(!isOnline) {
       const {rows:[active]}=await client.query(
         "SELECT id FROM deliveries WHERE rider_id=$1 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
