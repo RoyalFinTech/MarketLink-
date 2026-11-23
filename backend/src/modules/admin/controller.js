@@ -29,6 +29,9 @@ exports.setSetting = wrap(async (req,res) => res.json({ success:true, data: awai
 exports.auditLogs  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAuditLogs(req.query) }));
 exports.reports    = wrap(async (req,res) => res.json({ success:true, data: await svc.getReports(req.query) }));
 exports.affiliates = wrap(async (req,res) => res.json({ success:true, data: await svc.getAffiliateDirectory(req.query) }));
+const affiliateMarketerSvc = require('../affiliates/marketerService');
+exports.affiliateMarketerApplications = wrap(async (req,res) => res.json({success:true,data:await affiliateMarketerSvc.listApplications(req.query)}));
+exports.reviewAffiliateMarketerApplication = wrap(async (req,res) => res.json({success:true,data:await affiliateMarketerSvc.reviewApplication(req.params.id,req.body.decision,req.body.reason,actor(req))}));
 // ── Read-only financial reconciliation ──────────────────────────────
 const financialReconciliationSvc = require('./financialReconciliation');
 exports.financialReconciliation = wrap(async (req,res) => res.json({ success:true, data: await financialReconciliationSvc.getFinancialReconciliation(req.query) }));
