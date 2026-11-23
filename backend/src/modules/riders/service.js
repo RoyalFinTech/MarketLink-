@@ -5,6 +5,7 @@
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const notificationsService = require('../notifications/service');
 const { normalizePhone } = require('../../utils/phone');
 function normalizeGambianContact(value, label) {
   if (value == null || String(value).trim() === '') return null;
@@ -225,7 +226,17 @@ async function setAvailability(userId, isOnline) {
 
 
 // ── LOCATION UPDATE (GPS ping from rider app) ────────────────────────
-async function updateLocation(userId, { lat, lng, deliveryId }) {
+function distanceMeters(lat1,lng1,lat2,lng2) {
+  const toRadians=value=>Number(value)*Math.PI/180;
+  const dLat=toRadians(Number(lat2)-Number(lat1));
+  const dLng=toRadians(Number(lng2)-Number(lng1));
+  const a=Math.sin(dLat/2)**2+
+    Math.cos(toRadians(lat1))*Math.cos(toRadians(lat2))*Math.sin(dLng/2)**2;
+  return 6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(Math.max(0,1-a)));
+}
+
+// ── LOCATION UPDATE (GPS ping from rider app) ────────────────────────
+async function updateLocation(userId, { lat, lng, deliveryId, accuracy }) {
   // With no delivery ID this is an opt-in availability ping. It is only
   // accepted for an approved online rider who has no active delivery.
   if (!deliveryId) {
@@ -243,30 +254,89 @@ async function updateLocation(userId, { lat, lng, deliveryId }) {
     return { sharedForAvailability:true, updatedAt:new Date() };
   }
 
-  const { rows: [delivery] } = await query(
-    'SELECT id, rider_id, status FROM deliveries WHERE id=$1',
-    [deliveryId]
-  );
-  if (!delivery) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
-  if (String(delivery.rider_id)!==String(userId)) {
-    throw new AppError('You can only share your location for a delivery assigned to you.',403,'FORBIDDEN');
-  }
-  if (!['assigned','picked_up','in_transit'].includes(String(delivery.status))) {
-    throw new AppError('Location updates are only accepted for an active delivery.',409,'DELIVERY_NOT_ACTIVE');
+  // Lock the delivery before changing the rider GPS state. This serializes
+  // nearby-arrival checks so repeated location pings create only one alert.
+  const result = await withTransaction(async client => {
+    const {rows:[delivery]}=await client.query(
+      `SELECT d.id,d.order_id,d.rider_id,d.status,o.customer_id,o.order_number,
+              COALESCE(d.dropoff_lat,da.latitude) AS dropoff_lat,
+              COALESCE(d.dropoff_lng,da.longitude) AS dropoff_lng
+       FROM deliveries d
+       JOIN orders o ON o.id=d.order_id
+       LEFT JOIN delivery_addresses da ON da.id=o.delivery_address_id
+       WHERE d.id=$1
+       FOR UPDATE OF d`,
+      [deliveryId]
+    );
+    if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    if(String(delivery.rider_id)!==String(userId)){
+      throw new AppError('You can only share your location for a delivery assigned to you.',403,'FORBIDDEN');
+    }
+    if(!['assigned','picked_up','in_transit'].includes(String(delivery.status))){
+      throw new AppError('Location updates are only accepted for an active delivery.',409,'DELIVERY_NOT_ACTIVE');
+    }
+
+    const {rows:[updatedRider]}=await client.query(
+      "UPDATE riders SET current_lat=$1,current_lng=$2,last_location_at=now(),location_sharing_enabled=TRUE,location_sharing_delivery_id=$4 WHERE user_id=$3 AND is_online=TRUE AND kyc_status='approved' RETURNING user_id",
+      [lat,lng,userId,deliveryId]
+    );
+    if(!updatedRider)throw new AppError('Go online before sharing GPS for this delivery.',409,'RIDER_OFFLINE');
+
+    const {rows:[ping]}=await client.query(
+      `INSERT INTO rider_location_pings (rider_id, delivery_id, lat, lng)
+       VALUES ($1,$2,$3,$4) RETURNING recorded_at`,
+      [userId,deliveryId,lat,lng]
+    );
+
+    const preciseEnough=accuracy!==undefined&&accuracy!==null&&
+      Number.isFinite(Number(accuracy))&&Number(accuracy)>=0&&Number(accuracy)<=120;
+    const hasDestination=delivery.dropoff_lat!==null&&delivery.dropoff_lat!==undefined&&
+      delivery.dropoff_lng!==null&&delivery.dropoff_lng!==undefined;
+    const isNearCustomer=preciseEnough&&hasDestination&&
+      ['picked_up','in_transit'].includes(String(delivery.status))&&
+      distanceMeters(lat,lng,delivery.dropoff_lat,delivery.dropoff_lng)<=250;
+
+    let arrivalNotification=null;
+    if(isNearCustomer){
+      const {rows:[existing]}=await client.query(
+        "SELECT id FROM notifications WHERE user_id=$1 AND type='rider_arriving' AND reference_type='delivery' AND reference_id=$2 LIMIT 1",
+        [delivery.customer_id,deliveryId]
+      );
+      if(!existing){
+        const body='Your MarketLink rider is within about 250 metres of your delivery address. Please get ready to receive your order.';
+        const {rows:[created]}=await client.query(
+          `INSERT INTO notifications
+             (user_id,type,title,body,reference_type,reference_id,channel_inapp,channel_email,channel_sms,channel_push)
+           VALUES ($1,'rider_arriving','Your rider is nearby',$2,'delivery',$3,TRUE,FALSE,FALSE,FALSE)
+           RETURNING id`,
+          [delivery.customer_id,body,deliveryId]
+        );
+        if(created)arrivalNotification={id:created.id,userId:delivery.customer_id,body};
+      }
+    }
+    return {updatedAt:ping&&ping.recorded_at?ping.recorded_at:new Date(),arrivalNotification};
+  });
+
+  if(result.arrivalNotification){
+    try{
+      const pushResult=await notificationsService.pushToUser(result.arrivalNotification.userId,{
+        title:'Your rider is nearby',
+        body:result.arrivalNotification.body,
+        data:{type:'rider_arriving',deliveryId:String(deliveryId),url:'https://marketlink-gambia-frontend.onrender.com/'}
+      });
+      if(pushResult&&pushResult.sent){
+        await query('UPDATE notifications SET channel_push=TRUE WHERE id=$1',[result.arrivalNotification.id]);
+      }
+    }catch(pushError){
+      logger.warn('Rider arrival push notification could not be delivered',{deliveryId,error:pushError.message});
+    }
   }
 
-  const {rows:[updatedRider]}=await query(
-    "UPDATE riders SET current_lat=$1,current_lng=$2,last_location_at=now(),location_sharing_enabled=TRUE,location_sharing_delivery_id=$4 WHERE user_id=$3 AND is_online=TRUE AND kyc_status='approved' RETURNING user_id",
-    [lat,lng,userId,deliveryId]
-  );
-  if(!updatedRider)throw new AppError('Go online before sharing GPS for this delivery.',409,'RIDER_OFFLINE');
-
-  await query(
-    `INSERT INTO rider_location_pings (rider_id, delivery_id, lat, lng)
-     VALUES ($1,$2,$3,$4)`,
-    [userId,deliveryId,lat,lng]
-  );
-  return { sharedForDelivery:true, updatedAt:new Date() };
+  return {
+    sharedForDelivery:true,
+    updatedAt:result.updatedAt,
+    arrivalNotified:Boolean(result.arrivalNotification)
+  };
 }
 
 // ── DELIVERY HISTORY ─────────────────────────────────────────────────

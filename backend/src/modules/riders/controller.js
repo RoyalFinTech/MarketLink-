@@ -56,9 +56,9 @@ exports.setAvailability = wrap(async (req, res) => {
 
 // GPS location ping from rider app
 exports.updateLocation = wrap(async (req, res) => {
-  const { lat, lng, deliveryId } = req.body;
+  const { lat, lng, deliveryId, accuracy } = req.body;
   if (lat === undefined || lng === undefined || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) throw new AppError('Valid latitude and longitude are required.', 400, 'VALIDATION_ERROR');
-  const result = await svc.updateLocation(req.user.id, { lat, lng, deliveryId });
+  const result = await svc.updateLocation(req.user.id, { lat, lng, deliveryId, accuracy });
   res.json({ success: true, data: result });
 });
 

@@ -179,6 +179,33 @@ describe('order creation ownership safeguards', () => {
     expect(withTransaction).not.toHaveBeenCalled();
   });
 
+  test('copies the customer-owned saved address coordinates into the delivery destination', async () => {
+    const order = {id:'order-gps',customer_id:'customer-1',vendor_id:'vendor-1',total:125};
+    clientQuery
+      .mockResolvedValueOnce({rows:[{id:'address-1',latitude:'13.4532000',longitude:'-16.5775000'}]})
+      .mockResolvedValueOnce({rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'100.00',status:'active',vendor_kyc_status:'approved'}]})
+      .mockResolvedValueOnce({rows:[{quantity:10}]})
+      .mockResolvedValueOnce({rows:[order]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{quantity:9}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{id:'delivery-1'}]})
+      .mockResolvedValueOnce({rows:[]});
+
+    await placeOrder({
+      customerId:'customer-1',
+      vendorId:'vendor-1',
+      items:[{productId:'product-1',quantity:1}],
+      paymentMethod:'cod',
+      deliveryAddressId:'address-1'
+    });
+
+    const deliveryInsert=clientQuery.mock.calls.find(([sql])=>/INSERT INTO deliveries/i.test(sql));
+    expect(deliveryInsert).toBeDefined();
+    expect(deliveryInsert[0]).toContain('dropoff_lat,dropoff_lng');
+    expect(deliveryInsert[1]).toEqual(['order-gps','13.4532000','-16.5775000']);
+  });
+
   test('rejects a delivery address that belongs to another customer', async () => {
     clientQuery.mockResolvedValueOnce({ rows: [] });
     await expect(placeOrder({

@@ -299,16 +299,26 @@ async function getTracking(deliveryId, actorId, roles) {
   const { rows: [d] } = await query(
     `SELECT d.id, d.order_id, d.rider_id, d.status, d.estimated_minutes, d.picked_up_at,
             o.customer_id, o.vendor_id,
+            COALESCE(d.dropoff_lat,da.latitude) AS dropoff_lat,
+            COALESCE(d.dropoff_lng,da.longitude) AS dropoff_lng,
             CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.current_lat ELSE NULL END AS current_lat,
             CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.current_lng ELSE NULL END AS current_lng,
             CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.last_location_at ELSE NULL END AS last_location_at,
             u.full_name AS rider_name,
-            (SELECT json_agg(p ORDER BY p.recorded_at DESC) FROM (
-               SELECT lat, lng, recorded_at FROM rider_location_pings
-               WHERE delivery_id = $1 ORDER BY recorded_at DESC LIMIT 20
-             ) p) AS location_trail
+            CASE WHEN r.location_sharing_enabled=TRUE
+                       AND r.location_sharing_delivery_id=d.id
+                       AND r.user_id=d.rider_id
+                       AND d.status IN ('assigned','picked_up','in_transit')
+                 THEN (SELECT json_agg(p ORDER BY p.recorded_at DESC) FROM (
+                         SELECT lat, lng, recorded_at FROM rider_location_pings
+                         WHERE delivery_id = d.id AND rider_id = d.rider_id
+                         ORDER BY recorded_at DESC LIMIT 20
+                       ) p)
+                 ELSE NULL
+            END AS location_trail
      FROM deliveries d
      JOIN orders o ON o.id=d.order_id
+     LEFT JOIN delivery_addresses da ON da.id=o.delivery_address_id
      LEFT JOIN riders r ON r.user_id = d.rider_id
      LEFT JOIN users u ON u.id = r.user_id
      WHERE d.id = $1`, [deliveryId]);

@@ -214,7 +214,15 @@ assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products
 assert.match(html, /marketlinkLoadVendorCategories/, 'Vendor onboarding must load categories from the live MarketLink category service');
 assert.match(html, /dataset\.loaded!==\x271\x27/, 'Vendor onboarding must wait for the live category list instead of submitting stale hard-coded options');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Vendor backend must validate the independently supplied WhatsApp contact number');
-assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/service.js'), 'utf8'), /normalizeGambianContact\(whatsappNumber/, 'Rider backend must validate the independently supplied WhatsApp contact number');
+const riderService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/service.js'), 'utf8');
+assert.match(riderService, /normalizeGambianContact\(whatsappNumber/, 'Rider backend must validate the independently supplied WhatsApp contact number');
+assert.match(riderService, /distanceMeters\(/, 'Rider GPS must calculate distance from a trusted saved delivery pin');
+assert.match(riderService, /type='rider_arriving'/, 'Rider arrival notifications must be deduplicated per delivery');
+assert.match(riderService, /Number\(accuracy\)<=120/, 'Arrival alerts must require a sufficiently accurate GPS fix');
+const deliveryService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/delivery/service.js'), 'utf8');
+assert.match(deliveryService, /CASE WHEN r\.location_sharing_enabled=TRUE[\s\S]*?AS location_trail/, 'GPS trail must only be returned while sharing is enabled for the same active delivery');
+const orderServiceForGps = fs.readFileSync(path.join(root, '..', 'backend/src/modules/orders/service.js'), 'utf8');
+assert.match(orderServiceForGps, /dropoff_lat,dropoff_lng/, 'Order creation must persist the selected address GPS pin on its delivery');
 assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.js'), 'utf8'), /PROFILE_IMAGE_MIN_DIMENSION = 512/, 'Backend profile photo validation must preserve the minimum image dimensions');
 
 const uploadService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/uploads/service.js'), 'utf8');
@@ -251,8 +259,11 @@ assert.match(fs.readFileSync(path.join(root, '..', 'backend/src/modules/products
 const authService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/auth/service.js'), 'utf8');
 assert.match(authService, /const types=\['customer'\]/, 'Public registration must always create a customer role only; vendor/rider roles come from their application workflows');
 assert.doesNotMatch(authService, /Array\.isArray\(userType\).*userType/, 'Client-supplied userType must never grant privileged roles during public registration');
-assert.match(premiumJs, /openstreetmap\.org\/export\/embed\.html/, 'Customer order tracking must render an in-page live rider map when a fresh GPS ping exists');
-assert.match(premiumJs, /title="Live rider location map"/, 'Live rider map must have an accessible title');
+assert.match(premiumJs, /function updateCustomerTrackingMap\(/, 'Customer order tracking must render an interactive live rider map');
+assert.match(premiumJs, /L\.tileLayer\('https:\/\/\{s\}\.tile\.openstreetmap\.org\//, 'Customer tracking map must use real OpenStreetMap street tiles');
+assert.match(premiumJs, /function animateCustomerRiderMarker\(/, 'The rider marker must animate smoothly between GPS updates');
+assert.match(premiumJs, /ml-customer-tracking-map-host/, 'The customer order page must include the persistent live map container');
+assert.match(html, /style-src 'self' 'unsafe-inline' https:\/\/cdnjs\.cloudflare\.com/, 'Content security policy must permit the Leaflet map stylesheet');
 
 const productService = fs.readFileSync(path.join(root, '..', 'backend/src/modules/products/service.js'), 'utf8');
 assert.match(productService, /conds = includeAllStatuses \? \[\] : \["p\.status='active'", "v\.kyc_status='approved'"\]/, 'Public product catalog must exclude products from vendors awaiting approval');

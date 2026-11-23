@@ -16,12 +16,14 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
   }
 
   return withTransaction(async (client) => {
+    let deliveryAddress = null;
     if (deliveryAddressId) {
       const { rows:[address] } = await client.query(
-        'SELECT id FROM delivery_addresses WHERE id=$1 AND customer_id=$2',
+        'SELECT id,latitude,longitude FROM delivery_addresses WHERE id=$1 AND customer_id=$2',
         [deliveryAddressId, customerId]
       );
       if (!address) throw new AppError('The selected delivery address does not belong to your account.',403,'DELIVERY_ADDRESS_FORBIDDEN');
+      deliveryAddress = address;
     }
     let sub=0; const lines=[];
     const lockedProductIds = new Set();
@@ -94,7 +96,10 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, paym
     if (coupon) await client.query("INSERT INTO coupon_redemptions (coupon_id,customer_id,order_id) VALUES($1,$2,$3)",[coupon.id,customerId,order.id]);
     // total_orders is a settled-order metric; it is incremented only by settleOrderFinancials().
     await client.query("INSERT INTO order_status_history (order_id,status,note) VALUES($1,'pending','Order placed')",[order.id]);
-    await client.query("INSERT INTO deliveries (order_id,status) VALUES($1,'unassigned')",[order.id]);
+    await client.query(
+      "INSERT INTO deliveries (order_id,status,dropoff_lat,dropoff_lng) VALUES($1,'unassigned',$2,$3)",
+      [order.id, deliveryAddress?.latitude ?? null, deliveryAddress?.longitude ?? null]
+    );
     await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout,rider_payout,platform_fee_pct,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_amount) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",[order.id,vendorId,total,commPct,platFee,vendorPayout,riderPayout,commPct,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
     return { order, lineItems: lines };
   });

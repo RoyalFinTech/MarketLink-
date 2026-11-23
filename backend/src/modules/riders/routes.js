@@ -79,6 +79,7 @@ router.post('/location',
   [
     body('lat').isFloat({ min: -90,  max: 90  }).withMessage('Invalid latitude.'),
     body('lng').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude.'),
+    body('accuracy').optional({ nullable:true }).isFloat({ min: 0, max: 10000 }).withMessage('Invalid GPS accuracy.'),
     body('deliveryId').optional({ nullable:true, checkFalsy:true }).isUUID().withMessage('Invalid delivery reference.'),
   ],
   validate, ctrl.updateLocation

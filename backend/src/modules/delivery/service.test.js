@@ -9,9 +9,9 @@ jest.mock('../../utils/logger', () => ({
   info: jest.fn(), warn: jest.fn(), error: jest.fn(),
 }));
 
-const { withTransaction } = require('../../config/db');
+const { query, withTransaction } = require('../../config/db');
 const ordersService = require('../orders/service');
-const { updateStatus } = require('./service');
+const { updateStatus, getTracking } = require('./service');
 
 describe('delivery status transitions', () => {
   let clientQuery;
@@ -68,5 +68,37 @@ describe('delivery status transitions', () => {
     expect(clientQuery.mock.calls[0][0]).toMatch(/FOR UPDATE/i);
     expect(clientQuery.mock.calls.some(([sql]) => /INSERT INTO order_status_history/i.test(sql))).toBe(true);
     expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-1');
+  });
+});
+
+
+describe('delivery GPS tracking privacy', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns the saved address pin and GPS trail only behind the active delivery consent guard', async () => {
+    const trail=[{lat:'13.4532',lng:'-16.5775',recorded_at:'2026-11-23T06:00:00.000Z'}];
+    query.mockResolvedValueOnce({rows:[{
+      id:'delivery-1',customer_id:'customer-1',vendor_id:'vendor-1',rider_id:'rider-1',
+      status:'in_transit',dropoff_lat:'13.4532',dropoff_lng:'-16.5775',location_trail:trail
+    }]});
+    const result=await getTracking('delivery-1','customer-1',['customer']);
+    expect(result.location_trail).toEqual(trail);
+    expect(result.dropoff_lat).toBe('13.4532');
+    const sql=query.mock.calls[0][0];
+    expect(sql).toContain('COALESCE(d.dropoff_lat,da.latitude) AS dropoff_lat');
+    expect(sql).toContain('LEFT JOIN delivery_addresses da');
+    expect(sql).toContain('r.location_sharing_enabled=TRUE');
+    expect(sql).toContain('r.location_sharing_delivery_id=d.id');
+    expect(sql).toContain('WHERE delivery_id = d.id AND rider_id = d.rider_id');
+    expect(sql).toContain('ELSE NULL');
+  });
+
+  test('does not reveal delivery tracking data to an unrelated account', async () => {
+    query.mockResolvedValueOnce({rows:[{
+      id:'delivery-1',customer_id:'customer-1',vendor_id:'vendor-1',rider_id:'rider-1',
+      status:'in_transit',location_trail:[{lat:13.45,lng:-16.57}]
+    }]});
+    await expect(getTracking('delivery-1','stranger-1',['customer']))
+      .rejects.toMatchObject({code:'FORBIDDEN'});
   });
 });

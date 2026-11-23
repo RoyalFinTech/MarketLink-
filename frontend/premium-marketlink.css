@@ -2150,3 +2150,16 @@ body.ml-photo-viewer-open{overflow:hidden}
   #scr-onboard .ml-ob-layout-runtime .ml-ob-description{font-size:14px!important;line-height:1.7!important}
   #scr-onboard .ml-ob-dots button{min-width:11px!important;min-height:11px!important}
 }
+
+
+/* Customer live delivery map: persistent Leaflet canvas and animated scooter marker. */
+.ml-tracking-map-frame{margin-top:12px;overflow:hidden;border:1px solid #d8e4e8;border-radius:16px;background:#eef4f4}
+#ml-customer-tracking-map-host{height:285px;min-height:245px;width:100%;background:#e8eff0}
+#ml-customer-tracking-map{height:285px;min-height:245px;width:100%;z-index:1}
+.ml-rider-map-div-icon{background:transparent;border:0}
+.ml-rider-map-scooter{display:grid;place-items:center;width:40px;height:40px;border:3px solid #fff;border-radius:50%;background:#0d7377;box-shadow:0 4px 16px rgba(4,31,42,.35);font-size:22px;line-height:1;animation:mlRiderMapPulse 1.7s ease-in-out infinite}
+@keyframes mlRiderMapPulse{0%,100%{box-shadow:0 0 0 0 rgba(13,115,119,.38),0 4px 16px rgba(4,31,42,.28)}50%{box-shadow:0 0 0 9px rgba(13,115,119,0),0 4px 16px rgba(4,31,42,.28)}}
+.ml-tracking-map-caption,.ml-tracking-map-unavailable{margin:9px 2px 0;color:#617781;font-size:10px;line-height:1.55}
+.ml-tracking-map-unavailable{display:grid;place-items:center;min-height:245px;padding:20px;text-align:center;background:#edf4f5}
+.lm .ml-tracking-map-caption,.lm .ml-tracking-map-unavailable{color:#526975}
+@media(max-width:480px){#ml-customer-tracking-map-host,#ml-customer-tracking-map{height:250px;min-height:230px}}

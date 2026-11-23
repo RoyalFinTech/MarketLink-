@@ -46,7 +46,7 @@
      one is configured. If you deploy the backend somewhere other than localhost:4000, add
      that origin here (and set window.ML_API_URL to match) or ML_API's fetch calls will be
      silently blocked by the browser. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https://marketlink-gambia.onrender.com https://nominatim.openstreetmap.org;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https://marketlink-gambia.onrender.com https://nominatim.openstreetmap.org;">
 <!-- ═══════════════════════════════════════════════════════════════════
      DEPLOYMENT CONFIGURATION — read this before publishing MarketLink.html
      anywhere other than local development (GitHub Pages, Netlify, etc).
@@ -1553,7 +1553,12 @@ var ML_API = (function(){
     accept: function(id){ return post('/delivery/'+id+'/accept'); },
     decline: function(id){ return post('/delivery/'+id+'/decline'); },
     myDeliveries:function(qs){ return get('/riders/me/deliveries', qs); },
-    updateLocation: function(lat, lng, deliveryId){ return post('/riders/location', {lat:lat, lng:lng, deliveryId:deliveryId||undefined}); },
+    updateLocation: function(lat, lng, deliveryId, accuracy){
+      var payload={lat:lat,lng:lng};
+      if(deliveryId)payload.deliveryId=deliveryId;
+      if(accuracy!==undefined&&accuracy!==null&&Number.isFinite(Number(accuracy)))payload.accuracy=Number(accuracy);
+      return post('/riders/location',payload);
+    },
     setAvailability: function(isOnline){ return patch('/riders/availability', {isOnline:isOnline}); },
   };
 

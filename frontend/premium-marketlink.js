@@ -1004,6 +1004,65 @@
       root.innerHTML='<div class="ml-empty"><div style="font-size:32px">📦</div><b>Order history unavailable</b><span>'+esc(e.error||e.message||'MarketLink could not load your order history.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.openOrders()">Retry</button></div>';
     }
   }
+  var mlCustomerTrackingMapState={deliveryId:null,map:null,marker:null,destination:null,trail:null,lastPosition:null,animation:null};
+  var mlLeafletLoader=null;
+  function destroyCustomerTrackingMap(){
+    var state=mlCustomerTrackingMapState;
+    if(state.animation!==null&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(state.animation);
+    if(state.map){try{state.map.remove();}catch(e){}}
+    mlCustomerTrackingMapState={deliveryId:null,map:null,marker:null,destination:null,trail:null,lastPosition:null,animation:null};
+  }
+  function loadMarketLinkLeaflet(){
+    if(window.L&&window.L.map)return Promise.resolve(window.L);
+    if(mlLeafletLoader)return mlLeafletLoader;
+    mlLeafletLoader=new Promise(function(resolve,reject){
+      if(!document.querySelector('link[data-ml-leaflet-css]')){
+        var link=document.createElement('link');link.rel='stylesheet';link.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';link.dataset.mlLeafletCss='1';document.head.appendChild(link);
+      }
+      var script=document.querySelector('script[data-ml-leaflet-js]');
+      if(script&&window.L){resolve(window.L);return;}
+      if(script){script.addEventListener('load',function(){window.L?resolve(window.L):reject(new Error('Map library unavailable'));},{once:true});script.addEventListener('error',reject,{once:true});return;}
+      script=document.createElement('script');script.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';script.async=true;script.dataset.mlLeafletJs='1';script.crossOrigin='anonymous';
+      script.onload=function(){window.L?resolve(window.L):reject(new Error('Map library unavailable'));};script.onerror=function(){reject(new Error('Map library could not be loaded.'));};document.head.appendChild(script);
+    }).catch(function(error){var failed=document.querySelector('script[data-ml-leaflet-js]');if(failed&&!window.L)failed.remove();mlLeafletLoader=null;throw error;});
+    return mlLeafletLoader;
+  }
+  function animateCustomerRiderMarker(marker,from,to){
+    var state=mlCustomerTrackingMapState;
+    if(state.animation!==null&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(state.animation);
+    if(!from||typeof requestAnimationFrame!=='function'){marker.setLatLng(to);state.animation=null;return;}
+    var start=typeof performance!=='undefined'&&performance.now?performance.now():Date.now(),duration=1100;
+    function step(now){
+      var progress=Math.max(0,Math.min(1,(now-start)/duration));
+      var eased=progress<.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
+      marker.setLatLng([from[0]+(to[0]-from[0])*eased,from[1]+(to[1]-from[1])*eased]);
+      if(progress<1)state.animation=requestAnimationFrame(step);else state.animation=null;
+    }
+    state.animation=requestAnimationFrame(step);
+  }
+  function updateCustomerTrackingMap(locationTrail,dropoffLat,dropoffLng,deliveryId){
+    var host=G('ml-customer-tracking-map-host'),pings=Array.isArray(locationTrail)?locationTrail:[],latest=pings[0];
+    var lat=latest&&Number(latest.lat),lng=latest&&Number(latest.lng);
+    if(!host||!latest||!Number.isFinite(lat)||!Number.isFinite(lng))return;
+    var destinationValid=dropoffLat!==null&&dropoffLng!==null&&Number.isFinite(Number(dropoffLat))&&Number.isFinite(Number(dropoffLng));
+    loadMarketLinkLeaflet().then(function(L){
+      if(!document.documentElement.contains(host))return;
+      var state=mlCustomerTrackingMapState;
+      if(state.deliveryId!==deliveryId){destroyCustomerTrackingMap();state=mlCustomerTrackingMapState;state.deliveryId=deliveryId;}
+      if(!state.map){
+        state.map=L.map(host,{zoomControl:true,scrollWheelZoom:false,attributionControl:true});
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(state.map);
+        var icon=L.divIcon({className:'ml-rider-map-div-icon',html:'<span class="ml-rider-map-scooter">🛵</span>',iconSize:[42,42],iconAnchor:[21,21]});
+        state.marker=L.marker([lat,lng],{icon:icon,zIndexOffset:1000}).addTo(state.map);state.lastPosition=[lat,lng];
+      }else{animateCustomerRiderMarker(state.marker,state.lastPosition,[lat,lng]);state.lastPosition=[lat,lng];}
+      var route=pings.slice().reverse().map(function(p){return [Number(p.lat),Number(p.lng)];}).filter(function(p){return Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[0]>=-90&&p[0]<=90&&p[1]>=-180&&p[1]<=180;});
+      if(state.trail)state.trail.setLatLngs(route);else state.trail=L.polyline(route,{color:'#0d9488',weight:4,opacity:.82,dashArray:'7 7'}).addTo(state.map);
+      if(destinationValid){var dest=[Number(dropoffLat),Number(dropoffLng)];if(!state.destination)state.destination=L.marker(dest).addTo(state.map).bindTooltip('Delivery address');else state.destination.setLatLng(dest);}
+      else if(state.destination){state.map.removeLayer(state.destination);state.destination=null;}
+      if(!state.map.__marketLinkBoundsSet){var bounds=destinationValid?L.latLngBounds([[lat,lng],[Number(dropoffLat),Number(dropoffLng)]]):L.latLngBounds(route.length?route:[[lat,lng]]);if(bounds.isValid())state.map.fitBounds(bounds.pad(.18),{maxZoom:16});else state.map.setView([lat,lng],16);state.map.__marketLinkBoundsSet=true;}
+      setTimeout(function(){if(state.map)state.map.invalidateSize();},80);
+    }).catch(function(){if(document.documentElement.contains(host))host.innerHTML='<div class="ml-tracking-map-unavailable">The street map could not load on this connection. The latest GPS point is still available through Open directions.</div>';});
+  }
   function stopCustomerOrderDetailPolling(){
     if(mlOrderDetailTimer){clearInterval(mlOrderDetailTimer);mlOrderDetailTimer=null;}
     mlOpenOrderDetailId=null;
@@ -1083,12 +1142,12 @@
       var pingAge=pingDate&&!Number.isNaN(pingDate.getTime())?Date.now()-pingDate.getTime():Infinity;
       var freshGps=validLiveCoordinates&&pingAge>=0&&pingAge<=15*60*1000&&!terminal;
       var gpsHtml='';
+      var dropoffLat=liveTracking&&liveTracking.dropoff_lat!==null&&liveTracking.dropoff_lat!==undefined?Number(liveTracking.dropoff_lat):null;
+      var dropoffLng=liveTracking&&liveTracking.dropoff_lng!==null&&liveTracking.dropoff_lng!==undefined?Number(liveTracking.dropoff_lng):null;
+      var validDropoff=dropoffLat!==null&&dropoffLng!==null&&Number.isFinite(dropoffLat)&&Number.isFinite(dropoffLng)&&dropoffLat>=-90&&dropoffLat<=90&&dropoffLng>=-180&&dropoffLng<=180;
       if(freshGps){
         var mapUrl='https://www.google.com/maps?q='+encodeURIComponent(liveLat.toFixed(6)+','+liveLng.toFixed(6));
-        var mapDelta=0.008;
-        var mapBounds=[liveLng-mapDelta,liveLat-mapDelta,liveLng+mapDelta,liveLat+mapDelta].map(function(value){return Number(value).toFixed(6);}).join(',');
-        var mapEmbedUrl='https://www.openstreetmap.org/export/embed.html?bbox='+encodeURIComponent(mapBounds)+'&layer=mapnik&marker='+encodeURIComponent(liveLat.toFixed(6)+','+liveLng.toFixed(6));
-        gpsHtml='<div class="ml-tracking-location"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Live rider location</b><span>Last shared '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>Location shared for this delivery only.</small></div><a class="ml-btn ml-btn-secondary ml-tracking-map-link" href="'+mapUrl+'" target="_blank" rel="noopener noreferrer">Open directions ↗</a></div><div class="ml-tracking-map-frame"><iframe title="Live rider location map" src="'+mapEmbedUrl+'" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:240px;border:0;border-radius:14px" allowfullscreen></iframe></div>';
+        gpsHtml='<div class="ml-tracking-location"><div class="ml-tracking-location-symbol">🛵</div><div class="ml-tracking-location-copy"><b>Live rider location</b><span>Last shared '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>Rider movement updates as new GPS points arrive. Shared for this delivery only.</small></div><a class="ml-btn ml-btn-secondary ml-tracking-map-link" href="'+mapUrl+'" target="_blank" rel="noopener noreferrer">Open directions ↗</a></div><div class="ml-tracking-map-frame"><div id="ml-customer-tracking-map-host"><div id="ml-customer-tracking-map" role="img" aria-label="Map showing your rider and delivery destination"></div></div>'+(validDropoff?'':'<p class="ml-tracking-map-caption">The saved delivery address has no map pin yet. The map will still show your rider’s live position.</p>')+'</div>';
       }else if(validLiveCoordinates&&latestPing&&latestPing.recorded_at&&!terminal){
         gpsHtml='<div class="ml-tracking-location is-stale"><div class="ml-tracking-location-symbol">📍</div><div class="ml-tracking-location-copy"><b>Last rider location</b><span>Last update '+esc(mlTrackingTime(latestPing.recorded_at))+'</span><small>This location is older than 15 minutes, so it is not shown as live.</small></div></div>';
       }else if(!terminal&&o.rider_name){
@@ -1101,6 +1160,9 @@
       var statusClass=current==='delivered'?'delivered':closed?'closed':'active';
       var closedNotice=closed?'<div class="ml-tracking-issue '+(current==='cancelled'?'cancelled':'failed')+'"><b>'+esc(mlOrderStatusLabel(current))+'</b><span>'+(current==='cancelled'?'This order was cancelled. Contact support if you need help with a payment or refund.':current==='refunded'?'The order is marked as refunded. Check payment history for the confirmed refund record.':'The order could not be completed. Contact MarketLink support for assistance.')+'</span></div>':'';
       var timeline=history.length?'<div class="ml-tracking-history"><h4>Latest order updates</h4>'+history.slice().reverse().slice(0,8).map(function(ev){return '<div class="ml-tracking-history-row"><span class="ml-tracking-history-dot"></span><div><b>'+esc(mlOrderStatusLabel(ev.status))+'</b><small>'+esc(mlTrackingTime(ev.changed_at))+'</small>'+(ev.note?'<p>'+esc(ev.note)+'</p>':'')+'</div></div>';}).join('')+'</div>':'';
+      var preservedTrackingMap=freshGps?G('ml-customer-tracking-map'):null;
+      if(preservedTrackingMap&&preservedTrackingMap.parentNode)preservedTrackingMap.parentNode.removeChild(preservedTrackingMap);
+      if(!freshGps)destroyCustomerTrackingMap();
       root.innerHTML='<div class="ml-premium-home ml-order-tracking-page"><div class="ml-section-head"><div><div class="ml-eyebrow">MARKETLINK ORDER TRACKING</div><h2>'+esc(o.order_number||'Your order')+'</h2><p class="ml-hero-sub">Placed '+esc(mlOrderDate(o.placed_at||o.created_at))+'</p></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openOrders()">← Order history</button></div>'+
         '<section class="ml-tracking-hero"><div class="ml-tracking-hero-top"><div><span class="ml-tracking-label">CURRENT ORDER STATUS</span><h3>'+esc(mlOrderStatusLabel(current))+'</h3><p>'+(closed?'The order needs attention.':current==='delivered'?'Your delivery has been completed.': 'Your order progress refreshes automatically every 10 seconds while this page is open.')+'</p></div><span class="ml-live-order-status '+statusClass+'">'+esc(mlOrderStatusLabel(current))+'</span></div>'+
         (!closed?'<div class="ml-tracking-progress"><span style="width:'+(current==='delivered'?100:ratio)+'%"></span></div>':'')+
@@ -1110,6 +1172,12 @@
         '<div class="ml-live-order-card"><div class="ml-section-head"><h3>Order summary</h3></div><div class="ml-tracking-meta-row"><span>Vendor</span><b>'+esc(o.vendor_name||(o.vendor&&o.vendor.business_name)||'MarketLink vendor')+'</b></div><div class="ml-tracking-meta-row"><span>Payment</span><b>'+esc(paymentMethodLabel(o.payment_method)||'Not listed')+' · '+esc(String(o.payment_status||'Not listed').replace(/_/g,' '))+'</b></div><div class="ml-tracking-meta-row"><span>Total</span><b>'+money(o.total||0)+'</b></div><div class="ml-tracking-items">'+(items.length?items.map(function(it){return '<div><span>'+esc(it.name||it.product_name_snapshot||it.product_name||'Item')+' × '+Number(it.qty||it.quantity||1)+'</span><b>'+money(it.total||it.line_total||Number(it.price||it.unit_price||0)*Number(it.qty||it.quantity||1))+'</b></div>';}).join(''):'<span>Item details unavailable</span>')+'</div></div></section>'+
         timeline+pendingPaymentNotice+
         '<div class="ml-tracking-footer"><span class="ml-tracking-live-dot"></span><span>Order statuses refresh every 10 seconds. Rider location appears only when a recent GPS ping is recorded for this delivery.</span>'+cancelAction+'<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||id))+'\')">Refresh now ↻</button></div></div>';
+      var trackingMapHost=G('ml-customer-tracking-map-host');
+      if(trackingMapHost){
+        var mapPlaceholder=G('ml-customer-tracking-map');
+        if(preservedTrackingMap&&mapPlaceholder)mapPlaceholder.replaceWith(preservedTrackingMap);
+        updateCustomerTrackingMap(locationTrail,dropoffLat,dropoffLng,String(o.delivery_id||id));
+      }
       var cancelButton=G('ml-cancel-order');
       if(cancelButton)cancelButton.addEventListener('click',function(){cancelCustomerOrder(id);});
       if(terminal)stopCustomerOrderDetailPolling();else startCustomerOrderDetailPolling(id);
@@ -2497,7 +2565,7 @@
     mlRiderGpsBusy=true;
     mlRiderGpsLastSent=Date.now();
     try{
-      var response=await ML_API.delivery.updateLocation(lat,lng,deliveryId);
+      var response=await ML_API.delivery.updateLocation(lat,lng,deliveryId,Number(position.coords.accuracy));
       var data=response&&response.data?response.data:response;
       if(!S.activeDel||String(S.activeDel.id)!==String(deliveryId))return;
       var now=(data&&data.updatedAt)||new Date().toISOString();
