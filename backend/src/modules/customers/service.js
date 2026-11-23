@@ -66,12 +66,36 @@ async function listAddresses(customerId) {
   return rows;
 }
 
+function validateAddressCoordinates(latitude, longitude) {
+  const latMissing = latitude === undefined || latitude === null;
+  const lngMissing = longitude === undefined || longitude === null;
+  if (latMissing !== lngMissing) {
+    throw new AppError('Latitude and longitude must be provided together.', 400, 'INCOMPLETE_COORDINATES');
+  }
+  if (latMissing) return;
+  const lat = Number(latitude), lng = Number(longitude);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+      !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    throw new AppError('The saved map pin has invalid coordinates.', 400, 'INVALID_COORDINATES');
+  }
+}
+
+async function lockCustomerAddressDefaults(client, customerId) {
+  const { rows: [customer] } = await client.query(
+    'SELECT user_id FROM customers WHERE user_id = $1 FOR UPDATE', [customerId]);
+  if (!customer) throw new AppError('Customer not found.', 404, 'CUSTOMER_NOT_FOUND');
+}
+
 async function addAddress(customerId, data) {
   const { label, fullAddress, area, latitude, longitude, isDefault = false } = data;
   if (!fullAddress?.trim()) throw new AppError('Full address is required.', 400, 'VALIDATION_ERROR');
+  validateAddressCoordinates(latitude, longitude);
 
   return withTransaction(async (client) => {
     if (isDefault) {
+      // Serialize default-address changes for this customer; the partial unique
+      // index remains the database-level guard if another write path is added.
+      await lockCustomerAddressDefaults(client, customerId);
       await client.query(
         'UPDATE delivery_addresses SET is_default = FALSE WHERE customer_id = $1', [customerId]);
     }
@@ -87,25 +111,33 @@ async function addAddress(customerId, data) {
 }
 
 async function updateAddress(customerId, addressId, data) {
+  const hasLatitude = Object.prototype.hasOwnProperty.call(data, 'latitude');
+  const hasLongitude = Object.prototype.hasOwnProperty.call(data, 'longitude');
+  if (hasLatitude !== hasLongitude) {
+    throw new AppError('Update latitude and longitude together, or leave both unchanged.', 400, 'INCOMPLETE_COORDINATES');
+  }
+  if (hasLatitude) validateAddressCoordinates(data.latitude, data.longitude);
+
   const allowed = {
     label: 'label', fullAddress: 'full_address', area: 'area',
     latitude: 'latitude', longitude: 'longitude', isDefault: 'is_default',
   };
   const sets = [], params = []; let pi = 1;
   for (const [jsKey, col] of Object.entries(allowed)) {
-    if (data[jsKey] !== undefined) { sets.push(`${col} = $${pi++}`); params.push(data[jsKey]); }
+    if (data[jsKey] !== undefined) { sets.push(`${col} = ${pi++}`); params.push(data[jsKey]); }
   }
   if (!sets.length) throw new AppError('No fields to update.', 400, 'VALIDATION_ERROR');
 
   return withTransaction(async (client) => {
-    if (data.isDefault) {
+    if (data.isDefault === true) {
+      await lockCustomerAddressDefaults(client, customerId);
       await client.query(
         'UPDATE delivery_addresses SET is_default = FALSE WHERE customer_id = $1', [customerId]);
     }
     params.push(addressId, customerId);
     const { rows: [addr] } = await client.query(
       `UPDATE delivery_addresses SET ${sets.join(', ')}
-       WHERE id = $${pi} AND customer_id = $${pi+1} RETURNING *`,
+       WHERE id = ${pi} AND customer_id = ${pi+1} RETURNING *`,
       params
     );
     if (!addr) throw new AppError('Address not found.', 404, 'ADDRESS_NOT_FOUND');
