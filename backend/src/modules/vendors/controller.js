@@ -49,7 +49,7 @@ exports.updateProfile = wrap(async (req, res) => {
 
 // PUT /vendors/:id/profile  (admin updates any vendor store)
 exports.adminUpdateProfile = wrap(async (req, res) => {
-  const updated = await svc.updateProfile(req.params.id, req.body);
+  const updated = await svc.updateAdminProfile(req.params.id, req.body);
   res.json({ success: true, data: updated });
 });
 

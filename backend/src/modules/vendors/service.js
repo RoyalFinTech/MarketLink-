@@ -224,7 +224,7 @@ async function updateProfile(userId, data) {
   const sets = [], params = []; let pi = 1;
   for (const [jsKey, col] of Object.entries(allowed)) {
     if (data[jsKey] !== undefined) {
-      sets.push(`${col} = ${pi++}`);
+      sets.push(col + ' = ' + String.fromCharCode(36) + pi++);
       const value = jsKey === 'phone'
         ? normalizeGambianContact(data[jsKey], 'Business phone')
         : jsKey === 'whatsappNumber'
@@ -240,6 +240,23 @@ async function updateProfile(userId, data) {
     `UPDATE vendors SET ${sets.join(', ')} WHERE user_id = $${pi} RETURNING *`,
     params
   );
+  if (!updated) throw new AppError('Vendor not found.', 404, 'VENDOR_NOT_FOUND');
+  return updated;
+}
+
+async function updateAdminProfile(userId, data) {
+  const allowed = { commissionPct: 'commission_pct', isOpen: 'is_open', vacationMode: 'vacation_mode' };
+  const sets = [], params = []; let pi = 1;
+  for (const [jsKey, col] of Object.entries(allowed)) {
+    if (data[jsKey] !== undefined) {
+      sets.push(col + ' = ' + String.fromCharCode(36) + pi++);
+      params.push(jsKey === 'commissionPct' ? Number(data[jsKey]) : data[jsKey]);
+    }
+  }
+  if (!sets.length) throw new AppError('No valid Admin fields to update.', 400, 'VALIDATION_ERROR');
+  params.push(userId);
+  const marker = String.fromCharCode(36) + pi;
+  const { rows: [updated] } = await query('UPDATE vendors SET ' + sets.join(', ') + ' WHERE user_id = ' + marker + ' RETURNING *', params);
   if (!updated) throw new AppError('Vendor not found.', 404, 'VENDOR_NOT_FOUND');
   return updated;
 }
@@ -402,4 +419,4 @@ async function getAnalytics(vendorId, { period = '30d' } = {}) {
   };
 }
 
-module.exports = { register, getById, list, updateProfile, approve, reject, suspend, reinstate, getAnalytics };
+module.exports = { register, getById, list, updateProfile, updateAdminProfile, approve, reject, suspend, reinstate, getAnalytics };

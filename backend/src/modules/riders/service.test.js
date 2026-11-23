@@ -4,7 +4,19 @@ jest.mock('../notifications/service',()=>({pushToUser:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const notificationsService=require('../notifications/service');
-const {getDeliveryHistory,updateLocation,register,approve}=require('./service');
+const {getDeliveryHistory,updateLocation,register,approve,updateProfile}=require('./service');
+
+describe('rider profile updates',()=>{
+ const riderId='33333333-3333-4333-8333-333333333333';
+ beforeEach(()=>jest.clearAllMocks());
+ test('binds rider profile field and owner ID as parameters',async()=>{
+  query.mockResolvedValueOnce({rows:[{user_id:riderId,whatsapp_number:'+220831234567'}]});
+  const result=await updateProfile(riderId,{whatsappNumber:'+220831234567'});
+  expect(result.whatsapp_number).toBe('+220831234567');
+  expect(query.mock.calls[0][0]).toContain('whatsapp_number = $1 WHERE user_id = $2 RETURNING *');
+  expect(query.mock.calls[0][1]).toEqual(['+220831234567',riderId]);
+ });
+});
 
 describe('rider delivery history cash reconciliation data',()=>{
  beforeEach(()=>jest.clearAllMocks());

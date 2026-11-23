@@ -2,7 +2,7 @@ jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
-const {register,approve}=require('./service');
+const {register,approve,updateProfile,updateAdminProfile}=require('./service');
 
 describe('vendor application registration and approval',()=>{
  const userId='22222222-2222-4222-8222-222222222222';
@@ -43,6 +43,21 @@ describe('vendor application registration and approval',()=>{
   await expect(register(userId,{businessName:'Another Shop',phone:'+220871234567'}))
    .rejects.toMatchObject({statusCode:409,code:'VENDOR_EXISTS'});
   expect(withTransaction).not.toHaveBeenCalled();
+ });
+ test('vendor profile update binds fields and owner ID as SQL parameters',async()=>{
+  query.mockResolvedValueOnce({rows:[{user_id:userId,whatsapp_number:'+220831234567'}]});
+  const result=await updateProfile(userId,{whatsappNumber:'+220831234567'});
+  expect(result.whatsapp_number).toBe('+220831234567');
+  expect(query.mock.calls[0][0]).toContain('whatsapp_number = $1 WHERE user_id = $2 RETURNING *');
+  expect(query.mock.calls[0][1]).toEqual(['+220831234567',userId]);
+ });
+ test('Admin can update commission percentage but vendor self-service cannot',async()=>{
+  await expect(updateProfile(userId,{commissionPct:3.5})).rejects.toMatchObject({statusCode:400,code:'VALIDATION_ERROR'});
+  query.mockResolvedValueOnce({rows:[{user_id:userId,commission_pct:'3.50'}]});
+  const result=await updateAdminProfile(userId,{commissionPct:3.5});
+  expect(result.commission_pct).toBe('3.50');
+  expect(query.mock.calls[0][0]).toContain('commission_pct = $1 WHERE user_id = $2 RETURNING *');
+  expect(query.mock.calls[0][1]).toEqual([3.5,userId]);
  });
  test('admin approval changes KYC state, notifies the vendor and writes an audit entry',async()=>{
   const before={user_id:userId,kyc_status:'pending'};

@@ -182,7 +182,7 @@ async function updateProfile(userId, data) {
   const sets = [], params = []; let pi = 1;
   for (const [jsKey, col] of Object.entries(allowed)) {
     if (data[jsKey] !== undefined) {
-      sets.push(`${col} = ${pi++}`);
+      sets.push(col + ' = ' + String.fromCharCode(36) + pi++);
       const value = jsKey === 'mobileNumber'
         ? normalizeGambianContact(data[jsKey], 'Rider mobile number')
         : jsKey === 'whatsappNumber'
