@@ -255,25 +255,88 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
 
 async function acceptDelivery(deliveryId, riderId) {
   return withTransaction(async (client) => {
-    const { rows:[d] } = await client.query('SELECT * FROM deliveries WHERE id=$1 FOR UPDATE',[deliveryId]);
-    if(!d) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
-    const { rows:[rider] } = await client.query("SELECT user_id,is_online FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[riderId]);
+    // Keep the lock order consistent with order status updates: order first,
+    // then delivery, then rider. This avoids deadlocks during cancellation
+    // or when the vendor marks an order ready at the same time.
+    const { rows: [snapshot] } = await client.query(
+      'SELECT order_id FROM deliveries WHERE id=$1', [deliveryId]
+    );
+    if (!snapshot) throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const { rows: [order] } = await client.query(
+      'SELECT id,status,customer_id,vendor_id,order_number FROM orders WHERE id=$1 FOR UPDATE',
+      [snapshot.order_id]
+    );
+    if (!order) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+    if (!['awaiting_rider','rider_assigned'].includes(String(order.status))) {
+      throw new AppError('The vendor has not marked this order ready for a rider yet. You will receive the request when it is ready.',409,'DELIVERY_NOT_READY');
+    }
+    const { rows:[d] } = await client.query(
+      'SELECT * FROM deliveries WHERE id=$1 AND order_id=$2 FOR UPDATE',
+      [deliveryId,snapshot.order_id]
+    );
+    if(!d)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const { rows:[rider] } = await client.query(
+      "SELECT user_id,is_online FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",
+      [riderId]
+    );
     if(!rider) throw new AppError('Only an approved rider can accept a delivery.',403,'RIDER_UNAVAILABLE');
-    const {rows:[busy]}=await client.query("SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",[riderId,deliveryId]);
+    if(!rider.is_online) throw new AppError('Go online before accepting a delivery.',403,'RIDER_OFFLINE');
+    const {rows:[busy]}=await client.query(
+      "SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
+      [riderId,deliveryId]
+    );
     if(busy)throw new AppError('You already have an active delivery. Complete it before accepting another request.',409,'RIDER_HAS_ACTIVE_DELIVERY');
     await assertRiderMatchesLockedQuote(client,d.order_id,riderId);
+
     if(d.status==='assigned' && String(d.rider_id)===String(riderId)) {
-      await client.query("UPDATE rider_assignments SET status='accepted',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
+      await client.query(
+        "UPDATE rider_assignments SET status='accepted',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",
+        [deliveryId,riderId]
+      );
+      if(order.status==='awaiting_rider') {
+        await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[order.id]);
+        await client.query(
+          "INSERT INTO order_status_history (order_id,status,note) VALUES($1,'rider_assigned','The selected rider accepted the customer-approved delivery price.')",
+          [order.id]
+        );
+      }
+      await client.query(
+        `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+         VALUES ($1,'delivery_accepted','Rider confirmed 🛵','Your selected rider has accepted the delivery request.','delivery',$2)`,
+        [order.customer_id,deliveryId]
+      );
+      await client.query(
+        `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+         VALUES ($1,'delivery_accepted','Rider confirmed 🛵','The selected rider has accepted order '+$2+'.','delivery',$3)`,
+        [order.vendor_id,order.order_number,deliveryId]
+      );
       return d;
     }
     if(d.status!=='unassigned') throw new AppError('This delivery is no longer available.',409,'DELIVERY_NOT_AVAILABLE');
     if(d.rider_id && String(d.rider_id)!==String(riderId)) throw new AppError('This delivery is already assigned.',409,'DELIVERY_NOT_AVAILABLE');
-    if(!rider.is_online) throw new AppError('Go online before accepting an unassigned delivery.',403,'RIDER_OFFLINE');
-    const { rows:[updated] } = await client.query("UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",[riderId,deliveryId]);
+    const { rows:[updated] } = await client.query(
+      "UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 RETURNING *",
+      [riderId,deliveryId]
+    );
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
-    await client.query("INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'manual','accepted',now())",[deliveryId,riderId]);
-    const { rows:[o] } = await client.query('SELECT customer_id FROM orders WHERE id=$1',[updated.order_id]);
-    if(o) await client.query("INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_assigned','Rider Assigned 🛵','A rider has accepted your delivery.','delivery',$2)",[o.customer_id,deliveryId]);
+    await client.query(
+      "INSERT INTO order_status_history (order_id,status,note) VALUES($1,'rider_assigned','A rider accepted the delivery request.')",
+      [order.id]
+    );
+    await client.query(
+      "INSERT INTO rider_assignments (delivery_id,rider_id,assigned_by,assignment_type,status,responded_at) VALUES($1,$2,$2,'manual','accepted',now())",
+      [deliveryId,riderId]
+    );
+    await client.query(
+      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'delivery_accepted','Rider confirmed 🛵','A rider has accepted your delivery request.','delivery',$2)`,
+      [order.customer_id,deliveryId]
+    );
+    await client.query(
+      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'delivery_accepted','Rider confirmed 🛵','A rider has accepted order '+$2+'.','delivery',$3)`,
+      [order.vendor_id,order.order_number,deliveryId]
+    );
     return updated;
   });
 }
