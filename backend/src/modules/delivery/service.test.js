@@ -23,22 +23,26 @@ describe('delivery status transitions', () => {
   });
 
   test('locks and rechecks the delivery before applying a transition', async () => {
-    clientQuery.mockResolvedValueOnce({
-      rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }],
-    });
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ order_id: 'order-1' }] }) // delivery snapshot
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'delivered' }] }) // locked order
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }] }); // locked delivery
 
     await expect(updateStatus('delivery-1', 'in_transit', 'rider-1', ['rider']))
       .rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
 
-    expect(clientQuery).toHaveBeenCalledTimes(1);
-    expect(clientQuery.mock.calls[0][0]).toMatch(/FOR UPDATE/i);
+    expect(clientQuery).toHaveBeenCalledTimes(3);
+    expect(clientQuery.mock.calls[0][0]).toMatch(/SELECT order_id FROM deliveries/i);
+    expect(clientQuery.mock.calls[1][0]).toMatch(/FROM orders WHERE id=\$1 FOR UPDATE/i);
+    expect(clientQuery.mock.calls[2][0]).toMatch(/FROM deliveries WHERE id=\$1 AND order_id=\$2 FOR UPDATE/i);
     expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
   });
 
   test('retries settlement when the delivery is already marked delivered', async () => {
-    clientQuery.mockResolvedValueOnce({
-      rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }],
-    });
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ order_id: 'order-1' }] }) // delivery snapshot
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'delivered' }] }) // locked order
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }] }); // locked delivery
     ordersService.settleOrderFinancials.mockResolvedValue({ settled: true });
 
     const result = await updateStatus('delivery-1', 'delivered', 'rider-1', ['rider']);
@@ -46,26 +50,26 @@ describe('delivery status transitions', () => {
     expect(result.status).toBe('delivered');
     expect(result).not.toHaveProperty('settlementRetry');
     expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-1');
-    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery).toHaveBeenCalledTimes(3);
   });
 
   test('records the order timeline and settles only after delivery is committed', async () => {
     clientQuery
-      .mockResolvedValueOnce({
-        rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'in_transit' }],
-      })
-      .mockResolvedValueOnce({
-        rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }],
-      })
+      .mockResolvedValueOnce({ rows: [{ order_id: 'order-1' }] }) // delivery snapshot
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'on_the_way' }] }) // locked order
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'in_transit' }] }) // locked delivery
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'delivered' }] }) // update delivery
       .mockResolvedValueOnce({ rows: [] }) // update order status
       .mockResolvedValueOnce({ rows: [] }) // append order status history
-      .mockResolvedValueOnce({ rows: [{ customer_id: 'customer-1' }] })
+      .mockResolvedValueOnce({ rows: [{ customer_id: 'customer-1' }] }) // customer lookup
       .mockResolvedValueOnce({ rows: [] }) // customer notification
       .mockResolvedValueOnce({ rows: [] }); // stop delivery GPS sharing
 
     await updateStatus('delivery-1', 'delivered', 'rider-1', ['rider']);
 
-    expect(clientQuery.mock.calls[0][0]).toMatch(/FOR UPDATE/i);
+    expect(clientQuery.mock.calls[0][0]).toMatch(/SELECT order_id FROM deliveries/i);
+    expect(clientQuery.mock.calls[1][0]).toMatch(/FROM orders WHERE id=\$1 FOR UPDATE/i);
+    expect(clientQuery.mock.calls[2][0]).toMatch(/FROM deliveries WHERE id=\$1 AND order_id=\$2 FOR UPDATE/i);
     expect(clientQuery.mock.calls.some(([sql]) => /INSERT INTO order_status_history/i.test(sql))).toBe(true);
     expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-1');
   });
