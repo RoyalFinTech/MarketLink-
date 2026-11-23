@@ -6,6 +6,7 @@ const DEFAULT_DELIVERY_PRICING_POLICY = Object.freeze({
   minimumFeeGmd: 150,
   minimumAllowedFeeGmd: 150,
   maximumFeeGmd: 5000,
+  allowRiderOverrides: true,
 });
 
 function parsePolicyValue(value) {
@@ -24,6 +25,7 @@ function normaliseDeliveryPricingPolicy(value) {
     minimumFeeGmd: Number(source.minimumFeeGmd ?? DEFAULT_DELIVERY_PRICING_POLICY.minimumFeeGmd),
     minimumAllowedFeeGmd: Number(source.minimumAllowedFeeGmd ?? DEFAULT_DELIVERY_PRICING_POLICY.minimumAllowedFeeGmd),
     maximumFeeGmd: Number(source.maximumFeeGmd ?? DEFAULT_DELIVERY_PRICING_POLICY.maximumFeeGmd),
+    allowRiderOverrides: source.allowRiderOverrides !== false,
   };
   const valid = Number.isFinite(policy.baseFeeGmd) && policy.baseFeeGmd >= 0 && policy.baseFeeGmd <= 2000 &&
     Number.isFinite(policy.perKmFeeGmd) && policy.perKmFeeGmd >= 0 && policy.perKmFeeGmd <= 500 &&
@@ -64,6 +66,167 @@ function validateDeliveryPricingPolicy(input = {}) {
   return policy;
 }
 
+ 
+function validateRiderDeliveryOverride(input = {}, policyValue) {
+  const policy = normaliseDeliveryPricingPolicy(policyValue);
+  const baseFeeGmd = Number(input.baseFeeGmd);
+  const perKmFeeGmd = Number(input.perKmFeeGmd);
+  const minimumFeeGmd = Number(input.minimumFeeGmd);
+  if (![baseFeeGmd, perKmFeeGmd, minimumFeeGmd].every(Number.isFinite) ||
+      baseFeeGmd < 0 || baseFeeGmd > policy.maximumFeeGmd ||
+      perKmFeeGmd < 0 || perKmFeeGmd > 500 ||
+      minimumFeeGmd < policy.minimumAllowedFeeGmd || minimumFeeGmd > policy.maximumFeeGmd) {
+    const error = new Error('Enter a valid GMD rider tariff inside the administrator-approved limits.');
+    error.statusCode = 400;
+    error.code = 'INVALID_RIDER_PRICING_OVERRIDE';
+    throw error;
+  }
+  const rawRates = input.routeRates === undefined ? [] : input.routeRates;
+  if (!Array.isArray(rawRates) || rawRates.length > 20) {
+    const error = new Error('An Admin rider override can contain up to 20 fixed pickup-to-destination prices.');
+    error.statusCode = 400;
+    error.code = 'INVALID_RIDER_PRICING_OVERRIDE';
+    throw error;
+  }
+  const seen = new Set();
+  const routeRates = rawRates.map((rate, index) => {
+    const originArea = String(rate && rate.originArea || '').trim();
+    const destinationArea = String(rate && rate.destinationArea || '').trim();
+    const fixedFeeGmd = Number(rate && (rate.fixedFeeGmd ?? rate.fixedFee));
+    if (!originArea || !destinationArea || originArea.length > 120 || destinationArea.length > 120 ||
+        !Number.isFinite(fixedFeeGmd) || fixedFeeGmd < policy.minimumAllowedFeeGmd || fixedFeeGmd > policy.maximumFeeGmd) {
+      const error = new Error('Fixed route ' + (index + 1) + ' needs two locality names and a fare within the Admin-approved GMD range.');
+      error.statusCode = 400;
+      error.code = 'INVALID_RIDER_PRICING_OVERRIDE';
+      throw error;
+    }
+    const key = originArea.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() +
+      '|' + destinationArea.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (seen.has(key)) {
+      const error = new Error('Duplicate Admin fixed route at row ' + (index + 1) + '.');
+      error.statusCode = 400;
+      error.code = 'DUPLICATE_RIDER_PRICING_ROUTE';
+      throw error;
+    }
+    seen.add(key);
+    return { originArea, destinationArea, fixedFeeGmd: Number(fixedFeeGmd.toFixed(2)) };
+  });
+  return {
+    enabled: input.enabled !== false,
+    baseFeeGmd: Number(baseFeeGmd.toFixed(2)),
+    perKmFeeGmd: Number(perKmFeeGmd.toFixed(2)),
+    minimumFeeGmd: Number(minimumFeeGmd.toFixed(2)),
+    routeRates,
+  };
+}
+
+function resolveRiderDeliveryTariff(rider, riderRouteRates = [], policyValue) {
+  const policy = normaliseDeliveryPricingPolicy(policyValue);
+  const clampFee = (value, fallback) => {
+    const number = value == null ? Number(fallback) : Number(value);
+    if (!Number.isFinite(number) || number < 0) {
+      const error = new Error('A saved rider delivery tariff contains an invalid amount.');
+      error.statusCode = 409;
+      error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+      throw error;
+    }
+    return Number(Math.min(policy.maximumFeeGmd, Math.max(policy.minimumAllowedFeeGmd, number)).toFixed(2));
+  };
+  const clampBaseFee = (value, fallback) => {
+    const number = value == null ? Number(fallback) : Number(value);
+    if (!Number.isFinite(number) || number < 0) {
+      const error = new Error('A saved rider base tariff contains an invalid amount.');
+      error.statusCode = 409;
+      error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+      throw error;
+    }
+    return Number(Math.min(policy.maximumFeeGmd, number).toFixed(2));
+  };
+  const parseRouteRates = routes => {
+    if (!Array.isArray(routes) || routes.length > 20) {
+      const error = new Error('A saved rider delivery tariff contains an invalid route list.');
+      error.statusCode = 409;
+      error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+      throw error;
+    }
+    return routes.map(rate => {
+      const originArea = String(rate && (rate.origin_area ?? rate.originArea) || '').trim();
+      const destinationArea = String(rate && (rate.destination_area ?? rate.destinationArea) || '').trim();
+      const rawFee = rate && (rate.fixed_fee_gmd ?? rate.fixedFeeGmd ?? rate.fixedFee);
+      const fixedFee = Number(rawFee);
+      if (!originArea || !destinationArea || originArea.length > 120 || destinationArea.length > 120 || !Number.isFinite(fixedFee) || fixedFee <= 0) {
+        const error = new Error('A saved rider fixed route is invalid. Ask Admin to review the route.');
+        error.statusCode = 409;
+        error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+        throw error;
+      }
+      return {
+        id: rate.id || null,
+        origin_area: originArea,
+        destination_area: destinationArea,
+        fixed_fee_gmd: clampFee(fixedFee, policy.minimumAllowedFeeGmd),
+        is_active: rate.is_active === undefined ? true : Boolean(rate.is_active),
+      };
+    });
+  };
+
+  if (rider && rider.admin_delivery_pricing_override != null) {
+    // An Admin may later change the global minimum/maximum. Re-clamp existing
+    // Admin overrides against the new guardrails instead of breaking all quotes.
+    const override = parsePolicyValue(rider.admin_delivery_pricing_override);
+    const routeInput = Array.isArray(override.routeRates) ? override.routeRates : [];
+    const safeOverride = {
+      enabled: override.enabled !== false,
+      baseFeeGmd: clampBaseFee(override.baseFeeGmd, policy.baseFeeGmd),
+      perKmFeeGmd: Number(override.perKmFeeGmd),
+      minimumFeeGmd: clampFee(override.minimumFeeGmd, policy.minimumFeeGmd),
+      routeRates: parseRouteRates(routeInput).map(rate => ({
+        originArea: rate.origin_area,
+        destinationArea: rate.destination_area,
+        fixedFeeGmd: rate.fixed_fee_gmd,
+      })),
+    };
+    if (!Number.isFinite(safeOverride.perKmFeeGmd) || safeOverride.perKmFeeGmd < 0 || safeOverride.perKmFeeGmd > 500) {
+      const error = new Error('The saved Admin rider kilometre rate is invalid. Ask Admin to review it.');
+      error.statusCode = 409;
+      error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+      throw error;
+    }
+    const validated = validateRiderDeliveryOverride(safeOverride, policy);
+    return {
+      enabled: validated.enabled,
+      baseFeeGmd: validated.baseFeeGmd,
+      perKmFeeGmd: validated.perKmFeeGmd,
+      minimumFeeGmd: validated.minimumFeeGmd,
+      routeRates: validated.routeRates.map(rate => ({
+        origin_area: rate.originArea,
+        destination_area: rate.destinationArea,
+        fixed_fee_gmd: rate.fixedFeeGmd,
+        is_active: true,
+      })),
+      adminOverrideActive: true,
+    };
+  }
+  const rawBase = rider && rider.delivery_base_fee_gmd == null ? policy.baseFeeGmd : rider && rider.delivery_base_fee_gmd;
+  const rawPerKm = rider && rider.delivery_per_km_fee_gmd == null ? policy.perKmFeeGmd : rider && rider.delivery_per_km_fee_gmd;
+  const rawMinimum = rider && rider.delivery_min_fee_gmd == null ? policy.minimumFeeGmd : rider && rider.delivery_min_fee_gmd;
+  const perKmFeeGmd = Number(rawPerKm);
+  if (!Number.isFinite(perKmFeeGmd) || perKmFeeGmd < 0 || perKmFeeGmd > 500) {
+    const error = new Error('The saved rider kilometre tariff is invalid.');
+    error.statusCode = 409;
+    error.code = 'RIDER_DELIVERY_TARIFF_INVALID';
+    throw error;
+  }
+  return {
+    enabled: Boolean(rider && rider.delivery_pricing_enabled && policy.allowRiderOverrides),
+    baseFeeGmd: clampBaseFee(rawBase, policy.baseFeeGmd),
+    perKmFeeGmd,
+    minimumFeeGmd: clampFee(rawMinimum, policy.minimumFeeGmd),
+    routeRates: parseRouteRates(riderRouteRates || []),
+    adminOverrideActive: false,
+  };
+}
+
 function applyDeliveryPricingLimits(fee, policyValue) {
   const policy = normaliseDeliveryPricingPolicy(policyValue);
   const value = Number(fee);
@@ -80,5 +243,7 @@ module.exports = {
   DEFAULT_DELIVERY_PRICING_POLICY,
   normaliseDeliveryPricingPolicy,
   validateDeliveryPricingPolicy,
+  validateRiderDeliveryOverride,
+  resolveRiderDeliveryTariff,
   applyDeliveryPricingLimits,
 };

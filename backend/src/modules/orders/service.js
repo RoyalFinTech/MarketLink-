@@ -4,7 +4,7 @@ const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const { SETTING_KEYS, commissionSettingsFromRows, payoutFeeRecoveryPctFromRows } = require('../../utils/marketplaceCommission');
 const { calculatePayoutFeeRecovery } = require('../../utils/payoutFeeRecovery');
-const { normaliseDeliveryPricingPolicy, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
+const { normaliseDeliveryPricingPolicy, resolveRiderDeliveryTariff, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
 const { haversineKm, estimateRoadDistanceKm, matchingRouteRate, calculateDeliveryFare, roundGmd } = require('../../utils/deliveryPricing');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
@@ -31,7 +31,7 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,deliveryAddr
   for(const item of items){
     if(!item||!item.productId||!Number.isInteger(Number(item.quantity))||Number(item.quantity)<1)throw new AppError('Each cart item must have a valid product and positive integer quantity.',400,'INVALID_ORDER_ITEM');
     const {rows:[product]}=await client.query(
-      'SELECT p.id,p.vendor_id,p.name,p.price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1',
+      'SELECT p.id,p.vendor_id,p.name,CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price,p.price AS vendor_listed_price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1',
       [item.productId]
     );
     if(!product||product.status!=='active'||product.vendor_kyc_status!=='approved')throw new AppError('A product in your cart is no longer available.',409,'PRODUCT_UNAVAILABLE');
@@ -128,13 +128,11 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
     );
     const { rows: riders } = await client.query(
       `SELECT r.user_id AS rider_id,r.vehicle_type,r.rating_avg,r.rating_count,
-              r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,
-              u.full_name
+              r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,
+              r.admin_delivery_pricing_override,u.full_name
        FROM riders r JOIN users u ON u.id=r.user_id
-       WHERE r.kyc_status='approved' AND r.is_online=TRUE AND r.delivery_pricing_enabled=TRUE
-         AND r.delivery_base_fee_gmd IS NOT NULL
-         AND r.delivery_per_km_fee_gmd IS NOT NULL
-         AND r.delivery_min_fee_gmd IS NOT NULL
+       WHERE r.kyc_status='approved' AND r.is_online=TRUE
+         AND (r.admin_delivery_pricing_override IS NOT NULL OR (r.delivery_pricing_enabled=TRUE AND $1::boolean=TRUE))
          AND NOT EXISTS (
            SELECT 1 FROM deliveries active
            WHERE active.rider_id=r.user_id AND (
@@ -147,7 +145,7 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
            )
          )
        ORDER BY r.rating_avg DESC,r.rating_count DESC
-       LIMIT 20`
+       LIMIT 20`, [deliveryPolicy.allowRiderOverrides]
     );
     if (!riders.length) {
       return {
@@ -173,14 +171,16 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
     }
     const quotes = [];
     for (const rider of riders) {
-      const lane = matchingRouteRate(laneMap.get(rider.rider_id), originArea, destinationArea);
+      const effectiveTariff = resolveRiderDeliveryTariff(rider, laneMap.get(rider.rider_id) || [], deliveryPolicy);
+      if (!effectiveTariff.enabled) continue;
+      const lane = matchingRouteRate(effectiveTariff.routeRates, originArea, destinationArea);
       let fee;
       try {
         fee = applyDeliveryPricingLimits(calculateDeliveryFare({
-          fixedFee: lane ? lane.fixed_fee_gmd : null,
-          baseFee: rider.delivery_base_fee_gmd,
-          perKmFee: rider.delivery_per_km_fee_gmd,
-          minimumFee: rider.delivery_min_fee_gmd,
+          fixedFee: lane ? (lane.fixed_fee_gmd ?? lane.fixedFeeGmd) : null,
+          baseFee: effectiveTariff.baseFeeGmd,
+          perKmFee: effectiveTariff.perKmFeeGmd,
+          minimumFee: effectiveTariff.minimumFeeGmd,
           distanceKm: routeDistance,
         }), deliveryPolicy);
       } catch (error) {
@@ -198,8 +198,8 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, i
         [customerId,vendorId,deliveryAddressId,rider.rider_id,originArea,destinationArea,
          Number(vendor.latitude),Number(vendor.longitude),Number(address.latitude),Number(address.longitude),
          Math.max(0.01,roundGmd(straightLine)),routeDistance,lane?'route_fixed':'per_kilometre',
-         lane?null:Number(rider.delivery_base_fee_gmd),lane?null:Number(rider.delivery_per_km_fee_gmd),
-         lane?null:Number(rider.delivery_min_fee_gmd),fee,
+         lane?null:Number(effectiveTariff.baseFeeGmd),lane?null:Number(effectiveTariff.perKmFeeGmd),
+         lane?null:Number(effectiveTariff.minimumFeeGmd),fee,
          roundGmd(checkoutPreview.discountedSubtotal+fee+calculatePayoutFeeRecovery({vendorPayout:checkoutPreview.vendorPayout,riderPayout:fee,affiliatePayout:checkoutPreview.affiliatePayout,pct:checkoutPreview.payoutFeeRecoveryPct}).payoutFeeRecoveryAmount),
          checkoutPreview.payoutFeeRecoveryPct,
          buildCheckoutFingerprint({customerId,vendorId,deliveryAddressId,riderId:rider.rider_id,items:checkoutPreview.items,couponId:checkoutPreview.couponId,discount:checkoutPreview.discount,marketplaceCommissionPct:checkoutPreview.marketplaceCommissionPct,affiliateUserId:checkoutPreview.affiliateUserId,affiliateCommissionPct:checkoutPreview.affiliateCommissionPct,payoutFeeRecoveryPct:checkoutPreview.payoutFeeRecoveryPct,deliveryFee:fee})]
@@ -286,7 +286,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     for (const item of items) {
       const qty = Number(item.quantity);
       const { rows:[p] } = await client.query(
-        'SELECT p.id,p.vendor_id,p.name,p.price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1 FOR UPDATE OF p',
+        'SELECT p.id,p.vendor_id,p.name,CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price,p.price AS vendor_listed_price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1 FOR UPDATE OF p',
         [item.productId]
       );
       if (!p || p.status!=='active' || p.vendor_kyc_status!=='approved') {

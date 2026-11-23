@@ -18,6 +18,13 @@ exports.commissionSettings = wrap(async (req,res) => res.json({ success:true, da
 exports.updateCommissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.updateMarketplaceCommissionSettings(req.body, actor(req)) }));
 exports.deliveryPricingSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getDeliveryPricingSettings() }));
 exports.updateDeliveryPricingSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.updateDeliveryPricingSettings(req.body, actor(req)) }));
+exports.riderPricingOverrides = wrap(async (req,res) => res.json({success:true,data:await svc.listAdminRiderPricing(req.query)}));
+exports.setRiderPricingOverride = wrap(async (req,res) => res.json({success:true,data:await svc.updateAdminRiderPricingOverride(req.params.id,req.body,actor(req))}));
+exports.clearRiderPricingOverride = wrap(async (req,res) => res.json({success:true,data:await svc.updateAdminRiderPricingOverride(req.params.id,{clearOverride:true},actor(req))}));
+exports.vendorProductPricing = wrap(async (req,res) => res.json({success:true,data:await svc.listVendorProductPricing(req.query)}));
+exports.setVendorProductPriceOverride = wrap(async (req,res) => res.json({success:true,data:await svc.updateVendorProductPriceOverride(req.params.id,req.body,actor(req))}));
+exports.paymentReadiness = wrap(async (req,res) => res.json({success:true,data:await svc.getPaymentReadiness()}));
+
 exports.setSetting = wrap(async (req,res) => res.json({ success:true, data: await svc.updateSystemSetting(req.params.key, req.body.value, req.user.id) }));
 exports.auditLogs  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAuditLogs(req.query) }));
 exports.reports    = wrap(async (req,res) => res.json({ success:true, data: await svc.getReports(req.query) }));

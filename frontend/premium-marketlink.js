@@ -355,11 +355,27 @@
     return true;
   }
 
+  function checkoutCartPricingFingerprint(productIds){
+    var rows=(productIds||[]).map(function(id){
+      var product=CART_ITEMS[liveProductId(id)]||CART_ITEMS[id]||{};
+      var price=Number(product.price);
+      return {
+        id:String(liveProductId(id)),
+        quantity:Number(S.cart[liveProductId(id)]==null?S.cart[id]||0:S.cart[liveProductId(id)]),
+        unitPrice:Number.isFinite(price)?price.toFixed(2):'invalid'
+      };
+    }).sort(function(a,b){return a.id.localeCompare(b.id);});
+    return rows.map(function(row){return row.id+':'+row.quantity+':'+row.unitPrice;}).join(',');
+  }
+
   async function placeLiveOrder(){
     if(!apiOk()){toast('Please sign in before placing an order.','error');return;}
     var ids=Object.keys(S.cart||{});
     if(!ids.length){toast('Your cart is empty.','error');return;}
     var liveItems=await refreshCartMetadata();
+    // Product metadata refresh can migrate stale cart keys after an ID change.
+    // Rebuild the product list from the refreshed cart before quoting or placing.
+    ids=Object.keys(S.cart||{});
     if(liveItems.some(function(p){return !p||!p.id||String(p.status||'').toLowerCase()!=='active';})){
       toast('One or more cart items is no longer available. Refresh the cart.','error');
       renderLiveCart();return;
@@ -372,7 +388,7 @@
       try{var ar=await ML_API.customers.getAddresses(),addresses=normalizeProducts(ar.data),def=addresses.find(function(x){return x.is_default;});if(def){addressId=String(def.id);S.delivAddressId=addressId;S.deliveryAddressId=addressId;S.delivAddr=def.full_address||S.delivAddr||'';}}catch(e){}
     }
     if(!addressId){toast('Select a saved delivery address before checkout.','error');switchTab('cart');return;}
-    var checkoutQuoteFingerprint=ids.slice().sort().map(function(id){return id+':'+Number(S.cart[id]||0);}).join(',')+'|coupon:'+String(S.appliedCoupon&&S.appliedCoupon.code||'')+'|affiliate:'+String(S.referredAffiliateCode||'');
+    var checkoutQuoteFingerprint=checkoutCartPricingFingerprint(ids)+'|coupon:'+String(S.appliedCoupon&&S.appliedCoupon.code||'')+'|affiliate:'+String(S.referredAffiliateCode||'');
     var expectedQuoteKey=vendors[0]+'|'+addressId+'|'+checkoutQuoteFingerprint;
     var quoteCache=S.deliveryQuoteCache||null;
     var chosenQuote=quoteCache&&quoteCache.key===expectedQuoteKey&&Array.isArray(quoteCache.options)
@@ -1433,7 +1449,7 @@
     var addressHtml=addresses.length?addresses.map(function(a){var selected=String(a.id)===String(S.delivAddressId||S.deliveryAddressId);return '<button type="button" class="ml-profile-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid '+(selected?'rgba(66,210,201,.55)':'rgba(255,255,255,.07)')+';background:'+(selected?'rgba(13,115,119,.10)':'transparent')+';" onclick="window.ML_Premium.selectAddress(\''+esc(String(a.id))+'\')"><div class="ico">📍</div><div class="copy"><b>'+esc(a.label||'Address')+'</b><span>'+esc(a.full_address||'')+(a.area?' · '+esc(a.area):'')+'</span></div>'+(selected?'<span style="color:#42D2C9;font-size:10px;font-weight:700">Selected</span>':'')+'</button>';}).join(''):'<div class="ml-empty"><b>No saved delivery addresses</b><span>Add your first address in Profile → Saved addresses.</span></div>';
     var selectedDeliveryAddressId=String(S.delivAddressId||S.deliveryAddressId||'');
     var deliveryQuoteError='',deliveryQuoteCache=S.deliveryQuoteCache||null;
-    var cartPricingFingerprint=ids.slice().sort().map(function(id){return id+':'+Number(S.cart[id]||0);}).join(',')+'|coupon:'+String(S.appliedCoupon&&S.appliedCoupon.code||'')+'|affiliate:'+String(S.referredAffiliateCode||'');
+    var cartPricingFingerprint=checkoutCartPricingFingerprint(ids)+'|coupon:'+String(S.appliedCoupon&&S.appliedCoupon.code||'')+'|affiliate:'+String(S.referredAffiliateCode||'');
     var deliveryQuoteKey=vendorIds.length===1&&selectedDeliveryAddressId?vendorIds[0]+'|'+selectedDeliveryAddressId+'|'+cartPricingFingerprint:'';
     var deliveryQuoteCacheValid=Boolean(deliveryQuoteCache&&deliveryQuoteCache.key===deliveryQuoteKey&&Number(deliveryQuoteCache.cacheUntil||0)>Date.now());
     if(deliveryQuoteKey&&!deliveryQuoteCacheValid){

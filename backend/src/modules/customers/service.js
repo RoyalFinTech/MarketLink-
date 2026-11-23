@@ -160,7 +160,7 @@ async function getWishlist(customerId, { page = 1, limit = 20 }) {
   const offset  = (Math.max(parseInt(page) || 1, 1) - 1) * limit_;
   const { rows } = await query(
     `SELECT wi.id, wi.added_at,
-            p.id AS product_id, p.name, p.slug, p.price, p.compare_at_price,
+            p.id AS product_id, p.name, p.slug, CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price, p.price AS vendor_listed_price, p.compare_at_price,
             p.rating_avg, p.status,
             (SELECT image_url FROM product_images pi
              WHERE pi.product_id = p.id AND pi.is_primary = TRUE LIMIT 1) AS image,

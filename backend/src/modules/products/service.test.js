@@ -47,11 +47,11 @@ describe('product category filtering',()=>{
   const [listSql,listParams]=query.mock.calls[0];
   const [countSql,countParams]=query.mock.calls[1];
   expect(listSql).toContain('p.vendor_id=$1');
-  expect(listSql).toContain('p.price>=$2');
-  expect(listSql).toContain('p.price<=$3');
+  expect(listSql).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)>=$2');
+  expect(listSql).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)<=$3');
   expect(countSql).toContain('p.vendor_id=$1');
-  expect(countSql).toContain('p.price>=$2');
-  expect(countSql).toContain('p.price<=$3');
+  expect(countSql).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)>=$2');
+  expect(countSql).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END)<=$3');
   expect(listParams).toEqual(['vendor-1',10,50,20,0]);
   expect(countParams).toEqual(['vendor-1',10,50]);
  });
@@ -68,5 +68,14 @@ describe('product category filtering',()=>{
   await expect(list({includeAllStatuses:true})).rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
   expect(query).not.toHaveBeenCalled();
  });
+
+ test('public product listing exposes Admin customer price while retaining vendor-listed price',async()=>{
+  query.mockResolvedValueOnce({rows:[{id:'product-1',price:'125.00',vendor_listed_price:'100.00',admin_price_override_enabled:true}]}).mockResolvedValueOnce({rows:[{count:'1'}]});
+  const result=await list({page:1,limit:20});
+  expect(result.items[0]).toMatchObject({price:'125.00',vendor_listed_price:'100.00',admin_price_override_enabled:true});
+  expect(query.mock.calls[0][0]).toContain('(CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END) AS price');
+  expect(query.mock.calls[0][0]).toContain('p.price AS vendor_listed_price');
+ });
+
 
 });

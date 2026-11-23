@@ -28,7 +28,40 @@ router.put('/delivery-pricing-settings', authenticate, authorize(...ADMIN), [
   body('minimumFeeGmd').isFloat({min:0.01,max:5000}),
   body('minimumAllowedFeeGmd').isFloat({min:0.01,max:5000}),
   body('maximumFeeGmd').isFloat({min:0.01,max:5000}),
+  body('allowRiderOverrides').optional().isBoolean(),
 ], validate, ctrl.updateDeliveryPricingSettings);
+
+router.get('/rider-pricing', authenticate, authorize(...ADMIN), [
+  query('page').optional().isInt({min:1}),
+  query('limit').optional().isInt({min:1,max:100}),
+  query('search').optional().isString().isLength({max:120}),
+], validate, ctrl.riderPricingOverrides);
+router.put('/rider-pricing/:id/override', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(),
+  body('enabled').optional().isBoolean(),
+  body('baseFeeGmd').isFloat({min:0,max:5000}),
+  body('perKmFeeGmd').isFloat({min:0,max:500}),
+  body('minimumFeeGmd').isFloat({min:0.01,max:5000}),
+  body('routeRates').optional().isArray({max:20}),
+  body('note').optional().isString().isLength({max:500}),
+], validate, ctrl.setRiderPricingOverride);
+router.delete('/rider-pricing/:id/override', authenticate, authorize(...ADMIN),
+  [param('id').isUUID()], validate, ctrl.clearRiderPricingOverride);
+router.get('/vendor-product-pricing', authenticate, authorize(...ADMIN), [
+  query('page').optional().isInt({min:1}),
+  query('limit').optional().isInt({min:1,max:100}),
+  query('search').optional().isString().isLength({max:120}),
+  query('vendorId').optional().isUUID(),
+  query('status').optional().isIn(['active','pending_review','rejected','archived']),
+], validate, ctrl.vendorProductPricing);
+router.put('/vendor-product-pricing/:id/override', authenticate, authorize(...ADMIN), [
+  param('id').isUUID(),
+  body('enabled').isBoolean(),
+  body('price').optional().isFloat({min:0.01,max:1000000}),
+  body('note').optional().isString().isLength({max:500}),
+], validate, ctrl.setVendorProductPriceOverride);
+router.get('/payment-readiness', authenticate, authorize(...ADMIN), ctrl.paymentReadiness);
+
 router.put('/commission-settings', authenticate, authorize(...ADMIN), [
   body('marketplaceCommissionPct').isFloat({min:0,max:20}),
   body('affiliateCommissionPct').isFloat({min:0,max:20}),

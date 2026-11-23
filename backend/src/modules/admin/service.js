@@ -4,7 +4,8 @@ const { query, withTransaction } = require('../../config/db');
 const { SETTING_KEYS, commissionSettingsFromRows, validateCommissionSettings, withdrawalFeePctFromRows, payoutFeeRecoveryPctFromRows } = require('../../utils/marketplaceCommission');
 const { validateWithdrawalFeePct } = require('../../utils/walletWithdrawalFees');
 const { validatePayoutFeeRecoveryPct } = require('../../utils/payoutFeeRecovery');
-const { DEFAULT_DELIVERY_PRICING_POLICY, normaliseDeliveryPricingPolicy, validateDeliveryPricingPolicy } = require('../../utils/deliveryPricingPolicy');
+const { DEFAULT_DELIVERY_PRICING_POLICY, normaliseDeliveryPricingPolicy, validateDeliveryPricingPolicy, validateRiderDeliveryOverride } = require('../../utils/deliveryPricingPolicy');
+const modemPay = require('../../integrations/modempay');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -293,6 +294,86 @@ async function updateDeliveryPricingSettings(input,actor){
     );
     return policy;
   });
+}
+
+
+async function listAdminRiderPricing({page=1,limit=50,search}={}) {
+  const page_=Math.max(1,parseInt(page,10)||1);
+  const limit_=Math.min(100,Math.max(1,parseInt(limit,10)||50));
+  const offset=(page_-1)*limit_;
+  const params=[],where=[];
+  if(search&&String(search).trim()){
+    params.push('%'+String(search).trim().slice(0,120)+'%');
+    const p='$'+params.length;
+    where.push('(u.full_name ILIKE '+p+' OR u.phone ILIKE '+p+' OR r.address ILIKE '+p+' OR r.delivery_zone ILIKE '+p+' OR r.vehicle_type ILIKE '+p+')');
+  }
+  const whereSql=where.length?'WHERE '+where.join(' AND '):'';
+  const listSql="SELECT r.user_id,r.kyc_status,r.is_online,r.delivery_zone,r.vehicle_type,r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,r.admin_delivery_pricing_override,r.admin_delivery_pricing_override_by,r.admin_delivery_pricing_override_at,(SELECT COALESCE(jsonb_agg(jsonb_build_object('originArea',rr.origin_area,'destinationArea',rr.destination_area,'fixedFeeGmd',rr.fixed_fee_gmd) ORDER BY rr.origin_area,rr.destination_area),'[]'::jsonb) FROM rider_delivery_rates rr WHERE rr.rider_id=r.user_id AND rr.is_active=TRUE) AS route_rates,u.full_name,u.phone,u.email,(SELECT count(*)::int FROM rider_delivery_rates rr WHERE rr.rider_id=r.user_id AND rr.is_active=TRUE) AS saved_route_count FROM riders r JOIN users u ON u.id=r.user_id "+whereSql+" ORDER BY r.updated_at DESC NULLS LAST,u.full_name ASC LIMIT $"+(params.length+1)+" OFFSET $"+(params.length+2);
+  const {rows}=await query(listSql,[...params,limit_,offset]);
+  const {rows:[count]}=await query("SELECT count(*)::int AS total FROM riders r JOIN users u ON u.id=r.user_id "+whereSql,params);
+  return {items:rows.map(r=>Object.assign({},r,{adminOverrideActive:r.admin_delivery_pricing_override!=null,effectiveOverride:r.admin_delivery_pricing_override||null})),total:Number(count.total||0),page:page_,limit:limit_,totalPages:Math.ceil(Number(count.total||0)/limit_)};
+}
+
+async function updateAdminRiderPricingOverride(riderId,input={},actor) {
+  if(!actor||!actor.id)throw new Error('An authenticated administrator is required.');
+  const {rows:[policyRow]}=await query("SELECT value FROM system_settings WHERE key=$1",['delivery_pricing_policy']);
+  const policy=normaliseDeliveryPricingPolicy(policyRow&&policyRow.value);
+  const clear=input.clearOverride===true;
+  if(!clear&&!String(input.note||'').trim()){const e=new Error('Enter a reason for this Admin rider pricing override.');e.status=400;e.code='ADMIN_PRICE_REASON_REQUIRED';throw e;}
+  const override=clear?null:validateRiderDeliveryOverride(input,policy);
+  if(override&&input.note)override.note=String(input.note).trim().slice(0,500);
+  return withTransaction(async client=>{
+    const {rows:[rider]}=await client.query("SELECT user_id,delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd,admin_delivery_pricing_override FROM riders WHERE user_id=$1 FOR UPDATE",[riderId]);
+    if(!rider){const e=new Error('Rider profile not found.');e.status=404;e.code='RIDER_NOT_FOUND';throw e;}
+    const before={riderDeliveryPricingEnabled:rider.delivery_pricing_enabled,riderBaseFeeGmd:rider.delivery_base_fee_gmd,riderPerKmFeeGmd:rider.delivery_per_km_fee_gmd,riderMinimumFeeGmd:rider.delivery_min_fee_gmd,adminOverride:rider.admin_delivery_pricing_override||null};
+    const {rows:[updated]}=await client.query("UPDATE riders SET admin_delivery_pricing_override=$2::jsonb,admin_delivery_pricing_override_by=$3,admin_delivery_pricing_override_at=now(),updated_at=now() WHERE user_id=$1 RETURNING user_id,admin_delivery_pricing_override,admin_delivery_pricing_override_by,admin_delivery_pricing_override_at",[riderId,override===null?null:JSON.stringify(override),actor.id]);
+    const after={adminOverride:updated.admin_delivery_pricing_override||null,adminOverrideActive:updated.admin_delivery_pricing_override!=null,note:updated.admin_delivery_pricing_override&&updated.admin_delivery_pricing_override.note||null};
+    await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,$3,'rider_delivery_pricing',$4,$5::jsonb,$6::jsonb)",[actor.id,actor.role||'admin',clear?'rider.delivery_pricing_override_cleared':'rider.delivery_pricing_override_set',riderId,JSON.stringify(before),JSON.stringify(after)]);
+    return Object.assign({riderId:updated.user_id,updatedAt:updated.admin_delivery_pricing_override_at},after);
+  });
+}
+
+async function listVendorProductPricing({page=1,limit=50,search,vendorId,status}={}) {
+  const page_=Math.max(1,parseInt(page,10)||1);
+  const limit_=Math.min(100,Math.max(1,parseInt(limit,10)||50));
+  const offset=(page_-1)*limit_;
+  const params=[],where=[];
+  if(search&&String(search).trim()){params.push('%'+String(search).trim().slice(0,120)+'%');const p='$'+params.length;where.push('(p.name ILIKE '+p+' OR p.sku ILIKE '+p+' OR v.business_name ILIKE '+p+' OR u.full_name ILIKE '+p+')');}
+  if(vendorId){params.push(vendorId);where.push('p.vendor_id=$'+params.length);}
+  if(status&&['active','pending_review','rejected','archived'].includes(status)){params.push(status);where.push('p.status=$'+params.length);}
+  const whereSql=where.length?'WHERE '+where.join(' AND '):'';
+  const select="SELECT p.id,p.vendor_id,p.name,p.sku,p.status,p.category_id,c.name AS category_name,v.business_name AS vendor_name,u.full_name AS vendor_owner_name,p.price AS vendor_listed_price,p.admin_price_override,p.admin_price_override_enabled,CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS effective_customer_price,p.admin_price_override_note,p.admin_price_override_by,p.admin_price_override_at,inv.quantity AS stock FROM products p JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN users u ON u.id=p.vendor_id LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN inventory inv ON inv.product_id=p.id AND inv.variant_id IS NULL "+whereSql;
+  const {rows}=await query(select+" ORDER BY p.updated_at DESC NULLS LAST,p.name ASC LIMIT $"+(params.length+1)+" OFFSET $"+(params.length+2),[...params,limit_,offset]);
+  const {rows:[count]}=await query("SELECT count(*)::int AS total FROM products p JOIN vendors v ON v.user_id=p.vendor_id LEFT JOIN users u ON u.id=p.vendor_id "+whereSql,params);
+  return {items:rows,total:Number(count.total||0),page:page_,limit:limit_,totalPages:Math.ceil(Number(count.total||0)/limit_)};
+}
+
+async function updateVendorProductPriceOverride(productId,input={},actor) {
+  if(!actor||!actor.id)throw new Error('An authenticated administrator is required.');
+  const enabled=input.enabled===true,price=enabled?Number(input.price):null,note=String(input.note||'').trim().slice(0,500);
+  if(enabled&&(!Number.isFinite(price)||price<0.01||price>1000000)){const e=new Error('Enter an Admin customer price between D0.01 and D1,000,000.');e.status=400;e.code='INVALID_ADMIN_PRODUCT_PRICE';throw e;}
+  if(enabled&&!note){const e=new Error('Enter a reason for the product price override.');e.status=400;e.code='ADMIN_PRICE_REASON_REQUIRED';throw e;}
+  return withTransaction(async client=>{
+    const {rows:[product]}=await client.query("SELECT id,vendor_id,name,price,admin_price_override,admin_price_override_enabled,admin_price_override_note FROM products WHERE id=$1 FOR UPDATE",[productId]);
+    if(!product){const e=new Error('Product not found.');e.status=404;e.code='PRODUCT_NOT_FOUND';throw e;}
+    const before={vendorListedPrice:Number(product.price),adminPriceOverride:product.admin_price_override==null?null:Number(product.admin_price_override),overrideEnabled:Boolean(product.admin_price_override_enabled),note:product.admin_price_override_note||null};
+    const {rows:[updated]}=await client.query("UPDATE products SET admin_price_override=$2,admin_price_override_enabled=$3,admin_price_override_by=$4,admin_price_override_at=now(),admin_price_override_note=$5,updated_at=now() WHERE id=$1 RETURNING id,vendor_id,price,admin_price_override,admin_price_override_enabled,admin_price_override_note,admin_price_override_at",[productId,price,enabled,actor.id,enabled?note:null]);
+    const after={vendorListedPrice:Number(updated.price),effectiveCustomerPrice:Number(updated.admin_price_override_enabled?updated.admin_price_override:updated.price),adminPriceOverride:updated.admin_price_override==null?null:Number(updated.admin_price_override),overrideEnabled:Boolean(updated.admin_price_override_enabled),note:updated.admin_price_override_note||null};
+    await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,$3,'product_price_override',$4,$5::jsonb,$6::jsonb)",[actor.id,actor.role||'admin',enabled?'product.admin_price_override_set':'product.admin_price_override_cleared',productId,JSON.stringify(before),JSON.stringify(after)]);
+    return Object.assign({productId:updated.id,updatedAt:updated.admin_price_override_at},after);
+  });
+}
+
+async function getPaymentReadiness() {
+  const {rows:recentPayments}=await query("SELECT method,status,count(*)::int AS total FROM payments WHERE created_at>=now()-interval '30 days' GROUP BY method,status ORDER BY method,status");
+  const apiKeyConfigured=modemPay.isConfigured(),webhookSecretConfigured=modemPay.isWebhookConfigured(),h2h=modemPay.isH2H(),h2hApproved=modemPay.isH2HApproved();
+  const callbackUrlConfigured=Boolean(String(process.env.MODEM_PAY_CALLBACK_URL||'').trim());
+  const h2hGateReady=!h2h||h2hApproved;
+  const mobileMoneyReady=apiKeyConfigured&&webhookSecretConfigured&&callbackUrlConfigured&&h2hGateReady;
+  return {currency:'GMD',provider:'Modem Pay',mode:h2h?'H2H':'Hosted merchant checkout',configuration:{
+    apiKeyConfigured,webhookSecretConfigured,h2hApproved,callbackUrlConfigured,mobileMoneyCheckoutReady:mobileMoneyReady,walletCheckoutReady:true,cashOnDeliveryEnabled:true,transferApiConfigured:apiKeyConfigured&&h2hGateReady,
+    note:mobileMoneyReady?'Provider settings are present. Complete test-mode collections, signed and duplicate webhook tests, reconciliation and payout tests before enabling real-money operations.':'Mobile-money checkout remains blocked until the API key, webhook signing secret, public callback URL and any required H2H approval are configured privately in Render.'
+  },recentPayments};
 }
 
 async function getWithdrawalFeeReport({page=1,limit=50}={}){
@@ -725,4 +806,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, getWithdrawalFeeReport, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };

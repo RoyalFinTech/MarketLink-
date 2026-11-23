@@ -218,7 +218,7 @@ describe('order creation ownership safeguards', () => {
       }]};
       if(sql.includes('FROM riders WHERE user_id'))return{rows:[{user_id:'rider-1'}]};
       if(sql.includes('SELECT d.id FROM deliveries'))return{rows:[]};
-      if(sql.includes('FROM products p'))return{rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'100.00',status:'active',vendor_kyc_status:'approved'}]};
+      if(sql.includes('FROM products p'))return{rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'100.00',vendor_listed_price:'80.00',admin_price_override_enabled:true,status:'active',vendor_kyc_status:'approved'}]};
       if(sql.includes('SELECT quantity FROM inventory'))return{rows:[{quantity:10}]};
       if(sql.includes('FROM system_settings'))return{rows:[{key:'marketplace_commission_pct',value:'10.00'},{key:'affiliate_commission_pct',value:'3.00'},{key:'payout_fee_recovery_pct',value:'2.00'}]};
       if(sql.includes('FROM affiliates WHERE affiliate_code'))return{rows:[{user_id:'affiliate-1',affiliate_code:'AFF123'}]};
@@ -234,6 +234,9 @@ describe('order creation ownership safeguards', () => {
       paymentMethod:'cod',deliveryAddressId:'address-1',
       deliveryFeeQuoteId:'quote-1',affiliateCode:'AFF123'
     });
+    const lockedProductQuery=clientQuery.mock.calls.find(([sql])=>sql.includes('FROM products p')&&sql.includes('FOR UPDATE OF p'));
+    expect(lockedProductQuery[0]).toContain('CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price');
+    expect(lockedProductQuery[0]).toContain('p.price AS vendor_listed_price');
     const orderInsert=clientQuery.mock.calls.find(([sql])=>sql.startsWith('INSERT INTO orders'));
     expect(orderInsert).toBeDefined();
     expect(orderInsert[0]).toContain('payout_fee_recovery_pct');

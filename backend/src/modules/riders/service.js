@@ -8,7 +8,7 @@ const logger = require('../../utils/logger');
 const { assertOwnedUploadReference } = require('../uploads/service');
 const notificationsService = require('../notifications/service');
 const { normalizePhone } = require('../../utils/phone');
-const { normaliseDeliveryPricingPolicy } = require('../../utils/deliveryPricingPolicy');
+const { normaliseDeliveryPricingPolicy, resolveRiderDeliveryTariff } = require('../../utils/deliveryPricingPolicy');
 function normalizeGambianContact(value, label) {
   if (value == null || String(value).trim() === '') return null;
   try {
@@ -215,11 +215,24 @@ async function updateProfile(userId, data) {
 async function setAvailability(userId, isOnline) {
   return withTransaction(async (client) => {
     const {rows:[rider]}=await client.query(
-      "SELECT user_id,delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
+      "SELECT user_id,delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd,admin_delivery_pricing_override FROM riders WHERE user_id=$1 AND kyc_status='approved' FOR UPDATE",[userId]);
     if(!rider)throw new AppError('Only approved riders can toggle availability.',403,'NOT_APPROVED');
-    if(Boolean(isOnline) && (!rider.delivery_pricing_enabled ||
-       rider.delivery_base_fee_gmd===null || rider.delivery_per_km_fee_gmd===null || rider.delivery_min_fee_gmd===null)) {
-      throw new AppError('Save your delivery prices in Rider Dashboard → Pricing before going online.',409,'DELIVERY_PRICING_REQUIRED');
+    if(Boolean(isOnline)) {
+      const {rows:[policyRow]}=await client.query("SELECT value FROM system_settings WHERE key=$1",['delivery_pricing_policy']);
+      const policy=normaliseDeliveryPricingPolicy(policyRow?.value);
+      const effective=resolveRiderDeliveryTariff(rider,[],policy);
+      const hasSavedRiderTariff=[rider.delivery_base_fee_gmd,rider.delivery_per_km_fee_gmd,rider.delivery_min_fee_gmd].every(value=>value!==null&&value!==undefined);
+      const adminOverrideActive=rider.admin_delivery_pricing_override!=null;
+      if(!effective.enabled||(!adminOverrideActive&&!hasSavedRiderTariff)) {
+        throw new AppError(
+          adminOverrideActive
+            ? 'MarketLink Admin has disabled new delivery quotes for your rider account. Contact Admin if you think this is incorrect.'
+            : (!policy.allowRiderOverrides
+              ? 'Your delivery prices are managed by MarketLink Admin. Ask Admin to set and enable your rider tariff before going online.'
+              : 'Save your delivery prices in Rider Dashboard → Pricing before going online.'),
+          409,'DELIVERY_PRICING_REQUIRED'
+        );
+      }
     }
     if(!isOnline) {
       const {rows:[active]}=await client.query(
@@ -441,7 +454,8 @@ async function getEarnings(riderId, { page = 1, limit = 20, period = '30d' }) {
  */
 async function getDeliveryPricing(userId) {
   const { rows: [rider] } = await query(
-    `SELECT delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd
+    `SELECT delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd,
+            admin_delivery_pricing_override
      FROM riders WHERE user_id=$1`, [userId]
   );
   if (!rider) throw new AppError('Rider profile not found.', 404, 'RIDER_NOT_FOUND');
@@ -453,20 +467,27 @@ async function getDeliveryPricing(userId) {
     `SELECT id,origin_area,destination_area,fixed_fee_gmd,is_active
      FROM rider_delivery_rates WHERE rider_id=$1 ORDER BY origin_area,destination_area`, [userId]
   );
+  const effective = resolveRiderDeliveryTariff(rider, routeRates, policy);
   return {
-    enabled: Boolean(rider.delivery_pricing_enabled),
-    // New and not-yet-configured riders see the admin's GMD starter tariff.
-    // They must still save and enable the tariff before becoming quote-eligible.
-    baseFee: rider.delivery_base_fee_gmd == null ? policy.baseFeeGmd : Number(rider.delivery_base_fee_gmd),
-    perKmFee: rider.delivery_per_km_fee_gmd == null ? policy.perKmFeeGmd : Number(rider.delivery_per_km_fee_gmd),
-    minimumFee: rider.delivery_min_fee_gmd == null ? policy.minimumFeeGmd : Math.max(policy.minimumAllowedFeeGmd, Number(rider.delivery_min_fee_gmd)),
+    enabled: effective.enabled,
+    baseFee: effective.baseFeeGmd,
+    perKmFee: effective.perKmFeeGmd,
+    minimumFee: effective.minimumFeeGmd,
     adminPolicy: policy,
-    routeRates: routeRates.map(rate => ({
-      id: rate.id,
-      originArea: rate.origin_area,
-      destinationArea: rate.destination_area,
-      fixedFee: Number(Math.max(policy.minimumAllowedFeeGmd, Number(rate.fixed_fee_gmd))),
-      active: Boolean(rate.is_active),
+    allowRiderOverrides: policy.allowRiderOverrides,
+    adminOverrideActive: effective.adminOverrideActive,
+    adminOverride: effective.adminOverrideActive ? {
+      enabled: effective.enabled,
+      baseFee: effective.baseFeeGmd,
+      perKmFee: effective.perKmFeeGmd,
+      minimumFee: effective.minimumFeeGmd,
+    } : null,
+    routeRates: effective.routeRates.map(rate => ({
+      id: rate.id || null,
+      originArea: rate.origin_area || rate.originArea,
+      destinationArea: rate.destination_area || rate.destinationArea,
+      fixedFee: Number(rate.fixed_fee_gmd ?? rate.fixedFeeGmd ?? rate.fixedFee),
+      active: rate.is_active === undefined ? true : Boolean(rate.is_active),
     })),
   };
 }
@@ -480,6 +501,16 @@ async function updateDeliveryPricing(userId, data = {}) {
     "SELECT value FROM system_settings WHERE key=$1", ['delivery_pricing_policy']
   );
   const policy = normaliseDeliveryPricingPolicy(policyRow?.value);
+  const { rows: [riderState] } = await query(
+    'SELECT admin_delivery_pricing_override FROM riders WHERE user_id=$1', [userId]
+  );
+  if (!riderState) throw new AppError('Rider profile not found.', 404, 'RIDER_NOT_FOUND');
+  if (riderState.admin_delivery_pricing_override != null) {
+    throw new AppError('MarketLink Admin currently controls your delivery tariff. Contact Admin to request a price change.', 403, 'DELIVERY_PRICING_ADMIN_LOCKED');
+  }
+  if (!policy.allowRiderOverrides) {
+    throw new AppError('Rider self-service delivery pricing is currently managed by MarketLink Admin.', 403, 'DELIVERY_PRICING_ADMIN_ONLY');
+  }
   if (![baseFee, perKmFee, minimumFee].every(Number.isFinite) ||
       baseFee < 0 || baseFee > 2000 || baseFee > policy.maximumFeeGmd ||
       perKmFee < 0 || perKmFee > 500 ||
@@ -521,10 +552,10 @@ async function updateDeliveryPricing(userId, data = {}) {
     const { rows: [updated] } = await client.query(
       `UPDATE riders SET delivery_pricing_enabled=$1,delivery_base_fee_gmd=$2,
        delivery_per_km_fee_gmd=$3,delivery_min_fee_gmd=$4,updated_at=now()
-       WHERE user_id=$5 RETURNING user_id`,
+       WHERE user_id=$5 AND admin_delivery_pricing_override IS NULL RETURNING user_id`,
       [enabled, baseFee, perKmFee, minimumFee, userId]
     );
-    if (!updated) throw new AppError('Rider profile not found.', 404, 'RIDER_NOT_FOUND');
+    if (!updated) throw new AppError('Your delivery prices are currently controlled by Admin. Contact MarketLink support.', 403, 'DELIVERY_PRICING_ADMIN_LOCKED');
     await client.query('DELETE FROM rider_delivery_rates WHERE rider_id=$1', [userId]);
     for (const route of routes) {
       await client.query(

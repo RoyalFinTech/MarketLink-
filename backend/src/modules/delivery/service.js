@@ -5,6 +5,7 @@ const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const ordersService = require('../orders/service');
 const { matchingRouteRate, calculateDeliveryFare } = require('../../utils/deliveryPricing');
+const { normaliseDeliveryPricingPolicy, resolveRiderDeliveryTariff, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
 
 const VALID_TRANSITIONS = {
   unassigned:  ['assigned','cancelled'],
@@ -83,27 +84,31 @@ async function assertRiderMatchesLockedQuote(client, orderId, riderId) {
     return { fee: Number(locked.delivery_fee), locked: true };
   }
   const { rows: [rider] } = await client.query(
-    `SELECT delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd
+    `SELECT delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd,
+            admin_delivery_pricing_override
      FROM riders WHERE user_id=$1`,
     [riderId]
   );
-  if (!rider || !rider.delivery_pricing_enabled) {
-    throw new AppError('This order already has a customer-approved delivery price. Only a rider with the same delivery price can be assigned.',409,'DELIVERY_FEE_MISMATCH');
-  }
+  const { rows: [policyRow] } = await client.query("SELECT value FROM system_settings WHERE key=$1", ['delivery_pricing_policy']);
+  const policy = normaliseDeliveryPricingPolicy(policyRow?.value);
   const { rows: lanes } = await client.query(
     'SELECT origin_area,destination_area,fixed_fee_gmd FROM rider_delivery_rates WHERE rider_id=$1 AND is_active=TRUE',
     [riderId]
   );
-  const lane = matchingRouteRate(lanes, locked.origin_area, locked.destination_area);
+  const effective = resolveRiderDeliveryTariff(rider, lanes, policy);
+  if (!effective.enabled) {
+    throw new AppError('This order already has a customer-approved delivery price. Only a rider who is enabled and accepts that same delivery fare can be assigned.',409,'DELIVERY_FEE_MISMATCH');
+  }
+  const lane = matchingRouteRate(effective.routeRates, locked.origin_area, locked.destination_area);
   let fare;
   try {
-    fare = calculateDeliveryFare({
-      fixedFee: lane ? lane.fixed_fee_gmd : null,
-      baseFee: rider.delivery_base_fee_gmd,
-      perKmFee: rider.delivery_per_km_fee_gmd,
-      minimumFee: rider.delivery_min_fee_gmd,
+    fare = applyDeliveryPricingLimits(calculateDeliveryFare({
+      fixedFee: lane ? (lane.fixed_fee_gmd ?? lane.fixedFeeGmd) : null,
+      baseFee: effective.baseFeeGmd,
+      perKmFee: effective.perKmFeeGmd,
+      minimumFee: effective.minimumFeeGmd,
       distanceKm: locked.route_distance_km,
-    });
+    }), policy);
   } catch (error) {
     throw new AppError('The replacement rider has not configured a valid fare for this route.',409,'DELIVERY_FEE_MISMATCH');
   }
@@ -202,7 +207,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
   if(delivery.delivery_fee_quote_id&&!['awaiting_rider','rider_assigned'].includes(String(delivery.order_status)))throw new AppError('The vendor must mark this order ready before searching for a replacement rider.',409,'DELIVERY_NOT_READY');
   const hasPickup=delivery.pickup_lat!==null&&delivery.pickup_lng!==null;
   const {rows}=await query(
-    "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,"+
+    "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,r.admin_delivery_pricing_override,"+
     "CASE WHEN r.location_sharing_enabled=TRUE "+
       "AND (r.location_sharing_delivery_id=$4 OR r.location_sharing_delivery_id IS NULL) "+
       "AND r.last_location_at >= now()-interval '5 minutes' "+
@@ -217,7 +222,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
         "POWER(SIN(RADIANS(r.current_lng-$3::numeric)/2),2)))) "+
       "ELSE NULL END AS distance_km "+
     "FROM riders r JOIN users u ON u.id=r.user_id "+
-    "WHERE r.kyc_status=$5 AND r.is_online=TRUE "+
+    "WHERE r.kyc_status=$5 AND r.is_online=TRUE AND (r.delivery_pricing_enabled=TRUE OR r.admin_delivery_pricing_override IS NOT NULL) "+
     "AND NOT EXISTS (SELECT 1 FROM deliveries active JOIN orders reserved_order ON reserved_order.id=active.order_id WHERE active.rider_id=r.user_id AND (active.status IN ('assigned','picked_up','in_transit') OR (active.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned')))) "+
     "AND NOT EXISTS (SELECT 1 FROM rider_assignments declined WHERE declined.delivery_id=$4 AND declined.rider_id=r.user_id AND declined.status='declined') "+
     "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
@@ -235,6 +240,8 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
     );
     lockedQuote = quote || null;
     if (lockedQuote) {
+      const { rows: [policyRow] } = await query("SELECT value FROM system_settings WHERE key=$1", ['delivery_pricing_policy']);
+      const policy = normaliseDeliveryPricingPolicy(policyRow?.value);
       const { rows: lanes } = await query(
         'SELECT rider_id,origin_area,destination_area,fixed_fee_gmd FROM rider_delivery_rates WHERE rider_id=ANY($1::uuid[]) AND is_active=TRUE',
         [rows.map(row=>row.id)]
@@ -245,16 +252,17 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
         laneMap.get(lane.rider_id).push(lane);
       }
       candidates = rows.filter(r => {
-        if (!r.delivery_pricing_enabled) return false;
-        const lane = matchingRouteRate(laneMap.get(r.id), lockedQuote.origin_area, lockedQuote.destination_area);
+        const effective = resolveRiderDeliveryTariff(r, laneMap.get(r.id) || [], policy);
+        if (!effective.enabled) return false;
+        const lane = matchingRouteRate(effective.routeRates, lockedQuote.origin_area, lockedQuote.destination_area);
         try {
-          const fare = calculateDeliveryFare({
-            fixedFee: lane ? lane.fixed_fee_gmd : null,
-            baseFee: r.delivery_base_fee_gmd,
-            perKmFee: r.delivery_per_km_fee_gmd,
-            minimumFee: r.delivery_min_fee_gmd,
+          const fare = applyDeliveryPricingLimits(calculateDeliveryFare({
+            fixedFee: lane ? (lane.fixed_fee_gmd ?? lane.fixedFeeGmd) : null,
+            baseFee: effective.baseFeeGmd,
+            perKmFee: effective.perKmFeeGmd,
+            minimumFee: effective.minimumFeeGmd,
             distanceKm: lockedQuote.route_distance_km,
-          });
+          }), policy);
           return Math.abs(fare - Number(lockedQuote.delivery_fee_gmd)) <= 0.01;
         } catch (error) { return false; }
       });

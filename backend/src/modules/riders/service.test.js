@@ -6,7 +6,7 @@ jest.mock('../uploads/service',()=>({assertOwnedUploadReference:jest.fn().mockRe
 const {query,withTransaction}=require('../../config/db');
 const notificationsService=require('../notifications/service');
 const {assertOwnedUploadReference}=require('../uploads/service');
-const {getDeliveryHistory,updateLocation,register,approve,updateProfile}=require('./service');
+const {getDeliveryHistory,updateLocation,register,approve,updateProfile,setAvailability,updateDeliveryPricing}=require('./service');
 
 describe('rider profile updates',()=>{
  const riderId='33333333-3333-4333-8333-333333333333';
@@ -112,6 +112,43 @@ describe('rider live GPS and arrival alerts', () => {
   });
 });
 
+
+describe('Admin-controlled rider delivery tariffs',()=>{
+ const riderId='33333333-3333-4333-8333-333333333333';
+ let clientQuery;
+ beforeEach(()=>{
+  jest.clearAllMocks();
+  clientQuery=jest.fn();
+  withTransaction.mockImplementation(callback=>callback({query:clientQuery}));
+ });
+
+ test('allows an approved rider online when an enabled Admin override supplies the tariff',async()=>{
+  clientQuery
+   .mockResolvedValueOnce({rows:[{user_id:riderId,delivery_pricing_enabled:false,delivery_base_fee_gmd:null,delivery_per_km_fee_gmd:null,delivery_min_fee_gmd:null,admin_delivery_pricing_override:{enabled:true,baseFeeGmd:220,perKmFeeGmd:12,minimumFeeGmd:150,routeRates:[]}}]})
+   .mockResolvedValueOnce({rows:[{value:{baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:150,maximumFeeGmd:5000,allowRiderOverrides:false}}]})
+   .mockResolvedValueOnce({rows:[{user_id:riderId,is_online:true}]});
+  const result=await setAvailability(riderId,true);
+  expect(result).toMatchObject({user_id:riderId,is_online:true});
+  expect(clientQuery.mock.calls[2][0]).toContain('UPDATE riders SET is_online=$1');
+ });
+
+ test('blocks a rider online when global self-service is disabled and no Admin override exists',async()=>{
+  clientQuery
+   .mockResolvedValueOnce({rows:[{user_id:riderId,delivery_pricing_enabled:true,delivery_base_fee_gmd:220,delivery_per_km_fee_gmd:12,delivery_min_fee_gmd:150,admin_delivery_pricing_override:null}]})
+   .mockResolvedValueOnce({rows:[{value:{baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:150,maximumFeeGmd:5000,allowRiderOverrides:false}}]});
+  await expect(setAvailability(riderId,true)).rejects.toMatchObject({statusCode:409,code:'DELIVERY_PRICING_REQUIRED'});
+  expect(clientQuery).toHaveBeenCalledTimes(2);
+ });
+
+ test('rejects rider self-service price changes while an individual Admin override is active',async()=>{
+  query
+   .mockResolvedValueOnce({rows:[{value:{baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:150,maximumFeeGmd:5000,allowRiderOverrides:true}}]})
+   .mockResolvedValueOnce({rows:[{admin_delivery_pricing_override:{enabled:true,baseFeeGmd:300,perKmFeeGmd:15,minimumFeeGmd:200,routeRates:[]}}]});
+  await expect(updateDeliveryPricing(riderId,{baseFee:220,perKmFee:12,minimumFee:150}))
+   .rejects.toMatchObject({statusCode:403,code:'DELIVERY_PRICING_ADMIN_LOCKED'});
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+});
 
 describe('rider application registration and approval',()=>{
  const userId='33333333-3333-4333-8333-333333333333';
