@@ -25,6 +25,7 @@ router.put('/commission-settings', authenticate, authorize(...ADMIN), [
   body('marketplaceCommissionPct').isFloat({min:0,max:20}),
   body('affiliateCommissionPct').isFloat({min:0,max:20}),
   body('withdrawalServiceFeePct').optional().isFloat({min:0,max:10}),
+  body('payoutFeeRecoveryPct').optional().isFloat({min:0,max:10}),
 ], validate, ctrl.updateCommissionSettings);
 router.get('/settings',    authenticate, authorize(...SA), ctrl.settings);
 router.put('/settings/:key', authenticate, authorize(...SA),
