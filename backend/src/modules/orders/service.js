@@ -286,7 +286,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     for (const item of items) {
       const qty = Number(item.quantity);
       const { rows:[p] } = await client.query(
-        'SELECT p.id,p.vendor_id,p.name,CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price,p.price AS vendor_listed_price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1 FOR UPDATE OF p',
+        'SELECT p.id,p.vendor_id,p.name,CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1 FOR UPDATE OF p',
         [item.productId]
       );
       if (!p || p.status!=='active' || p.vendor_kyc_status!=='approved') {
