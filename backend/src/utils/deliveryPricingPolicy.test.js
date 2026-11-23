@@ -25,14 +25,18 @@ describe('administrator delivery pricing policy', () => {
   });
 
   test('rejects a default fare outside the administrator-approved bounds', () => {
-    expect(() => validateDeliveryPricingPolicy({
-      baseFeeGmd:600,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:100,maximumFeeGmd:500
-    })).toThrow(expect.objectContaining({code:'INVALID_DELIVERY_PRICING_POLICY',statusCode:400}));
+    let thrown;
+    try {
+      validateDeliveryPricingPolicy({baseFeeGmd:600,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:100,maximumFeeGmd:500});
+    } catch (error) { thrown = error; }
+    expect(thrown).toMatchObject({code:'INVALID_DELIVERY_PRICING_POLICY',statusCode:400});
   });
 
   test('rejects an inverted minimum/maximum range', () => {
-    expect(() => validateDeliveryPricingPolicy({
-      baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:600,maximumFeeGmd:500
-    })).toThrow(expect.objectContaining({code:'INVALID_DELIVERY_PRICING_POLICY',statusCode:400}));
+    let thrown;
+    try {
+      validateDeliveryPricingPolicy({baseFeeGmd:150,perKmFeeGmd:10,minimumFeeGmd:150,minimumAllowedFeeGmd:600,maximumFeeGmd:500});
+    } catch (error) { thrown = error; }
+    expect(thrown).toMatchObject({code:'INVALID_DELIVERY_PRICING_POLICY',statusCode:400});
   });
 });
