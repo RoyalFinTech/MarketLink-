@@ -4505,6 +4505,7 @@ function renderRDash(){
         '<div style="color:var(--mu);font-size:12px;margin-top:4px;">New deliveries appear when the vendor has prepared the order and marked it ready.</div>'+
         '<button class="btn btn-pu" style="margin-top:13px" onclick="loadRiderLiveData()">↻ Refresh requests</button></div>';
     } else {
+      content='<div style="display:flex;justify-content:flex-end;margin:0 0 10px;"><button class="btn btn-pu" onclick="loadRiderLiveData()">↻ Refresh requests</button></div>';
       riderRequests.forEach(function(d){
         content+='<div style="background:var(--sf);border-radius:13px;padding:13px;border:1.5px solid rgba(124,58,237,0.4);margin-bottom:11px;">'+
           '<div style="display:flex;justify-content:space-between;margin-bottom:9px;">'+
