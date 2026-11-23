@@ -326,7 +326,7 @@
     try{
       var data=await adminRequest('/admin/commission-settings','GET');
       var pool=Number(data.marketplaceCommissionPct||0),affiliate=Number(data.affiliateCommissionPct||0),withdrawalFee=Number(data.withdrawalServiceFeePct==null?2:data.withdrawalServiceFeePct),payoutRecovery=Number(data.payoutFeeRecoveryPct==null?2:data.payoutFeeRecoveryPct);
-      var retained=Number(data.marketlinkRetainedPct||0),vendor=Number(data.vendorPayoutPct||0),delivery=Number(data.baseDeliveryFeeGmd||25);
+      var retained=Number(data.marketlinkRetainedPct||0),vendor=Number(data.vendorPayoutPct||0),delivery=Number(data.baseDeliveryFeeGmd==null?150:data.baseDeliveryFeeGmd);
       var deliveryPolicy={};try{deliveryPolicy=await adminRequest('/admin/delivery-pricing-settings','GET')||{};}catch(deliveryPolicyError){}
       var deliveryBase=Number(deliveryPolicy.baseFeeGmd==null?150:deliveryPolicy.baseFeeGmd),deliveryPerKm=Number(deliveryPolicy.perKmFeeGmd==null?10:deliveryPolicy.perKmFeeGmd),deliveryMinimum=Number(deliveryPolicy.minimumFeeGmd==null?150:deliveryPolicy.minimumFeeGmd),deliveryAllowedMinimum=Number(deliveryPolicy.minimumAllowedFeeGmd==null?1:deliveryPolicy.minimumAllowedFeeGmd),deliveryMaximum=Number(deliveryPolicy.maximumFeeGmd==null?5000:deliveryPolicy.maximumFeeGmd);
       var feeReport={};try{feeReport=await adminRequest('/admin/withdrawal-fees','GET')||{};}catch(feeReportError){}
