@@ -4,6 +4,7 @@ const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const ordersService = require('../orders/service');
+const { matchingRouteRate, calculateDeliveryFare } = require('../../utils/deliveryPricing');
 
 const VALID_TRANSITIONS = {
   unassigned:  ['assigned','cancelled'],
@@ -66,6 +67,56 @@ async function list({ page=1, limit=20, status, riderId, vendorId, isAdmin=false
   return rows;
 }
 
+async function assertRiderMatchesLockedQuote(client, orderId, riderId) {
+  const { rows: [locked] } = await client.query(
+    `SELECT o.delivery_fee,o.delivery_fee_quote_id,q.rider_id AS quoted_rider_id,
+            q.origin_area,q.destination_area,q.route_distance_km
+     FROM orders o
+     LEFT JOIN delivery_fee_quotes q ON q.id=o.delivery_fee_quote_id
+     WHERE o.id=$1`,
+    [orderId]
+  );
+  if (!locked || !locked.delivery_fee_quote_id) return { fee: null, locked: false };
+  // The rider originally selected by the customer must receive the exact
+  // stored quote even if they later adjust their future tariff settings.
+  if (String(locked.quoted_rider_id) === String(riderId)) {
+    return { fee: Number(locked.delivery_fee), locked: true };
+  }
+  const { rows: [rider] } = await client.query(
+    `SELECT delivery_pricing_enabled,delivery_base_fee_gmd,delivery_per_km_fee_gmd,delivery_min_fee_gmd
+     FROM riders WHERE user_id=$1`,
+    [riderId]
+  );
+  if (!rider || !rider.delivery_pricing_enabled) {
+    throw new AppError('This order already has a customer-approved delivery price. Only a rider with the same delivery price can be assigned.',409,'DELIVERY_FEE_MISMATCH');
+  }
+  const { rows: lanes } = await client.query(
+    'SELECT origin_area,destination_area,fixed_fee_gmd FROM rider_delivery_rates WHERE rider_id=$1 AND is_active=TRUE',
+    [riderId]
+  );
+  const lane = matchingRouteRate(lanes, locked.origin_area, locked.destination_area);
+  let fare;
+  try {
+    fare = calculateDeliveryFare({
+      fixedFee: lane ? lane.fixed_fee_gmd : null,
+      baseFee: rider.delivery_base_fee_gmd,
+      perKmFee: rider.delivery_per_km_fee_gmd,
+      minimumFee: rider.delivery_min_fee_gmd,
+      distanceKm: locked.route_distance_km,
+    });
+  } catch (error) {
+    throw new AppError('The replacement rider has not configured a valid fare for this route.',409,'DELIVERY_FEE_MISMATCH');
+  }
+  if (Math.abs(fare - Number(locked.delivery_fee)) > 0.01) {
+    throw new AppError(
+      'This order has already been paid using a locked delivery fee of D' + Number(locked.delivery_fee).toFixed(2) +
+      '. Choose a rider who accepts that same price or request a new customer-approved quote.',
+      409,'DELIVERY_FEE_MISMATCH'
+    );
+  }
+  return { fee: fare, locked: true };
+}
+
 async function assignRider(deliveryId, riderId, actor) {
   return withTransaction(async (client) => {
     // Lock the delivery first so two shop users cannot replace one another's
@@ -91,6 +142,7 @@ async function assignRider(deliveryId, riderId, actor) {
       [riderId]
     );
     if(!lockedRider)throw new AppError('Rider not available or not approved.',400,'RIDER_UNAVAILABLE');
+    await assertRiderMatchesLockedQuote(client,d.order_id,riderId);
 
     const {rows:[busy]}=await client.query(
       "SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",
@@ -127,7 +179,7 @@ async function assignRider(deliveryId, riderId, actor) {
 
 async function listAvailableRiders(deliveryId, actorId, roles) {
   const {rows:[delivery]}=await query(
-    'SELECT d.id,d.status,o.vendor_id,COALESCE(d.pickup_lat,v.latitude) AS pickup_lat,COALESCE(d.pickup_lng,v.longitude) AS pickup_lng FROM deliveries d JOIN orders o ON o.id=d.order_id JOIN vendors v ON v.user_id=o.vendor_id WHERE d.id=$1',
+    'SELECT d.id,d.order_id,d.status,d.distance_km,o.vendor_id,o.delivery_fee,o.delivery_fee_quote_id,COALESCE(d.pickup_lat,v.latitude) AS pickup_lat,COALESCE(d.pickup_lng,v.longitude) AS pickup_lng FROM deliveries d JOIN orders o ON o.id=d.order_id JOIN vendors v ON v.user_id=o.vendor_id WHERE d.id=$1',
     [deliveryId]
   );
   if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
@@ -136,7 +188,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
   if(!['unassigned','failed'].includes(delivery.status))throw new AppError('Riders can only be searched before pickup and before assignment. Refresh the order status and try again.',409,'INVALID_STATUS');
   const hasPickup=delivery.pickup_lat!==null&&delivery.pickup_lng!==null;
   const {rows}=await query(
-    "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,"+
+    "SELECT r.user_id AS id,u.full_name,r.vehicle_type,r.delivery_zone,r.rating_avg,r.rating_count,r.delivery_pricing_enabled,r.delivery_base_fee_gmd,r.delivery_per_km_fee_gmd,r.delivery_min_fee_gmd,"+
     "CASE WHEN r.location_sharing_enabled=TRUE "+
       "AND (r.location_sharing_delivery_id=$4 OR r.location_sharing_delivery_id IS NULL) "+
       "AND r.last_location_at >= now()-interval '5 minutes' "+
@@ -156,10 +208,47 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
     "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
     [hasPickup,delivery.pickup_lat,delivery.pickup_lng,deliveryId,'approved']
   );
-  // Return an approximate distance only. Exact coordinates remain server-side
-  // and are never exposed to shop accounts through this discovery endpoint.
-  return rows.map(r=>Object.assign({},r,{
+  // If this order has a customer-approved delivery quote, vendors may only
+  // reassign it to another online rider whose tariff is exactly the same.
+  let candidates = rows;
+  let lockedQuote = null;
+  if (delivery.delivery_fee_quote_id) {
+    const { rows: [quote] } = await query(
+      `SELECT origin_area,destination_area,route_distance_km,delivery_fee_gmd
+       FROM delivery_fee_quotes WHERE id=$1`,
+      [delivery.delivery_fee_quote_id]
+    );
+    lockedQuote = quote || null;
+    if (lockedQuote) {
+      const { rows: lanes } = await query(
+        'SELECT rider_id,origin_area,destination_area,fixed_fee_gmd FROM rider_delivery_rates WHERE rider_id=ANY($1::uuid[]) AND is_active=TRUE',
+        [rows.map(row=>row.id)]
+      );
+      const laneMap = new Map();
+      for (const lane of lanes) {
+        if (!laneMap.has(lane.rider_id)) laneMap.set(lane.rider_id, []);
+        laneMap.get(lane.rider_id).push(lane);
+      }
+      candidates = rows.filter(r => {
+        if (!r.delivery_pricing_enabled) return false;
+        const lane = matchingRouteRate(laneMap.get(r.id), lockedQuote.origin_area, lockedQuote.destination_area);
+        try {
+          const fare = calculateDeliveryFare({
+            fixedFee: lane ? lane.fixed_fee_gmd : null,
+            baseFee: r.delivery_base_fee_gmd,
+            perKmFee: r.delivery_per_km_fee_gmd,
+            minimumFee: r.delivery_min_fee_gmd,
+            distanceKm: lockedQuote.route_distance_km,
+          });
+          return Math.abs(fare - Number(lockedQuote.delivery_fee_gmd)) <= 0.01;
+        } catch (error) { return false; }
+      });
+    }
+  }
+  // Return only approximate rider-to-pickup distance. Exact GPS stays server-side.
+  return candidates.map(r=>Object.assign({},r,{
     distance_km:r.distance_km===null?null:Number(Number(r.distance_km).toFixed(1)),
+    delivery_fee: lockedQuote ? Number(lockedQuote.delivery_fee_gmd) : Number(delivery.delivery_fee || 0),
     location_fresh:!!(r.last_location_at&&Date.now()-new Date(r.last_location_at).getTime()<5*60*1000)
   }));
 }
@@ -172,6 +261,7 @@ async function acceptDelivery(deliveryId, riderId) {
     if(!rider) throw new AppError('Only an approved rider can accept a delivery.',403,'RIDER_UNAVAILABLE');
     const {rows:[busy]}=await client.query("SELECT id FROM deliveries WHERE rider_id=$1 AND id<>$2 AND status IN ('assigned','picked_up','in_transit') LIMIT 1",[riderId,deliveryId]);
     if(busy)throw new AppError('You already have an active delivery. Complete it before accepting another request.',409,'RIDER_HAS_ACTIVE_DELIVERY');
+    await assertRiderMatchesLockedQuote(client,d.order_id,riderId);
     if(d.status==='assigned' && String(d.rider_id)===String(riderId)) {
       await client.query("UPDATE rider_assignments SET status='accepted',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",[deliveryId,riderId]);
       return d;
