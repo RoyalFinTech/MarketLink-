@@ -19,7 +19,7 @@ New orders include a configurable **2% payout-cost recovery provision** in the c
 
 The 2% provision is not a second marketplace commission and does not alter product listing prices. It is stored as its own order snapshot and is included in the customer total without exposing a separate commission, gateway-fee or processing-fee row during checkout or wallet payment.
 
-Illustrative examples (delivery fare D25):
+Illustrative examples (D150 starter delivery fare; actual rider quote varies by distance and saved route):
 
 | Component | Qualifying affiliate | No affiliate |
 |---|---:|---:|
@@ -28,20 +28,20 @@ Illustrative examples (delivery fare D25):
 | Vendor payout | D95.00 | D95.00 |
 | Affiliate payout | D2.00 | D0.00 |
 | MarketLink retained commission | D3.00 | D5.00 |
-| Rider delivery payout | D25.00 | D25.00 |
-| Payout-cost recovery base | D122.00 | D120.00 |
-| Customer-funded recovery at 2% | D2.44 | D2.40 |
-| **Customer all-in total** | **D127.44** | **D127.40** |
+| Rider delivery payout | D150.00 | D150.00 |
+| Payout-cost recovery base | D247.00 | D245.00 |
+| Customer-funded recovery at 2% | D4.94 | D4.90 |
+| **Customer all-in total** | **D254.94** | **D254.90** |
 
 The recovery percentage is configurable by Admin from 0% to 10%. The percentage and amount are recorded on each new order. The amount is recognized in the platform earnings ledger only when the order is paid and successfully delivered. Existing orders keep their original pricing; previous orders are not recalculated.
 
 ## 3. DAHA Wallet withdrawals
 
-The DAHA Wallet withdrawal service fee remains **2% by default for customers, vendors, riders and affiliates** (Admin can change the percentage within the existing 0%–10% control). It applies to cash-outs, including funds that were deposited directly and withdrawn without a marketplace purchase. There is no DAHA withdrawal fee on deposits or product purchases.
+The DAHA Wallet withdrawal service fee is **2% by default for customer cash-outs only** (Admin can change the percentage within the existing 0%–10% control). It applies to customers withdrawing directly deposited funds or other customer-held wallet funds without a marketplace-payee payout. There is no DAHA withdrawal fee on deposits or product purchases.
 
-The fee is shown transparently in the withdrawal review before the user enters their PIN. For example, to receive D100, a user pays D2 DAHA service fee and the wallet debit is D102. The fee is calculated on the amount the recipient receives, not on the fee-inclusive debit.
+Vendor, rider and affiliate withdrawals of marketplace earnings have **no second percentage cash-out fee**. Their outgoing transfer costs are funded by the customer-funded payout-cost provision already included in the order total. Their withdrawal review must show the amount to receive and the same amount as the wallet debit, before PIN confirmation.
 
-The customer-funded order provision in section 2 is separate: it helps offset actual outgoing provider transfer costs when vendor, rider or affiliate funds are later withdrawn. It does not replace the DAHA service fee.
+For customer cash-outs, the fee is shown in the withdrawal review before PIN confirmation. For example, to receive D100, a customer pays D2 DAHA service fee and the wallet debit is D102. The fee is calculated on the amount received, not on the fee-inclusive debit.
 
 ## 4. Provider transfer fee reconciliation
 
@@ -56,9 +56,11 @@ A positive net is retained by MarketLink. If the actual provider fee exceeds the
 
 Wave and AfriMoney are the configured outgoing mobile-money rails in the current integration. QMoney and APS remain visible as disabled options until outgoing payout support is confirmed and enabled. No production test transfer is assumed by this policy.
 
-## 5. Rider-controlled delivery pricing
+## 5. Admin, vendor and rider price controls
 
-Riders can save:
+The initial MarketLink Gambia delivery tariff is **D150 base + D10 per estimated kilometre, with a D150 minimum**. This is a configurable MarketLink starting point, not a verified 1Bena tariff. Admin controls the default amounts, lowest permitted fare and highest permitted fare from Finance. The initial allowed range is D1–D5,000.
+
+Riders can save their own tariff within the administrator-approved limits:
 - a default base delivery fee;
 - a per-kilometre amount;
 - a minimum fare; and
@@ -68,7 +70,9 @@ For a route without a matching fixed fare, the server calculates:
 
 `max(minimum fare, base fee + estimated road kilometres × rider's per-kilometre rate)`
 
-For a matching saved route pair, the rider's fixed fare overrides the calculator. Prices are stored in the rider tariff table.
+For a matching saved route pair, the rider's fixed fare overrides the calculator, but the administrator-approved minimum and maximum still apply. Prices are stored in the rider tariff table. Admin policy updates are audited and apply to new quotes; an already placed order keeps its locked price.
+
+Vendors continue to set their product retail prices in their product catalogue. Product price changes are revalidated against the checkout quote before order placement. There is currently no separate vendor delivery-tariff field: customer delivery pricing is based on the selected rider's tariff, not a second vendor-added delivery charge.
 
 The checkout route estimate uses the vendor's saved pickup GPS and the customer's saved delivery-address GPS. The current road-distance estimate applies a configurable distance factor (default 1.25) to straight-line GPS distance. It is an estimate, not live turn-by-turn navigation or a guaranteed road-route calculation.
 
@@ -80,6 +84,6 @@ Checkout displays the customer’s single all-in payable amount. The payment ser
 
 ## 6. Settlement controls
 
-Vendor, rider and qualifying affiliate wallet credits occur only after confirmed payment and successful delivery. The server validates the commission record, payout recovery snapshot, locked rider and order amounts before changing balances. A pending withdrawal reserves the full wallet debit (recipient payout plus DAHA withdrawal service fee). Failed payouts release the reserve; completed-payout reversals restore the full wallet debit.
+Vendor, rider and qualifying affiliate wallet credits occur only after confirmed payment and successful delivery. The server validates the commission record, payout recovery snapshot, locked rider and order amounts before changing balances. A pending customer withdrawal reserves the payout plus customer DAHA service fee; a pending marketplace-payee withdrawal reserves only the payout. Failed payouts release the reserve; completed-payout reversals restore the full wallet debit.
 
 No production transfer or customer charge should be initiated as a test without explicit authorization and a confirmed test merchant account.
