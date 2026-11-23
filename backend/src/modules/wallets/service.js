@@ -35,7 +35,7 @@ async function getWallet(userId) {
     query("SELECT value #>> '{}' AS value FROM system_settings WHERE key=$1",['withdrawal_service_fee_pct']),
     query(`SELECT EXISTS(SELECT 1 FROM vendors WHERE user_id=$1) AS is_vendor,
                   EXISTS(SELECT 1 FROM riders WHERE user_id=$1) AS is_rider,
-                  EXISTS(SELECT 1 FROM affiliates WHERE user_id=$1) AS is_affiliate`,[userId])
+                  EXISTS(SELECT 1 FROM affiliates WHERE user_id=$1 AND marketer_status IN ('approved','suspended')) AS is_affiliate`,[userId])
   ]);
   const withdrawalServiceFeePct=resolveWithdrawalServiceFeePct({
     isMarketplacePayee:Boolean(payeeRole&&(payeeRole.is_vendor||payeeRole.is_rider||payeeRole.is_affiliate)),
