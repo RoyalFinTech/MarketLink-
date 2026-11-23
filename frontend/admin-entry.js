@@ -320,6 +320,58 @@
       (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){return '<div class="ml-profile-row"><div class="ico">🛡️</div><div class="copy"><b>'+adminSafe(x.action||'Admin action')+'</b><span>'+adminSafe(x.actor_name||x.actor_id||'Administrator')+' · '+adminSafe(x.entity_type||'system')+'</span><small>'+adminSafe(x.created_at?new Date(x.created_at).toLocaleString():'')+'</small></div></div>';}).join('')+'</div>':'<div class="ml-empty"><b>No audit entries</b><span>No administrative activity was returned.</span></div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Audit trail unavailable</b><span>'+adminSafe(e.error||e.message||'Could not load audit records.')+'</span></div>';}
   }
+  async function adminCommissionSettingsView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Commission control</h3><p>Loading protected finance settings…</p></div>';
+    try{
+      var data=await adminRequest('/admin/commission-settings','GET');
+      var pool=Number(data.marketplaceCommissionPct||0),affiliate=Number(data.affiliateCommissionPct||0);
+      var retained=Number(data.marketlinkRetainedPct||0),vendor=Number(data.vendorPayoutPct||0),delivery=Number(data.baseDeliveryFeeGmd||25);
+      root.innerHTML='<div class="ml-premium-home">'+
+        '<div class="ml-section-head"><div><div class="ml-eyebrow">FINANCE · COMMISSION POLICY</div><h3>Commission control</h3><p style="margin:5px 0;color:var(--mu)">Controls the actual split recorded on new orders and distributed after confirmed payment and successful delivery.</p></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">↻ Refresh</button></div>'+
+        '<div class="ml-stat-grid">'+
+          '<div class="ml-stat"><div class="ml-stat-label">Total marketplace pool</div><div class="ml-stat-value" id="ml-commission-pool-stat">'+pool.toFixed(2)+'%</div></div>'+
+          '<div class="ml-stat"><div class="ml-stat-label">MarketLink retained</div><div class="ml-stat-value" id="ml-commission-retained-stat">'+retained.toFixed(2)+'%</div></div>'+
+          '<div class="ml-stat"><div class="ml-stat-label">Affiliate reward</div><div class="ml-stat-value" id="ml-commission-affiliate-stat">'+affiliate.toFixed(2)+'%</div></div>'+
+          '<div class="ml-stat"><div class="ml-stat-label">Vendor net merchandise</div><div class="ml-stat-value" id="ml-commission-vendor-stat">'+vendor.toFixed(2)+'%</div></div>'+
+        '</div>'+
+        '<div class="ml-profile-card" style="margin-top:14px;padding:16px">'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">'+
+            '<label style="display:block">Total marketplace commission (%)<input id="ml-commission-pool" type="number" inputmode="decimal" min="0" max="20" step="0.01" value="'+pool.toFixed(2)+'" oninput="window.__ML_ADMIN_COMMISSION_PREVIEW()" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"><small style="display:block;color:var(--mu);margin-top:5px">Deducted from discounted merchandise proceeds, not added to customer checkout.</small></label>'+
+            '<label style="display:block">Affiliate reward (%)<input id="ml-commission-affiliate" type="number" inputmode="decimal" min="0" max="20" step="0.01" value="'+affiliate.toFixed(2)+'" oninput="window.__ML_ADMIN_COMMISSION_PREVIEW()" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)"><small style="display:block;color:var(--mu);margin-top:5px">Paid only for a qualifying referral after delivery and payment confirmation.</small></label>'+
+          '</div>'+
+          '<div class="ml-wallet-note" style="margin:14px 0;padding:13px;border-radius:12px"><b>Live split preview</b><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin-top:10px"><div><small>MarketLink keeps</small><div id="ml-commission-preview-retained" style="font-weight:800;font-size:20px">'+retained.toFixed(2)+'%</div></div><div><small>Affiliate receives</small><div id="ml-commission-preview-affiliate" style="font-weight:800;font-size:20px">'+affiliate.toFixed(2)+'%</div></div><div><small>Vendor receives</small><div id="ml-commission-preview-vendor" style="font-weight:800;font-size:20px">'+vendor.toFixed(2)+'%</div></div></div><small style="display:block;margin-top:8px;color:var(--mu)">MarketLink retained share = total pool minus affiliate reward. Affiliate reward cannot exceed the total pool.</small></div>'+
+          '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center"><button class="ml-btn ml-btn-primary" id="ml-commission-save" onclick="window.__ML_ADMIN_COMMISSION_SAVE()">Save commission settings</button><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_COMMISSION()">Discard changes</button></div>'+
+          '<small style="display:block;margin-top:10px;color:var(--mu)">Changes apply to future orders only. Existing orders keep the commission percentages recorded when they were placed.</small>'+
+        '</div>'+
+        '<div class="ml-profile-card" style="margin-top:14px;padding:16px"><b>How MarketLink distributes funds</b><p style="color:var(--mu);margin:8px 0">The vendor sets the retail product price. The commission pool is deducted from the discounted merchandise subtotal. After delivery and confirmed payment, the backend credits the vendor and qualifying affiliate DAHA Wallets and records MarketLink’s retained share. The rider receives the delivery fee, currently D '+delivery.toFixed(2)+' per order, separately from the merchandise split.</p><p style="color:var(--mu);margin:8px 0"><b>Payment gateway fee:</b> No separate gateway surcharge is currently added to customer checkout. The provider’s actual merchant fee must be verified and reconciled before enabling a customer-facing processing-fee line. This control does not change gateway fees.</p></div>'+
+      '</div>';
+      window.__ML_ADMIN_COMMISSION_PREVIEW();
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Commission settings unavailable</b><span>'+adminSafe(e.message||'Could not load finance settings.')+'</span></div>';}
+  }
+  window.__ML_ADMIN_COMMISSION_PREVIEW=function(){
+    var poolEl=document.getElementById('ml-commission-pool'),affiliateEl=document.getElementById('ml-commission-affiliate');if(!poolEl||!affiliateEl)return;
+    var pool=Number(poolEl.value),affiliate=Number(affiliateEl.value),valid=Number.isFinite(pool)&&Number.isFinite(affiliate)&&pool>=0&&pool<=20&&affiliate>=0&&affiliate<=pool;
+    var retained=valid?pool-affiliate:0,vendor=valid?100-pool:0;
+    [['ml-commission-preview-retained',retained],['ml-commission-preview-affiliate',affiliate],['ml-commission-preview-vendor',vendor]].forEach(function(pair){var el=document.getElementById(pair[0]);if(el)el.textContent=valid?pair[1].toFixed(2)+'%':'—';});
+    [['ml-commission-retained-stat',retained],['ml-commission-affiliate-stat',affiliate],['ml-commission-vendor-stat',vendor],['ml-commission-pool-stat',pool]].forEach(function(pair){var el=document.getElementById(pair[0]);if(el)el.textContent=valid?pair[1].toFixed(2)+'%':'—';});
+    var save=document.getElementById('ml-commission-save');if(save)save.disabled=!valid;
+  };
+  window.__ML_ADMIN_COMMISSION_SAVE=async function(){
+    var poolEl=document.getElementById('ml-commission-pool'),affiliateEl=document.getElementById('ml-commission-affiliate');if(!poolEl||!affiliateEl)return;
+    var marketplaceCommissionPct=Number(poolEl.value),affiliateCommissionPct=Number(affiliateEl.value);
+    if(!Number.isFinite(marketplaceCommissionPct)||!Number.isFinite(affiliateCommissionPct)||marketplaceCommissionPct<0||marketplaceCommissionPct>20||affiliateCommissionPct<0||affiliateCommissionPct>marketplaceCommissionPct){
+      if(window.toast)window.toast('Affiliate reward must be between zero and the total commission pool; total commission is capped at 20%.','error');return;
+    }
+    var button=document.getElementById('ml-commission-save');if(button){button.disabled=true;button.textContent='Saving…';}
+    try{
+      await adminRequest('/admin/commission-settings','PUT',{marketplaceCommissionPct,affiliateCommissionPct});
+      if(window.toast)window.toast('Commission settings saved. They apply to new orders only.','success');
+      await adminCommissionSettingsView();
+    }catch(e){if(window.toast)window.toast(e.message||'Could not save commission settings.','error');if(button){button.disabled=false;button.textContent='Save commission settings';}}
+  };
+  window.__ML_ADMIN_COMMISSION=adminCommissionSettingsView;
+
   async function adminSettingsView(){
     var root=document.getElementById('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><h3>System settings</h3><p>Loading protected settings…</p></div>';
@@ -741,6 +793,7 @@
       revenue: function () { if (api.refreshAdminRevenue) api.refreshAdminRevenue(); },
       payouts: function () { if (api.refreshAdminPayouts) api.refreshAdminPayouts(); },
       reconciliation: function () { if (api.refreshFinancialReconciliation) api.refreshFinancialReconciliation(); },
+      commission: adminCommissionSettingsView,
       ledger: function () { if (api.refreshAdminTransactions) api.refreshAdminTransactions(1); },
       exceptions: function () { if (api.refreshAdminFailedPayments) api.refreshAdminFailedPayments(1); },
       users: function () { if (api.adminUsers) api.adminUsers(); },
@@ -806,6 +859,7 @@
       '<button data-ml-admin-route="revenue"><span>💹</span>Revenue reports</button>' +
       '<button data-ml-admin-route="payouts"><span>💸</span>Withdrawals</button>' +
       '<button data-ml-admin-route="reconciliation"><span>🧾</span>Reconciliation</button>' +
+      '<button data-ml-admin-route="commission"><span>⚖️</span>Commission control</button>' +
       '<button data-ml-admin-route="ledger"><span>📒</span>DAHA ledger</button>' +
       '<button data-ml-admin-route="exceptions"><span>🚨</span>Payment exceptions</button>' +
       '<div class="ml-admin-side-label">🛠️ MANAGEMENT</div>' +
