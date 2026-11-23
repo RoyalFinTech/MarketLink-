@@ -3,7 +3,7 @@ const { AppError } = require('../middleware/errorHandler');
 const DEFAULT_MARKETPLACE_COMMISSION_PCT = 5;
 const DEFAULT_AFFILIATE_COMMISSION_PCT = 2;
 const MAX_MARKETPLACE_COMMISSION_PCT = 20;
-const SETTING_KEYS = Object.freeze({ marketplace:'marketplace_commission_pct', affiliate:'affiliate_commission_pct', withdrawal:'withdrawal_service_fee_pct' });
+const SETTING_KEYS = Object.freeze({ marketplace:'marketplace_commission_pct', affiliate:'affiliate_commission_pct', withdrawal:'withdrawal_service_fee_pct', payoutRecovery:'payout_fee_recovery_pct' });
 function numberFromStoredValue(value,fallback,key) {
   const number = Number(value == null ? fallback : value);
   if (!Number.isFinite(number)) throw new AppError('The stored '+key+' setting is invalid. Finance settings must be corrected before accepting new orders.',500,'COMMISSION_SETTINGS_INVALID');
@@ -29,5 +29,7 @@ function validateCommissionSettings(input) {
   return buildCommissionSettings(input.marketplaceCommissionPct,input.affiliateCommissionPct,400);
 }
 const { DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT, MAX_WITHDRAWAL_SERVICE_FEE_PCT, validateWithdrawalFeePct } = require('./walletWithdrawalFees');
+const { DEFAULT_PAYOUT_FEE_RECOVERY_PCT, MAX_PAYOUT_FEE_RECOVERY_PCT, validatePayoutFeeRecoveryPct } = require('./payoutFeeRecovery');
 function withdrawalFeePctFromRows(rows){const map=new Map((rows||[]).map(row=>[String(row.key),row.value]));return validateWithdrawalFeePct(map.get(SETTING_KEYS.withdrawal),500);}
-module.exports={DEFAULT_MARKETPLACE_COMMISSION_PCT,DEFAULT_AFFILIATE_COMMISSION_PCT,MAX_MARKETPLACE_COMMISSION_PCT,DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,MAX_WITHDRAWAL_SERVICE_FEE_PCT,SETTING_KEYS,buildCommissionSettings,commissionSettingsFromRows,validateCommissionSettings,withdrawalFeePctFromRows};
+function payoutFeeRecoveryPctFromRows(rows){const map=new Map((rows||[]).map(row=>[String(row.key),row.value]));return validatePayoutFeeRecoveryPct(map.get(SETTING_KEYS.payoutRecovery),500);}
+module.exports={DEFAULT_MARKETPLACE_COMMISSION_PCT,DEFAULT_AFFILIATE_COMMISSION_PCT,MAX_MARKETPLACE_COMMISSION_PCT,DEFAULT_WITHDRAWAL_SERVICE_FEE_PCT,MAX_WITHDRAWAL_SERVICE_FEE_PCT,DEFAULT_PAYOUT_FEE_RECOVERY_PCT,MAX_PAYOUT_FEE_RECOVERY_PCT,SETTING_KEYS,buildCommissionSettings,commissionSettingsFromRows,validateCommissionSettings,withdrawalFeePctFromRows,payoutFeeRecoveryPctFromRows};
