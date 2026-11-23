@@ -68,7 +68,7 @@ async function calculateCheckoutPreview(client,{customerId,vendorId,deliveryAddr
   const settings=commissionSettingsFromRows(settingRows);
   let affiliateAmount=0,affiliateUserId=null;
   if(affiliateCode){
-    const {rows:[affiliate]}=await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
+    const {rows:[affiliate]}=await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1 AND marketer_status='approved'',[String(affiliateCode).trim().toUpperCase()]);
     if(affiliate&&String(affiliate.user_id)!==String(customerId)){
       affiliateUserId=affiliate.user_id;
       affiliateAmount=Number((Math.max(0,subtotal-discount)*settings.affiliateCommissionPct/100).toFixed(2));
@@ -332,7 +332,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     let affiliate=null;
     let affiliatePct=0;
     if (affiliateCode) {
-      const { rows:[a] } = await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
+      const { rows:[a] } = await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1 AND marketer_status='approved'',[String(affiliateCode).trim().toUpperCase()]);
       if (a && a.user_id !== customerId) {
         affiliate=a;
         affiliatePct=affiliateDefaultPct;
