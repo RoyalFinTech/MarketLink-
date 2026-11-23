@@ -185,6 +185,7 @@ describe('order creation ownership safeguards', () => {
       .mockResolvedValueOnce({rows:[{id:'address-1',latitude:'13.4532000',longitude:'-16.5775000'}]})
       .mockResolvedValueOnce({rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'100.00',status:'active',vendor_kyc_status:'approved'}]})
       .mockResolvedValueOnce({rows:[{quantity:10}]})
+      .mockResolvedValueOnce({rows:[{key:'marketplace_commission_pct',value:'5.00'},{key:'affiliate_commission_pct',value:'2.00'}]})
       .mockResolvedValueOnce({rows:[order]})
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[{quantity:9}]})
@@ -204,6 +205,26 @@ describe('order creation ownership safeguards', () => {
     expect(deliveryInsert).toBeDefined();
     expect(deliveryInsert[0]).toContain('dropoff_lat,dropoff_lng');
     expect(deliveryInsert[1]).toEqual(['order-gps','13.4532000','-16.5775000']);
+  });
+
+  test('uses Admin-controlled commission settings for future order snapshots without adding a checkout surcharge',async()=>{
+    const order={id:'order-configured-split',customer_id:'customer-1',vendor_id:'vendor-1',total:125};
+    clientQuery.mockImplementation(async(sql,params)=>{
+      if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.45',longitude:'-16.58'}]};
+      if(sql.includes('FROM products p'))return{rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'100.00',status:'active',vendor_kyc_status:'approved'}]};
+      if(sql.includes('SELECT quantity FROM inventory'))return{rows:[{quantity:10}]};
+      if(sql.includes('FROM system_settings'))return{rows:[{key:'marketplace_commission_pct',value:'10.00'},{key:'affiliate_commission_pct',value:'3.00'}]};
+      if(sql.includes('FROM affiliates WHERE affiliate_code'))return{rows:[{user_id:'affiliate-1',affiliate_code:'AFF123'}]};
+      if(sql.startsWith('INSERT INTO orders'))return{rows:[order]};
+      if(sql.includes('UPDATE inventory SET quantity=quantity-$1'))return{rows:[{quantity:9}]};
+      return{rows:[]};
+    });
+    await placeOrder({customerId:'customer-1',vendorId:'vendor-1',items:[{productId:'product-1',quantity:1}],paymentMethod:'cod',deliveryAddressId:'address-1',affiliateCode:'AFF123'});
+    const orderInsert=clientQuery.mock.calls.find(([sql])=>sql.startsWith('INSERT INTO orders'));
+    expect(orderInsert).toBeDefined();
+    expect(orderInsert[1].slice(5,18)).toEqual([100,25,0,10,10,90,25,125,null,'affiliate-1',3,3,7]);
+    expect(orderInsert[0]).toContain('platform_fee_pct');
+    expect(orderInsert[0]).toContain('affiliate_commission_pct');
   });
 
   test('rejects a delivery address that belongs to another customer', async () => {
