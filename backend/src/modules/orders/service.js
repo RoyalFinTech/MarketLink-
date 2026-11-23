@@ -6,9 +6,69 @@ const { calculatePayoutFeeRecovery } = require('../../utils/payoutFeeRecovery');
 const { haversineKm, estimateRoadDistanceKm, matchingRouteRate, calculateDeliveryFare, roundGmd } = require('../../utils/deliveryPricing');
 function genNum() { return `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random()*99999)).padStart(5,'0')}`; }
 
-async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId }) {
+
+async function calculateCheckoutPreview(client,{customerId,vendorId,items,couponCode,affiliateCode}) {
+  if(!Array.isArray(items)||!items.length)throw new AppError('Add products to your cart before requesting a delivery total.',400,'EMPTY_ORDER');
+  let subtotal=0;
+  const seen=new Set();
+  for(const item of items){
+    if(!item||!item.productId||!Number.isInteger(Number(item.quantity))||Number(item.quantity)<1)throw new AppError('Each cart item must have a valid product and positive integer quantity.',400,'INVALID_ORDER_ITEM');
+    const {rows:[product]}=await client.query(
+      'SELECT p.id,p.vendor_id,p.name,p.price,p.status,v.kyc_status AS vendor_kyc_status FROM products p JOIN vendors v ON v.user_id=p.vendor_id WHERE p.id=$1',
+      [item.productId]
+    );
+    if(!product||product.status!=='active'||product.vendor_kyc_status!=='approved')throw new AppError('A product in your cart is no longer available.',409,'PRODUCT_UNAVAILABLE');
+    if(String(product.vendor_id)!==String(vendorId))throw new AppError('Checkout must contain products from one selected vendor.',400,'VENDOR_MISMATCH');
+    if(seen.has(String(product.id)))throw new AppError('Remove duplicate product rows before requesting a delivery total.',400,'DUPLICATE_ORDER_ITEM');
+    seen.add(String(product.id));
+    const {rows:[inventory]}=await client.query('SELECT quantity FROM inventory WHERE product_id=$1 AND variant_id IS NULL',[product.id]);
+    if(!inventory||inventory.quantity==null||Number(inventory.quantity)<Number(item.quantity))throw new AppError('A product in your cart does not have enough available stock.',409,'INSUFFICIENT_STOCK');
+    subtotal+=Number(product.price)*Number(item.quantity);
+  }
+  let discount=0;
+  if(couponCode){
+    const {rows:[coupon]}=await client.query(
+      "SELECT * FROM coupons WHERE code=$1 AND is_active=TRUE AND starts_at<=now() AND (expires_at IS NULL OR expires_at>now())",
+      [String(couponCode).trim().toUpperCase()]
+    );
+    if(!coupon)throw new AppError('Invalid or expired coupon.',400,'INVALID_COUPON');
+    if(coupon.vendor_id&&String(coupon.vendor_id)!==String(vendorId))throw new AppError('This coupon is not valid for this vendor.',400,'INVALID_COUPON_VENDOR');
+    if(subtotal<Number(coupon.min_order_value||0))throw new AppError('Your cart does not meet the minimum order value for this coupon.',400,'COUPON_MIN_ORDER');
+    const {rows:[usage]}=await client.query(
+      'SELECT count(*)::int AS total,count(*) FILTER (WHERE customer_id=$2)::int AS customer_total FROM coupon_redemptions WHERE coupon_id=$1',
+      [coupon.id,customerId]
+    );
+    if(coupon.max_uses!==null&&Number(usage.total)>=Number(coupon.max_uses))throw new AppError('This coupon has reached its usage limit.',400,'COUPON_MAX_USES');
+    if(Number(usage.customer_total)>=Number(coupon.max_uses_per_user||1))throw new AppError('You have already used this coupon the maximum number of times.',400,'COUPON_USER_LIMIT');
+    discount=coupon.discount_type==='percent'?Number((subtotal*Number(coupon.discount_value)/100).toFixed(2)):Math.min(Number(coupon.discount_value),subtotal);
+  }
+  const {rows:settingRows}=await client.query(
+    "SELECT key,value #>> '{}' AS value FROM system_settings WHERE key=ANY($1::text[])",
+    [[SETTING_KEYS.marketplace,SETTING_KEYS.affiliate,SETTING_KEYS.payoutRecovery]]
+  );
+  const settings=commissionSettingsFromRows(settingRows);
+  let affiliateAmount=0;
+  if(affiliateCode){
+    const {rows:[affiliate]}=await client.query('SELECT user_id,affiliate_code FROM affiliates WHERE affiliate_code=$1',[String(affiliateCode).trim().toUpperCase()]);
+    if(affiliate&&String(affiliate.user_id)!==String(customerId)){
+      affiliateAmount=Number((Math.max(0,subtotal-discount)*settings.affiliateCommissionPct/100).toFixed(2));
+    }
+  }
+  const discountedSubtotal=Math.max(0,subtotal-discount);
+  const platformFee=Number((discountedSubtotal*settings.marketplaceCommissionPct/100).toFixed(2));
+  const vendorPayout=Number((discountedSubtotal-platformFee).toFixed(2));
+  return {
+    discountedSubtotal,
+    vendorPayout,
+    affiliatePayout:affiliateAmount,
+    payoutFeeRecoveryPct:payoutFeeRecoveryPctFromRows(settingRows),
+  };
+}
+
+async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId, items, couponCode, affiliateCode }) {
   if (!vendorId || !deliveryAddressId) throw new AppError('Choose a vendor and saved delivery address before requesting delivery prices.', 400, 'DELIVERY_QUOTE_INPUT_REQUIRED');
   return withTransaction(async client => {
+    const checkoutPreview=await calculateCheckoutPreview(client,{customerId,vendorId,items,couponCode,affiliateCode});
     const { rows: [address] } = await client.query(
       'SELECT id,full_address,area,latitude,longitude FROM delivery_addresses WHERE id=$1 AND customer_id=$2',
       [deliveryAddressId, customerId]
@@ -117,6 +177,7 @@ async function quoteDeliveryOptions({ customerId, vendorId, deliveryAddressId })
         rating: Number(rider.rating_avg || 0),
         ratingCount: Number(rider.rating_count || 0),
         deliveryFee: Number(quote.delivery_fee_gmd),
+        estimatedCustomerTotal: roundGmd(checkoutPreview.discountedSubtotal+Number(quote.delivery_fee_gmd)+calculatePayoutFeeRecovery({vendorPayout:checkoutPreview.vendorPayout,riderPayout:Number(quote.delivery_fee_gmd),affiliatePayout:checkoutPreview.affiliatePayout,pct:checkoutPreview.payoutFeeRecoveryPct}).payoutFeeRecoveryAmount),
         estimatedRouteDistanceKm: Number(quote.route_distance_km),
         pricingMode: quote.pricing_mode,
         expiresAt: quote.expires_at,
