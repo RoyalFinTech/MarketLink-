@@ -1,5 +1,8 @@
 -- Keep free customer Referrers non-earning at both the data and schema levels.
--- Only an Admin-approved Affiliate Marketer may carry a commission rate.
+-- Migration 026 imposed a legacy fixed-2% check; remove it before backfilling.
+ALTER TABLE public.affiliates
+  DROP CONSTRAINT IF EXISTS affiliates_commission_pct_fixed_2_chk;
+
 ALTER TABLE public.affiliates
   ALTER COLUMN commission_pct SET DEFAULT 0.00;
 
