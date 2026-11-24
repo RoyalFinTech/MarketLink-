@@ -171,7 +171,7 @@ async function reviewApplication(applicationId,decision,reason,actor) {
         "SELECT value #>> '{}' AS value FROM system_settings WHERE key='affiliate_commission_pct'"
       );
       const commissionPct=Number(commissionSetting&&commissionSetting.value);
-      if(!Number.isFinite(commissionPct)||commissionPct<0||commissionPct>100) {
+      if(!Number.isFinite(commissionPct)||commissionPct<0||commissionPct>20) {
         throw new AppError('Affiliate commission configuration is missing or invalid. Admin must correct the setting before approval.',503,'AFFILIATE_COMMISSION_CONFIG_INVALID');
       }
       await client.query('INSERT INTO user_roles(user_id,role_id) VALUES($1,$2) ON CONFLICT(user_id,role_id) DO NOTHING',[app.user_id,role.id]);
