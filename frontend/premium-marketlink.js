@@ -3344,13 +3344,13 @@
   // Admin DAHA withdrawal actions. These deliberately call the protected backend;
   // payout initiation remains blocked server-side until configured payout-provider credentials and
   // webhook verification are configured.
-  async function approveDahaWithdrawal(withdrawalId){
+  async function approveDahaWithdrawal(withdrawalId,retrySameRequest){
     var id=String(withdrawalId||'').trim();
     if(!id){toast('A valid withdrawal record is required.','error');return;}
     if(!ML_API.admin||typeof ML_API.admin.approveWithdrawal!=='function'){
       toast('The secure Admin payout endpoint is unavailable. No payout was sent.','error');return;
     }
-    if(!window.confirm('Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
+    if(!window.confirm(retrySameRequest?'The provider response for this payout is unknown. Retry the same withdrawal using its original idempotency key so Modem Pay can return the original transfer instead of creating a second payout? Check the recipient and amount first.':'Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
     try{
       var result=await ML_API.admin.approveWithdrawal(id);
       var data=result&&result.data||{};
@@ -3401,10 +3401,13 @@
         var recipientHtml=(recipientName||recipientNumber)
           ?'<small style="display:block;margin-top:5px;color:#b8c7d3">Recipient: '+esc(recipientName||'Name not provided')+' · Account: '+esc(recipientNumber||'Number not provided')+'</small>'
           :'<small style="display:block;margin-top:5px;color:#FFCF86">Recipient details are missing. Verify the saved payout profile before approval.</small>';
+        var retryableUnknown=status==='payout_pending'&&['unknown','unknown_reference','initiation_unknown'].includes(String(x.provider_status||'').toLowerCase())&&!x.provider_ref;
+        var providerRefHtml=x.provider_ref?'<small style="display:block;margin-top:4px;color:#8fa5b1">Provider reference: '+esc(x.provider_ref)+'</small>':'';
         var actions=status==='processing'
-          ?'<div style="display:flex;gap:8px;margin-top:9px"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approveDahaWithdrawal(\''+esc(x.id)+'\')">Approve payout</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectDahaWithdrawal(\''+esc(x.id)+'\')">Reject</button></div>'
+          ?'<div style="display:flex;gap:8px;margin-top:9px"><button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.approveDahaWithdrawal(\\''+esc(x.id)+'\\')">Approve payout</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.rejectDahaWithdrawal(\\''+esc(x.id)+'\\')">Reject</button></div>'
+          :retryableUnknown?'<small style="display:block;margin-top:6px;color:#FFCF86">Provider outcome is unknown. Funds remain reserved. Retry is restricted to the original idempotency key; do not create a new payout.</small><button type="button" class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.approveDahaWithdrawal(\\''+esc(x.id)+'\\',true)">Retry same provider request</button>'
           :'<small style="display:block;margin-top:6px;color:#8fa5b1">Provider status: '+esc(providerStatus||'awaiting confirmation')+'. Funds remain reserved until confirmation.</small>';
-        return '<div class="ml-profile-row" style="align-items:flex-start"><div class="ico">💸</div><div class="copy"><b>'+esc(x.full_name||'Account')+'</b><span>'+esc(x.user_type||'account')+' · '+esc(x.payout_method||'Payout')+' · '+esc(status.replace(/_/g,' '))+'</span>'+recipientHtml+actions+'</div><strong>'+money(x.amount||0)+'</strong></div>';
+        return '<div class="ml-profile-row" style="align-items:flex-start"><div class="ico">💸</div><div class="copy"><b>'+esc(x.full_name||'Account')+'</b><span>'+esc(x.user_type||'account')+' · '+esc(x.payout_method||'Payout')+' · '+esc(status.replace(/_/g,' '))+'</span>'+recipientHtml+providerRefHtml+actions+'</div><strong>'+money(x.amount||0)+'</strong></div>';
       }).join('')+'</div>':'<div class="ml-empty"><b>No pending payouts</b><span>The production database has no withdrawal requests awaiting admin action.</span></div>')+'</div>';
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Live payouts unavailable</b><span>'+esc(e.error||'The backend did not return withdrawal data.')+'</span></div>';}
   }
