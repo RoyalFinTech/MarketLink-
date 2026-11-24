@@ -502,7 +502,13 @@ async function getAffiliateDirectory({page=1,limit=50,search}={}) {
       a.total_earnings,a.created_at,u.full_name,u.phone,u.email,u.status,
       coalesce(w.balance,0) AS wallet_balance,
       coalesce((SELECT count(*)::int FROM orders o WHERE o.affiliate_user_id=a.user_id AND o.status='delivered' AND o.payment_status='confirmed'),0) AS delivered_orders,
-      coalesce((SELECT sum(o.affiliate_commission_amount) FROM orders o WHERE o.affiliate_user_id=a.user_id AND o.status='delivered' AND o.payment_status='confirmed'),0) AS settled_commission
+      coalesce((SELECT sum(t.amount)
+        FROM transactions t
+        JOIN wallets credited_wallet ON credited_wallet.id=t.wallet_id
+        WHERE credited_wallet.user_id=a.user_id
+          AND t.type='credit'
+          AND t.category='affiliate_commission'
+          AND t.reference_type='order_affiliate_payout'),0) AS settled_commission
     FROM affiliates a JOIN users u ON u.id=a.user_id
     LEFT JOIN wallets w ON w.user_id=a.user_id
     ${whereSql}
