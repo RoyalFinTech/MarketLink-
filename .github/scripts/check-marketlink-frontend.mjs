@@ -343,7 +343,10 @@ assert.match(withdrawalTests, /clamps customer withdrawal history pagination/, '
 
 
 const addressIndex = JSON.parse(fs.readFileSync(path.join(root, 'data', 'gambia-address-index.json'), 'utf8'));
-assert.equal(addressIndex.places.length, 2347, 'The customer address index must include the full Gambian place inventory');
+assert.ok(addressIndex.places.length >= 2347, 'The customer address index must retain the full Gambian place inventory');
+assert.ok(addressIndex.places.some(place => place.name === 'Mariama Kunda' && (place.aliases || []).includes('Maria Makunda')), 'Address search must resolve Maria Makunda to Mariama Kunda');
+assert.ok(addressIndex.places.some(place => place.name === 'Tipa Garage' && (place.aliases || []).includes('Tippa Garage')), 'Address search must include Tipa/Tippa Garage');
+assert.ok(addressIndex.places.some(place => place.name === 'Sukuta Traffic Lights'), 'Address search must include Sukuta Traffic Lights');
 assert.match(premiumJs, /async function loadGambiaAddressIndex/, 'Saved-address form must load the local Gambian place index');
 assert.match(premiumJs, /function searchGambiaAddressSuggestions/, 'Saved-address entry must show local suggestions as customers type');
 assert.match(premiumJs, /Maria Makunda/, 'Address autocomplete must account for the common Maria Makunda spelling');
