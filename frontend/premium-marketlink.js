@@ -3544,6 +3544,8 @@
       var cards=items.map(function(a){
         var id=String(a.id||'').replace(/[^a-f0-9-]/gi,'');
         var statusText=String(a.status||'pending').toLowerCase();
+        var accountStatus=String(a.account_status||'unknown').toLowerCase();
+        var accountIsActive=accountStatus==='active';
         var channels=Array.isArray(a.marketing_channels)?a.marketing_channels.join(', '):'Not provided';
         var socials=a.social_links&&typeof a.social_links==='object'?Object.keys(a.social_links).map(function(k){return k+': '+a.social_links[k];}).join(' · '):'';
         var docs='';
@@ -3552,14 +3554,19 @@
         if(a.address_proof_file_id)docs+='<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewAffiliateKycFile(\''+a.address_proof_file_id+'\')">View address proof</button>';
         var actions='';
         if(statusText==='pending'){
-          actions='<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'approved\')">Approve marketer</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'rejected\')">Reject application</button>';
+          actions=(accountIsActive
+            ?'<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'approved\')">Approve marketer</button>'
+            :'<span class="ml-status-pill" style="color:#FCA5A5">Approval blocked · account '+esc(accountStatus)+'</span>')+
+            '<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'rejected\')">Reject application</button>';
         }else if(statusText==='approved'){
           actions='<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'suspended\')">Suspend access</button>';
         }else if(statusText==='suspended'){
-          actions='<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'reinstated\')">Reinstate marketer</button>';
+          actions=(accountIsActive
+            ?'<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'reinstated\')">Reinstate marketer</button>'
+            :'<span class="ml-status-pill" style="color:#FCA5A5">Reinstatement blocked · account '+esc(accountStatus)+'</span>');
         }
         return '<article class="ml-profile-card" style="margin-bottom:12px;padding:15px"><div class="ml-section-head"><div><b style="color:#fff">'+esc(a.legal_name||a.full_name||'Applicant')+'</b><div style="font-size:10px;color:#91A5B5;margin-top:4px">'+esc(a.full_name||'')+' · '+esc(a.phone||'No phone')+' · '+esc(a.email||'No email')+'</div></div><span class="ml-status-pill">'+esc(statusText)+'</span></div>'+
-          '<div style="font-size:11px;color:#DCE8ED;line-height:1.6;margin-top:9px"><b>Residential address:</b> '+esc(a.residential_address||'Not provided')+'<br><b>Promotion channels:</b> '+esc(channels)+'<br><b>Marketing plan:</b><br>'+esc(a.marketing_plan||'Not provided')+
+          '<div style="font-size:11px;color:#DCE8ED;line-height:1.6;margin-top:9px"><b>MarketLink account:</b> '+esc(accountStatus)+'<br><b>Residential address:</b> '+esc(a.residential_address||'Not provided')+'<br><b>Promotion channels:</b> '+esc(channels)+'<br><b>Marketing plan:</b><br>'+esc(a.marketing_plan||'Not provided')+
           (socials?'<br><b>Social links:</b> '+esc(socials):'')+
           (a.rejection_reason?'<br><b>Review feedback:</b> '+esc(a.rejection_reason):'')+'</div>'+
           '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:12px">'+docs+'</div>'+
