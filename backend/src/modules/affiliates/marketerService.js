@@ -55,7 +55,7 @@ async function submitApplication(userId, input) {
   const channels=cleanChannels(input.marketingChannels);
   const social=safeSocialLinks(input.socialLinks);
   const identity=await uploads.assertOwnedUploadReference(input.identityDocumentUrl,userId,'affiliate-document',null,'Identity document');
-  const selfie=await uploads.assertOwnedUploadReference(input.selfieUrl,userId,'affiliate-document',null,'KYC selfie');
+  const selfie=await uploads.assertOwnedUploadReference(input.selfieUrl,userId,'affiliate-selfie',null,'KYC selfie');
   const addressProof=input.addressProofUrl
     ? await uploads.assertOwnedUploadReference(input.addressProofUrl,userId,'affiliate-document',null,'Address proof')
     : null;
