@@ -40,9 +40,6 @@ describe('Affiliate Marketer application and approval',()=>{
  });
 
  test('rejects non-WhatsApp domains in the WhatsApp contact field',async()=>{
-  uploads.assertOwnedUploadReference
-   .mockResolvedValueOnce({id:'identity-file',file_type:'document'})
-   .mockResolvedValueOnce({id:'selfie-file',file_type:'image'});
   await expect(service.submitApplication('user-1',{
    legalName:'Awa Jallow',residentialAddress:'Serrekunda, The Gambia',
    marketingChannels:['whatsapp'],marketingPlan:'I will promote MarketLink through my local WhatsApp community and social pages.',
