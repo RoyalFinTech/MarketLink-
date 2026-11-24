@@ -21,13 +21,16 @@ function cleanChannels(value) {
 function safeSocialLinks(value) {
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const result = {};
-  for (const key of ['facebook','instagram','tiktok','youtube','website']) {
+  for (const key of ['facebook','instagram','tiktok','youtube','whatsapp','website']) {
     const raw = String(input[key] || '').trim();
     if (!raw) continue;
     if (raw.length > 500 || !/^https:\/\//i.test(raw)) throw new AppError('Social links must be secure https URLs.',400,'INVALID_SOCIAL_LINK');
     let parsed;
     try { parsed = new URL(raw); } catch(e) { throw new AppError('A social link is invalid.',400,'INVALID_SOCIAL_LINK'); }
     if (!['https:'].includes(parsed.protocol)) throw new AppError('Social links must use HTTPS.',400,'INVALID_SOCIAL_LINK');
+    if (key === 'whatsapp' && parsed.hostname.toLowerCase() !== 'wa.me' && !parsed.hostname.toLowerCase().endsWith('.whatsapp.com') && parsed.hostname.toLowerCase() !== 'whatsapp.com') {
+      throw new AppError('Use an official WhatsApp link such as https://wa.me/220XXXXXXXXX.',400,'INVALID_SOCIAL_LINK');
+    }
     result[key] = parsed.toString();
   }
   return result;

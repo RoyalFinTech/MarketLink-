@@ -2330,3 +2330,21 @@ body.ml-photo-viewer-open{overflow:hidden}
  .ml-daha-summary-grid small{font-size:7px}
  .ml-daha-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Official social brand marks and DAHA Wallet eagle identity */
+.ml-affiliate-channel{display:flex;align-items:center;gap:9px;min-height:44px;padding:9px 11px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.035);color:#eaf2f5;font-size:12px;font-weight:700;cursor:pointer;}
+.ml-affiliate-channel:has(input:checked){border-color:rgba(17,168,161,.65);background:rgba(17,168,161,.10);}
+.ml-affiliate-channel input{accent-color:#11a8a1;width:16px;height:16px;flex:0 0 auto;}
+.ml-affiliate-channel-icon{width:27px;height:27px;border-radius:8px;background:rgba(255,255,255,.08);display:grid;place-items:center;flex:0 0 auto;}
+.ml-affiliate-social-icon{width:19px;height:19px;object-fit:contain;display:inline-block;vertical-align:middle;}
+.ml-affiliate-social-emoji{font-size:17px;line-height:1;}
+.ml-affiliate-social-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.ml-affiliate-social-fields label{display:grid;gap:7px;color:#b9c9d1;font-size:11px;font-weight:750;}
+.ml-affiliate-social-fields label>span{display:flex;align-items:center;gap:7px;min-height:22px;}
+.ml-affiliate-social-fields input{width:100%;min-width:0;box-sizing:border-box;background:#0b1a27;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:11px;color:#f7fbfd;}
+.ml-daha-eagle-icon img{width:29px;height:29px;object-fit:contain;border-radius:7px;}
+.ml-daha-branded-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;}
+.ml-daha-branded-button img{width:25px;height:25px;object-fit:contain;}
+.ml-daha-inline-eagle{width:26px;height:26px;object-fit:contain;vertical-align:middle;}
+@media(max-width:600px){.ml-affiliate-social-fields{grid-template-columns:1fr;}}
