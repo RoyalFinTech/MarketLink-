@@ -72,7 +72,7 @@ function detectGambianOperator(national) {
  */
 function toGambianNational9(national) {
   const digits = String(national || '').replace(/\D/g, '');
-  if (digits.length === 9) return digits;
+  if (digits.length === 9) return /^[1-9]\\d{8}$/.test(digits) ? digits : null;
   if (digits.length === 7) {
     const operator = detectGambianOperator(digits);
     if (!operator) return null;
