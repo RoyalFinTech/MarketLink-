@@ -58,6 +58,7 @@ describe('Affiliate Marketer application and approval',()=>{
   const updated={id:'application-1',user_id:'user-1',status:'approved',reviewed_at:'2026-11-23T00:00:00Z',rejection_reason:null};
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:'user-1',status:'active'}]})
    .mockResolvedValueOnce({rows:[{id:7}]})
    .mockResolvedValueOnce({rows:[{value:'2'}]})
    .mockResolvedValueOnce({rows:[]})
@@ -75,6 +76,17 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(clientQuery.mock.calls[4][1]).toEqual(['user-1',2,'admin-1']);
   expect(clientQuery.mock.calls[2][0]).toContain("affiliate_commission_pct");
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes('admin_action_logs'))).toBe(true);
+ });
+
+ test('does not approve or reinstate an applicant whose MarketLink account is inactive',async()=>{
+  const application={id:'application-inactive',user_id:'user-inactive',status:'pending'};
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:'user-inactive',status:'suspended'}]});
+  withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
+  await expect(service.reviewApplication('application-inactive','approved',null,{id:'admin-1',role:'admin'}))
+   .rejects.toMatchObject({code:'APPLICANT_ACCOUNT_NOT_ACTIVE',statusCode:403});
+  expect(clientQuery).toHaveBeenCalledTimes(2);
  });
 
  test('suspension removes the active commission rate as well as the marketer role',async()=>{
@@ -98,6 +110,7 @@ describe('Affiliate Marketer application and approval',()=>{
   const application={id:'application-3',user_id:'user-3',status:'pending'};
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:'user-3',status:'active'}]})
    .mockResolvedValueOnce({rows:[{id:7}]})
    .mockResolvedValueOnce({rows:[{value:'invalid'}]});
   withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
@@ -110,6 +123,7 @@ describe('Affiliate Marketer application and approval',()=>{
   const application={id:'application-4',user_id:'user-4',status:'pending'};
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:'user-4',status:'active'}]})
    .mockResolvedValueOnce({rows:[{id:7}]})
    .mockResolvedValueOnce({rows:[{value:'20.01'}]});
   withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
