@@ -522,17 +522,19 @@
         AFRICELL:{prefix:'87',legacy:/^(2|7|40|41)/},
         QCELL:{prefix:'83',legacy:/^(3|5)/},
         COMIUM:{prefix:'86',legacy:/^(6|8)/},
-        GAMCEL:{prefix:'',legacy:/^9/}
+        GAMCEL:{prefix:'',legacy:/^(?:9\d{6}|9\d{8})$/},
+        OTHER:{prefix:'',legacy:/^\d{9}$/}
       };
       var networkRule=networkRules[operatorEl.value];
-      if(national.length!==7){adminAuthErr('Enter the 7 digits after the selected network prefix (9 digits total).');nationalEl.focus();return;}
+      var expectedLength=operatorEl.value==='GAMCEL'?(national.length===7?7:9):(operatorEl.value==='OTHER'?9:7);
+      if(national.length!==expectedLength){adminAuthErr((operatorEl.value==='GAMCEL'||operatorEl.value==='OTHER')?'Enter the full 9-digit Gambian number.':'Enter the 7 subscriber digits after the selected network prefix.');nationalEl.focus();return;}
       if(!networkRule||!networkRule.legacy.test(national)){adminAuthErr('The number does not match the selected network. Check the number and network, then try again.');nationalEl.focus();return;}
       phone=networkRule.prefix+national;
       if(idEl)idEl.value=phone;
     }
     if(!phone||!pin){adminAuthErr('Enter your admin phone number and 4-digit PIN');return;}
     var gamcelLegacy=Boolean(operatorEl&&operatorEl.value==='GAMCEL');
-    if(gamcelLegacy?!/^\d{7}$/.test(phone):!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
+    if(gamcelLegacy?!/^(?:9\d{6}|9\d{8})$/.test(phone):!/^\d{9}$/.test(phone)){adminAuthErr('Check your Gambian mobile number and selected network.');return;}
     if(!/^\d{4}$/.test(pin)){adminAuthErr('Enter your 4-digit security PIN.');return;}
     window.__ML_ADMIN_LOGIN_IN_FLIGHT=true;
     if(button){button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='Signing in…';}
@@ -2763,8 +2765,8 @@
     if(!f.bname||!f.sname||!f.saddr||!f.cat||!f.whatsappNumber){
       toast('Complete the business name, shop name, address, category and customer WhatsApp number first.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
-    if(!/^\+220(?:87|83|86)\d{7}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,''))){
-      toast('Enter the full 9-digit Gambian contact number after +220, including its 87, 83 or 86 prefix.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
+    if(!/^\+220\d{9}$/.test(String(f.whatsappNumber).replace(/[\s()-]/g,''))){
+      toast('Enter the complete 9-digit Gambian contact number after +220.','error');S.vStep=0;if(typeof renderVApp==='function')renderVApp();return;
     }
     if(!f.idDocFile){toast('Please upload your National ID or Passport before submitting.','error');return;}
     var btn=document.querySelector('#vapp-body .btn-p'),uploaded=[];

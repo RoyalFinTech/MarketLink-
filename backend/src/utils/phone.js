@@ -34,7 +34,7 @@
 //   This should be re-verified against the actual PURA PDF (human-read
 //   or OCR'd) before being treated as fully authoritative.
 // ═══════════════════════════════════════════════════════════════════════
-const { parsePhoneNumberFromString, isValidPhoneNumber } = require('libphonenumber-js');
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
 const GAMBIA_OPERATOR_PREFIXES = {
   AFRICELL: { newPrefix: '87', legacyPrefixes: ['2', '7', '40', '41'] },
@@ -66,18 +66,13 @@ function detectGambianOperator(national) {
 }
 
 /**
- * Migrate a Gambian national number (legacy 7-digit or already-correct
- * 9-digit) to its canonical 9-digit post-migration form. Returns null if
- * the number can't be confidently mapped — callers must surface this as
- * "please check your Gambian mobile number", never silently guess.
+ * Preserve complete nine-digit Gambian national numbers as supplied.
+ * Legacy seven-digit ranges may still be normalized for existing-account
+ * lookup; registration applies the stricter nine-digit rule separately.
  */
 function toGambianNational9(national) {
   const digits = String(national || '').replace(/\D/g, '');
-  if (digits.length === 9) {
-    const prefix2 = digits.slice(0, 2);
-    if (GAMBIA_NEW_PREFIXES[prefix2] || digits[0] === '9') return digits;
-    return null;
-  }
+  if (digits.length === 9) return /^[1-9]\d{8}$/.test(digits) ? digits : null;
   if (digits.length === 7) {
     const operator = detectGambianOperator(digits);
     if (!operator) return null;
@@ -118,7 +113,9 @@ function normalizePhone(raw, defaultCountryIso) {
     const migrated = toGambianNational9(national);
     if (!migrated) throw new Error('Please check your Gambian mobile number.');
     const e164 = '+220' + migrated;
-    if (!isValidPhoneNumber(e164)) throw new Error('Please check your Gambian mobile number.');
+    // PURA's new nine-digit national format may be newer than libphonenumber metadata.
+    // Validate the national structure here and leave carrier inference to known prefixes only.
+    if (migrated.length !== 9) throw new Error('Please check your Gambian mobile number.');
     return { e164, countryIso: 'GM', national: migrated, operator: detectGambianOperator(migrated) };
   }
 
