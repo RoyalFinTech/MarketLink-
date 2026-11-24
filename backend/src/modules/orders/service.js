@@ -611,13 +611,13 @@ async function settleOrderFinancials(orderId) {
         'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
         [affiliateAmount, affiliateWallet.id]);
       await client.query(
-        "INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','affiliate_commission',$2,$3,'order_affiliate_payout',$4,'MarketLink affiliate commission (' + affiliateCommissionPct + '%) credited to DAHA Wallet')",
+        `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES($1,'credit','affiliate_commission',$2,$3,'order_affiliate_payout',$4,'MarketLink affiliate commission (${affiliateCommissionPct}%) credited to DAHA Wallet')`,
         [affiliateWallet.id, affiliateAmount, credited.balance, orderId]);
       await client.query(
         'UPDATE affiliates SET total_earnings=COALESCE(total_earnings,0)+$1,total_orders=total_orders+1 WHERE user_id=$2',
         [affiliateAmount, order.affiliate_user_id]);
       await client.query(
-        "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'affiliate_reward','You earned a ' + affiliateCommissionPct + '% affiliate commission',$2,'order',$3)",
+        `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES($1,'affiliate_reward','You earned a ${affiliateCommissionPct}% affiliate commission',$2,'order',$3)`,
         [order.affiliate_user_id, 'D ' + affiliateAmount.toFixed(2) + ' (' + affiliateCommissionPct + '% commission) was credited to your DAHA Wallet after successful delivery and payment.', orderId]);
     }
 
