@@ -3,7 +3,7 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('bcryptjs',()=>({compare:jest.fn()}));
 
-const {withTransaction}=require('../../config/db');
+const {query,withTransaction}=require('../../config/db');
 const bcrypt=require('bcryptjs');
 const service=require('./service');
 
@@ -122,5 +122,44 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     });
     expect(result).toEqual({ignored:true,reason:'provider_reference_mismatch'});
     expect(clientQuery).toHaveBeenCalledTimes(1);
+  });
+
+  test('a matching successful provider webhook debits the wallet and writes one withdrawal ledger entry',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const unbound={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'payout_pending',provider_ref:null,amount:'50',wallet_debit_amount:'50',service_fee_amount:'0'};
+    const bound={...unbound,provider_ref:'provider-ref-1'};
+    const completed={...bound,status:'completed',provider_status:'completed'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[unbound]})
+      .mockResolvedValueOnce({rows:[{id:withdrawalId}]})
+      .mockResolvedValueOnce({rows:[bound]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'50'}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[completed]})
+      .mockResolvedValueOnce({rows:[]});
+
+    const result=await service.processProviderWebhook({
+      event:'transfer.succeeded',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'GMD',status:'succeeded',fee:0}
+    });
+
+    expect(result).toMatchObject({processed:true,data:{status:'completed',provider_status:'completed'}});
+    expect(clientQuery.mock.calls.filter(([sql])=>sql.includes('UPDATE wallets SET balance=balance-$1'))).toHaveLength(1);
+    expect(clientQuery.mock.calls.filter(([sql])=>sql.includes("INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description) VALUES ($1,'debit','withdrawal'"))).toHaveLength(1);
+    expect(clientQuery.mock.calls.some(([sql])=>sql.includes("status='completed',provider_status='completed'"))).toBe(true);
+  });
+
+  test('a repeated success webhook after completion does not debit or ledger-credit a second time',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const completed={id:withdrawalId,status:'completed',provider_status:'completed'};
+    clientQuery.mockResolvedValueOnce({rows:[completed]});
+    query.mockResolvedValueOnce({rows:[completed]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.succeeded',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'GMD',status:'succeeded'}
+    });
+    expect(result).toMatchObject({duplicate:true,data:{status:'completed'}});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
 });
