@@ -7,7 +7,7 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const withdrawalPinLimiter = require('../withdrawals/pinLimiter');
 const ctrl = require('./controller');
 
-const WALLET_ROLES = ['customer', 'vendor', 'rider'];
+const WALLET_ROLES = ['customer', 'vendor', 'rider', 'affiliate_marketer'];
 router.get('/me', authenticate, authorize(...WALLET_ROLES), ctrl.getMine);
 router.get('/me/transactions', authenticate, authorize(...WALLET_ROLES), [
   query('page').optional().isInt({ min: 1 }),
