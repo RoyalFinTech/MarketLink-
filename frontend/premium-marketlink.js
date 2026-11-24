@@ -2621,6 +2621,15 @@
   function searchGambiaAddressSuggestions(value){
     var host=G('ml-addr-suggestions'),raw=String(value||'').trim();
     if(!host)return;
+    if(liveAddressPinDraft&&liveAddressPinDraft.addressTextAnchor){
+      var anchorKey=normalizeGambiaAddressSearch(liveAddressPinDraft.addressTextAnchor);
+      var currentKey=normalizeGambiaAddressSearch(raw);
+      if(anchorKey&&currentKey.indexOf(anchorKey)!==0){
+        liveAddressPinDraft=null;
+        var changedPinStatus=G('ml-addr-pin-status');
+        if(changedPinStatus)changedPinStatus.textContent='Address text changed. The previous map pin was cleared; select the new mapped place or use GPS again.';
+      }
+    }
     var q=normalizeGambiaAddressSearch(raw);
     if(q.length<2){host.innerHTML='';host.style.display='none';addressSuggestionResults=[];return;}
     if(!gambiaAddressIndex){
@@ -2666,7 +2675,7 @@
     var full=G('ml-addr-full'),area=G('ml-addr-area');
     if(full)full.value=String(item.name||'')+', '+String(item.region||'The Gambia')+', The Gambia';
     if(area)area.value=String(item.region||'');
-    liveAddressPinDraft={latitude:Number(item.lat),longitude:Number(item.lng),source:'mapped-place-centre',name:item.name||''};
+    liveAddressPinDraft={latitude:Number(item.lat),longitude:Number(item.lng),source:'mapped-place-centre',name:item.name||'',addressTextAnchor:String(item.name||'')+', '+String(item.region||'The Gambia')+', The Gambia'};
     var host=G('ml-addr-suggestions');if(host){host.innerHTML='';host.style.display='none';}
     var status=G('ml-addr-pin-status');
     if(status)status.textContent='Approximate pin saved for '+String(item.name||'this place')+'. Use “Use my GPS location” for the exact house or gate.';
@@ -2676,9 +2685,9 @@
     var status=G('ml-addr-pin-status');
     if(status)status.textContent='Requesting permission to read your current location…';
     navigator.geolocation.getCurrentPosition(function(position){
-      liveAddressPinDraft={latitude:Number(position.coords.latitude),longitude:Number(position.coords.longitude),source:'device-gps',name:'Current device location'};
       var full=G('ml-addr-full');
       if(full&&!full.value.trim())full.value='My current location (GPS pin)';
+      liveAddressPinDraft={latitude:Number(position.coords.latitude),longitude:Number(position.coords.longitude),source:'device-gps',name:'Current device location',addressTextAnchor:full?String(full.value||'').trim():''};
       var exact=Number(position.coords.accuracy);
       if(status)status.textContent='Exact device GPS pin saved'+(Number.isFinite(exact)?' · reported accuracy about '+Math.round(exact)+' m':'')+'. The pin will be stored with this address.';
       toast('Your current GPS location has been added to this address.','success');
@@ -2695,7 +2704,7 @@
     var editingAddress=liveAddressEditId?liveAddresses.find(function(a){return String(a.id)===String(liveAddressEditId);}):null;
     if(!editingAddress){liveAddressEditId=null;liveAddressPinDraft=null;}
     else if(!liveAddressPinDraft&&editingAddress.latitude!==null&&editingAddress.latitude!==undefined&&editingAddress.longitude!==null&&editingAddress.longitude!==undefined){
-      liveAddressPinDraft={latitude:Number(editingAddress.latitude),longitude:Number(editingAddress.longitude),source:'saved-pin',name:editingAddress.full_address||''};
+      liveAddressPinDraft={latitude:Number(editingAddress.latitude),longitude:Number(editingAddress.longitude),source:'saved-pin',name:editingAddress.full_address||'',addressTextAnchor:editingAddress.full_address||''};
     }
     var cards=liveAddresses.map(function(a){
       var id=String(a.id),hasPin=a.latitude!==null&&a.latitude!==undefined&&a.longitude!==null&&a.longitude!==undefined;
