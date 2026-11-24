@@ -423,7 +423,7 @@ const KNOWLEDGE_BASE = [
     roles: ['all'],
     keywords: ['Africell phone number', 'QCell number', 'Comium number', 'Gamcel number', 'network dropdown', 'seven digit phone', 'Gambia phone format'],
     question: 'How do I enter my Gambian phone number?',
-    answer: 'A full Gambian mobile number is nine digits (not including +220). For Africell, QCell and Comium, select the correct network: MarketLink adds its two-digit prefix (87, 83 or 86), and you enter the remaining seven subscriber digits. The screen shows that these seven digits plus the selected prefix make nine digits total. Gamcel or a number without an added two-digit network prefix must be entered as a full nine-digit national number. Older seven-digit 9XX accounts may still sign in, but new registrations and contact updates require nine digits. Never share your MarketLink PIN or a provider one-time code with anyone.',
+    answer: 'A full Gambian mobile number is nine digits (not including +220). For Africell, QCell and Comium, select the correct network: MarketLink adds its two-digit prefix (87, 83 or 86), and you enter the remaining seven subscriber digits. The screen shows that these seven digits plus the selected prefix make nine digits total. Gamcel or a number without an added two-digit network prefix must be entered as a full nine-digit national number. Older seven-digit 9XX accounts may still sign in, but new registrations and contact updates require nine digits. If your number uses another prefix, choose Other and enter all nine digits; MarketLink will not add a prefix. Never share your MarketLink PIN or a provider one-time code with anyone.',
   },
   {
     id: 'vendor-product-upload-simple',
