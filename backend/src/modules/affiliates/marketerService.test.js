@@ -29,7 +29,7 @@ describe('Affiliate Marketer application and approval',()=>{
    marketingPlan:'I will promote MarketLink through my local community groups and social pages.',
    identityDocumentUrl:'https://api.marketlink.test/api/v1/uploads/identity-file/content',
    selfieUrl:'https://api.marketlink.test/api/v1/uploads/selfie-file/content',
-   socialLinks:{facebook:'https://facebook.com/example'}
+   socialLinks:{facebook:'https://facebook.com/example',whatsapp:'https://wa.me/220871234567'}
   });
 
   expect(result).toMatchObject({id:'application-1',status:'pending'});
@@ -37,6 +37,20 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(uploads.assertOwnedUploadReference).toHaveBeenNthCalledWith(1,expect.any(String),'user-1','affiliate-document',null,'Identity document');
   expect(uploads.assertOwnedUploadReference).toHaveBeenNthCalledWith(2,expect.any(String),'user-1','affiliate-selfie',null,'KYC selfie');
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes("UPDATE affiliates SET marketer_status='pending',commission_pct=0"))).toBe(true);
+ });
+
+ test('rejects non-WhatsApp domains in the WhatsApp contact field',async()=>{
+  uploads.assertOwnedUploadReference
+   .mockResolvedValueOnce({id:'identity-file',file_type:'document'})
+   .mockResolvedValueOnce({id:'selfie-file',file_type:'image'});
+  await expect(service.submitApplication('user-1',{
+   legalName:'Awa Jallow',residentialAddress:'Serrekunda, The Gambia',
+   marketingChannels:['whatsapp'],marketingPlan:'I will promote MarketLink through my local WhatsApp community and social pages.',
+   identityDocumentUrl:'https://api.marketlink.test/api/v1/uploads/identity-file/content',
+   selfieUrl:'https://api.marketlink.test/api/v1/uploads/selfie-file/content',
+   socialLinks:{whatsapp:'https://example.com/not-whatsapp'}
+  })).rejects.toMatchObject({code:'INVALID_SOCIAL_LINK',statusCode:400});
+  expect(withTransaction).not.toHaveBeenCalled();
  });
 
  test('rejects a PDF uploaded in the selfie field before creating an application',async()=>{
