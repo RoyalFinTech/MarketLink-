@@ -4,7 +4,7 @@ jest.mock('../notifications/service',()=>({sendSms:jest.fn()}));
 const {query,withTransaction}=require('../../config/db'),notifications=require('../notifications/service');
 const bcrypt=require('bcryptjs');
 const jwt=require('jsonwebtoken');
-const {registerInitiate,requestPinReset,refreshAccessToken}=require('./service');
+const {registerInitiate,registerComplete,requestPinReset,refreshAccessToken}=require('./service');
 describe('OTP delivery mode',()=>{
  const oldEnv={...process.env};
  beforeEach(()=>{jest.clearAllMocks();process.env.OTP_EXPIRY_MINUTES='5';process.env.NODE_ENV='test';process.env.RENDER='false';query.mockImplementation(async sql=>{if(sql.startsWith('SELECT id FROM users WHERE phone=$1'))return{rows:[]};if(sql.startsWith('INSERT INTO otp_verifications'))return{rows:[{id:'otp-id'}]};return{rows:[]};});});
@@ -41,6 +41,30 @@ describe('OTP delivery mode',()=>{
   expect(result.phone).toBe('+220871234567');
  });
 
+});
+
+describe('customer Referrer commission separation',()=>{
+ test('new customer registration creates a non-earning referral profile',async()=>{
+  process.env.JWT_ACCESS_SECRET='marketlink-test-access-secret';
+  process.env.JWT_REFRESH_SECRET='marketlink-test-refresh-secret';
+  const codeHash=await bcrypt.hash('123456',8);
+  query.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT * FROM otp_verifications'))return{rows:[{id:'otp-1',code_hash:codeHash,expires_at:new Date(Date.now()+60000),attempts:0}]};
+   if(sql.startsWith('SELECT id FROM users WHERE phone=$1'))return{rows:[]};
+   return{rows:[]};
+  });
+  const clientQuery=jest.fn(async(sql)=>{
+   if(sql.startsWith('INSERT INTO users'))return{rows:[{id:'new-user',full_name:'Test Customer',phone:'+220871234567',status:'active'}]};
+   return{rows:[]};
+  });
+  withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
+  const result=await registerComplete({fullName:'Test Customer',phone:'871234567',otp:'123456',pin:'1234'});
+  expect(result.affiliateCode).toMatch(/^ML[A-F0-9]{8}$/);
+  const affiliateInsert=clientQuery.mock.calls.find(([sql])=>sql.startsWith('INSERT INTO affiliates'));
+  expect(affiliateInsert).toBeDefined();
+  expect(affiliateInsert[0]).toContain('VALUES($1,$2,0)');
+  expect(affiliateInsert[1][2]).toBe(0);
+ });
 });
 
 describe('atomic refresh-token rotation',()=>{
