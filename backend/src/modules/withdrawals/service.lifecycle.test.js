@@ -74,4 +74,53 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     })).rejects.toMatchObject({code:'INVALID_WITHDRAWAL_PIN',statusCode:401});
     expect(clientQuery).toHaveBeenCalledTimes(1);
   });
+
+  test('Admin rejection is limited to an uninitiated processing request and releases its reservation',async()=>{
+    const pending={id:'withdrawal-2',user_id:'affiliate-user',status:'processing'};
+    const rejected={...pending,status:'rejected',provider_status:'rejected_by_admin'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[pending]})
+      .mockResolvedValueOnce({rows:[rejected]})
+      .mockResolvedValueOnce({rows:[]});
+
+    const result=await service.reject('withdrawal-2','admin-user');
+
+    expect(result).toEqual(rejected);
+    expect(clientQuery.mock.calls[0][0]).toContain('FOR UPDATE');
+    expect(clientQuery.mock.calls[1][0]).toContain("status='rejected'");
+    expect(clientQuery.mock.calls[2][0]).toContain('INSERT INTO notifications');
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('a verified provider failure releases a payout reservation without debiting the wallet',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const pending={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'payout_pending',provider_ref:'provider-ref-1',amount:'50',currency:'GMD'};
+    const rejected={...pending,status:'rejected',provider_status:'failed'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[pending]})
+      .mockResolvedValueOnce({rows:[rejected]})
+      .mockResolvedValueOnce({rows:[]});
+
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'GMD',status:'failed'}
+    });
+
+    expect(result).toMatchObject({processed:true,data:{status:'rejected',provider_status:'failed'}});
+    expect(clientQuery.mock.calls[0][0]).toContain('FOR UPDATE');
+    expect(clientQuery.mock.calls[1][0]).toContain("status='rejected'");
+    expect(clientQuery.mock.calls[2][0]).toContain('INSERT INTO notifications');
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('a provider failure with a mismatched reference cannot release a withdrawal reservation',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_ref:'provider-ref-1',amount:'50'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'wrong-reference',amount:50,currency:'GMD',status:'failed'}
+    });
+    expect(result).toEqual({ignored:true,reason:'provider_reference_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+  });
 });
