@@ -103,12 +103,12 @@ router.post('/register',
     body('businessCategoryGroup')
       .optional().trim().isLength({ max: 80 }),
     body('whatsappNumber')
-      .optional({ nullable: true }).custom(value => /^(?:\+220)?(?:87|83|86)\d{7}$/.test(String(value))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
+      .optional({ nullable: true }).custom(value => (String(value).startsWith('+220') ? /^\+220\d{9}$/.test(String(value)) : /^\+?[1-9]\d{7,14}$/.test(String(value)))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
 
     body('businessAddress')
       .optional().trim().isLength({ max: 500 }),
     body('phone')
-      .optional().custom(value => /^(?:\+220)?(?:87|83|86)\d{7}$/.test(String(value))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
+      .optional().custom(value => (String(value).startsWith('+220') ? /^\+220\d{9}$/.test(String(value)) : /^\+?[1-9]\d{7,14}$/.test(String(value)))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
     body('email')
       .optional().isEmail().normalizeEmail().withMessage('Invalid email address.'),
     body('description')
@@ -145,9 +145,9 @@ router.put('/profile',
     body('businessName').optional().trim().notEmpty().isLength({ max: 150 }),
     body('businessCategory').optional().trim().isLength({ max: 80 }),
     body('businessCategoryGroup').optional().trim().isLength({ max: 80 }),
-    body('whatsappNumber').optional({ nullable: true }).custom(value => /^(?:\+220)?(?:87|83|86)\d{7}$/.test(String(value))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
+    body('whatsappNumber').optional({ nullable: true }).custom(value => (String(value).startsWith('+220') ? /^\+220\d{9}$/.test(String(value)) : /^\+?[1-9]\d{7,14}$/.test(String(value)))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
     body('businessAddress').optional().trim().isLength({ max: 500 }),
-    body('phone').optional().custom(value => /^(?:\+220)?(?:87|83|86)\d{7}$/.test(String(value))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
+    body('phone').optional().custom(value => (String(value).startsWith('+220') ? /^\+220\d{9}$/.test(String(value)) : /^\+?[1-9]\d{7,14}$/.test(String(value)))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
     body('email').optional().isEmail().normalizeEmail(),
     body('description').optional().trim().isLength({ max: 2000 }),
     body('servicesOffered').optional({ nullable: true }).trim().isLength({ max: 120 }),
