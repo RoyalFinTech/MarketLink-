@@ -14,12 +14,14 @@ describe('Admin marketplace commission settings',()=>{
   clientQuery.mockResolvedValueOnce({rows:[{key:'marketplace_commission_pct',value:'5.00'},{key:'affiliate_commission_pct',value:'2.00'},{key:'withdrawal_service_fee_pct',value:'2.00'},{key:'payout_fee_recovery_pct',value:'2.00'}]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]});
   const result=await updateMarketplaceCommissionSettings({marketplaceCommissionPct:10,affiliateCommissionPct:3,withdrawalServiceFeePct:2,payoutFeeRecoveryPct:2},{id:'admin-1',role:'admin'});
   expect(result).toMatchObject({marketplaceCommissionPct:10,affiliateCommissionPct:3,marketlinkRetainedPct:7,vendorPayoutPct:90,withdrawalServiceFeePct:2,payoutFeeRecoveryPct:2});
-  expect(clientQuery).toHaveBeenCalledTimes(6);
+  expect(clientQuery).toHaveBeenCalledTimes(7);
   expect(clientQuery.mock.calls[1][1]).toEqual(['marketplace_commission_pct','10','admin-1']);
   expect(clientQuery.mock.calls[2][1]).toEqual(['affiliate_commission_pct','3','admin-1']);
   expect(clientQuery.mock.calls[3][1]).toEqual(['withdrawal_service_fee_pct','2','admin-1']);
   expect(clientQuery.mock.calls[4][1]).toEqual(['payout_fee_recovery_pct','2','admin-1']);
-  expect(clientQuery.mock.calls[5][0]).toContain('finance.commission_settings_updated');
+  expect(clientQuery.mock.calls[5][0]).toContain("UPDATE affiliates SET commission_pct=$1 WHERE marketer_status='approved'");
+  expect(clientQuery.mock.calls[5][1]).toEqual([3]);
+  expect(clientQuery.mock.calls[6][0]).toContain('finance.commission_settings_updated');
  });
  test('rejects affiliate share above pool before starting transaction',async()=>{
   await expect(updateMarketplaceCommissionSettings({marketplaceCommissionPct:5,affiliateCommissionPct:5.1},{id:'admin-1',role:'admin'})).rejects.toMatchObject({statusCode:400,code:'INVALID_COMMISSION_SETTINGS'});
