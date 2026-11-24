@@ -119,9 +119,22 @@ async function getDashboard(userId) {
   if(status.marketerStatus!=='approved') throw new AppError('Your Affiliate Marketer account must be approved before you can access the marketer dashboard.',403,'AFFILIATE_MARKETER_NOT_APPROVED');
   const [wallet,stats]=await Promise.all([
     query('SELECT balance,currency FROM wallets WHERE user_id=$1',[userId]),
-    query(`SELECT count(*) FILTER(WHERE status='delivered' AND payment_status='confirmed')::int AS qualifying_orders,
-                  COALESCE(sum(affiliate_commission_amount) FILTER(WHERE status='delivered' AND payment_status='confirmed'),0) AS earned
-           FROM orders WHERE affiliate_user_id=$1`,[userId])
+    query(`SELECT count(*) FILTER(
+                    WHERE o.status='delivered' AND o.payment_status='confirmed' AND cr.status='paid'
+                  )::int AS qualifying_orders,
+                  COALESCE((
+                    SELECT sum(t.amount)
+                    FROM transactions t
+                    JOIN wallets credited_wallet ON credited_wallet.id=t.wallet_id
+                    WHERE credited_wallet.user_id=$1
+                      AND t.type='credit'
+                      AND t.category='affiliate_commission'
+                      AND t.reference_type='order_affiliate_payout'
+                  ),0) AS earned
+           FROM orders o
+           LEFT JOIN commission_records cr
+             ON cr.order_id=o.id AND cr.affiliate_user_id=o.affiliate_user_id
+           WHERE o.affiliate_user_id=$1`,[userId])
   ]);
   return {
     affiliateCode:status.referrer.affiliateCode,
