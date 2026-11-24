@@ -843,9 +843,28 @@
     }
   }
   window.__ML_ADMIN_AFFILIATE_QUEUE=adminAffiliateMarketerQueue;
-  window.__ML_ADMIN_VIEW_AFFILIATE_DOC=function(id,label){
-    var url=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'')+'/api/v1/uploads/'+encodeURIComponent(id)+'/content';
-    viewApplicationDocument(url,label||'Affiliate KYC document');
+  window.__ML_ADMIN_VIEW_AFFILIATE_DOC=async function(id,label){
+    var token=window.ML_API&&typeof ML_API.getAccessToken==='function'?ML_API.getAccessToken():null;
+    if(!token){if(window.toast)window.toast('Your Admin session has expired. Sign in again.','warning');return;}
+    var base=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com/api/v1').replace(/\/+$/,'');
+    if(!/\/api\/v1$/.test(base))base+='/api/v1';
+    try{
+      var response=await fetch(base+'/uploads/'+encodeURIComponent(id)+'/content',{headers:{Authorization:'Bearer '+token}});
+      if(!response.ok)throw new Error(response.status===403?'You are not authorised to view this private KYC document.':'Could not retrieve the private KYC document ('+response.status+').');
+      var blob=await response.blob(),objectUrl=URL.createObjectURL(blob);
+      var overlay=document.createElement('div');
+      overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',label||'Affiliate KYC document');
+      overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(4,10,24,.92);display:flex;flex-direction:column;padding:12px;box-sizing:border-box';
+      var bar=document.createElement('div');bar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;color:#fff;padding:8px 4px';
+      var title=document.createElement('b');title.textContent=label||'Affiliate KYC document';
+      var close=document.createElement('button');close.type='button';close.textContent='Close';close.style.cssText='border:0;border-radius:8px;padding:9px 16px;background:#d7b45a;color:#101827;font-weight:700';
+      bar.append(title,close);
+      var frame=document.createElement('iframe');frame.title=label||'Affiliate KYC document';frame.src=objectUrl;frame.style.cssText='width:100%;flex:1;min-height:0;border:0;border-radius:10px;background:#fff';
+      function dismiss(){URL.revokeObjectURL(objectUrl);overlay.remove();document.removeEventListener('keydown',onKey);}
+      function onKey(event){if(event.key==='Escape')dismiss();}
+      close.addEventListener('click',dismiss);overlay.addEventListener('click',function(event){if(event.target===overlay)dismiss();});document.addEventListener('keydown',onKey);
+      overlay.append(bar,frame);document.body.appendChild(overlay);
+    }catch(error){if(window.toast)window.toast(error.message||'Could not view this KYC document.','error');}
   };
   window.__ML_ADMIN_AFFILIATE_REVIEW=async function(id,decision){
     var reason='';
