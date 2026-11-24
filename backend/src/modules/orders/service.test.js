@@ -147,6 +147,18 @@ describe('order financial settlement safeguards', () => {
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE commission_records SET status='paid'/i.test(sql))).toBe(false);
   });
 
+  test('refuses settlement when the affiliate commission percentage differs from the order snapshot', async () => {
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ ...baseOrder, affiliate_commission_pct: 0 }] })
+      .mockResolvedValueOnce({ rows: [{ ...baseCommission, affiliate_commission_pct: 2 }] });
+
+    await expect(require('./service').settleOrderFinancials('order-1'))
+      .rejects.toMatchObject({ code: 'SETTLEMENT_LEDGER_MISMATCH' });
+
+    expect(clientQuery).toHaveBeenCalledTimes(2);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
+  });
+
   test('refuses settlement when an affiliate reward has no affiliate recipient', async () => {
     clientQuery
       .mockResolvedValueOnce({ rows: [{ ...baseOrder, affiliate_commission_amount: 2 }] })
