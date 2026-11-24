@@ -522,10 +522,11 @@
         AFRICELL:{prefix:'87',legacy:/^(2|7|40|41)/},
         QCELL:{prefix:'83',legacy:/^(3|5)/},
         COMIUM:{prefix:'86',legacy:/^(6|8)/},
-        GAMCEL:{prefix:'',legacy:/^(?:9\d{6}|9\d{8})$/}
+        GAMCEL:{prefix:'',legacy:/^(?:9\d{6}|9\d{8})$/},
+        OTHER:{prefix:'',legacy:/^\d{9}$/}
       };
       var networkRule=networkRules[operatorEl.value];
-      var expectedLength=operatorEl.value==='GAMCEL'?(national.length===7?7:9):7;
+      var expectedLength=operatorEl.value==='GAMCEL'?(national.length===7?7:9):(operatorEl.value==='OTHER'?9:7);
       if(national.length!==expectedLength){adminAuthErr(operatorEl.value==='GAMCEL'?'Enter the full 9-digit Gambian number.':'Enter the 7 subscriber digits after the selected network prefix.');nationalEl.focus();return;}
       if(!networkRule||!networkRule.legacy.test(national)){adminAuthErr('The number does not match the selected network. Check the number and network, then try again.');nationalEl.focus();return;}
       phone=networkRule.prefix+national;
