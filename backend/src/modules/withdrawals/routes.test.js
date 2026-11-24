@@ -1,4 +1,5 @@
 'use strict';
+jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 const walletRouter=require('../wallets/routes');
 const withdrawalRouter=require('./routes');
 
