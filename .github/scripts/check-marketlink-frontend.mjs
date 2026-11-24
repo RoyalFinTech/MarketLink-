@@ -183,9 +183,13 @@ assert.ok(fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8').includes("r
 assert.ok(!fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8').includes(String.raw`replace(/\\D/g, '')`), 'Admin phone selector must not use an escaped literal-backslash regex');
 assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
 assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
-assert.match(html, /Gamcel is still using its existing 7-digit number/, 'Phone selector must distinguish Gamcel Phase 1 from migrated nine-digit networks');
-assert.match(premiumJs, /gamcelLegacy\?\!\/\^\\d\{7\}\$\//, 'Admin login must preserve current Gamcel Phase 1 seven-digit compatibility');
+assert.match(html, /Gamcel \(full 9 digits\)/, 'Gamcel selector must request the complete nine-digit national number');
+assert.ok(premiumJs.includes("national.length===7?7:9"), 'Admin login must request nine digits for new Gamcel numbers while retaining legacy sign-in compatibility');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
+const phoneUtil = fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js'), 'utf8');
+assert.match(phoneUtil, /if \(digits\.length === 9\) return digits;/, 'Phone normalization must accept complete nine-digit Gambian national numbers without guessing carrier prefixes');
+assert.match(html, /Enter all 9 digits; MarketLink adds no extra prefix/, 'Gamcel phone guidance must ask for the full nine-digit number');
+
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
 assert.match(premiumJs, /ml-daha-deposit-number[\s\S]*?maxlength="7"/, 'DAHA mobile-money deposit must collect seven subscriber digits after a selected network prefix');
