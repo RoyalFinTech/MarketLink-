@@ -24,7 +24,7 @@ describe('Gambian phone normalization',()=>{
   });
 
   test('rejects a nine-digit number beginning with zero',()=>{
-    expect(()=>normalizePhone('001234567','GM')).toThrow('Please check your Gambian mobile number.');
+    expect(()=>normalizePhone('012345678','GM')).toThrow('Please check your Gambian mobile number.');
   });
 
   test('rejects incomplete or unmappable legacy Gambian numbers',()=>{
