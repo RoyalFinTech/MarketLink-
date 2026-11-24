@@ -268,6 +268,13 @@ async function updateMarketplaceCommissionSettings(input,actor){
     for(const [key,value] of [[SETTING_KEYS.marketplace,settings.marketplaceCommissionPct],[SETTING_KEYS.affiliate,settings.affiliateCommissionPct],[SETTING_KEYS.withdrawal,withdrawalServiceFeePct],[SETTING_KEYS.payoutRecovery,payoutFeeRecoveryPct]]){
       await client.query("INSERT INTO system_settings(key,value,category,updated_by) VALUES($1,$2::jsonb,'finance',$3) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,category='finance',updated_by=EXCLUDED.updated_by,updated_at=now()",[key,JSON.stringify(value),actor.id]);
     }
+    // The affiliate rate stored on each approved marketer is the effective rate
+    // shown in the Admin affiliate directory. Keep it aligned with the global
+    // finance setting used by checkout; never change free referrers or inactive applications.
+    await client.query(
+      "UPDATE affiliates SET commission_pct=$1 WHERE marketer_status='approved'",
+      [settings.affiliateCommissionPct]
+    );
     const after={...settings,withdrawalServiceFeePct,payoutFeeRecoveryPct};
     await client.query("INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,'finance.commission_settings_updated','commission_settings',NULL,$3,$4)",[actor.id,actor.role||'admin',JSON.stringify(before),JSON.stringify(after)]);
     const deliveryPolicy=normaliseDeliveryPricingPolicy(beforeRows.find(row=>row.key==='delivery_pricing_policy')?.value);
