@@ -62,7 +62,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       amount:50,payoutMethod:'afrimoney',
       payoutDetails:{account_number:'771234567',beneficiary_name:'Awa Jallow'},pin:'1234'
     })).rejects.toMatchObject({code:'INVALID_ACCOUNT_NUMBER',statusCode:400});
-    expect(clientQuery).toHaveBeenCalledTimes(5);
+    expect(clientQuery).toHaveBeenCalledTimes(4);
   });
 
   test('does not reserve funds when the account PIN is incorrect',async()=>{
