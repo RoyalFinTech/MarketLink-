@@ -233,7 +233,7 @@ describe('order creation ownership safeguards', () => {
       if(sql.includes('FROM products p'))return{rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'100.00',vendor_listed_price:'80.00',admin_price_override_enabled:true,status:'active',vendor_kyc_status:'approved'}]};
       if(sql.includes('SELECT quantity FROM inventory'))return{rows:[{quantity:10}]};
       if(sql.includes('FROM system_settings'))return{rows:[{key:'marketplace_commission_pct',value:'10.00'},{key:'affiliate_commission_pct',value:'3.00'},{key:'payout_fee_recovery_pct',value:'2.00'}]};
-      if(sql.includes('FROM affiliates WHERE affiliate_code'))return{rows:[{user_id:'affiliate-1',affiliate_code:'AFF123'}]};
+      if(sql.includes('FROM affiliates a JOIN users u ON u.id=a.user_id WHERE a.affiliate_code'))return{rows:[{user_id:'affiliate-1',affiliate_code:'AFF123'}]};
       if(sql.startsWith('INSERT INTO orders'))return{rows:[order]};
       if(sql.includes('UPDATE inventory SET quantity=quantity-$1'))return{rows:[{quantity:9}]};
       if(sql.includes('INSERT INTO deliveries'))return{rows:[{id:'delivery-1'}]};
@@ -249,9 +249,10 @@ describe('order creation ownership safeguards', () => {
     const lockedProductQuery=clientQuery.mock.calls.find(([sql])=>sql.includes('FROM products p')&&sql.includes('FOR UPDATE OF p'));
     expect(lockedProductQuery[0]).toContain('CASE WHEN p.admin_price_override_enabled THEN p.admin_price_override ELSE p.price END AS price');
     expect(lockedProductQuery[0]).not.toContain('p.price AS vendor_listed_price');
-    const marketerLookups=clientQuery.mock.calls.filter(([sql])=>sql.includes('FROM affiliates WHERE affiliate_code'));
+    const marketerLookups=clientQuery.mock.calls.filter(([sql])=>sql.includes('FROM affiliates a JOIN users u ON u.id=a.user_id WHERE a.affiliate_code'));
     expect(marketerLookups).toHaveLength(1);
-    expect(marketerLookups[0][0]).toContain("marketer_status='approved'");
+    expect(marketerLookups[0][0]).toContain("a.marketer_status='approved'");
+    expect(marketerLookups[0][0]).toContain("u.status='active'");
     const orderInsert=clientQuery.mock.calls.find(([sql])=>sql.startsWith('INSERT INTO orders'));
     expect(orderInsert).toBeDefined();
     expect(orderInsert[0]).toContain('payout_fee_recovery_pct');
@@ -277,7 +278,7 @@ describe('order creation ownership safeguards', () => {
       if(sql.includes('FROM products p'))return{rows:[{id:'product-1',vendor_id:'vendor-1',name:'Rice',price:'101.00',status:'active',vendor_kyc_status:'approved'}]};
       if(sql.includes('SELECT quantity FROM inventory'))return{rows:[{quantity:10}]};
       if(sql.includes('FROM system_settings'))return{rows:[{key:'marketplace_commission_pct',value:'10.00'},{key:'affiliate_commission_pct',value:'3.00'},{key:'payout_fee_recovery_pct',value:'2.00'}]};
-      if(sql.includes('FROM affiliates WHERE affiliate_code'))return{rows:[{user_id:'affiliate-1',affiliate_code:'AFF123'}]};
+      if(sql.includes('FROM affiliates a JOIN users u ON u.id=a.user_id WHERE a.affiliate_code'))return{rows:[{user_id:'affiliate-1',affiliate_code:'AFF123'}]};
       return{rows:[]};
     });
     await expect(placeOrder({
