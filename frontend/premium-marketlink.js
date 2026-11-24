@@ -1939,7 +1939,7 @@
         button.disabled=true;button.textContent='Uploading private KYC documents…';
         try{
           var identityUpload=await ML_API.uploads.upload(identity,'affiliate-document');
-          var selfieUpload=await ML_API.uploads.upload(selfie,'affiliate-document');
+          var selfieUpload=await ML_API.uploads.upload(selfie,'affiliate-selfie');
           var proofUpload=proof?await ML_API.uploads.upload(proof,'affiliate-document'):null;
           button.textContent='Submitting application…';
           var payload={
