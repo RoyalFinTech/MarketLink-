@@ -3586,7 +3586,7 @@ function renderProfile(){
 
   var rows=[
     ['❤️','Wishlist','wishlist'],
-    ['💰','DAHA Wallet','wallet'],
+    ['<img src="./assets/daha-wallet-eagle.webp" alt="DAHA Wallet" style="width:24px;height:24px;object-fit:contain;">','DAHA Wallet','wallet'],
     ['🔗','Referrals','affiliate'],
     ['⚖️','Compare Products','compare'],
     ['📍','Saved Addresses','addresses'],
@@ -3786,7 +3786,7 @@ async function renderWalletPage(){
     }catch(e){}
   }
 
-  el.innerHTML=profBack('💰 DAHA Wallet'+(fromServer?' ✓':''))+
+  el.innerHTML=profBack('<img class="ml-daha-inline-eagle" src="./assets/daha-wallet-eagle.webp" alt="DAHA Wallet"> DAHA Wallet'+(fromServer?' ✓':''))+
     '<div style="padding:13px;">'+
     ''+
     '<div style="background:linear-gradient(135deg,#0D7377,#7C3AED);border-radius:18px;padding:22px;margin-bottom:16px;text-align:center;position:relative;overflow:hidden;">'+
@@ -4235,7 +4235,7 @@ function renderVDash(){
       '<button class="btn" style="background:#fff;color:#0D7377;margin-top:12px;width:100%;font-weight:700;" onclick="vRequestPayout('+available+')">Request Payout</button>'+
       '</div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">'+
-      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:6px;">💳 DAHA Wallet payout destination</div>'+
+      '<div style="color:var(--tx);font-size:13px;font-weight:700;margin-bottom:6px;"><img class="ml-daha-inline-eagle" src="./assets/daha-wallet-eagle.webp" alt="DAHA Wallet"> DAHA Wallet payout destination</div>'+
       '<div style="color:var(--mu);font-size:12px;line-height:1.55;">Vendor withdrawals are processed through DAHA Wallet. Set or update your Wave or AfriMoney recipient number there; it can be different from your MarketLink sign-in number. A 4-digit PIN is required to confirm each request.</div>'+
       '<button type="button" class="btn btn-s" style="width:100%;margin-top:10px;" onclick="window.ML_Premium.openProfilePage(\'wallet\')">Manage DAHA payout details →</button></div>'+
       '<div style="background:var(--sf);border-radius:13px;padding:14px;border:1px solid rgba(255,255,255,0.07);">'+
