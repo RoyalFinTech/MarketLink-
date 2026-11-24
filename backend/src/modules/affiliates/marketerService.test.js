@@ -10,8 +10,8 @@ describe('Affiliate Marketer application and approval',()=>{
 
  test('submits a pending application only after validating private KYC uploads',async()=>{
   uploads.assertOwnedUploadReference
-   .mockResolvedValueOnce({id:'identity-file'})
-   .mockResolvedValueOnce({id:'selfie-file'});
+   .mockResolvedValueOnce({id:'identity-file',file_type:'document'})
+   .mockResolvedValueOnce({id:'selfie-file',file_type:'image'});
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[{id:'user-1',status:'active'}]})
    .mockResolvedValueOnce({rows:[]})
