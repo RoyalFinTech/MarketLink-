@@ -120,7 +120,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       event:'transfer.failed',
       payload:{metadata:{withdrawal_id:withdrawalId},id:'wrong-reference',amount:50,currency:'GMD',status:'failed'}
     });
-    expect(result).toEqual({ignored:true,reason:'provider_reference_mismatch'});
+    expect(result).toEqual({processed:true,data:{ignored:true,reason:'provider_reference_mismatch'}});
     expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
