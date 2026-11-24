@@ -184,6 +184,8 @@ assert.ok(!fs.readFileSync(path.join(root, 'admin-entry.js'), 'utf8').includes(S
 assert.match(html, /id="va-phone" maxlength="9"/, 'Vendor contact input must accept the full nine-digit Gambian number');
 assert.match(html, /id="ra-phone" maxlength="9"/, 'Rider contact input must accept the full nine-digit Gambian number');
 assert.match(html, /Gamcel \(full 9 digits\)/, 'Gamcel selector must request the complete nine-digit national number');
+assert.match(html, /Other \(full 9 digits\)/, 'Other or unclassified Gambian prefixes must be entered as nine digits without guessing a carrier');
+assert.match(html, /if\(d\.length===9\)return d;/, 'Frontend phone normalization must accept complete nine-digit Gambian numbers without stale carrier metadata');
 assert.ok(premiumJs.includes("national.length===7?7:9"), 'Admin login must request nine digits for new Gamcel numbers while retaining legacy sign-in compatibility');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 const phoneUtil = fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js'), 'utf8');
