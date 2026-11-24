@@ -59,6 +59,7 @@ describe('Affiliate Marketer application and approval',()=>{
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[application]})
    .mockResolvedValueOnce({rows:[{id:7}]})
+   .mockResolvedValueOnce({rows:[{value:'2'}]})
    .mockResolvedValueOnce({rows:[]})
    .mockResolvedValueOnce({rows:[]})
    .mockResolvedValueOnce({rows:[updated]})
@@ -69,9 +70,40 @@ describe('Affiliate Marketer application and approval',()=>{
   const result=await service.reviewApplication('application-1','approved',null,{id:'admin-1',role:'admin'});
 
   expect(result).toMatchObject({id:'application-1',status:'approved'});
-  expect(clientQuery.mock.calls[2][0]).toContain('INSERT INTO user_roles');
-  expect(clientQuery.mock.calls[3][0]).toContain("UPDATE affiliates SET marketer_status='approved'");
+  expect(clientQuery.mock.calls[3][0]).toContain('INSERT INTO user_roles');
+  expect(clientQuery.mock.calls[4][0]).toContain("UPDATE affiliates SET marketer_status='approved'");
+  expect(clientQuery.mock.calls[4][1]).toEqual(['user-1',2,'admin-1']);
+  expect(clientQuery.mock.calls[2][0]).toContain("affiliate_commission_pct");
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes('admin_action_logs'))).toBe(true);
+ });
+
+ test('suspension removes the active commission rate as well as the marketer role',async()=>{
+  const application={id:'application-2',user_id:'user-2',status:'approved'};
+  const updated={id:'application-2',user_id:'user-2',status:'suspended'};
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:7}]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[updated]})
+   .mockResolvedValueOnce({rows:[]})
+   .mockResolvedValueOnce({rows:[]});
+  withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
+  await service.reviewApplication('application-2','suspended','Policy breach',{id:'admin-1',role:'admin'});
+  expect(clientQuery.mock.calls[2][0]).toContain('DELETE FROM user_roles');
+  expect(clientQuery.mock.calls[3][0]).toContain("marketer_status='suspended',commission_pct=0");
+ });
+
+ test('does not approve when the configured affiliate commission is invalid',async()=>{
+  const application={id:'application-3',user_id:'user-3',status:'pending'};
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:7}]})
+   .mockResolvedValueOnce({rows:[{value:'invalid'}]});
+  withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
+  await expect(service.reviewApplication('application-3','approved',null,{id:'admin-1',role:'admin'}))
+   .rejects.toMatchObject({code:'AFFILIATE_COMMISSION_CONFIG_INVALID',statusCode:503});
+  expect(clientQuery).toHaveBeenCalledTimes(3);
  });
 
  test('requires an Admin rejection reason',async()=>{
