@@ -4138,10 +4138,12 @@ function renderVDash(){
   var active=S.vOrders.filter(function(o){return o.status==='Preparing';}).length;
   var scMap={Pending:'#FF6B2B',Preparing:'#0D7377','Awaiting Rider':'#8B5CF6',Delivered:'#22C55E',Cancelled:'#EF4444'};
 
+  var vendorPickupPinMissing=!!(S.vProfile&&String(S.vProfile.kyc_status||'').toLowerCase()==='approved'&&(S.vProfile.latitude==null||S.vProfile.longitude==null));
+  var vendorPickupPinNotice=vendorPickupPinMissing?'<div style="margin-top:10px;padding:11px;border-radius:10px;background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.32);"><b style="display:block;color:#F5A623;font-size:11px;">📍 Delivery setup needed</b><p style="margin:5px 0 8px;color:var(--mu);font-size:10px;line-height:1.5;">Your shop GPS pickup pin is missing. Customers cannot receive accurate rider delivery prices until you save the pin at your shop.</p><button type="button" class="btn btn-s btn-sm" onclick="vOpenPickupSettings()">Set shop GPS pin</button></div>':'';
   var profileSummary=S.vProfile?'<section style="margin:12px 13px 0;padding:12px;border:1px solid rgba(13,115,119,.25);border-radius:12px;background:var(--sf);">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"><b style="font-size:12px;color:var(--tx);">My business profile</b><span style="font-size:10px;font-weight:800;text-transform:uppercase;color:'+(String(S.vProfile.kyc_status||'pending')==='approved'?'#22C55E':String(S.vProfile.kyc_status||'pending')==='rejected'?'#EF4444':'#F5A623')+';">'+sanitizeText(S.vProfile.kyc_status||'pending')+'</span></div>'+
     [['Business',S.vProfile.business_name],['Category',S.vProfile.business_category],['Address',S.vProfile.business_address],['Business phone',S.vProfile.phone||S.vProfile.business_phone],['Business email',S.vProfile.email||S.vProfile.business_email],['Application details',S.vProfile.description]].filter(function(row){return row[1];}).map(function(row){return '<div style="display:flex;gap:8px;padding:5px 0;border-top:1px solid rgba(148,163,184,.12);"><b style="flex:0 0 95px;color:var(--mu);font-size:10px;">'+sanitizeText(row[0])+'</b><span style="min-width:0;overflow-wrap:anywhere;color:var(--tx);font-size:11px;">'+sanitizeText(row[1])+'</span></div>';}).join('')+
-    (String(S.vProfile.kyc_status||'pending')==='pending'?'<p style="font-size:10px;line-height:1.5;color:var(--mu);margin:8px 0 0;">Your application is awaiting Admin review. You will receive a notification when it is approved or declined.</p>':'')+'</section>':'';
+    (String(S.vProfile.kyc_status||'pending')==='pending'?'<p style="font-size:10px;line-height:1.5;color:var(--mu);margin:8px 0 0;">Your application is awaiting Admin review. You will receive a notification when it is approved or declined.</p>':'')+vendorPickupPinNotice+'</section>':'';
   var content='';
   if(S.vSubTab==='orders'){
     if(S.vOrders.length===0){
@@ -4425,6 +4427,7 @@ function vSaveProdEdit(id){
   renderVDash(); toast('Product updated ✅');
 }
 function vRemoveProd(id){S.vProds=S.vProds.filter(function(p){return p.id!==id;});renderVDash();toast('Product removed.');}
+function vOpenPickupSettings(){S.vSubTab='pickup';renderVDash();}
 async function vCapturePickupGPS(){
   if(!navigator.geolocation){toast('This browser does not provide GPS. Enter a shop address and use a GPS-enabled device to capture the pickup pin.','error');return;}
   var button=G('v-pickup-capture');
