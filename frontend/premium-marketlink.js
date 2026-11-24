@@ -3528,7 +3528,92 @@
     var root=G('adash-body');if(!root)return;
     root.innerHTML='<div class="ml-premium-home"><div class="ml-empty"><b>'+esc(title)+'</b><span>'+esc(detail)+'</span></div></div>';
   }
+  var ADMIN_AFFILIATE_KYC_PAGE=1;
+  var ADMIN_AFFILIATE_KYC_STATUS='pending';
+
+  async function renderAdminAffiliateMarketers(page,status){
+    var root=G('adash-body');if(!root)return;
+    ADMIN_AFFILIATE_KYC_PAGE=Math.max(1,Number(page)||1);
+    ADMIN_AFFILIATE_KYC_STATUS=String(status||ADMIN_AFFILIATE_KYC_STATUS||'pending');
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Affiliate Marketer KYC</div><div class="ml-hero-sub">Loading applications from the production database…</div></div>';
+    try{
+      var response=await ML_API.admin.affiliateMarketerApplications({page:ADMIN_AFFILIATE_KYC_PAGE,limit:25,status:ADMIN_AFFILIATE_KYC_STATUS});
+      var data=response&&response.data||{},items=Array.isArray(data.items)?data.items:[];
+      var filters=[['pending','Pending'],['approved','Approved'],['rejected','Rejected'],['suspended','Suspended'],['all','All']];
+      var filterHtml=filters.map(function(x){return '<button type="button" class="ml-btn '+(ADMIN_AFFILIATE_KYC_STATUS===x[0]?'ml-btn-primary':'ml-btn-secondary')+'" onclick="window.ML_Premium.refreshAffiliateKyc(1,\''+x[0]+'\')">'+x[1]+'</button>';}).join('');
+      var cards=items.map(function(a){
+        var id=String(a.id||'').replace(/[^a-f0-9-]/gi,'');
+        var statusText=String(a.status||'pending').toLowerCase();
+        var channels=Array.isArray(a.marketing_channels)?a.marketing_channels.join(', '):'Not provided';
+        var socials=a.social_links&&typeof a.social_links==='object'?Object.keys(a.social_links).map(function(k){return k+': '+a.social_links[k];}).join(' · '):'';
+        var docs='';
+        if(a.identity_document_file_id)docs+='<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewAffiliateKycFile(\''+a.identity_document_file_id+'\')">View identity document</button>';
+        if(a.selfie_file_id)docs+='<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewAffiliateKycFile(\''+a.selfie_file_id+'\')">View selfie</button>';
+        if(a.address_proof_file_id)docs+='<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewAffiliateKycFile(\''+a.address_proof_file_id+'\')">View address proof</button>';
+        var actions='';
+        if(statusText==='pending'){
+          actions='<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'approved\')">Approve marketer</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'rejected\')">Reject application</button>';
+        }else if(statusText==='approved'){
+          actions='<button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'suspended\')">Suspend access</button>';
+        }else if(statusText==='suspended'){
+          actions='<button type="button" class="ml-btn ml-btn-primary" onclick="window.ML_Premium.reviewAffiliateMarketer(\''+id+'\',\'reinstated\')">Reinstate marketer</button>';
+        }
+        return '<article class="ml-profile-card" style="margin-bottom:12px;padding:15px"><div class="ml-section-head"><div><b style="color:#fff">'+esc(a.legal_name||a.full_name||'Applicant')+'</b><div style="font-size:10px;color:#91A5B5;margin-top:4px">'+esc(a.full_name||'')+' · '+esc(a.phone||'No phone')+' · '+esc(a.email||'No email')+'</div></div><span class="ml-status-pill">'+esc(statusText)+'</span></div>'+
+          '<div style="font-size:11px;color:#DCE8ED;line-height:1.6;margin-top:9px"><b>Residential address:</b> '+esc(a.residential_address||'Not provided')+'<br><b>Promotion channels:</b> '+esc(channels)+'<br><b>Marketing plan:</b><br>'+esc(a.marketing_plan||'Not provided')+
+          (socials?'<br><b>Social links:</b> '+esc(socials):'')+
+          (a.rejection_reason?'<br><b>Review feedback:</b> '+esc(a.rejection_reason):'')+'</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:12px">'+docs+'</div>'+
+          (actions?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'+actions+'</div>':'')+'</article>';
+      }).join('');
+      var total=Number(data.total||0),pages=Math.max(1,Number(data.totalPages||1));
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">ADMIN · IDENTITY & ELIGIBILITY</div><h3 style="color:#fff;margin:6px 0 0;font-size:22px">Affiliate Marketer applications</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshAffiliateKyc()">↻ Refresh</button></div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:7px;margin:12px 0">'+filterHtml+'</div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Applications in this view</div><div class="ml-stat-value">'+items.length+'</div></div><div class="ml-stat"><div class="ml-stat-label">Matching applications</div><div class="ml-stat-value">'+total+'</div></div></div>'+
+        (cards||'<div class="ml-empty"><b>No '+esc(ADMIN_AFFILIATE_KYC_STATUS==='all'?'':ADMIN_AFFILIATE_KYC_STATUS+' ')+'Affiliate Marketer applications</b><span>There are no matching applications in the production database.</span></div>')+
+        (pages>1?'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0"><button class="ml-btn ml-btn-secondary" '+(ADMIN_AFFILIATE_KYC_PAGE<=1?'disabled':'')+' onclick="window.ML_Premium.refreshAffiliateKyc('+(ADMIN_AFFILIATE_KYC_PAGE-1)+')">Previous</button><span style="color:#9FB0BD;font-size:11px">Page '+ADMIN_AFFILIATE_KYC_PAGE+' of '+pages+'</span><button class="ml-btn ml-btn-secondary" '+(ADMIN_AFFILIATE_KYC_PAGE>=pages?'disabled':'')+' onclick="window.ML_Premium.refreshAffiliateKyc('+(ADMIN_AFFILIATE_KYC_PAGE+1)+')">Next</button></div>':'')+
+        '</div>';
+    }catch(error){
+      root.innerHTML='<div class="ml-profile-shell"><div class="ml-empty"><b>Affiliate Marketer review queue unavailable</b><span>'+esc(error.error||error.message||'The backend did not return the application queue.')+'</span><button class="ml-btn ml-btn-primary" onclick="adminGoTo(\'affiliate-marketers\')">Retry</button></div></div>';
+    }
+  }
+
+  async function viewAffiliateKycFile(fileId){
+    var id=String(fileId||'').trim();
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)){toast('Invalid KYC document reference.','error');return;}
+    var token=ML_API.getAccessToken&&ML_API.getAccessToken();
+    var popup=window.open('about:blank','_blank');
+    if(!token){if(popup)popup.close();toast('Please sign in again to view private KYC documents.','warning');return;}
+    if(popup){popup.opener=null;popup.document.write('<title>Secure KYC document</title><p style="font:14px sans-serif;padding:24px">Loading secure document…</p>');}
+    try{
+      var base=String(window.ML_API_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'');
+      var response=await fetch(base+'/api/v1/uploads/'+id+'/content',{headers:{Authorization:'Bearer '+token}});
+      if(!response.ok)throw new Error(response.status===403?'Your account is not authorized to view this document.':'The secure document could not be loaded.');
+      var blob=await response.blob(),url=URL.createObjectURL(blob);
+      if(popup)popup.location.href=url;
+      else{
+        var link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.click();
+      }
+      setTimeout(function(){URL.revokeObjectURL(url);},60000);
+    }catch(error){if(popup)popup.close();toast(error.message||'Could not open the private document.','error');}
+  }
+
+  async function reviewAffiliateMarketerApplication(id,decision){
+    var reason='';
+    if(decision==='rejected'||decision==='suspended'){
+      reason=window.prompt(decision==='rejected'?'Reason for rejecting this application:':'Reason for suspending this marketer:','');
+      if(!reason||!reason.trim())return;
+    }
+    if(decision==='approved'&&!window.confirm('Approve this Affiliate Marketer? This grants the marketer role and enables the configured affiliate commission for qualifying completed orders.'))return;
+    if(decision==='reinstated'&&!window.confirm('Reinstate this Affiliate Marketer account?'))return;
+    try{
+      await ML_API.admin.reviewAffiliateMarketerApplication(id,{decision:decision,reason:reason.trim()});
+      toast('Affiliate Marketer review saved.','success');
+      await renderAdminAffiliateMarketers(ADMIN_AFFILIATE_KYC_PAGE,ADMIN_AFFILIATE_KYC_STATUS);
+    }catch(error){toast(error.error||error.message||'The review could not be saved.','error');}
+  }
+
   function adminGoToLive(tab){
+    if(tab==='affiliate-marketers'){renderAdminAffiliateMarketers(1,'pending');return;}
     if(tab==='overview'){refreshAdmin();return;}
     if(tab==='analytics'){renderLiveAdminAnalytics('30d');return;}
     if(tab==='f-revenue'){renderLiveAdminRevenue();return;}
@@ -3630,7 +3715,7 @@
   var existingAdminGoTo=window.adminGoTo;
   window.__ML_ORIGINAL_ADMIN_GOTO=existingAdminGoTo;
   window.adminGoTo=adminGoToLive;
-    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,searchAddressSuggestions:searchGambiaAddressSuggestions,selectAddressSuggestion:selectGambiaAddressSuggestion,useCurrentAddressLocation:useCurrentAddressLocation,cancelEditAddress:cancelEditAddress,choosePaymentFromSettings:choosePaymentFromSettings,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},toggleWithdrawalNetwork:toggleDahaPayoutNetwork,selectWithdrawalNetwork:selectDahaPayoutNetwork,submitDahaDeposit:submitDahaDeposit,selectDahaDepositMethod:selectDahaDepositMethod,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:function(){S.deliveryQuoteCache=null;return renderLiveCart();},refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(period){return renderLiveAdminAnalytics(period||'30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectDeliveryQuote:selectDeliveryQuote,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication};
+    window.ML_Premium={openMessages:openMessages,openVendorChat:openVendorChat,toggleAppearance:togglePremiumAppearance,handleProfilePhoto:handleProfilePhotoInput,removeProfilePhoto:removeProfilePhoto,renderCategories:function(){S.activeCategoryId=null;S.activeCategoryName=null;switchTab('catpage');},openOrders:function(){switchTab('orders');},viewOrder:openOrderDetail,showProfileOverview:function(){S.profilePage=null;renderPremiumProfile();},openProfilePage:openProfilePage,searchAddressSuggestions:searchGambiaAddressSuggestions,selectAddressSuggestion:selectGambiaAddressSuggestion,useCurrentAddressLocation:useCurrentAddressLocation,cancelEditAddress:cancelEditAddress,choosePaymentFromSettings:choosePaymentFromSettings,openMarketLinkAI:openMarketLinkAI,askMarketLinkAI:openMarketLinkAIWithQuestion,askMarketLinkAIFromButton:openMarketLinkAIFromButton,applyLanguagePreference:function(){var v=G('ml-language-profile');if(v&&window.MarketLinkI18n)window.MarketLinkI18n.setLanguage(v.value);toast('Language preference saved.','success');},openRoleDashboard:openRoleDashboard,refreshWallet:function(){return renderPremiumWalletPage(G('profile-body'));},toggleWithdrawalNetwork:toggleDahaPayoutNetwork,selectWithdrawalNetwork:selectDahaPayoutNetwork,submitDahaDeposit:submitDahaDeposit,selectDahaDepositMethod:selectDahaDepositMethod,continueDahaDeposit:continueDahaDeposit,saveDahaPayoutProfile:saveDahaPayoutProfile,reviewDahaWithdrawal:reviewDahaWithdrawal,submitDahaWithdrawal:reviewDahaWithdrawal,confirmDahaWithdrawal:confirmDahaWithdrawal,cancelDahaWithdrawalReview:cancelDahaWithdrawalReview,beginDahaWithdrawal:beginDahaWithdrawal,markNotificationRead:markPremiumNotificationRead,markAllNotificationsRead:markAllPremiumNotificationsRead,removeWishlist:removePremiumWishlistItem,removeCompareItem:removePremiumCompareItem,goOnboardTo:goOnboardTo,promoAction:promoAction,goPromoTo:function(i){paintPromoCarousel(i);},promoNext:function(){paintPromoCarousel(mlPromoIndex+1);},promoPrev:function(){paintPromoCarousel(mlPromoIndex-1);},refresh:refresh,refreshCart:function(){S.deliveryQuoteCache=null;return renderLiveCart();},refreshAdmin:refreshAdmin,refreshAdminAnalytics:function(period){return renderLiveAdminAnalytics(period||'30d');},refreshAdminRevenue:renderLiveAdminRevenue,refreshAdminPayouts:renderLiveAdminPayouts,refreshFinancialReconciliation:renderFinancialReconciliation,retryFinancialSettlement:retryAdminSettlement,refreshAdminTransactions:renderLiveAdminTransactions,refreshAdminFailedPayments:renderLiveAdminFailedPayments,approveDahaWithdrawal:approveDahaWithdrawal,rejectDahaWithdrawal:rejectDahaWithdrawal,selectAddress:selectAddress,selectDeliveryQuote:selectDeliveryQuote,selectPayment:selectPayment,setCoupon:setCoupon,manageAddresses:manageAddresses,editAddress:editAddress,addAddress:addAddress,setDefaultAddress:setDefaultAddress,deleteAddress:deleteAddress,renderAddresses:renderAddresses,approveApplicant:approveApplicant,rejectApplicant:rejectApplicant,openCategory:openCategory,openProduct:openProduct,add:add,placeOrder:placeLiveOrder,checkPaymentStatus:function(){return checkLivePaymentStatus(false);},continueModemPay:continueLiveModemPayment,restoreCartAndRetry:restoreLiveCartAfterPaymentFailure,finishPaidOrder:finishLivePaidOrder,editProfile:editProfileModal,saveProfile:saveProfile,saveProfilePhoto:saveProfilePhoto,pickPhoto:pickProfilePhoto,takePhoto:takeProfilePhoto,openPhotoViewer:openProfilePhotoViewer,closePhotoViewer:closeProfilePhotoViewer,renderProfile:renderPremiumProfile,submitVendor:submitVendor,submitRider:submitRider,toggleRiderOnline:toggleRiderOnline,load:loadLiveHome,adminRefresh:loadAdminDashboard,confirmCodPayment:confirmCodPayment,submitCodRemittance:submitCodRemittance,reviewCodRemittance:reviewCodRemittance,adminApprovals:adminApprovals,approve:approveAdmin,adminUsers:adminUsers,viewApplicationDocument:viewApplicationDocument,rejectApplication:rejectApplication,refreshAffiliateKyc:renderAdminAffiliateMarketers,viewAffiliateKycFile:viewAffiliateKycFile,reviewAffiliateMarketer:reviewAffiliateMarketerApplication};
   function switchTab(tab){
     if(tab!=='orders')stopCustomerOrderDetailPolling();
     S.curTab=tab;
