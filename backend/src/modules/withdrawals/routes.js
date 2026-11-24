@@ -6,7 +6,7 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const withdrawalPinLimiter = require('./pinLimiter');
 const svc = require('./service');
 
-const WALLET_ROLES = ['vendor', 'rider'];
+const WALLET_ROLES = ['vendor', 'rider', 'affiliate_marketer'];
 
 /**
  * Shared wallet/withdrawal endpoints.
