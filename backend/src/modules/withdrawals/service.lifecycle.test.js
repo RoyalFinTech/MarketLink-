@@ -143,7 +143,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_ref:null,amount:'50'}]});
     const result=await service.processProviderWebhook({
       event:'transfer.succeeded',
-      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49.99,currency:'GMD',status:'succeeded'}
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49.98,currency:'GMD',status:'succeeded'}
     });
     expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
     expect(clientQuery).toHaveBeenCalledTimes(1);
