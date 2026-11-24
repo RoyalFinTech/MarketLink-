@@ -35,6 +35,7 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(result).toMatchObject({id:'application-1',status:'pending'});
   expect(uploads.assertOwnedUploadReference).toHaveBeenCalledTimes(2);
   expect(uploads.assertOwnedUploadReference).toHaveBeenNthCalledWith(1,expect.any(String),'user-1','affiliate-document',null,'Identity document');
+  expect(uploads.assertOwnedUploadReference).toHaveBeenNthCalledWith(2,expect.any(String),'user-1','affiliate-selfie',null,'KYC selfie');
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes("UPDATE affiliates SET marketer_status='pending',commission_pct=0"))).toBe(true);
  });
 
@@ -50,6 +51,7 @@ describe('Affiliate Marketer application and approval',()=>{
    identityDocumentUrl:'https://api.marketlink.test/api/v1/uploads/identity-file/content',
    selfieUrl:'https://api.marketlink.test/api/v1/uploads/selfie-file/content'
   })).rejects.toMatchObject({code:'KYC_SELFIE_IMAGE_REQUIRED',statusCode:400});
+  expect(uploads.assertOwnedUploadReference).toHaveBeenNthCalledWith(2,expect.any(String),'user-1','affiliate-selfie',null,'KYC selfie');
   expect(withTransaction).not.toHaveBeenCalled();
  });
 
