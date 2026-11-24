@@ -366,7 +366,7 @@ const KNOWLEDGE_BASE = [
     roles: ['customer'],
     keywords: ['affiliate link commission', '2 percent affiliate', 'referral reward', 'how affiliate earnings work'],
     question: 'How do MarketLink affiliate rewards work?',
-    answer: 'Share your own MarketLink affiliate link. A qualifying referred order can earn a 2% reward on the eligible discounted merchandise subtotal after successful delivery. Delivery fees and other non-merchandise charges are excluded. Cancelled, failed, undelivered, refunded or fraudulent orders do not qualify; only verified referral records count.',
+    answer: 'A normal customer Referrer can share a personal referral link and track invited customers, but does not earn commissions, wallet credits or cash payouts. The paid programme is separate: apply as a MarketLink Affiliate Marketer, submit the required KYC documents and wait for Admin approval. Only approved marketers can qualify for commissions under the programme rules.',
   },
   {
     id: 'vendor-get-started',
@@ -503,7 +503,7 @@ const KNOWLEDGE_BASE = [
     roles: ['customer'],
     keywords: ['affiliate 22 percent', 'affiliate rate', 'commission percentage', 'affiliate earnings percentage'],
     question: 'What is the MarketLink affiliate commission rate?',
-    answer: 'The current customer affiliate reward configured in the app is 2% on qualifying purchases, not 22%. A promotional banner or message must not be read as a guaranteed rate unless the dashboard and the applicable campaign terms confirm it. Rewards depend on valid referral tracking and the order meeting the programme rules.',
+    answer: 'Customer Referrers do not receive a commission. Only a separately approved MarketLink Affiliate Marketer can qualify for paid commissions. The applicable rate and eligible order rules are governed by the approved marketer programme and its current configuration; never promise a rate to an ordinary customer Referrer.',
   },
 
 
