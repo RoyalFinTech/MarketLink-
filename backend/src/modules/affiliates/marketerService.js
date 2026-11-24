@@ -60,6 +60,12 @@ async function submitApplication(userId, input) {
     ? await uploads.assertOwnedUploadReference(input.addressProofUrl,userId,'affiliate-document',null,'Address proof')
     : null;
   if(!identity || !selfie) throw new AppError('Upload both an identity document and a selfie before submitting.',400,'KYC_DOCUMENTS_REQUIRED');
+  // Identity evidence may be a scanned document (PDF) or a photo of an ID.
+  // A selfie, however, must be an actual image; accepting a PDF here lets a
+  // malformed application pass the server-side KYC completeness check.
+  if(String(selfie.file_type||'').toLowerCase()!=='image') {
+    throw new AppError('Your KYC selfie must be uploaded as a JPG or PNG image.',400,'KYC_SELFIE_IMAGE_REQUIRED');
+  }
 
   return withTransaction(async client=>{
     const {rows:[user]}=await client.query("SELECT id,status FROM users WHERE id=$1 FOR UPDATE",[userId]);
