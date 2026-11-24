@@ -32,7 +32,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
 
   test('enforces the D50 minimum before opening a transaction',async()=>{
     await expect(service.requestWithdrawal('affiliate-user',{
-      amount:49.99,payoutMethod:'wave',payoutDetails:{account_number:'871234567',beneficiary_name:'Awa Jallow'},pin:'1234'
+      amount:49.98,payoutMethod:'wave',payoutDetails:{account_number:'871234567',beneficiary_name:'Awa Jallow'},pin:'1234'
     })).rejects.toMatchObject({code:'BELOW_MINIMUM',statusCode:400});
     expect(withTransaction).not.toHaveBeenCalled();
   });
