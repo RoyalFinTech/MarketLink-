@@ -10,8 +10,8 @@ describe('Affiliate Marketer application and approval',()=>{
 
  test('submits a pending application only after validating private KYC uploads',async()=>{
   uploads.assertOwnedUploadReference
-   .mockResolvedValueOnce({id:'identity-file'})
-   .mockResolvedValueOnce({id:'selfie-file'});
+   .mockResolvedValueOnce({id:'identity-file',file_type:'document'})
+   .mockResolvedValueOnce({id:'selfie-file',file_type:'image'});
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[{id:'user-1',status:'active'}]})
    .mockResolvedValueOnce({rows:[]})
@@ -36,6 +36,21 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(uploads.assertOwnedUploadReference).toHaveBeenCalledTimes(2);
   expect(uploads.assertOwnedUploadReference).toHaveBeenNthCalledWith(1,expect.any(String),'user-1','affiliate-document',null,'Identity document');
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes("UPDATE affiliates SET marketer_status='pending',commission_pct=0"))).toBe(true);
+ });
+
+ test('rejects a PDF uploaded in the selfie field before creating an application',async()=>{
+  uploads.assertOwnedUploadReference
+   .mockResolvedValueOnce({id:'identity-file',file_type:'document'})
+   .mockResolvedValueOnce({id:'selfie-file',file_type:'document'});
+  await expect(service.submitApplication('user-1',{
+   legalName:'Awa Jallow',
+   residentialAddress:'Serrekunda, The Gambia',
+   marketingChannels:['whatsapp'],
+   marketingPlan:'I will promote MarketLink through local community groups and social pages.',
+   identityDocumentUrl:'https://api.marketlink.test/api/v1/uploads/identity-file/content',
+   selfieUrl:'https://api.marketlink.test/api/v1/uploads/selfie-file/content'
+  })).rejects.toMatchObject({code:'KYC_SELFIE_IMAGE_REQUIRED',statusCode:400});
+  expect(withTransaction).not.toHaveBeenCalled();
  });
 
  test('grants the marketer role only after Admin approval and records an audit event',async()=>{
