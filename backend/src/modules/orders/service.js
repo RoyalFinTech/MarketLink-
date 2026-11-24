@@ -270,7 +270,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
       throw new AppError('Your saved delivery coordinates changed. Request a fresh delivery price.', 409, 'DELIVERY_ADDRESS_CHANGED');
     }
     const { rows: [lockedRider] } = await client.query(
-      "SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE AND delivery_pricing_enabled=TRUE FOR UPDATE",
+      "SELECT user_id FROM riders WHERE user_id=$1 AND kyc_status='approved' AND is_online=TRUE AND ((admin_delivery_pricing_override IS NOT NULL AND COALESCE(admin_delivery_pricing_override->>'enabled','true') <> 'false') OR (admin_delivery_pricing_override IS NULL AND delivery_pricing_enabled=TRUE)) FOR UPDATE",
       [deliveryQuote.rider_id]
     );
     if (!lockedRider) throw new AppError('The selected rider is no longer online. Refresh delivery prices and choose another rider.', 409, 'RIDER_QUOTE_NO_LONGER_AVAILABLE');

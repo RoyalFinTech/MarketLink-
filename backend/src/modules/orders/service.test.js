@@ -204,7 +204,7 @@ describe('order creation ownership safeguards', () => {
     expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
-  test('snapshots the all-in order total and uses the customer-approved rider fare', async()=>{
+  test('accepts an active Admin-priced rider and snapshots the customer-approved fare', async()=>{
     const fingerprint=buildCheckoutFingerprint({
       customerId:'customer-1',
       vendorId:'vendor-1',
@@ -258,6 +258,9 @@ describe('order creation ownership safeguards', () => {
     expect(orderInsert[0]).toContain('payout_fee_recovery_pct');
     expect(orderInsert[0]).toContain('payout_fee_recovery_amount');
     expect(orderInsert[1].slice(6,21)).toEqual([100,25,0,10,10,90,25,127.36,null,'affiliate-1',3,3,7,2,2.36]);
+    const riderEligibilityQuery=clientQuery.mock.calls.find(([sql])=>sql.includes('FROM riders WHERE user_id'))?.[0]||'';
+    expect(riderEligibilityQuery).toContain('admin_delivery_pricing_override');
+    expect(riderEligibilityQuery).toContain("COALESCE(admin_delivery_pricing_override->>'enabled','true') <> 'false'");
     const deliveryInsert=clientQuery.mock.calls.find(([sql])=>/INSERT INTO deliveries/i.test(sql));
     expect(deliveryInsert).toBeDefined();
     expect(deliveryInsert[0]).toContain('dropoff_lat,dropoff_lng');
