@@ -4071,7 +4071,7 @@ async function loadVendorLiveData(){
     };});
     var prows=Array.isArray(pd)?pd:(pd&&Array.isArray(pd.items)?pd.items:[]);
     S.vProds=prows.map(function(p){return {
-      id:p.id,name:p.name,price:Number(p.price||0),emoji:'🛍️',desc:p.description||'',categoryName:p.category_name||'Uncategorised',
+      id:p.id,name:p.name,price:Number(p.price||0),imageUrl:p.primary_image||null,emoji:'🛍️',desc:p.description||'',categoryName:p.category_name||'Uncategorised',
       stock:p.stock==null?null:Number(p.stock),status:p.status||'pending_review'
     };});
   }catch(e){
@@ -4133,7 +4133,7 @@ function renderVDash(){
     S._vendorLiveLoaded=true; loadVendorLiveData();
   }
   if(!S.vProds) S.vProds=[];
-  var earned=S.vOrders.filter(function(o){return o.status==='Delivered';}).reduce(function(a,o){return a+o.total;},0);
+  var earned=Number(S.vAnalytics&&S.vAnalytics.summary&&S.vAnalytics.summary.settled_vendor_earnings||0);
   var pending=S.vOrders.filter(function(o){return o.status==='Pending';}).length;
   var active=S.vOrders.filter(function(o){return o.status==='Preparing';}).length;
   var scMap={Pending:'#FF6B2B',Preparing:'#0D7377','Awaiting Rider':'#8B5CF6',Delivered:'#22C55E',Cancelled:'#EF4444'};
@@ -4215,7 +4215,7 @@ function renderVDash(){
       } else {
         var lowStock=p.stock!=null && p.stock<=5;
         content+='<div style="background:var(--sf);border-radius:12px;padding:12px;border:1px solid '+(lowStock?'rgba(239,68,68,0.35)':'rgba(255,255,255,0.07)')+';margin-bottom:8px;display:flex;align-items:center;gap:11px;">'+
-          '<div style="font-size:26px;flex-shrink:0;">'+p.emoji+'</div>'+
+          '<div style="width:58px;height:58px;flex:0 0 58px;border-radius:11px;overflow:hidden;background:var(--sfl);display:grid;place-items:center;font-size:26px;">'+(p.imageUrl?'<img src="'+sanitizeText(p.imageUrl)+'" alt="'+sanitizeText(p.name)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🛍️\';">' : p.emoji)+'</div>'+
           '<div style="flex:1;"><div style="color:var(--tx);font-size:12px;font-weight:600;">'+p.name+'</div>'+
           '<div style="color:#0D7377;font-size:11px;font-weight:700;">D '+p.price+'</div>'+
           '<div style="color:var(--mu);font-size:10px;margin-top:2px;">'+sanitizeText(p.categoryName||'Uncategorised')+' · '+sanitizeText(String(p.status||'pending_review').replace(/_/g,' '))+'</div>'+
@@ -4297,7 +4297,7 @@ function renderVDash(){
     '<div style="width:7px;height:7px;border-radius:50%;background:'+(S.vOnline?'#22C55E':'#EF4444')+';"></div>'+
     '<span style="color:'+(S.vOnline?'#22C55E':'#EF4444')+';font-size:11px;font-weight:600;">'+(S.vOnline?'Open':'Closed')+'</span></div></div></div>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">'+
-    [['💰','D '+earned,'Earnings','#F5A623'],['⏳',pending,'Pending','#FF6B2B'],['👨‍🍳',active,'Preparing','#0D7377']].map(function(s){
+    [['💰','D '+earned,'Settled earnings','#F5A623'],['⏳',pending,'Pending orders','#FF6B2B'],['👨‍🍳',active,'Preparing','#0D7377']].map(function(s){
       return '<div style="background:rgba(255,255,255,0.07);border-radius:11px;padding:10px;text-align:center;border:1px solid rgba(255,255,255,0.09);">'+
         '<div style="font-size:18px;margin-bottom:3px;">'+s[0]+'</div><div style="color:'+s[3]+';font-size:14px;font-weight:700;">'+s[1]+'</div>'+
         '<div style="color:rgba(255,255,255,0.45);font-size:9px;margin-top:1px;">'+s[2]+'</div></div>';
