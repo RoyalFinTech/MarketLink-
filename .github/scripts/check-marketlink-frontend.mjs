@@ -90,6 +90,8 @@ assert.ok(html.includes('property="og:image:secure_url" content="' + expectedOgU
 assert.ok(html.includes('name="twitter:image" content="' + expectedOgUrl + '"'), 'Twitter image URL must match');
 assert.ok(fs.existsSync(path.join(root, 'assets', 'marketlink-logo.png')), 'Official MarketLink logo is missing');
 assert.ok(fs.existsSync(path.join(root, 'assets', 'daha-wallet-eagle.webp')), 'Official DAHA eagle asset is missing');
+assert.match(html, /daha-wallet-eagle\.webp/, 'Profile menu and legacy DAHA Wallet surfaces must use the eagle asset');
+assert.match(premiumJs, /ml-app-footer[\s\S]*daha-wallet-eagle\.webp/, 'Persistent wallet navigation must carry the DAHA eagle');
 assert.ok(fs.existsSync(path.join(root, 'assets', 'apple-touch-icon-180.png')), 'Apple touch icon is missing');
 
 assert.match(html, /rel=["']manifest["'][^>]*manifest\.webmanifest/i, 'HTML must link the PWA manifest');
