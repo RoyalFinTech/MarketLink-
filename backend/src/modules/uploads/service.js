@@ -168,7 +168,8 @@ async function ensureBucket(config, bucket, isPublic) {
 async function uploadSupabase(file, purpose) {
   const config = supabaseConfig();
   if (!config.url || !config.key) throw new AppError('Supabase Storage credentials are missing on the backend.', 503, 'STORAGE_NOT_CONFIGURED');
-  const privateFile = String(purpose).toLowerCase().includes('document') || String(purpose).toLowerCase().includes('doc') || file.mimetype === 'application/pdf';
+  const purposeKey=safePurpose(purpose);
+  const privateFile = purposeKey==='affiliate-selfie' || purposeKey.includes('document') || purposeKey.includes('doc') || file.mimetype === 'application/pdf';
   const bucket = privateFile ? config.privateBucket : config.bucket;
   await ensureBucket(config, bucket, !privateFile);
   const key = safePurpose(purpose) + '/' + Date.now() + '-' + crypto.randomUUID() + (EXT_BY_MIME[file.mimetype] || '.bin');
@@ -201,7 +202,7 @@ async function upload(file, purpose, uploaderId) {
   let stored;
   if(provider==='database') {
     const publicBanner=['banner','vendor-logo','rider-photo','product-image'].includes(safePurpose(purpose));
-    const privateOnboardingDoc=['vendor-document','rider-document','license-document','cod-remittance-document','affiliate-document'].includes(safePurpose(purpose));
+    const privateOnboardingDoc=['vendor-document','rider-document','license-document','cod-remittance-document','affiliate-document','affiliate-selfie'].includes(safePurpose(purpose));
     if(!isProfilePhoto(purpose)&&!publicBanner&&!privateOnboardingDoc) {
       throw new AppError('Secure cloud storage is not configured for this type of file. Please contact MarketLink support.',503,'STORAGE_NOT_CONFIGURED');
     }
@@ -282,7 +283,10 @@ async function getPublicProfileContent(fileId) {
   return {buffer:f.content_bytes,contentType:f.content_type || 'image/jpeg'};
 }
 function privateDocumentType(file,purpose) {
-  const p=String(purpose || '').toLowerCase();
+  const p=safePurpose(purpose);
+  // Affiliate selfies are private KYC images, not identity documents. Keep
+  // them in private storage while preserving the image type required by KYC.
+  if(p==='affiliate-selfie' && file.mimetype!=='application/pdf') return 'image';
   return file.mimetype === 'application/pdf' || p.includes('document') || p.includes('doc') ? 'document' : 'image';
 }
 async function storageDelete(storedUrl) {
