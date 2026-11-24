@@ -177,6 +177,15 @@ async function reviewApplication(applicationId,decision,reason,actor) {
     if(nextStatus==='approved' && !['pending','approved','suspended'].includes(app.status)) throw new AppError('Only a pending or suspended application can be approved.',409,'INVALID_APPLICATION_STATE');
     if(nextStatus==='rejected' && app.status!=='pending') throw new AppError('Only pending applications can be rejected.',409,'INVALID_APPLICATION_STATE');
     if(nextStatus==='suspended' && app.status!=='approved') throw new AppError('Only approved Affiliate Marketers can be suspended.',409,'INVALID_APPLICATION_STATE');
+    if(nextStatus==='approved') {
+      // Lock and re-check the underlying account at decision time. An applicant
+      // may have been suspended after submitting KYC; approval or reinstatement
+      // must never grant marketer access to a non-active account.
+      const {rows:[account]}=await client.query('SELECT id,status FROM users WHERE id=$1 FOR UPDATE',[app.user_id]);
+      if(!account || account.status!=='active') {
+        throw new AppError('The applicant account must be active before Affiliate Marketer approval or reinstatement.',403,'APPLICANT_ACCOUNT_NOT_ACTIVE');
+      }
+    }
     const {rows:[role]}=await client.query('SELECT id FROM roles WHERE name=$1',[MARKETER_ROLE]);
     if(!role) throw new AppError('Affiliate Marketer role is not configured. Apply the affiliate marketer migration first.',503,'MARKETER_ROLE_MISSING');
     if(nextStatus==='approved') {
