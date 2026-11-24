@@ -177,3 +177,49 @@ describe('applicant upload ownership validation',()=>{
   await expect(assertOwnedUploadReference(file.file_url,riderId,'rider-document','document','Rider identity document')).rejects.toMatchObject({statusCode:400,code:'UPLOAD_PURPOSE_MISMATCH'});
  });
 });
+
+describe('scoped moderator access to private KYC files',()=>{
+ beforeEach(()=>{jest.clearAllMocks();withTransaction.mockImplementation(async work=>work({query}));});
+
+ test('allows a moderator to read only a vendor KYC file linked to a vendor record',async()=>{
+  const vendorFile={...file,purpose:'vendor-document',content_bytes:Buffer.from('%PDF-test'),content_type:'application/pdf'};
+  query.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[vendorFile]};
+   if(sql.includes('FROM vendors v WHERE'))return{rows:[{in_use:true}]};
+   return{rows:[]};
+  });
+  await expect(getFile(fileId,'moderator-user',['moderator']))
+   .resolves.toMatchObject({contentType:'application/pdf'});
+ });
+
+ test('denies moderator access to affiliate marketer KYC documents',async()=>{
+  const affiliateFile={...file,purpose:'affiliate-document',content_bytes:Buffer.from('%PDF-test')};
+  query.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[affiliateFile]};
+   return{rows:[]};
+  });
+  await expect(getFile(fileId,'moderator-user',['moderator']))
+   .rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
+ });
+
+ test('denies moderator access to vendor KYC files not linked to a vendor or rider record',async()=>{
+  const orphanFile={...file,purpose:'vendor-document',content_bytes:Buffer.from('%PDF-test')};
+  query.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[orphanFile]};
+   if(sql.includes('FROM vendors v WHERE'))return{rows:[{in_use:false}]};
+   return{rows:[]};
+  });
+  await expect(getFile(fileId,'moderator-user',['moderator']))
+   .rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
+ });
+
+ test('does not allow a moderator to delete another users KYC file',async()=>{
+  const vendorFile={...file,purpose:'vendor-document'};
+  query.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[vendorFile]};
+   return{rows:[]};
+  });
+  await expect(deleteFile(fileId,'moderator-user',['moderator']))
+   .rejects.toMatchObject({statusCode:403,code:'FORBIDDEN'});
+ });
+});
