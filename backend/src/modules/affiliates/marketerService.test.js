@@ -38,6 +38,21 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes("UPDATE affiliates SET marketer_status='pending',commission_pct=0"))).toBe(true);
  });
 
+ test('rejects a PDF uploaded in the selfie field before creating an application',async()=>{
+  uploads.assertOwnedUploadReference
+   .mockResolvedValueOnce({id:'identity-file',file_type:'document'})
+   .mockResolvedValueOnce({id:'selfie-file',file_type:'document'});
+  await expect(service.submitApplication('user-1',{
+   legalName:'Awa Jallow',
+   residentialAddress:'Serrekunda, The Gambia',
+   marketingChannels:['whatsapp'],
+   marketingPlan:'I will promote MarketLink through local community groups and social pages.',
+   identityDocumentUrl:'https://api.marketlink.test/api/v1/uploads/identity-file/content',
+   selfieUrl:'https://api.marketlink.test/api/v1/uploads/selfie-file/content'
+  })).rejects.toMatchObject({code:'KYC_SELFIE_IMAGE_REQUIRED',statusCode:400});
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+
  test('grants the marketer role only after Admin approval and records an audit event',async()=>{
   const application={id:'application-1',user_id:'user-1',status:'pending'};
   const updated={id:'application-1',user_id:'user-1',status:'approved',reviewed_at:'2026-11-23T00:00:00Z',rejection_reason:null};
