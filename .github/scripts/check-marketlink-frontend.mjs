@@ -189,6 +189,11 @@ assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all ni
 const phoneUtil = fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js'), 'utf8');
 assert.match(phoneUtil, /if \(digits\.length === 9\) return digits;/, 'Phone normalization must accept complete nine-digit Gambian national numbers without guessing carrier prefixes');
 assert.match(html, /Enter all 9 digits; MarketLink adds no extra prefix/, 'Gamcel phone guidance must ask for the full nine-digit number');
+const riderPhoneRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/riders/routes.js'), 'utf8');
+const vendorPhoneRoutes = fs.readFileSync(path.join(root, '..', 'backend/src/modules/vendors/routes.js'), 'utf8');
+assert.match(riderPhoneRoutes, /\\+220\\d\{9\}/, 'Rider contact routes must accept nine-digit Gambian national numbers');
+assert.match(vendorPhoneRoutes, /\\+220\\d\{9\}/, 'Vendor contact routes must accept nine-digit Gambian national numbers');
+
 
 assert.match(html, /whatsappNumber:f\.whatsappNumber\|\|null/, 'Vendor application must persist the supplied WhatsApp contact');
 assert.match(html, /mobileNumber:f\.whatsappNumber\|\|null/, 'Rider application must persist the supplied nine-digit mobile contact');
