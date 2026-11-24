@@ -106,6 +106,18 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(clientQuery).toHaveBeenCalledTimes(3);
  });
 
+ test('rejects affiliate commission above the Admin-configured 20 percent maximum',async()=>{
+  const application={id:'application-4',user_id:'user-4',status:'pending'};
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[application]})
+   .mockResolvedValueOnce({rows:[{id:7}]})
+   .mockResolvedValueOnce({rows:[{value:'20.01'}]});
+  withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
+  await expect(service.reviewApplication('application-4','approved',null,{id:'admin-1',role:'admin'}))
+   .rejects.toMatchObject({code:'AFFILIATE_COMMISSION_CONFIG_INVALID',statusCode:503});
+  expect(clientQuery).toHaveBeenCalledTimes(3);
+ });
+
  test('requires an Admin rejection reason',async()=>{
   await expect(service.reviewApplication('application-1','rejected',' ',{id:'admin-1',role:'admin'}))
    .rejects.toMatchObject({code:'REJECTION_REASON_REQUIRED',statusCode:400});
