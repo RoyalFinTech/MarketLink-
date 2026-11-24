@@ -2,9 +2,18 @@
 
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('bcryptjs',()=>({compare:jest.fn()}));
+jest.mock('../../integrations/modempay',()=>({
+  isConfigured:jest.fn(()=>true),
+  isWebhookConfigured:jest.fn(()=>true),
+  isH2H:jest.fn(()=>false),
+  isH2HApproved:jest.fn(()=>true),
+  quoteTransferFee:jest.fn(),
+  initiateTransfer:jest.fn(),
+}));
 
 const {query,withTransaction}=require('../../config/db');
 const bcrypt=require('bcryptjs');
+const modemPay=require('../../integrations/modempay');
 const service=require('./service');
 
 describe('affiliate marketer withdrawal request lifecycle',()=>{
@@ -14,6 +23,11 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     clientQuery=jest.fn();
     withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
     bcrypt.compare.mockResolvedValue(true);
+    modemPay.isConfigured.mockReturnValue(true);
+    modemPay.isWebhookConfigured.mockReturnValue(true);
+    modemPay.isH2H.mockReturnValue(false);
+    modemPay.isH2HApproved.mockReturnValue(true);
+    modemPay.quoteTransferFee.mockResolvedValue({fee:1,currency:'GMD',network:'wave'});
   });
 
   test('enforces the D50 minimum before opening a transaction',async()=>{
@@ -161,5 +175,46 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     expect(result).toMatchObject({duplicate:true,data:{status:'completed'}});
     expect(clientQuery).toHaveBeenCalledTimes(1);
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('an unknown provider outcome can be retried only with the same withdrawal idempotency key',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const processing={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'processing',payout_method:'wave',payout_details:{account_number:'871234567',beneficiary_name:'Awa Jallow'},amount:'50',wallet_debit_amount:'50',service_fee_amount:'0'};
+    const reserved={...processing,status:'payout_pending',provider_status:'initiating'};
+    const unknown={...reserved,provider_status:'unknown'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[processing]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'100'}]})
+      .mockResolvedValueOnce({rows:[{amount:'0'}]})
+      .mockResolvedValueOnce({rows:[reserved]})
+      .mockResolvedValueOnce({rows:[unknown]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'100'}]})
+      .mockResolvedValueOnce({rows:[{amount:'0'}]})
+      .mockResolvedValueOnce({rows:[reserved]});
+    query
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[unknown]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[unknown]});
+    modemPay.initiateTransfer.mockRejectedValue({code:'MODEM_PAY_NETWORK_ERROR',statusCode:503});
+
+    const first=await service.approve(withdrawalId,'admin-user');
+    const second=await service.approve(withdrawalId,'admin-user');
+
+    expect(first).toMatchObject({id:withdrawalId,status:'payout_pending',provider_status:'unknown'});
+    expect(second).toMatchObject({id:withdrawalId,status:'payout_pending',provider_status:'unknown'});
+    expect(modemPay.initiateTransfer).toHaveBeenCalledTimes(2);
+    expect(modemPay.initiateTransfer.mock.calls[0][0].idempotencyKey).toBe('marketlink-withdrawal-'+withdrawalId);
+    expect(modemPay.initiateTransfer.mock.calls[1][0].idempotencyKey).toBe('marketlink-withdrawal-'+withdrawalId);
+    expect(query.mock.calls.filter(([sql])=>sql.includes("provider_status='unknown'"))).toHaveLength(2);
+  });
+
+  test('blocks Admin payout approval before any transaction when the provider is not configured',async()=>{
+    modemPay.isConfigured.mockReturnValue(false);
+    await expect(service.approve('8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831','admin-user'))
+      .rejects.toMatchObject({code:'PROVIDER_UNAVAILABLE',statusCode:503});
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(modemPay.quoteTransferFee).not.toHaveBeenCalled();
+    expect(modemPay.initiateTransfer).not.toHaveBeenCalled();
   });
 });
