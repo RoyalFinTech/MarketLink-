@@ -118,6 +118,18 @@ describe('Affiliate Marketer application and approval',()=>{
   expect(clientQuery).toHaveBeenCalledTimes(3);
  });
 
+ test('reports only commission actually credited to the Affiliate Marketer DAHA Wallet',async()=>{
+  query
+   .mockResolvedValueOnce({rows:[{affiliate_code:'MLABC1234',total_clicks:8,total_orders:3,total_earnings:99,marketer_status:'approved'}]})
+   .mockResolvedValueOnce({rows:[{balance:'125.00',currency:'GMD'}]})
+   .mockResolvedValueOnce({rows:[{qualifying_orders:2,earned:'12.50'}]});
+  const dashboard=await service.getDashboard('affiliate-user-1');
+  expect(dashboard).toMatchObject({affiliateCode:'MLABC1234',qualifyingOrders:2,lifetimeEarned:12.5,walletBalance:125,currency:'GMD'});
+  expect(query.mock.calls[2][0]).toContain("t.category='affiliate_commission'");
+  expect(query.mock.calls[2][0]).toContain("t.reference_type='order_affiliate_payout'");
+  expect(query.mock.calls[2][0]).toContain("cr.status='paid'");
+ });
+
  test('requires an Admin rejection reason',async()=>{
   await expect(service.reviewApplication('application-1','rejected',' ',{id:'admin-1',role:'admin'}))
    .rejects.toMatchObject({code:'REJECTION_REASON_REQUIRED',statusCode:400});
