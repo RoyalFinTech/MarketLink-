@@ -106,6 +106,34 @@ describe('vendor and rider onboarding uploads',()=>{
   expect(downloaded.buffer.toString()).toBe(pdf.toString());
   expect(downloaded.contentType).toBe('application/pdf');
  });
+
+ test('affiliate selfie uploads as a private image and remains owner-readable',async()=>{
+  const previous={storage:process.env.STORAGE_PROVIDER,node:process.env.NODE_ENV,render:process.env.RENDER,api:process.env.API_PUBLIC_URL};
+  process.env.STORAGE_PROVIDER='database';
+  process.env.NODE_ENV='production';
+  process.env.RENDER='true';
+  process.env.API_PUBLIC_URL='https://api.marketlink.test';
+  const png=Buffer.alloc(24);
+  Buffer.from([137,80,78,71,13,10,26,10]).copy(png,0);
+  png.write('IHDR',12,'ascii');png.writeUInt32BE(512,16);png.writeUInt32BE(512,20);
+  query.mockImplementation(async(sql,params=[])=>{
+   if(sql.includes('INSERT INTO file_uploads'))return{rows:[{id:params[0],uploaded_by:params[1],file_url:params[2],file_type:params[3],purpose:params[4],content_bytes:params[6],content_type:params[7],storage_backend:params[8]}]};
+   if(sql.startsWith('SELECT * FROM file_uploads'))return{rows:[{id:fileId,uploaded_by:riderId,content_bytes:png,content_type:'image/png',purpose:'affiliate-selfie',file_type:'image'}]};
+   return{rows:[]};
+  });
+  try{
+   const result=await upload({mimetype:'image/png',size:png.length,buffer:png,originalname:'selfie.png'},'affiliate-selfie',riderId);
+   expect(result.record.file_type).toBe('image');
+   expect(result.record.purpose).toBe('affiliate-selfie');
+   expect(result.url).toContain('/api/v1/uploads/');
+   expect(result.url.endsWith('/content')).toBe(true);
+   const downloaded=await getFile(result.record.id,riderId,['customer']);
+   expect(downloaded.contentType).toBe('image/png');
+   expect(downloaded.buffer.toString()).toBe(png.toString());
+  }finally{
+   for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key==='storage'?'STORAGE_PROVIDER':key==='node'?'NODE_ENV':key==='render'?'RENDER':'API_PUBLIC_URL'];else process.env[key==='storage'?'STORAGE_PROVIDER':key==='node'?'NODE_ENV':key==='render'?'RENDER':'API_PUBLIC_URL']=value;}
+  }
+ });
 });
 
 
