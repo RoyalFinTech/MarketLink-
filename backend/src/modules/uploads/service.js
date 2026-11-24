@@ -327,11 +327,33 @@ function parseSupabaseRef(storedUrl) {
   if(sep<1) return null;
   return {bucket:rest.slice(0,sep),key:rest.slice(sep+1)};
 }
+async function moderatorCanReviewKycFile(file) {
+  // Moderators may review vendor/rider onboarding evidence, but must never
+  // receive broad access to affiliate, customer, payout, or other private files.
+  const purpose=String(file && file.purpose || '').toLowerCase().replace(/_/g,'-');
+  const allowedPurposes=['vendor-document','rider-document','license-document'];
+  if(!allowedPurposes.includes(purpose)) return false;
+  const {rows:[linked]}=await query(
+    `SELECT (
+       EXISTS(SELECT 1 FROM vendors v WHERE
+         v.id_document_url LIKE '%' || $1 || '/content%')
+       OR EXISTS(SELECT 1 FROM riders r WHERE
+         r.id_document_url LIKE '%' || $1 || '/content%'
+         OR r.license_document_url LIKE '%' || $1 || '/content%')
+     ) AS in_use`,
+    [String(file.id)]
+  );
+  return Boolean(linked && linked.in_use);
+}
+
 async function getFile(fileId, requesterId, roles) {
   const {rows:[f]}=await query('SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL',[fileId]);
   if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
-  const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
-  if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to access this file.',403,'FORBIDDEN');
+  const roleList=roles||[];
+  const isAdmin=roleList.some(r=>['admin','super_admin'].includes(r));
+  const isOwner=String(f.uploaded_by)===String(requesterId);
+  const isScopedModerator=roleList.includes('moderator') && await moderatorCanReviewKycFile(f);
+  if(!isAdmin && !isOwner && !isScopedModerator) throw new AppError('You are not allowed to access this file.',403,'FORBIDDEN');
   if(f.content_bytes) return {buffer:Buffer.from(f.content_bytes),contentType:f.content_type||'application/octet-stream'};
   const ref=parseSupabaseRef(f.file_url);
   if(ref) {
@@ -372,7 +394,10 @@ async function deleteFile(fileId, requesterId, roles) {
     const {rows:[f]}=await client.query(
       'SELECT * FROM file_uploads WHERE id=$1 AND deleted_at IS NULL FOR UPDATE',[fileId]);
     if(!f) throw new AppError('File not found.',404,'FILE_NOT_FOUND');
-    const isAdmin=(roles||[]).some(r=>['admin','super_admin','moderator'].includes(r));
+    // Moderators are read-only KYC reviewers. Only Admin/Super Admin or
+    // the original uploader may delete a file; attached KYC evidence is
+    // separately protected by the in-use checks below.
+    const isAdmin=(roles||[]).some(r=>['admin','super_admin'].includes(r));
     if(!isAdmin && String(f.uploaded_by)!==String(requesterId)) throw new AppError('You are not allowed to delete this file.',403,'FORBIDDEN');
     const {rows:[reference]}=await client.query(
       "SELECT EXISTS(SELECT 1 FROM cod_cash_remittances WHERE proof_url LIKE '%' || $1 || '/content') AS in_use",
