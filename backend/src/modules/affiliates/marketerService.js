@@ -167,11 +167,18 @@ async function reviewApplication(applicationId,decision,reason,actor) {
     const {rows:[role]}=await client.query('SELECT id FROM roles WHERE name=$1',[MARKETER_ROLE]);
     if(!role) throw new AppError('Affiliate Marketer role is not configured. Apply the affiliate marketer migration first.',503,'MARKETER_ROLE_MISSING');
     if(nextStatus==='approved') {
+      const {rows:[commissionSetting]}=await client.query(
+        "SELECT value #>> '{}' AS value FROM system_settings WHERE key='affiliate_commission_pct'"
+      );
+      const commissionPct=Number(commissionSetting&&commissionSetting.value);
+      if(!Number.isFinite(commissionPct)||commissionPct<0||commissionPct>100) {
+        throw new AppError('Affiliate commission configuration is missing or invalid. Admin must correct the setting before approval.',503,'AFFILIATE_COMMISSION_CONFIG_INVALID');
+      }
       await client.query('INSERT INTO user_roles(user_id,role_id) VALUES($1,$2) ON CONFLICT(user_id,role_id) DO NOTHING',[app.user_id,role.id]);
-      await client.query("UPDATE affiliates SET marketer_status='approved',commission_pct=2.00,marketer_approved_at=now(),marketer_approved_by=$2 WHERE user_id=$1",[app.user_id,actor.id]);
+      await client.query("UPDATE affiliates SET marketer_status='approved',commission_pct=$2,marketer_approved_at=now(),marketer_approved_by=$3 WHERE user_id=$1",[app.user_id,commissionPct,actor.id]);
     } else if(nextStatus==='suspended') {
       await client.query('DELETE FROM user_roles WHERE user_id=$1 AND role_id=$2',[app.user_id,role.id]);
-      await client.query("UPDATE affiliates SET marketer_status='suspended' WHERE user_id=$1",[app.user_id]);
+      await client.query("UPDATE affiliates SET marketer_status='suspended',commission_pct=0 WHERE user_id=$1",[app.user_id]);
     } else {
       await client.query('DELETE FROM user_roles WHERE user_id=$1 AND role_id=$2',[app.user_id,role.id]);
       await client.query("UPDATE affiliates SET marketer_status=$2,commission_pct=0,marketer_approved_at=NULL,marketer_approved_by=NULL WHERE user_id=$1",[app.user_id,nextStatus]);
