@@ -3350,7 +3350,7 @@
     if(!ML_API.admin||typeof ML_API.admin.approveWithdrawal!=='function'){
       toast('The secure Admin payout endpoint is unavailable. No payout was sent.','error');return;
     }
-    if(!window.confirm(retrySameRequest?'The provider response for this payout is unknown. Retry the same withdrawal using its original idempotency key so Modem Pay can return the original transfer instead of creating a second payout? Check the recipient and amount first.':'Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
+    if(!window.confirm(retrySameRequest?'The provider response for this payout is unknown. Retry the same withdrawal using its original idempotency key so the provider can return the original transfer instead of creating a second payout? Check the recipient and amount first.':'Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
     try{
       var result=await ML_API.admin.approveWithdrawal(id);
       var data=result&&result.data||{};
