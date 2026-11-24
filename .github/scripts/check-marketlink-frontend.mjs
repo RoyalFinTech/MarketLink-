@@ -187,6 +187,7 @@ assert.match(html, /Gamcel \(full 9 digits\)/, 'Gamcel selector must request the
 assert.match(html, /Other \(full 9 digits\)/, 'Other or unclassified Gambian prefixes must be entered as nine digits without guessing a carrier');
 assert.ok(html.includes("if(d.length===9)return /^[1-9]\\d{8}$/.test(d)?d:null;"), 'Frontend phone normalization must accept structurally valid nine-digit Gambian numbers without stale carrier metadata');
 assert.ok(premiumJs.includes("national.length===7?7:9"), 'Admin login must request nine digits for new Gamcel numbers while retaining legacy sign-in compatibility');
+assert.ok(premiumJs.includes("OTHER:{prefix:'',legacy:/^\\d{9}$/}"), 'Admin login must accept a full nine-digit national number when no known carrier prefix applies');
 assert.match(html, /slice\(0,9\)/, 'Rider/vendor onboarding must preserve all nine national digits');
 const phoneUtil = fs.readFileSync(path.join(root, '..', 'backend/src/utils/phone.js'), 'utf8');
 assert.ok(phoneUtil.includes("if (digits.length === 9) return /^[1-9]\\d{8}$/.test(digits) ? digits : null;"), 'Phone normalization must accept structurally valid nine-digit Gambian national numbers without guessing carrier prefixes');
