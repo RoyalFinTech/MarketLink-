@@ -46,7 +46,7 @@
   var mlPromoSlides=[
     {kind:'shop',eyebrow:'THE GAMBIA • LOCAL MARKETPLACE',title:'Groceries delivered',accent:'with care.',body:'Fresh produce, pantry essentials and everyday finds from local sellers across The Gambia.',pill:'SHOP YOUR LOCAL MARKET',image:'./assets/hero-marketlink-bag.webp',cta:'Browse products'},
     {kind:'sell',eyebrow:'FOR LOCAL BUSINESSES',title:'Your shop. More customers.',accent:'Grow with MarketLink.',body:'Bring your business online, showcase your real products and manage incoming orders in one place.',pill:'SELL ON MARKETLINK',image:'./assets/promo-vendor.webp',cta:'Become a vendor'},
-    {kind:'affiliate',eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link.',accent:'Earn 2%.',body:'Share your affiliate link. Earn 2% of eligible discounted merchandise when a referred order is successfully delivered.',pill:'EARN ON ELIGIBLE PURCHASES',image:'./assets/promo-shopping.webp',cta:'Explore affiliate'},
+    {kind:'affiliate',eyebrow:'OFFICIAL MARKETLINK PARTNER PROGRAMME',title:'Become an',accent:'Affiliate Marketer.',body:'Apply with your identity documents. Once approved by MarketLink Admin, access your professional marketer workspace and eligible commission tools.',pill:'ADMIN-APPROVED MARKETER PROGRAMME',image:'./assets/promo-shopping.webp',cta:'Apply as a marketer'},
     {kind:'promote',eyebrow:'VENDOR PROMOTION DESK',title:'Put your products',accent:'in the spotlight.',body:'Request a featured banner, product search boost or shop spotlight. Admin confirms the price and schedule before anything goes live.',pill:'FOR MARKETLINK VENDORS',image:'./assets/promo-vendor.webp',cta:'Request promotion'}
   ];
   function promoSlideMarkup(index,cls){
@@ -58,8 +58,8 @@
       '<div class="ml-promo-copy"><span class="ml-promo-eyebrow"><i></i>'+esc(p.eyebrow)+'</span><span class="ml-promo-kicker">'+esc(p.pill)+'</span>'+
       '<h3>'+esc(p.title)+'<em>'+esc(p.accent)+'</em></h3><p>'+esc(p.body)+'</p>'+
       '<button class="ml-promo-cta" onclick="window.ML_Premium.promoAction(\''+p.kind+'\')">'+esc(p.cta)+' <b>↗</b></button></div>'+
-      '<div class="ml-promo-art-stamp"><span>'+(p.kind==='shop'?'🛍️':p.kind==='sell'||p.kind==='promote'?'🏪':'🔗')+'</span><b>'+(p.kind==='affiliate'?'2%':p.kind==='promote'?'🎫':gambiaFlagMarkup())+'</b><small>'+(p.kind==='affiliate'?'AFFILIATE REWARD':p.kind==='sell'?'LOCAL BUSINESS':p.kind==='promote'?'PROMOTION DESK':'MADE FOR THE GAMBIA')+'</small></div>'+
-      '<div class="ml-promo-bottom-note">'+(p.kind==='affiliate'?'Reward is calculated on eligible discounted merchandise subtotal after successful delivery.':p.kind==='sell'?'Real products. Real customers. One connected marketplace.':p.kind==='promote'?'Admin approval and confirmed payment are required before publishing.':'Discover products from local vendors, all in one place.')+'</div></article>';
+      '<div class="ml-promo-art-stamp"><span>'+(p.kind==='shop'?'🛍️':p.kind==='sell'||p.kind==='promote'?'🏪':'🔗')+'</span><b>'+(p.kind==='affiliate'?'✓':p.kind==='promote'?'🎫':gambiaFlagMarkup())+'</b><small>'+(p.kind==='affiliate'?'MARKETER KYC':p.kind==='sell'?'LOCAL BUSINESS':p.kind==='promote'?'PROMOTION DESK':'MADE FOR THE GAMBIA')+'</small></div>'+
+      '<div class="ml-promo-bottom-note">'+(p.kind==='affiliate'?'A separate professional programme. Submit KYC and wait for Admin approval before earning commissions.':p.kind==='sell'?'Real products. Real customers. One connected marketplace.':p.kind==='promote'?'Admin approval and confirmed payment are required before publishing.':'Discover products from local vendors, all in one place.')+'</div></article>';
   }
   function promoCarouselMarkup(){
     return '<section class="ml-promo-carousel" id="ml-promo-carousel" aria-label="MarketLink promotions">'+
@@ -100,7 +100,7 @@
     if(kind==='sell'){if(!ML_API.auth.isAuthenticated()){goAuth();return;}if(typeof openVendorApp==='function')openVendorApp();else toast('Open Profile and choose Become a Vendor to apply.','info');return;}
     if(kind==='affiliate'){
       if(!ML_API.auth.isAuthenticated()){goAuth();return;}
-      S.profilePage='affiliate';if(typeof switchTab==='function')switchTab('profile');else renderPremiumProfile();return;
+      S.profilePage='affiliate-marketer';if(typeof switchTab==='function')switchTab('profile');else renderPremiumProfile();return;
     }
   }
   function liveCategoryName(id){
@@ -907,9 +907,10 @@
   }
   function isMarketLinkRole(role){return (S.roles||[]).some(function(r){return String(r).toLowerCase()===String(role).toLowerCase();});}
   function roleCtaSectionMarkup(){
-    return '<section class="ml-role-cta-section"><div class="ml-role-cta-heading"><div><h3>Grow with MarketLink</h3><p>Sell through the marketplace or earn by delivering local orders.</p></div></div><div class="ml-role-cta-buttons">'+
+    return '<section class="ml-role-cta-section"><div class="ml-role-cta-heading"><div><h3>Grow with MarketLink</h3><p>Sell, deliver, or apply to become an approved Affiliate Marketer.</p></div></div><div class="ml-role-cta-buttons">'+
       (isMarketLinkRole('vendor')?'<button type="button" class="ml-role-cta-button" onclick="window.ML_Premium.openRoleDashboard(\'vendor\')"><span class="ml-role-cta-icon">🏪</span><span class="ml-role-cta-copy"><b>Vendor Dashboard</b><small>Manage your store and incoming orders.</small></span><span>↗</span></button>':'<button type="button" class="ml-role-cta-button" onclick="openVendorApp()"><span class="ml-role-cta-icon">🏪</span><span class="ml-role-cta-copy"><b>Become a Vendor</b><small>Register your business and reach more customers.</small></span><span>↗</span></button>')+
       (isMarketLinkRole('rider')?'<button type="button" class="ml-role-cta-button" onclick="window.ML_Premium.openRoleDashboard(\'rider\')"><span class="ml-role-cta-icon">🛵</span><span class="ml-role-cta-copy"><b>Rider Dashboard</b><small>View deliveries and manage availability.</small></span><span>↗</span></button>':'<button type="button" class="ml-role-cta-button" onclick="openRiderApp()"><span class="ml-role-cta-icon">🛵</span><span class="ml-role-cta-copy"><b>Become a Rider</b><small>Apply to join the delivery network.</small></span><span>↗</span></button>')+
+      '<button type="button" class="ml-role-cta-button" onclick="window.ML_Premium.openProfilePage(\'affiliate-marketer\')"><span class="ml-role-cta-icon">🔗</span><span class="ml-role-cta-copy"><b>Become an Affiliate Marketer</b><small>Submit KYC and apply for the professional marketer programme.</small></span><span>↗</span></button>'+
     '</div></section>';
   }
   async function openRoleDashboard(role){
@@ -2459,7 +2460,7 @@
       {q:'How do I change my profile or photo?',a:'Open Profile and choose Edit profile to update your name, display name, date of birth, gender and short introduction. Choose Change photo or Remove beside your profile picture. Profile photos must be JPG or PNG, at least 512 × 512 pixels and no larger than 5 MB.'},
       {q:'How do I become a vendor?',a:'Open Profile and choose Become a vendor. Complete the application with accurate business details. Vendor access starts after the required review and approval.'},
       {q:'How do I become a rider?',a:'Open Profile and choose Become a rider. Complete the application with accurate contact and delivery details. Rider access is subject to review and approval.'},
-      {q:'How does the affiliate reward work?',a:'Share your unique affiliate link. Eligible referrals can earn a 2% reward on the qualifying merchandise subtotal after the order is successfully delivered. Delivery fees and other non-merchandise charges are excluded.'},
+      {q:'Do customer referrals earn commissions?',a:'No. The customer Referrer feature lets you share your personal referral link and track invited customers, but it does not pay commissions or wallet credits. To qualify for the paid programme, apply separately as a MarketLink Affiliate Marketer and wait for Admin approval.'},
       {q:'How can I contact MarketLink?',a:'For a direct call, use +220 87 407 1510. To contact the team on WhatsApp, use +220 407 1510. Include your order number when asking about an order. Never share your PIN or payment password.'}
     ];
     var faqHtml=faqs.map(function(faq){
@@ -2549,7 +2550,7 @@
     var profileItems=[
       {icon:'💬',title:'Messages',desc:'Chat privately with MarketLink vendors and customers',page:'messages'},
       {icon:'❤️',title:'Wishlist',desc:'Products you have saved',page:'wishlist'},
-      {icon:'🔗',title:'Affiliate Program',desc:'Your link, referrals and eligible 2% rewards',page:'affiliate'},
+      {icon:'🔗',title:'Referrals',desc:'Your personal referral link and invited customers. No commissions or payouts.',page:'affiliate'},
       {icon:'⚖️',title:'Compare Products',desc:'Review products you selected to compare',page:'compare'},
       {icon:'💳',title:'Payment Methods',desc:'View supported checkout payment methods',page:'payments'},
       {icon:'🌐',title:'Language preference',desc:'Choose your preferred MarketLink language',page:'language'},
@@ -3573,7 +3574,7 @@
   var mlOnboardSlides=[
     {eyebrow:'SHOP THE LOCAL MARKET',title:'Your market.',accent:'Your phone.',body:'Find fresh produce, groceries and everyday essentials from local sellers across The Gambia.',chips:['Local vendors','Everyday essentials','Easy ordering'],image:'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1600&q=85',visualTitle:'Fresh picks, closer to home',visualNote:'Discover what local sellers have today.',symbol:'🛍️'},
     {eyebrow:'BUILT FOR GAMBIAN BUSINESSES',title:'Bring your shop',accent:'to more customers.',body:'Showcase your products, manage real orders and grow your business with a connected local marketplace.',chips:['Your products','Your customers','One dashboard'],image:'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=1600&q=85',visualTitle:'Your business, online',visualNote:'Reach shoppers beyond your storefront.',symbol:'🏪'},
-    {eyebrow:'MARKETLINK AFFILIATE PROGRAM',title:'Share a link.',accent:'Earn 2%.',body:'Share your personal affiliate link. Earn 2% of the eligible discounted merchandise subtotal when a referred order is successfully delivered.',chips:['Share on WhatsApp','Eligible purchases','Rewards after delivery'],image:'https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1600&q=85',visualTitle:'Your network has value',visualNote:'Earn on the eligible merchandise subtotal after delivery.',symbol:'🔗'}
+    {eyebrow:'OFFICIAL AFFILIATE MARKETER PROGRAMME',title:'Build your',accent:'marketing business.',body:'Apply with your identity documents. After Admin approval, access a dedicated marketer workspace and eligible commission tools. Customer referrals alone do not earn commissions.',chips:['Submit KYC','Admin verification','Dedicated marketer workspace'],image:'https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1600&q=85',visualTitle:'Become an approved marketer',visualNote:'Professional marketer access begins only after Admin approval.',symbol:'🔗'}
   ];
   function goOnboardTo(index){
     S.obSlide=(Number(index)+mlOnboardSlides.length)%mlOnboardSlides.length;
@@ -3596,7 +3597,7 @@
       '<div class="ml-ob-visual" style="background-image:linear-gradient(180deg,rgba(5,18,30,.04) 15%,rgba(5,18,30,.85) 100%),url(&quot;'+esc(p.image)+'&quot;)">'+
       '<div class="ml-ob-visual-top"><span>'+gambiaFlagMarkup()+' MADE FOR THE GAMBIA</span><span class="ml-ob-live"><i></i> LOCAL OPPORTUNITY</span></div>'+
       '<div class="ml-ob-visual-bottom"><span class="ml-ob-visual-symbol">'+p.symbol+'</span><h2>'+esc(p.visualTitle)+'</h2><p>'+esc(p.visualNote)+'</p>'+
-      (S.obSlide===2?'<div class="ml-ob-reward"><strong>2%</strong><span>affiliate reward<small>on eligible referred purchases</small></span></div>':'<div class="ml-ob-visual-pills"><span>SHOP</span><span>SELL</span><span>DELIVER</span></div>')+
+      (S.obSlide===2?'<div class="ml-ob-reward"><strong>✓</strong><span>Admin approval<small>required before paid marketer access</small></span></div>':'<div class="ml-ob-visual-pills"><span>SHOP</span><span>SELL</span><span>DELIVER</span></div>')+
       '</div><div class="ml-ob-image-glow"></div></div></div>';
     dots.className='ml-ob-dots';
     dots.innerHTML=mlOnboardSlides.map(function(_,i){return '<button type="button" aria-label="Go to onboarding slide '+(i+1)+'" class="'+(i===S.obSlide?'active':'')+'" onclick="window.ML_Premium.goOnboardTo('+i+')"></button>';}).join('');
