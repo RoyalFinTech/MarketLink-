@@ -63,7 +63,7 @@ describe('customer Referrer commission separation',()=>{
   const affiliateInsert=clientQuery.mock.calls.find(([sql])=>sql.startsWith('INSERT INTO affiliates'));
   expect(affiliateInsert).toBeDefined();
   expect(affiliateInsert[0]).toContain('VALUES($1,$2,0)');
-  expect(affiliateInsert[1][2]).toBe(0);
+  expect(affiliateInsert[1]).toHaveLength(2);
  });
 });
 
