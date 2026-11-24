@@ -71,10 +71,10 @@ describe('Affiliate Marketer application and approval',()=>{
   const result=await service.reviewApplication('application-1','approved',null,{id:'admin-1',role:'admin'});
 
   expect(result).toMatchObject({id:'application-1',status:'approved'});
-  expect(clientQuery.mock.calls[3][0]).toContain('INSERT INTO user_roles');
-  expect(clientQuery.mock.calls[4][0]).toContain("UPDATE affiliates SET marketer_status='approved'");
-  expect(clientQuery.mock.calls[4][1]).toEqual(['user-1',2,'admin-1']);
-  expect(clientQuery.mock.calls[2][0]).toContain("affiliate_commission_pct");
+  expect(clientQuery.mock.calls[4][0]).toContain('INSERT INTO user_roles');
+  expect(clientQuery.mock.calls[5][0]).toContain("UPDATE affiliates SET marketer_status='approved'");
+  expect(clientQuery.mock.calls[5][1]).toEqual(['user-1',2,'admin-1']);
+  expect(clientQuery.mock.calls[3][0]).toContain("affiliate_commission_pct");
   expect(clientQuery.mock.calls.some(([sql])=>sql.includes('admin_action_logs'))).toBe(true);
  });
 
@@ -116,7 +116,7 @@ describe('Affiliate Marketer application and approval',()=>{
   withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
   await expect(service.reviewApplication('application-3','approved',null,{id:'admin-1',role:'admin'}))
    .rejects.toMatchObject({code:'AFFILIATE_COMMISSION_CONFIG_INVALID',statusCode:503});
-  expect(clientQuery).toHaveBeenCalledTimes(3);
+  expect(clientQuery).toHaveBeenCalledTimes(4);
  });
 
  test('rejects affiliate commission above the Admin-configured 20 percent maximum',async()=>{
@@ -129,7 +129,7 @@ describe('Affiliate Marketer application and approval',()=>{
   withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
   await expect(service.reviewApplication('application-4','approved',null,{id:'admin-1',role:'admin'}))
    .rejects.toMatchObject({code:'AFFILIATE_COMMISSION_CONFIG_INVALID',statusCode:503});
-  expect(clientQuery).toHaveBeenCalledTimes(3);
+  expect(clientQuery).toHaveBeenCalledTimes(4);
  });
 
  test('reports only commission actually credited to the Affiliate Marketer DAHA Wallet',async()=>{
