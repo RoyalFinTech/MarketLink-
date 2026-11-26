@@ -324,10 +324,11 @@ async function failProviderWithdrawal(withdrawalId, transfer = {}) {
     const { rows: [wd] } = await client.query(
       'SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [withdrawalId]);
     if (!wd) throw new AppError('Withdrawal not found.', 404, 'WITHDRAWAL_NOT_FOUND');
-    if (wd.status === 'rejected') return wd;
-    if (wd.status === 'completed') return { ignored: true, reason: 'already_completed' };
-    if (wd.status !== 'payout_pending') return { ignored: true, reason: 'withdrawal_not_pending' };
 
+    // Validate every signed failure/cancellation callback against the saved
+    // provider reference, amount and currency before treating a terminal row
+    // as a harmless duplicate. A terminal state must never bypass callback
+    // binding checks merely because no second balance mutation would occur.
     const metadata = transfer.metadata || {};
     if (metadata.withdrawal_id && String(metadata.withdrawal_id) !== String(wd.id)) {
       return { ignored: true, reason: 'withdrawal_metadata_mismatch' };
@@ -345,6 +346,9 @@ async function failProviderWithdrawal(withdrawalId, transfer = {}) {
     if (String(transfer.currency || '').toUpperCase() !== 'GMD') {
       return { ignored: true, reason: 'currency_mismatch' };
     }
+    if (wd.status === 'rejected') return { duplicate: true, data: wd };
+    if (wd.status === 'completed') return { ignored: true, reason: 'already_completed' };
+    if (wd.status !== 'payout_pending') return { ignored: true, reason: 'withdrawal_not_pending' };
     const { rows: [updated] } = await client.query(
       "UPDATE withdrawals SET status='rejected',provider_status=$1,provider_response=$2,processed_at=now(),updated_at=now() WHERE id=$3 RETURNING *",
       [String(transfer.status || 'failed').slice(0,40), JSON.stringify(transfer), wd.id]);
