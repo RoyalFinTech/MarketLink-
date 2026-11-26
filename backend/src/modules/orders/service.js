@@ -263,7 +263,75 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
        FOR UPDATE`,
       [deliveryFeeQuoteId, customerId, vendorId, deliveryAddressId]
     );
-    if (!deliveryQuote) throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
+    if (!deliveryQuote) {
+      // A customer may lose the HTTP response after the order transaction commits.
+      // The consumed quote is the checkout idempotency key: recover that exact
+      // order instead of making the customer start over or creating a duplicate.
+      const { rows: [consumedQuote] } = await client.query(
+        `SELECT * FROM delivery_fee_quotes
+         WHERE id=$1 AND customer_id=$2 AND vendor_id=$3 AND delivery_address_id=$4
+           AND status='consumed' AND order_id IS NOT NULL
+         FOR UPDATE`,
+        [deliveryFeeQuoteId, customerId, vendorId, deliveryAddressId]
+      );
+      if (!consumedQuote) throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
+
+      const { rows: [existingOrder] } = await client.query(
+        `SELECT * FROM orders
+         WHERE id=$1 AND customer_id=$2 AND vendor_id=$3
+           AND delivery_address_id=$4 AND delivery_fee_quote_id=$5
+         FOR UPDATE`,
+        [consumedQuote.order_id, customerId, vendorId, deliveryAddressId, deliveryFeeQuoteId]
+      );
+      if (!existingOrder) throw new AppError('The used checkout quote could not be matched to your order. Contact MarketLink support before retrying.', 409, 'CHECKOUT_RETRY_MISMATCH');
+      if (String(existingOrder.payment_method || '').toLowerCase() !== paymentMethod) {
+        throw new AppError('This checkout quote already belongs to an order with a different payment method. Open My Orders to continue that order.', 409, 'CHECKOUT_RETRY_MISMATCH');
+      }
+
+      const { rows: existingLines } = await client.query(
+        `SELECT product_id,product_name_snapshot,unit_price_snapshot,quantity,line_total
+         FROM order_items WHERE order_id=$1 ORDER BY product_id,quantity`,
+        [existingOrder.id]
+      );
+      const requestedItems = items.map(item => ({
+        productId:String(item.productId), quantity:Number(item.quantity),
+      })).sort((a,b) => a.productId.localeCompare(b.productId) || a.quantity-b.quantity);
+      const storedItems = existingLines.map(line => ({
+        productId:String(line.product_id), quantity:Number(line.quantity),
+      })).sort((a,b) => a.productId.localeCompare(b.productId) || a.quantity-b.quantity);
+      if (JSON.stringify(requestedItems) !== JSON.stringify(storedItems)) {
+        throw new AppError('This checkout quote was already used for a different cart. Refresh checkout before placing another order.', 409, 'CHECKOUT_RETRY_MISMATCH');
+      }
+
+      const recoveredFingerprint = buildCheckoutFingerprint({
+        customerId, vendorId, deliveryAddressId, riderId:consumedQuote.rider_id,
+        items:existingLines.map(line => ({
+          productId:line.product_id, qty:Number(line.quantity), unitPrice:Number(line.unit_price_snapshot),
+        })),
+        couponId:existingOrder.coupon_id,
+        discount:Number(existingOrder.discount_amount || 0),
+        marketplaceCommissionPct:Number(existingOrder.platform_fee_pct || 0),
+        affiliateUserId:existingOrder.affiliate_user_id,
+        affiliateCommissionPct:Number(existingOrder.affiliate_commission_pct || 0),
+        payoutFeeRecoveryPct:Number(existingOrder.payout_fee_recovery_pct || 0),
+        deliveryFee:Number(existingOrder.delivery_fee || 0),
+      });
+      if (recoveredFingerprint !== String(consumedQuote.checkout_fingerprint || '')) {
+        throw new AppError('The saved order no longer matches its original checkout quote. Contact MarketLink support before retrying.', 409, 'CHECKOUT_RETRY_MISMATCH');
+      }
+
+      return {
+        order:existingOrder,
+        lineItems:existingLines.map(line => ({
+          productId:line.product_id, name:line.product_name_snapshot,
+          price:Number(line.unit_price_snapshot), qty:Number(line.quantity), lt:Number(line.line_total),
+        })),
+        recovered:true,
+      };
+    }
+    if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
+      throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
+    }
     if (deliveryQuote.estimated_customer_total == null || deliveryQuote.payout_fee_recovery_pct == null || !deliveryQuote.checkout_fingerprint) throw new AppError('Your selected rider price needs refreshing before checkout. Request a fresh total and try again.',409,'CHECKOUT_QUOTE_REFRESH_REQUIRED');
     if (Number(deliveryQuote.dropoff_lat) !== Number(deliveryAddress.latitude) ||
         Number(deliveryQuote.dropoff_lng) !== Number(deliveryAddress.longitude)) {
