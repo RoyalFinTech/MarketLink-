@@ -2,6 +2,8 @@
 const crypto = require('crypto');
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
+const logger = require('../../utils/logger');
+const notificationsService = require('../notifications/service');
 const { SETTING_KEYS, commissionSettingsFromRows, payoutFeeRecoveryPctFromRows } = require('../../utils/marketplaceCommission');
 const { calculatePayoutFeeRecovery } = require('../../utils/payoutFeeRecovery');
 const { normaliseDeliveryPricingPolicy, resolveRiderDeliveryTariff, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
@@ -243,7 +245,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     }
   }
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     let deliveryAddress = null;
     if (deliveryAddressId) {
       const { rows:[address] } = await client.query(
@@ -461,6 +463,33 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
     await client.query("INSERT INTO commission_records (order_id,vendor_id,order_total,commission_pct,commission_amount,vendor_payout,rider_payout,platform_fee_pct,affiliate_user_id,affiliate_commission_pct,affiliate_commission_amount,platform_net_amount) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",[order.id,vendorId,total,commPct,platFee,vendorPayout,riderPayout,commPct,affiliate?.user_id||null,affiliatePct,affiliateAmount,platformNetFee]);
     return { order, lineItems: lines };
   });
+
+  // Alert the vendor only after the order is committed. Recovered checkout
+  // responses must not send a second "new order" alert.
+  if(result&&result.order&&!result.recovered){
+    try{
+      const {rows:[vendor]}=await query(
+        'SELECT u.id,u.phone,u.email FROM users u JOIN vendors v ON v.user_id=u.id WHERE u.id=$1',
+        [result.order.vendor_id]
+      );
+      if(vendor){
+        const isCod=String(result.order.payment_method||'').toLowerCase()==='cod';
+        const amount=Number(result.order.total||0).toFixed(2);
+        await notificationsService.send({
+          userId:vendor.id,
+          type:isCod?'order_received_cod':'order_received_payment_pending',
+          title:isCod?'New Cash on Delivery order':'New MarketLink order received',
+          body:isCod
+            ?'Order '+result.order.order_number+' is confirmed as Cash on Delivery for D '+amount+'. Prepare the items and collect payment on delivery.'
+            :'Order '+result.order.order_number+' has been placed for D '+amount+'. Payment is not yet confirmed; check payment status before dispatch or handover.',
+          referenceType:'order',referenceId:result.order.id,
+          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,
+            data:{orderId:String(result.order.id),orderNumber:String(result.order.order_number),paymentMethod:String(result.order.payment_method||'')}}
+        });
+      }
+    }catch(error){logger.warn('Vendor order notification deferred after order commit',{orderId:result.order.id,error:error.message});}
+  }
+  return result;
 }
 
 async function getById(id, userId, roles) {
@@ -824,15 +853,45 @@ async function updateStatus(orderId,status,userId,roles,note){
     }
     if(status==='awaiting_rider'){
       const { rows:[deliveryState] }=await client.query(
-        'SELECT status,rider_id FROM deliveries WHERE order_id=$1 LIMIT 1',
+        'SELECT id,status,rider_id FROM deliveries WHERE order_id=$1 LIMIT 1',
         [orderId]
       );
+      updatedOrder.delivery_id=deliveryState&&deliveryState.id||null;
       updatedOrder.delivery_status=deliveryState&&deliveryState.status||null;
       updatedOrder.delivery_rider_id=deliveryState&&deliveryState.rider_id||null;
     }
     return updatedOrder;
   });
 
+  if(status==='awaiting_rider'){
+    try{
+      const {rows:[vendor]}=await query(
+        'SELECT u.id,u.phone,u.email,o.order_number FROM orders o JOIN users u ON u.id=o.vendor_id WHERE o.id=$1',
+        [orderId]
+      );
+      if(vendor){
+        const assigned=Boolean(result.delivery_rider_id);
+        await notificationsService.send({
+          userId:vendor.id,
+          type:assigned?'order_ready_rider_requested':'order_ready_auto_dispatch_started',
+          title:assigned?'Order ready — rider request sent':'Order ready — finding a rider',
+          body:assigned
+            ?'Order '+vendor.order_number+' is ready. The selected rider has been asked to accept; MarketLink will remind them and automatically seek a replacement if they miss the deadline.'
+            :'Order '+vendor.order_number+' is ready. The selected rider is unavailable, so MarketLink has started automatic replacement search. You can also assign another rider manually.',
+          referenceType:'order',referenceId:orderId,
+          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,
+            data:{orderId:String(orderId),orderNumber:String(vendor.order_number)}}
+        });
+      }
+      if(result.delivery_rider_id){
+        await notificationsService.pushToUser(result.delivery_rider_id,{
+          title:'Order ready — accept delivery',
+          body:'The vendor has prepared order '+(vendor&&vendor.order_number||'')+'. Please accept or decline the delivery request promptly.',
+          data:{orderId:String(orderId),deliveryId:String(result.delivery_id||'')}
+        }).catch(()=>null);
+      }
+    }catch(error){logger.warn('Vendor or rider ready-for-dispatch alert deferred',{orderId,error:error.message});}
+  }
   if(status==='delivered')await settleOrderFinancials(orderId);
   return result;
 }
