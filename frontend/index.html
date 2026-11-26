@@ -1558,6 +1558,7 @@ var ML_API = (function(){
     getTracking: function(id){ return get('/delivery/'+id+'/tracking'); },
     availableRiders:function(id){return get('/delivery/'+encodeURIComponent(id)+'/available-riders');},
     assignRider:function(id,riderId){return post('/delivery/'+encodeURIComponent(id)+'/assign',{riderId:riderId});},
+    reassignRider:function(id){return post('/delivery/'+encodeURIComponent(id)+'/reassign');},
     updateStatus:function(id, status, extra){ return patch('/delivery/'+id+'/status', Object.assign({status:status}, extra||{})); },
     accept: function(id){ return post('/delivery/'+id+'/accept'); },
     decline: function(id){ return post('/delivery/'+id+'/decline'); },
