@@ -31,8 +31,8 @@ describe('rider cash remittance controls',()=>{
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,payment_status:'pending',order_status:'delivered',order_payment_status:'pending',delivery_id:'delivery-1',rider_id:riderId,delivery_status:'delivered'}]};
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE payment_id'))return{rows:[]};
    if(sql.includes('INSERT INTO cod_cash_remittances'))return{rows:[remittance]};
-   if(sql.includes('SELECT payment_id FROM cod_cash_remittances WHERE id=$1'))return{rows:[{payment_id:paymentId}]};
    if(sql.includes('SELECT p.method,p.amount'))return{rows:[{method:'cod',amount:'145.00',payment_status:'pending',order_status:'delivered',delivery_status:'delivered',rider_id:riderId}]};
+   if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
    if(sql.includes('UPDATE cod_cash_remittances'))return{rows:[{...remittance,status:params[0]}]};
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
    if(sql.includes('SELECT id,customer_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:'customer-1',total:'145.00',status:'delivered',order_number:'ML-123'}]};
