@@ -6,6 +6,7 @@ const { validateWithdrawalFeePct } = require('../../utils/walletWithdrawalFees')
 const { validatePayoutFeeRecoveryPct } = require('../../utils/payoutFeeRecovery');
 const { DEFAULT_DELIVERY_PRICING_POLICY, normaliseDeliveryPricingPolicy, validateDeliveryPricingPolicy, validateRiderDeliveryOverride } = require('../../utils/deliveryPricingPolicy');
 const modemPay = require('../../integrations/modempay');
+const { normaliseSmartRiderDispatchPolicy, validateSmartRiderDispatchPolicy } = require('../delivery/dispatchPolicy');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
@@ -403,6 +404,137 @@ async function getWithdrawalFeeReport({page=1,limit=50}={}){
   query(`SELECT w.id,w.user_id,u.full_name AS account_name,w.payout_method,w.amount,w.service_fee_pct,w.service_fee_amount,w.wallet_debit_amount,w.provider_fee_quote,w.provider_fee_amount,w.provider_fee_source,w.platform_fee_margin,w.provider_status,w.status,w.created_at,w.processed_at FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC LIMIT $1 OFFSET $2`,[limit_,offset])
  ]);
  return {summary:summary.rows[0],items:rows.rows,total:Number(summary.rows[0]?.total||0),page:page_,limit:limit_};
+}
+
+async function getSmartRiderDispatchOverview() {
+  const { rows:[setting] } = await query(
+    'SELECT value,updated_at,updated_by FROM system_settings WHERE key=$1',
+    ['smart_rider_dispatch_policy']
+  );
+  const { rows:deliveries } = await query(
+    `SELECT d.id,d.status,d.rider_id,d.next_auto_dispatch_at,d.auto_dispatch_attempts,
+            o.order_number,o.status AS order_status,o.vendor_id,
+            v.business_name AS vendor_name,
+            ru.full_name AS rider_name,ru.phone AS rider_phone,
+            r.whatsapp_number AS rider_whatsapp_number,r.mobile_number AS rider_mobile_number,
+            ra.status AS assignment_status,ra.created_at AS assigned_at,ra.responded_at,
+            ra.response_deadline_at,ra.reminder_1_sent_at,ra.reminder_2_sent_at,
+            ra.pickup_deadline_at,ra.pickup_reminder_sent_at
+     FROM deliveries d
+     JOIN orders o ON o.id=d.order_id
+     JOIN vendors v ON v.user_id=o.vendor_id
+     LEFT JOIN users ru ON ru.id=d.rider_id
+     LEFT JOIN riders r ON r.user_id=d.rider_id
+     LEFT JOIN LATERAL (
+       SELECT a.status,a.created_at,a.responded_at,a.response_deadline_at,
+              a.reminder_1_sent_at,a.reminder_2_sent_at,a.pickup_deadline_at,
+              a.pickup_reminder_sent_at
+       FROM rider_assignments a
+       WHERE a.delivery_id=d.id
+       ORDER BY a.created_at DESC
+       LIMIT 1
+     ) ra ON TRUE
+     WHERE d.status IN ('assigned','unassigned')
+       AND o.status IN ('awaiting_rider','rider_assigned')
+     ORDER BY COALESCE(d.next_auto_dispatch_at,ra.response_deadline_at,ra.pickup_deadline_at,d.created_at) ASC
+     LIMIT 100`
+  );
+  const settings=normaliseSmartRiderDispatchPolicy(setting && setting.value);
+  return {
+    settings,
+    settingsUpdatedAt:setting && setting.updated_at || null,
+    deliveries,
+    counts:{
+      assigned:deliveries.filter(row=>row.status==='assigned').length,
+      awaitingRider:deliveries.filter(row=>row.status==='unassigned').length,
+      responsePending:deliveries.filter(row=>row.assignment_status==='pending').length,
+      pickupPending:deliveries.filter(row=>row.assignment_status==='accepted').length,
+    },
+  };
+}
+
+async function searchSmartRiderDispatch(deliveryId, actor) {
+  const AppError=require('../../middleware/errorHandler').AppError;
+  const {rows:[delivery]}=await query(
+    `SELECT d.id,d.status,o.vendor_id,o.order_number,o.status AS order_status
+     FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id=$1`,
+    [deliveryId]
+  );
+  if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+  if(delivery.status!=='unassigned'||delivery.order_status!=='awaiting_rider'){
+    throw new AppError('A manual rider search is only available for an order waiting for a rider and not yet assigned.',409,'DELIVERY_NOT_SEARCHABLE');
+  }
+  const deliveryService=require('../delivery/service');
+  const result=await deliveryService.dispatchNextRider(delivery.id,delivery.vendor_id,delivery.order_number,true,{automatic:false});
+  if(actor&&actor.id)await query(
+    `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
+     VALUES($1,$2,'delivery.dispatch_manual_search','delivery',$3,$4,$5)`,
+    [actor.id,actor.role||'admin',delivery.id,JSON.stringify({status:'unassigned'}),JSON.stringify({assigned:result.assigned,riderId:result.riderId||null,reason:result.reason||null})]
+  );
+  return result;
+}
+
+async function reassignSmartRiderDispatch(deliveryId, actor) {
+  const AppError=require('../../middleware/errorHandler').AppError;
+  const {rows:[before]}=await query(
+    'SELECT d.id,d.status,d.rider_id,o.vendor_id FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id=$1',
+    [deliveryId]
+  );
+  if(!before)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+  if(before.status!=='assigned'||!before.rider_id)throw new AppError('Only an assigned delivery before pickup can be reassigned.',409,'DELIVERY_NOT_REASSIGNABLE');
+  const deliveryService=require('../delivery/service');
+  const result=await deliveryService.reassignDelivery(deliveryId,{id:actor&&actor.id,roles:actor&&Array.isArray(actor.roles)?actor.roles:[actor&&actor.role||'admin']});
+  if(actor&&actor.id)await query(
+    `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
+     VALUES($1,$2,'delivery.dispatch_manual_reassign','delivery',$3,$4,$5)`,
+    [actor.id,actor.role||'admin',deliveryId,JSON.stringify({status:before.status,riderId:before.rider_id}),JSON.stringify(result)]
+  );
+  return result;
+}
+
+async function updateSmartRiderDispatchSettings(input, actor) {
+  const AppError=require('../../middleware/errorHandler').AppError;
+  if(!actor || !actor.id) throw new AppError('An authenticated administrator is required.',403,'FORBIDDEN');
+  return withTransaction(async client=>{
+    const {rows:[current]}=await client.query(
+      'SELECT value FROM system_settings WHERE key=$1 FOR UPDATE',
+      ['smart_rider_dispatch_policy']
+    );
+    const before=normaliseSmartRiderDispatchPolicy(current && current.value);
+    const after=validateSmartRiderDispatchPolicy(input,before);
+    await client.query(
+      `INSERT INTO system_settings(key,value,category,updated_by)
+       VALUES($1,$2,'delivery',$3)
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,category='delivery',
+         updated_by=EXCLUDED.updated_by,updated_at=now()`,
+      ['smart_rider_dispatch_policy',JSON.stringify(after),actor.id]
+    );
+    await client.query(
+      `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
+       VALUES($1,$2,'delivery.dispatch_policy_updated','system_setting',NULL,$3,$4)`,
+      [actor.id,actor.role||'admin',JSON.stringify(before),JSON.stringify(after)]
+    );
+    // Apply changed deadlines to active assignments as well as future requests.
+    // Reminder sent-at markers are deliberately preserved, so a saved policy
+    // cannot cause a reminder to be sent twice.
+    await client.query(
+      `UPDATE rider_assignments ra
+       SET response_deadline_at=ra.created_at+($1::int * interval '1 second')
+       FROM deliveries d
+       WHERE d.id=ra.delivery_id AND d.status='assigned' AND d.rider_id=ra.rider_id
+         AND ra.status='pending'`,
+      [after.responseDeadlineSeconds]
+    );
+    await client.query(
+      `UPDATE rider_assignments ra
+       SET pickup_deadline_at=COALESCE(ra.responded_at,ra.created_at)+($1::int * interval '1 second')
+       FROM deliveries d
+       WHERE d.id=ra.delivery_id AND d.status='assigned' AND d.rider_id=ra.rider_id
+         AND ra.status='accepted'`,
+      [after.pickupDeadlineSeconds]
+    );
+    return {settings:after,previousSettings:before,updatedBy:actor.id};
+  });
 }
 
 async function getSystemSettings() {
@@ -819,4 +951,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSmartRiderDispatchOverview, updateSmartRiderDispatchSettings, searchSmartRiderDispatch, reassignSmartRiderDispatch, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };

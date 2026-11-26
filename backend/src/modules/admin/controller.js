@@ -14,6 +14,11 @@ exports.suspend    = wrap(async (req,res) => {
 exports.reinstate  = wrap(async (req,res) => res.json({ success:true, data: await svc.reinstateUser(req.params.id, actor(req)) }));
 exports.analytics  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAnalytics(req.query) }));
 exports.settings   = wrap(async (req,res) => res.json({ success:true, data: await svc.getSystemSettings() }));
+const dispatchActor = req => ({id:req.user.id,role:(req.user.roles||[]).includes('super_admin')?'super_admin':'admin',roles:req.user.roles||[]});
+exports.smartRiderDispatch = wrap(async (req,res) => res.json({success:true,data:await svc.getSmartRiderDispatchOverview()}));
+exports.updateSmartRiderDispatchSettings = wrap(async (req,res) => res.json({success:true,data:await svc.updateSmartRiderDispatchSettings(req.body,dispatchActor(req))}));
+exports.searchSmartRiderDispatch = wrap(async (req,res) => res.json({success:true,data:await svc.searchSmartRiderDispatch(req.params.id,dispatchActor(req))}));
+exports.reassignSmartRiderDispatch = wrap(async (req,res) => res.json({success:true,data:await svc.reassignSmartRiderDispatch(req.params.id,dispatchActor(req))}));
 exports.commissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getMarketplaceCommissionSettings() }));
 exports.updateCommissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.updateMarketplaceCommissionSettings(req.body, actor(req)) }));
 exports.deliveryPricingSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getDeliveryPricingSettings() }));
