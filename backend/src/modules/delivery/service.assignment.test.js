@@ -4,7 +4,7 @@ jest.mock('../notifications/service',()=>({send:jest.fn().mockResolvedValue({}),
 
 const {query,withTransaction}=require('../../config/db');
 const notificationsService=require('../notifications/service');
-const {assignRider,listAvailableRiders,acceptDelivery,reassignDelivery,processDispatchTimers}=require('./service');
+const {assignRider,listAvailableRiders,acceptDelivery,reassignDelivery,processDispatchTimers,updateStatus}=require('./service');
 
 describe('vendor and rider assignment lifecycle',()=>{
   let clientQuery;
@@ -131,6 +131,18 @@ describe('vendor and rider assignment lifecycle',()=>{
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE rider_assignments SET status='accepted'/.test(sql))).toBe(true);
     expect(clientQuery.mock.calls.filter(([sql])=>/INSERT INTO notifications/.test(sql))).toHaveLength(2);
   });
+  test('does not allow a rider to confirm pickup after the configured pickup deadline',async()=>{
+    clientQuery
+      .mockResolvedValueOnce({rows:[{order_id:'order-1'}]})
+      .mockResolvedValueOnce({rows:[{id:'order-1',status:'rider_assigned'}]})
+      .mockResolvedValueOnce({rows:[{id:deliveryId,order_id:'order-1',rider_id:riderId,status:'assigned'}]})
+      .mockResolvedValueOnce({rows:[]});
+
+    await expect(updateStatus(deliveryId,'picked_up',riderId,['rider']))
+      .rejects.toMatchObject({code:'RIDER_ACCEPTANCE_REQUIRED'});
+    expect(clientQuery.mock.calls[3][0]).toMatch(/pickup_deadline_at IS NULL OR pickup_deadline_at>now\(\)/);
+  });
+
   test('manual vendor replacement releases the old rider and searches again without changing the delivery fee',async()=>{
     clientQuery
       .mockResolvedValueOnce({rows:[{order_id:'order-1'}]})
