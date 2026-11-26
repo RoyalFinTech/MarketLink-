@@ -50,6 +50,18 @@ describe('DAHA deposit Gambian mobile number handling', () => {
     }));
   });
 
+  test('marks a failed DAHA deposit by external idempotency reference when metadata ID is absent', async () => {
+    const clientQuery=jest.fn().mockResolvedValue({rows:[{id:'deposit-123'}]});
+    const result=await service.failDepositWebhook({query:clientQuery},{
+      external_reference:'marketlink-daha-deposit-deposit-123'
+    },'charge.failed');
+    expect(result).toEqual({processed:true,depositId:'deposit-123',status:'failed'});
+    expect(clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE idempotency_key=$1'),
+      ['marketlink-daha-deposit-deposit-123','charge.failed']
+    );
+  });
+
   test('rejects legacy seven-digit input instead of silently treating it as a full number', async () => {
     await expect(service.initiateDeposit('user-1', {
       amount: 50,
