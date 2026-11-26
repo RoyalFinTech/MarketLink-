@@ -4068,7 +4068,7 @@ async function loadVendorLiveData(){
       id:o.id||o.order_number, order_number:o.order_number, deliveryId:o.delivery_id||null, customer:o.customer_name||'Customer',
       items:o.item_summary||'Order items unavailable', total:Number(o.total||0), status:({pending:'Pending',accepted:'Accepted',preparing:'Preparing',awaiting_rider:'Awaiting Rider',rider_assigned:'Rider Assigned',picked_up:'Picked Up',on_the_way:'On the Way',delivered:'Delivered',cancelled:'Cancelled'})[o.status]||o.status||'Pending',
       rawStatus:o.status, time:o.placed_at?new Date(o.placed_at).toLocaleString():'',
-      rider:o.rider_name||o.rider_id||null, timeline:[o.placed_at?'Order placed — '+new Date(o.placed_at).toLocaleString():'Order placed']
+      rider:o.rider_name||o.rider_id||null,riderPhone:o.rider_phone||null,riderMobile:o.rider_mobile_number||null,riderWhatsApp:o.rider_whatsapp_number||null,assignmentStatus:o.rider_assignment_status||null,responseDeadlineAt:o.rider_response_deadline_at||null,pickupDeadlineAt:o.rider_pickup_deadline_at||null, timeline:[o.placed_at?'Order placed — '+new Date(o.placed_at).toLocaleString():'Order placed']
     };});
     var prows=Array.isArray(pd)?pd:(pd&&Array.isArray(pd.items)?pd.items:[]);
     S.vProds=prows.map(function(p){return {
@@ -4165,7 +4165,21 @@ function renderVDash(){
           (o.status==='Pending'?'<button class="btn btn-ok btn-sm" onclick="vAccept(\''+o.id+'\')">✅ Accept</button><button class="btn btn-er btn-sm" onclick="vReject(\''+o.id+'\')">❌ Reject</button>':'')+
           (o.status==='Accepted'?'<button class="btn btn-p btn-sm" onclick="vStartPreparing(\''+o.id+'\')">📦 Start preparing</button>':'')+
           ((o.status==='Preparing'||o.status==='Awaiting Rider')?'<button class="btn btn-p btn-sm" onclick="vReqRider(\''+o.id+'\')">🛵 '+(o.status==='Awaiting Rider'?'Search riders again':'Find a rider')+'</button>':'')+
-          (o.status==='Rider Assigned'?'<span style="color:#8B5CF6;font-size:11px;font-weight:600;">🛵 '+(o.rider||'Rider')+' en route</span>':'')+
+          (o.status==='Rider Assigned'?(function(){
+            var phone=String(o.riderMobile||o.riderPhone||'').replace(/[^0-9]/g,'');
+            var wa=String(o.riderWhatsApp||o.riderMobile||o.riderPhone||'').replace(/[^0-9]/g,'');
+            var accepted=String(o.assignmentStatus||'').toLowerCase()==='accepted';
+            var deadline=accepted?o.pickupDeadlineAt:o.responseDeadlineAt;
+            var deadlineText=deadline?' · deadline '+new Date(deadline).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
+            return '<div style="width:100%;margin-top:9px;padding:10px;border-radius:11px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.22);">'+
+              '<div style="color:#bda9ff;font-size:11px;font-weight:800;">🛵 '+sanitizeText(o.rider||'Assigned rider')+' · '+(accepted?'Accepted · heading to shop':'Waiting for rider acceptance')+'</div>'+
+              '<div style="color:var(--mu);font-size:10px;margin-top:4px;">'+(accepted?'Pickup confirmation timer is running':'Rider has 90 seconds to accept')+deadlineText+'</div>'+
+              '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px;">'+
+              (phone?'<a class="btn btn-s btn-sm" href="tel:'+phone+'" style="text-decoration:none;">📞 Call rider</a>':'')+
+              (wa?'<a class="btn btn-s btn-sm" href="https://wa.me/'+wa+'" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">WhatsApp rider</a>':'')+
+              '<button class="btn btn-er btn-sm" onclick="vReplaceRider(\''+String(o.id)+'\')">Find another rider</button>'+
+              '</div></div>';
+          })():'')+
           '</div></div></div>';
       });
     }
@@ -4370,6 +4384,24 @@ async function vReqRider(id){
   }catch(e){toast(e.error||'Could not request a rider. Please check the order status and try again.','error');}
 }
 var AVAILABLE_RIDERS=[];
+async function vReplaceRider(orderId){
+  var order=S.vOrders.find(function(o){return String(o.id)===String(orderId);});
+  if(!order||!order.deliveryId){toast('Delivery details are not loaded yet. Refresh and try again.','error');return;}
+  if(!confirm('Release the current rider and let MarketLink search for another available rider? This is only allowed before pickup.'))return;
+  try{
+    var response=await ML_API.delivery.reassignRider(order.deliveryId);
+    var result=response&&response.data||{};
+    closeSheet('sh-notif');
+    S._vendorLiveLoaded=false;
+    await loadVendorLiveData();
+    if(result.assigned){
+      toast('The previous rider was released and MarketLink sent a new request to another rider.','success');
+    }else{
+      toast('No replacement rider is available right now. MarketLink will keep searching automatically. You can also choose a rider manually.','warning');
+      await vManualAssign(orderId);
+    }
+  }catch(e){toast(e.error||'Could not replace this rider. Refresh the order and try again.','error');}
+}
 async function vManualAssign(orderId){
   var order=S.vOrders.find(function(o){return String(o.id)===String(orderId);});
   if(!order||!order.deliveryId){toast('This order has no delivery record yet.','error');return;}
@@ -4419,7 +4451,7 @@ async function vConfirmManualAssign(riderId){
     await ML_API.delivery.assignRider(order.deliveryId,riderId);
     var chosen=AVAILABLE_RIDERS.find(function(r){return String(r.id)===String(riderId);});
     S.vOrders=S.vOrders.map(function(o){return String(o.id)===String(orderId)?Object.assign({},o,{status:'Rider Assigned',rawStatus:'rider_assigned',rider:chosen&&chosen.full_name||'Assigned rider'}):o;});
-    closeSheet('sh-notif');renderVDash();toast('Rider assigned. The rider can now open the delivery and navigate to pickup.','success');refreshNotifBadges();
+    closeSheet('sh-notif');S._vendorLiveLoaded=false;await loadVendorLiveData();toast('Rider request sent. The rider must accept before confirming pickup. MarketLink will send reminders and search again if the timer expires.','success');refreshNotifBadges();
   }catch(e){toast(e.error||'Could not assign this rider. Try refreshing the rider list.','error');}
 }
 function vAddProd(){
