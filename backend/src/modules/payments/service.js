@@ -678,6 +678,14 @@ async function processWebhook({ event, rawBody }) {
         logger.warn('Modem Pay success event references a missing order', { eventId, orderId });
         return { processed: true, ignored: true, eventId, eventType, reason: 'order_not_found' };
       }
+      // A late provider success must never revive a cancelled order. Keep the
+      // event and pending payment visible for Finance reconciliation instead.
+      if (orderState.status === 'cancelled') {
+        logger.error('Modem Pay reported a successful charge for a cancelled order; manual reconciliation required', {
+          eventId, orderId, paymentStatus: orderState.payment_status,
+        });
+        return { processed: true, ignored: true, eventId, eventType, reason: 'order_cancelled_reconciliation_required' };
+      }
 
       const paymentId = metadata.paymentId || metadata.payment_id;
       let payment = null;

@@ -66,6 +66,23 @@ describe('Modem Pay charge success webhook reconciliation',()=>{
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
 
+ test('does not confirm or settle a late successful charge for a cancelled order',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'event-cancelled-order'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'cancelled',payment_status:'failed'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const event={event:'charge.succeeded',payload:{
+    id:'provider-charge-after-cancel',status:'completed',amount:145,currency:'GMD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+  }};
+  const result=await processWebhook({event,rawBody:JSON.stringify(event)});
+  expect(result).toMatchObject({processed:true,ignored:true,reason:'order_cancelled_reconciliation_required'});
+  expect(clientQuery).toHaveBeenCalledTimes(2);
+  expect(clientQuery.mock.calls[1][0]).toContain('orders WHERE id=$1 FOR UPDATE');
+  expect(clientQuery.mock.calls.some(([sql])=>/FROM payments p|UPDATE payments SET status='confirmed'|UPDATE orders SET payment_status='confirmed'/.test(sql))).toBe(false);
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
+
  test('does not confirm or settle a signed provider event with an amount mismatch',async()=>{
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[{id:'event-bad-amount'}]})
