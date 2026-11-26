@@ -53,6 +53,43 @@ describe('order payment recovery details',()=>{
   expect(query.mock.calls[0][0]).toContain('latest_payment.created_at DESC LIMIT 1');
  });
 });
+describe('customer vendor contact visibility',()=>{
+ beforeEach(()=>jest.clearAllMocks());
+
+ test('returns vendor phone and WhatsApp to the customer who owns the order',async()=>{
+  query.mockResolvedValueOnce({rows:[{
+   id:'order-1',customer_id:'customer-1',vendor_id:'vendor-1',rider_id:'rider-1',
+   vendor_phone:'+220123456789',vendor_whatsapp_number:'+220123456789',
+   rider_whatsapp_number:'+220987654321',items:[]
+  }]});
+  const result=await getById('order-1','customer-1',['customer']);
+  expect(result.vendor_phone).toBe('+220123456789');
+  expect(result.vendor_whatsapp_number).toBe('+220123456789');
+  expect(result.rider_whatsapp_number).toBe('+220987654321');
+  expect(query.mock.calls[0][0]).toContain('v.phone AS vendor_phone');
+  expect(query.mock.calls[0][0]).toContain('v.whatsapp_number AS vendor_whatsapp_number');
+ });
+
+ test('does not expose customer-facing vendor or rider contact details to an Admin lookup',async()=>{
+  query.mockResolvedValueOnce({rows:[{
+   id:'order-1',customer_id:'customer-1',vendor_id:'vendor-1',rider_id:'rider-1',
+   vendor_phone:'+220123456789',vendor_whatsapp_number:'+220123456789',
+   rider_whatsapp_number:'+220987654321',items:[]
+  }]});
+  const result=await getById('order-1','admin-1',['admin']);
+  expect(result.vendor_phone).toBeUndefined();
+  expect(result.vendor_whatsapp_number).toBeUndefined();
+  expect(result.rider_whatsapp_number).toBeUndefined();
+ });
+
+ test('includes vendor contact channels in customer order history',async()=>{
+  query.mockResolvedValueOnce({rows:[]});
+  await listForCustomer('customer-1',{});
+  expect(query.mock.calls[0][0]).toContain('v.phone AS vendor_phone');
+  expect(query.mock.calls[0][0]).toContain('v.whatsapp_number AS vendor_whatsapp_number');
+ });
+});
+
 describe('order status concurrency', () => {
   let clientQuery;
 
