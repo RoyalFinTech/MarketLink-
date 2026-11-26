@@ -8,7 +8,7 @@ const notificationsService = require('../notifications/service');
 const { normaliseSmartRiderDispatchPolicy } = require('./dispatchPolicy');
 
 async function getSmartRiderDispatchPolicy() {
-  const result=await query('SELECT value FROM system_settings WHERE key=$1',['smart_rider_dispatch_policy']).catch(()=>null);
+  const result=await Promise.resolve(query('SELECT value FROM system_settings WHERE key=$1',['smart_rider_dispatch_policy'])).catch(()=>null);
   const row=result&&result.rows&&result.rows[0];
   return normaliseSmartRiderDispatchPolicy(row&&row.value);
 }
