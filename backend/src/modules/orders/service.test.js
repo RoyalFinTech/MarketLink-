@@ -204,6 +204,82 @@ describe('order creation ownership safeguards', () => {
     expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
+  test('recovers the same order after a lost response even if the saved GPS pin was edited', async()=>{
+    const order={
+      id:'order-recovered',customer_id:'customer-1',vendor_id:'vendor-1',
+      delivery_address_id:'address-1',delivery_fee_quote_id:'quote-1',
+      payment_method:'cod',coupon_id:null,discount_amount:'0',
+      platform_fee_pct:'10',affiliate_user_id:null,affiliate_commission_pct:'0',
+      payout_fee_recovery_pct:'2',delivery_fee:'25',total:'127.36'
+    };
+    const fingerprint=buildCheckoutFingerprint({
+      customerId:'customer-1',vendorId:'vendor-1',deliveryAddressId:'address-1',
+      riderId:'rider-1',items:[{productId:'product-1',qty:1,unitPrice:100}],
+      couponId:null,discount:0,marketplaceCommissionPct:10,
+      affiliateUserId:null,affiliateCommissionPct:0,payoutFeeRecoveryPct:2,deliveryFee:25
+    });
+    const consumedQuote={
+      id:'quote-1',status:'consumed',order_id:order.id,rider_id:'rider-1',
+      checkout_fingerprint:fingerprint
+    };
+    clientQuery.mockImplementation(async(sql)=>{
+      if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.99',longitude:'-16.99'}]};
+      if(sql.includes("status='quoted'"))return{rows:[]};
+      if(sql.includes("status='consumed'"))return{rows:[consumedQuote]};
+      if(sql.includes('FROM orders'))return{rows:[order]};
+      if(sql.includes('FROM order_items'))return{rows:[{
+        product_id:'product-1',product_name_snapshot:'Rice',
+        unit_price_snapshot:'100',quantity:1,line_total:'100'
+      }]};
+      return{rows:[]};
+    });
+
+    const result=await placeOrder({
+      customerId:'customer-1',vendorId:'vendor-1',
+      items:[{productId:'product-1',quantity:1}],
+      paymentMethod:'cod',deliveryAddressId:'address-1',deliveryFeeQuoteId:'quote-1'
+    });
+
+    expect(result).toMatchObject({recovered:true,order:{id:'order-recovered'}});
+    expect(result.lineItems).toEqual([{productId:'product-1',name:'Rice',price:100,qty:1,lt:100}]);
+    expect(clientQuery.mock.calls).toHaveLength(5);
+    expect(clientQuery.mock.calls.some(([sql])=>/INSERT INTO orders|UPDATE inventory|INSERT INTO deliveries|INSERT INTO order_items/.test(sql))).toBe(false);
+  });
+
+  test('does not recover a consumed quote for a different cart payload', async()=>{
+    const order={
+      id:'order-recovered',customer_id:'customer-1',vendor_id:'vendor-1',
+      delivery_address_id:'address-1',delivery_fee_quote_id:'quote-1',
+      payment_method:'cod',coupon_id:null,discount_amount:'0',
+      platform_fee_pct:'10',affiliate_user_id:null,affiliate_commission_pct:'0',
+      payout_fee_recovery_pct:'2',delivery_fee:'25',total:'127.36'
+    };
+    const fingerprint=buildCheckoutFingerprint({
+      customerId:'customer-1',vendorId:'vendor-1',deliveryAddressId:'address-1',
+      riderId:'rider-1',items:[{productId:'product-1',qty:1,unitPrice:100}],
+      couponId:null,discount:0,marketplaceCommissionPct:10,
+      affiliateUserId:null,affiliateCommissionPct:0,payoutFeeRecoveryPct:2,deliveryFee:25
+    });
+    clientQuery.mockImplementation(async(sql)=>{
+      if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.45',longitude:'-16.58'}]};
+      if(sql.includes("status='quoted'"))return{rows:[]};
+      if(sql.includes("status='consumed'"))return{rows:[{id:'quote-1',order_id:order.id,rider_id:'rider-1',checkout_fingerprint:fingerprint}]};
+      if(sql.includes('FROM orders'))return{rows:[order]};
+      if(sql.includes('FROM order_items'))return{rows:[{
+        product_id:'product-1',product_name_snapshot:'Rice',
+        unit_price_snapshot:'100',quantity:1,line_total:'100'
+      }]};
+      return{rows:[]};
+    });
+
+    await expect(placeOrder({
+      customerId:'customer-1',vendorId:'vendor-1',
+      items:[{productId:'product-1',quantity:2}],
+      paymentMethod:'cod',deliveryAddressId:'address-1',deliveryFeeQuoteId:'quote-1'
+    })).rejects.toMatchObject({code:'CHECKOUT_RETRY_MISMATCH',statusCode:409});
+    expect(clientQuery.mock.calls.some(([sql])=>/INSERT INTO orders|UPDATE inventory|INSERT INTO deliveries/.test(sql))).toBe(false);
+  });
+
   test('accepts an active Admin-priced rider and snapshots the customer-approved fare', async()=>{
     const fingerprint=buildCheckoutFingerprint({
       customerId:'customer-1',
