@@ -14,6 +14,8 @@ exports.suspend    = wrap(async (req,res) => {
 exports.reinstate  = wrap(async (req,res) => res.json({ success:true, data: await svc.reinstateUser(req.params.id, actor(req)) }));
 exports.analytics  = wrap(async (req,res) => res.json({ success:true, data: await svc.getAnalytics(req.query) }));
 exports.settings   = wrap(async (req,res) => res.json({ success:true, data: await svc.getSystemSettings() }));
+exports.smartRiderDispatch = wrap(async (req,res) => res.json({success:true,data:await svc.getSmartRiderDispatchOverview()}));
+exports.updateSmartRiderDispatchSettings = wrap(async (req,res) => res.json({success:true,data:await svc.updateSmartRiderDispatchSettings(req.body,actor(req))}));
 exports.commissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getMarketplaceCommissionSettings() }));
 exports.updateCommissionSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.updateMarketplaceCommissionSettings(req.body, actor(req)) }));
 exports.deliveryPricingSettings = wrap(async (req,res) => res.json({ success:true, data: await svc.getDeliveryPricingSettings() }));
