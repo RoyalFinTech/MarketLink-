@@ -480,7 +480,8 @@ async function submitCodCashRemittance({paymentId,riderId,providerReference,depo
   if(!destination||!destination.configured)throw new AppError('MarketLink has not published a verified collection account for this deposit method yet. Contact Admin before sending cash.',503,'COD_REMITTANCE_DESTINATION_NOT_CONFIGURED');
   if(!proofFileId||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(proofFileId)))throw new AppError('Upload a clear receipt image or PDF before submitting the cash remittance.',400,'COD_REMITTANCE_PROOF_REQUIRED');
   const proofUrl=String(process.env.API_PUBLIC_URL||process.env.PUBLIC_API_URL||process.env.RENDER_EXTERNAL_URL||'https://marketlink-gambia.onrender.com').replace(/\/+$/,'')+'/api/v1/uploads/'+proofFileId+'/content';
-  return withTransaction(async(client)=>{
+  try {
+    return await withTransaction(async(client)=>{
     // Serialize receipt submission against deletion. Whichever operation locks
     // the file row first wins; a deleted file can never be attached afterwards.
     const {rows:[file]}=await client.query(
@@ -518,9 +519,14 @@ async function submitCodCashRemittance({paymentId,riderId,providerReference,depo
        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [paymentId,payment.order_id,riderId,amount,method,reference,proofUrl||null]);
     return created;
-  });
+    });
+  } catch(error) {
+    if(error&&error.code==='23505'&&error.constraint==='idx_cod_remittance_provider_reference') {
+      throw new AppError('This deposit reference has already been submitted for another COD payment. Check the receipt and enter the correct reference.',409,'COD_REMITTANCE_REFERENCE_DUPLICATE');
+    }
+    throw error;
+  }
 }
-
 async function listMyCodCashRemittances(riderId,{page=1,limit=20}={}){
   const page_=Math.max(parseInt(page,10)||1,1),limit_=Math.min(Math.max(parseInt(limit,10)||20,1),50),offset=(page_-1)*limit_;
   const {rows}=await query(
