@@ -185,6 +185,26 @@ describe('vendor and rider assignment lifecycle',()=>{
     }));
   });
 
+  test('Admin can pause the dispatcher without running its timer transaction',async()=>{
+    query.mockResolvedValueOnce({rows:[{value:{automationEnabled:false}}]});
+    const result=await processDispatchTimers();
+    expect(result).toEqual({processed:0,disabled:true});
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  test('uses the Admin-configured reminder thresholds in the timer scan',async()=>{
+    query.mockResolvedValueOnce({rows:[{value:{
+      firstReminderSeconds:20,secondReminderSeconds:45,responseDeadlineSeconds:75
+    }}]});
+    clientQuery
+      .mockResolvedValueOnce({rows:[{locked:true}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]});
+    const result=await processDispatchTimers();
+    expect(result.processed).toBe(0);
+    expect(clientQuery.mock.calls[1][1]).toEqual([true,true,20,45,240]);
+  });
+
   test('does not run dispatch timers when another backend instance owns the advisory lock',async()=>{
     clientQuery.mockResolvedValueOnce({rows:[{locked:false}]});
     const result=await processDispatchTimers();
