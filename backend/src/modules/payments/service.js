@@ -161,7 +161,7 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
   });
   if(result&&result.vendorId&&!result.existing){
     try{
-      const {rows:[vendor]}=await query('SELECT phone FROM users WHERE id=$1',[result.vendorId]);
+      const {rows:[vendor]}=await query('SELECT id,phone FROM users WHERE id=$1',[result.vendorId]);
       if(vendor){
         await notificationsService.pushToUser(vendor.id,{
           title:'Customer payment confirmed',
