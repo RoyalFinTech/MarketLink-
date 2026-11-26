@@ -253,6 +253,9 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
       if (!address) throw new AppError('The selected delivery address does not belong to your account.',403,'DELIVERY_ADDRESS_FORBIDDEN');
       deliveryAddress = address;
     }
+    if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
+      throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
+    }
     const { rows: [deliveryQuote] } = await client.query(
       `SELECT * FROM delivery_fee_quotes
        WHERE id=$1 AND customer_id=$2 AND vendor_id=$3 AND delivery_address_id=$4
@@ -327,9 +330,6 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
         })),
         recovered:true,
       };
-    }
-    if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
-      throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
     }
     if (deliveryQuote.estimated_customer_total == null || deliveryQuote.payout_fee_recovery_pct == null || !deliveryQuote.checkout_fingerprint) throw new AppError('Your selected rider price needs refreshing before checkout. Request a fresh total and try again.',409,'CHECKOUT_QUOTE_REFRESH_REQUIRED');
     if (Number(deliveryQuote.dropoff_lat) !== Number(deliveryAddress.latitude) ||
