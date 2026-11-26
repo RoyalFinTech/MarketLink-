@@ -1060,7 +1060,7 @@
           var rider=x.rider_name||'No rider assigned',deadline=x.assignment_status==='accepted'?x.pickup_deadline_at:x.response_deadline_at;
           var contact=x.rider_whatsapp_number||x.rider_mobile_number||x.rider_phone||'No contact on file';
           return '<div class="ml-profile-row" style="align-items:flex-start"><div class="ico">🛵</div><div class="copy"><b>Order '+adminSafe(x.order_number||x.id)+'</b><span>'+adminSafe(x.vendor_name||'Vendor')+' · '+adminSafe(x.status)+' · '+adminSafe(x.assignment_status||'no active assignment')+'</span><small>Rider: '+adminSafe(rider)+' · Contact: '+adminSafe(contact)+'</small><small>Deadline: '+adminFormatDate(deadline)+' · Next search: '+adminFormatDate(x.next_auto_dispatch_at)+' · Automatic searches: '+Number(x.auto_dispatch_attempts||0)+'</small>'+
-          (x.status==='assigned'?'<button class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.__ML_ADMIN_DISPATCH_REASSIGN(\''+adminSafe(x.id)+'\')">Release and find another rider</button>':'<small style="display:block;margin-top:8px;color:var(--mu)">Waiting for the next configured rider search.</small>')+
+          (x.status==='assigned'?'<button class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.__ML_ADMIN_DISPATCH_REASSIGN(\''+adminSafe(x.id)+'\')">Release and find another rider</button>':'<button class="ml-btn ml-btn-primary" style="margin-top:8px" onclick="window.__ML_ADMIN_DISPATCH_SEARCH(\''+adminSafe(x.id)+'\')">Search for a rider now</button>')+
           '</div></div>';
         }).join('')+'</div>':'<div class="ml-empty"><b>No active rider dispatches</b><span>There are no orders currently assigned or waiting for a rider.</span></div>');
       root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">DELIVERY OPERATIONS</div><h3>Smart Rider Dispatcher</h3><p>Control rider reminders, response deadlines, pickup deadlines, automatic replacement and retry behaviour.</p>'+settingsHTML+queueHTML+'</div>';
@@ -1077,6 +1077,14 @@
       if(window.toast)window.toast('Smart Rider Dispatch settings saved and applied by the backend.','success');
       await adminSmartRiderDispatchView();
     }catch(e){if(window.toast)window.toast(e.message||'Could not save dispatch settings.','error');if(button){button.disabled=false;button.textContent='Save dispatch settings';}}
+  };
+  window.__ML_ADMIN_DISPATCH_SEARCH=async function(id){
+    if(!window.confirm('Run an immediate manual rider search for this waiting order?'))return;
+    try{
+      var result=await adminRequest('/admin/smart-rider-dispatch/'+encodeURIComponent(id)+'/search','POST',{});
+      if(window.toast)window.toast(result&&result.assigned?'A replacement rider has been assigned for acceptance.':'No eligible rider was found; the configured retry schedule remains active.','success');
+      await adminSmartRiderDispatchView();
+    }catch(e){if(window.toast)window.toast(e.message||'Could not search for a rider.','error');}
   };
   window.__ML_ADMIN_DISPATCH_REASSIGN=async function(id){
     if(!window.confirm('Release the currently assigned rider and ask MarketLink to find a replacement? This is only allowed before pickup.'))return;
