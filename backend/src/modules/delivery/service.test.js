@@ -73,6 +73,41 @@ describe('delivery status transitions', () => {
     expect(clientQuery.mock.calls.some(([sql]) => /INSERT INTO order_status_history/i.test(sql))).toBe(true);
     expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith('order-1');
   });
+
+  test('blocks pickup while the assigned rider request is still pending', async () => {
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ order_id: 'order-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'rider_assigned' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'assigned' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(updateStatus('delivery-1', 'picked_up', 'rider-1', ['rider']))
+      .rejects.toMatchObject({ code: 'RIDER_ACCEPTANCE_REQUIRED' });
+
+    expect(clientQuery).toHaveBeenCalledTimes(4);
+    expect(clientQuery.mock.calls[3][0]).toMatch(/rider_assignments[\\s\\S]*status='accepted'/i);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE deliveries SET status/i.test(sql))).toBe(false);
+    expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+  });
+
+  test('allows pickup only after the assigned rider accepted that delivery', async () => {
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ order_id: 'order-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'rider_assigned' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'assigned' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'assignment-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'delivery-1', order_id: 'order-1', rider_id: 'rider-1', status: 'picked_up' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ customer_id: 'customer-1' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await updateStatus('delivery-1', 'picked_up', 'rider-1', ['rider']);
+
+    expect(result.status).toBe('picked_up');
+    expect(clientQuery.mock.calls[3][0]).toMatch(/rider_assignments[\\s\\S]*status='accepted'/i);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status = \\$1/i.test(sql))).toBe(true);
+  });
 });
 
 
