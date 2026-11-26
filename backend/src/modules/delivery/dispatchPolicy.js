@@ -10,7 +10,7 @@ const DEFAULT_SMART_RIDER_DISPATCH_POLICY = Object.freeze({
   responseDeadlineSeconds: 90,
   pickupReminderSeconds: 240,
   pickupDeadlineSeconds: 480,
-  reassignDelaySeconds: 45,
+  reassignDelaySeconds: 0,
   retrySearchIntervalSeconds: 60,
   maxAutoDispatchAttempts: 0,
 });
@@ -21,7 +21,7 @@ const NUMERIC_RULES = {
   responseDeadlineSeconds: [10, 1800],
   pickupReminderSeconds: [5, 1800],
   pickupDeadlineSeconds: [10, 3600],
-  reassignDelaySeconds: [5, 600],
+  reassignDelaySeconds: [0, 600],
   retrySearchIntervalSeconds: [5, 1800],
   maxAutoDispatchAttempts: [0, 100],
 };
