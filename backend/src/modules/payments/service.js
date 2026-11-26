@@ -89,7 +89,7 @@ async function releaseOrderInventoryAfterPaymentFailure(orderId,paymentId,reason
 async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) {
   return withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
-      'SELECT id,customer_id,total,payment_status,payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
+      'SELECT id,customer_id,vendor_id,order_number,total,payment_status,payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
       [orderId, customerId]
     );
     if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
@@ -151,6 +151,12 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
       "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','DAHA Wallet payment complete',$2,'payment',$3)",
       [customerId,'Your DAHA Wallet payment of D ' + requestedAmount.toFixed(2) + ' is confirmed.',paymentId]
     );
+    if(order.vendor_id){
+      await client.query(
+        "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'order_payment_confirmed','Customer payment confirmed',$2,'order',$3)",
+        [order.vendor_id,'DAHA Wallet payment of D '+requestedAmount.toFixed(2)+' for order '+(order.order_number||orderId)+' is confirmed. You may continue the order workflow.',orderId]
+      );
+    }
     return { payment, action: 'wallet_paid', status: 'confirmed', walletBalance: nextBalance };
   });
 }
@@ -762,7 +768,7 @@ async function processWebhook({ event, rawBody }) {
       await client.query("UPDATE payments SET status='confirmed',paid_at=now() WHERE id=$1", [payment.id]);
       await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1", [payment.order_id]);
       const { rows: [order] } = await client.query(
-        'SELECT customer_id,total FROM orders WHERE id=$1',
+        'SELECT customer_id,vendor_id,total,order_number FROM orders WHERE id=$1',
         [payment.order_id]
       );
       if (order) {
@@ -770,6 +776,12 @@ async function processWebhook({ event, rawBody }) {
           "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','Payment Confirmed ✅',$2,'payment',$3)",
           [order.customer_id, 'Your payment of D ' + order.total + ' has been confirmed.', payment.id]
         );
+        if(order.vendor_id){
+          await client.query(
+            "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'order_payment_confirmed','Customer payment confirmed',$2,'order',$3)",
+            [order.vendor_id,'Payment of D '+Number(payment.amount).toFixed(2)+' for order '+(order.order_number||payment.order_id)+' is confirmed. You may continue the order workflow.',payment.order_id]
+          );
+        }
       }
       logger.info('Modem Pay charge confirmed', { eventId, orderId, paymentId: payment.id });
       return { processed: true, eventId, eventType, paymentId: payment.id, orderId };
