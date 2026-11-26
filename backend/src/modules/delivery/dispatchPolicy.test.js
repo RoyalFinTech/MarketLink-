@@ -20,6 +20,7 @@ describe('Smart Rider Dispatch policy', () => {
       pickupDeadlineSeconds: 420,
       reassignDelaySeconds: 30,
       retrySearchIntervalSeconds: 90,
+      reassignDelaySeconds: 0,
       maxAutoDispatchAttempts: 5,
     })).toMatchObject({
       firstReminderSeconds: 20,
@@ -28,6 +29,7 @@ describe('Smart Rider Dispatch policy', () => {
       pickupReminderSeconds: 180,
       pickupDeadlineSeconds: 420,
       maxAutoDispatchAttempts: 5,
+      reassignDelaySeconds: 0,
     });
   });
 
