@@ -632,7 +632,7 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
       // rider's response is still pending. Require the matching acceptance
       // record as a separate gate before the rider can confirm collection.
       const { rows: [acceptedAssignment] } = await client.query(
-        "SELECT id FROM rider_assignments WHERE delivery_id=$1 AND rider_id=$2 AND status='accepted' LIMIT 1",
+        "SELECT id FROM rider_assignments WHERE delivery_id=$1 AND rider_id=$2 AND status='accepted' AND (pickup_deadline_at IS NULL OR pickup_deadline_at>now()) LIMIT 1",
         [deliveryId,d.rider_id]
       );
       if (!acceptedAssignment) {
