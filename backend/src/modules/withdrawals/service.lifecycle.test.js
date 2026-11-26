@@ -278,4 +278,62 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     expect(modemPay.quoteTransferFee).not.toHaveBeenCalled();
     expect(modemPay.initiateTransfer).not.toHaveBeenCalled();
   });
+
+  test('a synchronous completed provider response debits the wallet exactly once',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const processing={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'processing',payout_method:'wave',payout_details:{account_number:'871234567',beneficiary_name:'Awa Jallow'},amount:'50',wallet_debit_amount:'50',service_fee_amount:'0',provider_fee_quote:null};
+    const reserved={...processing,status:'payout_pending',provider_status:'initiating'};
+    const bound={...reserved,provider_ref:'provider-ref-1',provider_status:'completed'};
+    const completed={...bound,status:'completed',provider_status:'completed'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[processing]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'100'}]})
+      .mockResolvedValueOnce({rows:[{amount:'0'}]})
+      .mockResolvedValueOnce({rows:[reserved]})
+      .mockResolvedValueOnce({rows:[bound]})
+      .mockResolvedValueOnce({rows:[bound]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'50'}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[completed]})
+      .mockResolvedValueOnce({rows:[]});
+    query
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[bound]});
+    modemPay.initiateTransfer.mockResolvedValue({
+      id:'provider-ref-1',status:'completed',amount:50,currency:'GMD',
+      fee:0,metadata:{withdrawal_id:withdrawalId}
+    });
+
+    const result=await service.approve(withdrawalId,'admin-user');
+
+    expect(result).toMatchObject({id:withdrawalId,status:'completed',provider_ref:'provider-ref-1'});
+    expect(clientQuery.mock.calls.filter(([sql])=>sql.includes('UPDATE wallets SET balance=balance-$1'))).toHaveLength(1);
+    expect(clientQuery.mock.calls.filter(([sql])=>sql.includes("VALUES ($1,'debit','withdrawal'"))).toHaveLength(1);
+    expect(modemPay.initiateTransfer).toHaveBeenCalledWith(expect.objectContaining({
+      idempotencyKey:'marketlink-withdrawal-'+withdrawalId,
+      amount:50,currency:'GMD',network:'wave',accountNumber:'871234567'
+    }));
+  });
+
+  test('a failed payout fee quote restores the request to an uninitiated state and sends no transfer',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const processing={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'processing',payout_method:'wave',payout_details:{account_number:'871234567',beneficiary_name:'Awa Jallow'},amount:'50',wallet_debit_amount:'50',service_fee_amount:'0'};
+    const reserved={...processing,status:'payout_pending',provider_status:'initiating'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[processing]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'100'}]})
+      .mockResolvedValueOnce({rows:[{amount:'0'}]})
+      .mockResolvedValueOnce({rows:[reserved]});
+    query.mockResolvedValueOnce({rows:[]});
+    modemPay.quoteTransferFee.mockRejectedValue(new Error('fee service unavailable'));
+
+    await expect(service.approve(withdrawalId,'admin-user'))
+      .rejects.toMatchObject({code:'PAYOUT_FEE_QUOTE_FAILED',statusCode:503});
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("SET status='processing',provider_status='fee_quote_failed'"),
+      expect.any(Array)
+    );
+    expect(modemPay.initiateTransfer).not.toHaveBeenCalled();
+  });
 });
