@@ -70,6 +70,10 @@ exports.approveWithdrawal = wrap(async (req,res) => {
   res.json({ success:true, message, data });
 });
 exports.rejectWithdrawal   = wrap(async (req,res) => res.json({ success:true, message:'Withdrawal rejected.', data: await withdrawalsSvc.reject(req.params.id, req.user.id) }));
+exports.reconcileWithdrawal = wrap(async (req,res) => {
+  const data=await withdrawalsSvc.reconcileProviderWithdrawal(req.params.id,actor(req));
+  res.json({success:true,message:data.status==='completed'?'Provider confirmed the payout; DAHA ledger reconciled.':'Provider status refreshed; the withdrawal remains reserved if not terminal.',data});
+});
 
 
 exports.supportTickets = wrap(async (req,res) => res.json({success:true,data:await svc.listSupportTickets(req.query)}));

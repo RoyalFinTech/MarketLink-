@@ -142,6 +142,8 @@ router.get('/withdrawals',  authenticate, authorize(...ADMIN),
   validate, ctrl.pendingWithdrawals);
 router.post('/withdrawals/:id/approve', authenticate, authorize(...ADMIN),
   [param('id').isUUID()], validate, ctrl.approveWithdrawal);
+router.post('/withdrawals/:id/reconcile', authenticate, authorize(...ADMIN),
+  [param('id').isUUID()], validate, ctrl.reconcileWithdrawal);
 router.post('/withdrawals/:id/reject',  authenticate, authorize(...ADMIN),
   [param('id').isUUID()], validate, ctrl.rejectWithdrawal);
 

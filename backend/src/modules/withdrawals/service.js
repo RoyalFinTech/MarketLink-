@@ -497,6 +497,74 @@ async function processProviderWebhook(event) {
 }
 
 
+// Admin recovery path for a payout whose webhook was delayed or lost.
+// Modem Pay documents GET /v1/transfers/:id for retrieving the authoritative
+// transfer object. This never creates or retries a transfer.
+async function reconcileProviderWithdrawal(withdrawalId, actor) {
+  if (!modemPay.isConfigured()) {
+    throw new AppError('Modem Pay is not configured. No reconciliation was performed.',503,'PROVIDER_UNAVAILABLE');
+  }
+  if (modemPay.isH2H()) {
+    throw new AppError('Provider transfer lookup is not enabled for H2H mode. Contact Modem Pay before manually changing this payout.',409,'PAYOUT_LOOKUP_UNSUPPORTED');
+  }
+  const {rows:[wd]}=await query('SELECT * FROM withdrawals WHERE id=$1',[withdrawalId]);
+  if(!wd)throw new AppError('Withdrawal not found.',404,'WITHDRAWAL_NOT_FOUND');
+  if(wd.status!=='payout_pending') {
+    if(wd.status==='completed')return wd;
+    throw new AppError('Only a payout awaiting provider confirmation can be reconciled.',409,'WITHDRAWAL_NOT_PENDING');
+  }
+  if(!wd.provider_ref) {
+    throw new AppError('This payout has no provider transfer ID. Do not retry it here; use the existing idempotent initiation recovery or contact Modem Pay.',409,'TRANSFER_REFERENCE_REQUIRED');
+  }
+
+  const transfer=await modemPay.retrieveTransfer(wd.provider_ref);
+  const data=transfer&&transfer.data?transfer.data:(transfer||{});
+  const refs=[data.id,data.transfer_reference,data.transaction_reference,data.reference].filter(Boolean).map(String);
+  if(!refs.includes(String(wd.provider_ref))) {
+    throw new AppError('Modem Pay returned a different transfer ID. No wallet or withdrawal state was changed.',409,'PROVIDER_REFERENCE_MISMATCH');
+  }
+  if(data.metadata?.withdrawal_id&&String(data.metadata.withdrawal_id)!==String(wd.id)) {
+    throw new AppError('Modem Pay transfer metadata does not match this withdrawal. No wallet was changed.',409,'WITHDRAWAL_METADATA_MISMATCH');
+  }
+  const amount=Number(data.amount);
+  if(!Number.isFinite(amount)||Math.abs(amount-Number(wd.amount))>0.01) {
+    throw new AppError('Modem Pay transfer amount does not match the withdrawal. No wallet was changed.',409,'PROVIDER_AMOUNT_MISMATCH');
+  }
+  if(String(data.currency||'').toUpperCase()!=='GMD') {
+    throw new AppError('Modem Pay transfer currency is not GMD. No wallet was changed.',409,'PROVIDER_CURRENCY_MISMATCH');
+  }
+
+  const status=String(data.status||'').trim().toLowerCase();
+  let result;
+  if(['completed','succeeded','success'].includes(status)) {
+    result=await completeProviderWithdrawal(wd.id,data);
+  } else if(['failed','rejected','cancelled','canceled'].includes(status)) {
+    result=await failProviderWithdrawal(wd.id,data);
+  } else if(status==='flagged'||['pending','processing'].includes(status)) {
+    result=await withTransaction(async(client)=>{
+      const {rows:[current]}=await client.query('SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE',[wd.id]);
+      if(!current)throw new AppError('Withdrawal not found.',404,'WITHDRAWAL_NOT_FOUND');
+      if(current.status!=='payout_pending'||String(current.provider_ref||'')!==String(wd.provider_ref)) {
+        throw new AppError('Withdrawal state changed during provider reconciliation. Refresh the Admin queue.',409,'WITHDRAWAL_STATE_CHANGED');
+      }
+      const providerStatus=status==='flagged'?'flagged':status;
+      const {rows:[updated]}=await client.query(
+        'UPDATE withdrawals SET provider_status=$1,provider_response=$2,updated_at=now() WHERE id=$3 AND status=\'payout_pending\' RETURNING *',
+        [providerStatus,JSON.stringify(data),wd.id]);
+      return updated||current;
+    });
+  } else {
+    throw new AppError('Modem Pay returned an unrecognized transfer status. The payout remains reserved for manual investigation.',409,'PROVIDER_STATUS_UNRECOGNIZED');
+  }
+
+  await query(
+    "INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES($1,$2,'withdrawal.provider_reconciled','withdrawal',$3,$4)",
+    [actor.id,actor.role||'admin',wd.id,JSON.stringify({providerStatus:status,marketLinkStatus:result&&result.status||null,providerRef:wd.provider_ref})]
+  ).catch(()=>null);
+  return result;
+}
+
+
 async function reject(withdrawalId, adminUserId) {
   return withTransaction(async (client) => {
     const { rows: [wd] } = await client.query(
@@ -516,4 +584,4 @@ async function reject(withdrawalId, adminUserId) {
   });
 }
 
-module.exports = { getBalance, requestWithdrawal, listMine, listPendingForAdmin, approve, reject, processProviderWebhook };
+module.exports = { getBalance, requestWithdrawal, listMine, listPendingForAdmin, approve, reject, reconcileProviderWithdrawal, processProviderWebhook };

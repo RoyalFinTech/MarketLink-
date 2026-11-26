@@ -72,6 +72,23 @@ describe('Modem Pay configuration and webhook verification', () => {
     expect(modemPay.verifyWebhookSignature(raw, signature, canonical)).toBe(true);
   });
 
+  test('retrieves an existing payout by its provider transfer ID without creating a new transfer', async () => {
+    process.env.MODEM_PAY_API_KEY = 'sk_test_marketlink_reconcile';
+    const transfer = { id:'provider-transfer-123', status:'pending', amount:50, currency:'GMD' };
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok:true,
+      text:async()=>JSON.stringify(transfer),
+    });
+    global.fetch=fetchMock;
+    const modemPay=require('./modempay');
+    const result=await modemPay.retrieveTransfer('provider-transfer-123');
+    expect(result).toEqual(transfer);
+    expect(fetchMock).toHaveBeenCalledWith('https://api.modempay.com/v1/transfers/provider-transfer-123',expect.objectContaining({
+      method:'GET',
+      headers:expect.objectContaining({Authorization:'Bearer sk_test_marketlink_reconcile'}),
+    }));
+  });
+
   test('quotes a GMD mobile-money payout fee before sending money', async () => {
     process.env.MODEM_PAY_API_KEY = 'sk_test_marketlink_quote';
     const responseBody = { data: { fee: 1.25, currency: 'GMD', network: 'wave', amount: 100 } };
