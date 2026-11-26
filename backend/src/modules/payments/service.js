@@ -6,6 +6,7 @@ const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const modemPay = require('../../integrations/modempay');
 const ordersService = require('../orders/service');
+const notificationsService = require('../notifications/service');
 const dahaWalletService = require('../wallets/service');
 
 const modemAdapter = {
@@ -86,9 +87,9 @@ async function releaseOrderInventoryAfterPaymentFailure(orderId,paymentId,reason
 
 
 async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) {
-  return withTransaction(async (client) => {
+  const result=await withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
-      'SELECT id,customer_id,total,payment_status,payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
+      'SELECT id,customer_id,vendor_id,order_number,total,payment_status,payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
       [orderId, customerId]
     );
     if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
@@ -150,8 +151,12 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
       "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'payment_confirmed','DAHA Wallet payment complete',$2,'payment',$3)",
       [customerId,'Your DAHA Wallet payment of D ' + requestedAmount.toFixed(2) + ' is confirmed.',paymentId]
     );
-    return { payment, action: 'wallet_paid', status: 'confirmed', walletBalance: nextBalance };
+    return { payment, action: 'wallet_paid', status: 'confirmed', walletBalance: nextBalance, vendorId:order.vendor_id, orderId:order.id, orderNumber:order.order_number, amount:requestedAmount };
   });
+  if(result&&result.vendorId&&!result.existing)await notifyVendorPaymentConfirmed({
+    vendorId:result.vendorId,orderId:result.orderId,orderNumber:result.orderNumber,amount:result.amount,method:'wallet'
+  });
+  return result;
 }
 
 async function initiatePayment({ orderId, method, amount, currency='GMD', customerId, accountNumber }) {
@@ -396,7 +401,7 @@ async function confirmPayment(paymentId,actorId,roles){
     const settlement=await ordersService.settleOrderFinancials(payment.order_id);
     return {payment:confirmed,settlement};
   }
-  if(payment.status==='confirmed')return payment;
+  if(payment.status==='confirmed')return {payment,newlyConfirmed:false};
   if(PROVIDERS[payment.method]&&PROVIDERS[payment.method]!==modemAdapter){
     await PROVIDERS[payment.method].verify(payment.provider_ref);
   }else{
@@ -584,14 +589,34 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
   return{remittance,payment:confirmed,settlement};
 }
 
+async function notifyVendorPaymentConfirmed({vendorId,orderId,orderNumber,amount,method}){
+  if(!vendorId)return;
+  try{
+    const {rows:[vendor]}=await query(
+      'SELECT u.id,u.phone,u.email FROM users u JOIN vendors v ON v.user_id=u.id WHERE u.id=$1',
+      [vendorId]
+    );
+    if(!vendor)return;
+    await notificationsService.send({
+      userId:vendor.id,
+      type:'order_payment_confirmed',
+      title:'Customer payment confirmed',
+      body:'Payment of D '+Number(amount||0).toFixed(2)+' for order '+(orderNumber||orderId)+' is confirmed. You may continue the order workflow.',
+      referenceType:'order',referenceId:orderId,
+      channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,
+        data:{orderId:String(orderId),orderNumber:String(orderNumber||''),paymentMethod:String(method||'')}}
+    });
+  }catch(error){logger.warn('Vendor payment confirmation notification deferred',{orderId,error:error.message});}
+}
+
 async function markPaymentConfirmed(paymentId,actor=null){
-  return withTransaction(async(client)=>{
+  const outcome=await withTransaction(async(client)=>{
     // All payment mutation paths lock the order before its payment row.
     const {rows:[paymentReference]}=await client.query(
       'SELECT order_id FROM payments WHERE id=$1',[paymentId]);
     if(!paymentReference)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
     const {rows:[order]}=await client.query(
-      'SELECT id,customer_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE',
+      'SELECT id,customer_id,vendor_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE',
       [paymentReference.order_id]);
     if(!order)throw new AppError('The order linked to this payment was not found.',404,'ORDER_NOT_FOUND');
     const {rows:[payment]}=await client.query(
@@ -627,8 +652,10 @@ async function markPaymentConfirmed(paymentId,actor=null){
       );
     }
     logger.info('Payment confirmed',{paymentId,orderId:payment.order_id,method:payment.method});
-    return updated;
+    return {payment:updated,newlyConfirmed:true,vendorId:order.vendor_id,orderId:order.id,orderNumber:order.order_number,amount:Number(payment.amount),method:payment.method};
   });
+  if(outcome.newlyConfirmed)await notifyVendorPaymentConfirmed(outcome);
+  return outcome.payment;
 }
 async function processWebhook({ event, rawBody }) {
   if (String(event?.event || '').startsWith('transfer.')) {
@@ -733,7 +760,7 @@ async function processWebhook({ event, rawBody }) {
       await client.query("UPDATE payments SET status='confirmed',paid_at=now() WHERE id=$1", [payment.id]);
       await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1", [payment.order_id]);
       const { rows: [order] } = await client.query(
-        'SELECT customer_id,total FROM orders WHERE id=$1',
+        'SELECT customer_id,vendor_id,total,order_number FROM orders WHERE id=$1',
         [payment.order_id]
       );
       if (order) {
@@ -743,7 +770,7 @@ async function processWebhook({ event, rawBody }) {
         );
       }
       logger.info('Modem Pay charge confirmed', { eventId, orderId, paymentId: payment.id });
-      return { processed: true, eventId, eventType, paymentId: payment.id, orderId };
+      return { processed: true, eventId, eventType, paymentId: payment.id, orderId, vendorId:order&&order.vendor_id||null, orderNumber:order&&order.order_number||null, paymentAmount:Number(payment.amount), paymentMethod:payment.method };
     }
 
     if (['charge.cancelled','charge.failed','charge.expired','payment_intent.cancelled','payment_intent.expired'].includes(eventType)) {
@@ -819,6 +846,12 @@ async function processWebhook({ event, rawBody }) {
         eventId, orderId: result.orderId, error: err.message,
       });
     }
+  }
+  if(result&&result.vendorId&&result.paymentId&&!result.duplicate&&!result.ignored){
+    await notifyVendorPaymentConfirmed({
+      vendorId:result.vendorId,orderId:result.orderId,orderNumber:result.orderNumber,
+      amount:result.paymentAmount,method:result.paymentMethod
+    });
   }
   return result;
 }
