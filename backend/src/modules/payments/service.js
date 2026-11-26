@@ -87,7 +87,7 @@ async function releaseOrderInventoryAfterPaymentFailure(orderId,paymentId,reason
 
 
 async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) {
-  return withTransaction(async (client) => {
+  const result=await withTransaction(async (client) => {
     const { rows: [order] } = await client.query(
       'SELECT id,customer_id,vendor_id,order_number,total,payment_status,payment_method FROM orders WHERE id=$1 AND customer_id=$2 FOR UPDATE',
       [orderId, customerId]
@@ -157,8 +157,25 @@ async function payOrderFromDahaWallet({ orderId, requestedAmount, customerId }) 
         [order.vendor_id,'DAHA Wallet payment of D '+requestedAmount.toFixed(2)+' for order '+(order.order_number||orderId)+' is confirmed. You may continue the order workflow.',orderId]
       );
     }
-    return { payment, action: 'wallet_paid', status: 'confirmed', walletBalance: nextBalance };
+    return { payment, action: 'wallet_paid', status: 'confirmed', walletBalance: nextBalance, vendorId:order.vendor_id, orderId:order.id, orderNumber:order.order_number, amount:requestedAmount };
   });
+  if(result&&result.vendorId&&!result.existing){
+    try{
+      const {rows:[vendor]}=await query('SELECT phone FROM users WHERE id=$1',[result.vendorId]);
+      if(vendor){
+        await notificationsService.pushToUser(vendor.id,{
+          title:'Customer payment confirmed',
+          body:'DAHA Wallet payment of D '+Number(result.amount).toFixed(2)+' for order '+result.orderNumber+' is confirmed.',
+          data:{orderId:String(result.orderId),orderNumber:String(result.orderNumber)}
+        }).catch(()=>null);
+        if(vendor.phone)await notificationsService.sendSms({
+          to:vendor.phone,
+          message:'MarketLink: DAHA Wallet payment of D '+Number(result.amount).toFixed(2)+' for order '+result.orderNumber+' is confirmed.'
+        }).catch(()=>null);
+      }
+    }catch(error){logger.warn('Vendor DAHA Wallet alert deferred',{orderId:result.orderId,error:error.message});}
+  }
+  return result;
 }
 
 async function initiatePayment({ orderId, method, amount, currency='GMD', customerId, accountNumber }) {
@@ -784,7 +801,7 @@ async function processWebhook({ event, rawBody }) {
         }
       }
       logger.info('Modem Pay charge confirmed', { eventId, orderId, paymentId: payment.id });
-      return { processed: true, eventId, eventType, paymentId: payment.id, orderId };
+      return { processed: true, eventId, eventType, paymentId: payment.id, orderId, vendorId:order&&order.vendor_id||null, orderNumber:order&&order.order_number||null, paymentAmount:Number(payment.amount), paymentMethod:payment.method };
     }
 
     if (['charge.cancelled','charge.failed','charge.expired','payment_intent.cancelled','payment_intent.expired'].includes(eventType)) {
@@ -860,6 +877,22 @@ async function processWebhook({ event, rawBody }) {
         eventId, orderId: result.orderId, error: err.message,
       });
     }
+  }
+  if(result&&result.vendorId&&result.paymentId&&!result.duplicate&&!result.ignored){
+    try{
+      const {rows:[vendor]}=await query('SELECT phone FROM users WHERE id=$1',[result.vendorId]);
+      if(vendor){
+        await notificationsService.pushToUser(vendor.id,{
+          title:'Customer payment confirmed',
+          body:'Payment of D '+Number(result.paymentAmount||0).toFixed(2)+' for order '+result.orderNumber+' is confirmed.',
+          data:{orderId:String(result.orderId),orderNumber:String(result.orderNumber)}
+        }).catch(()=>null);
+        if(vendor.phone)await notificationsService.sendSms({
+          to:vendor.phone,
+          message:'MarketLink: Payment of D '+Number(result.paymentAmount||0).toFixed(2)+' for order '+result.orderNumber+' is confirmed.'
+        }).catch(()=>null);
+      }
+    }catch(error){logger.warn('Vendor payment webhook alert deferred',{orderId:result.orderId,error:error.message});}
   }
   return result;
 }
