@@ -374,6 +374,22 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(sql).toContain("p.status='pending'");
   expect(sql).toContain("COALESCE(cr.status,'')<>'paid'");
  });
+ test('returns a clear conflict when a deposit reference was already used for another COD payment',async()=>{
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER='871234567';
+  process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME='MarketLink Gambia';
+  const duplicate=Object.assign(new Error('duplicate key'),{
+   code:'23505',constraint:'idx_cod_remittance_provider_reference'
+  });
+  withTransaction.mockRejectedValue(duplicate);
+  await expect(submitCodCashRemittance({
+   paymentId:payment.id,riderId:'44444444-4444-4444-8444-444444444444',
+   providerReference:'WAVE-RECEIPT-DUPLICATE',depositMethod:'wave',
+   proofFileId:'55555555-5555-4555-8555-555555555555'
+  })).rejects.toMatchObject({
+   statusCode:409,code:'COD_REMITTANCE_REFERENCE_DUPLICATE'
+  });
+ });
+
  test('requires a receipt file before accepting a rider cash remittance',async()=>{
   await expect(submitCodCashRemittance({
    paymentId:payment.id,riderId:'44444444-4444-4444-8444-444444444444',
