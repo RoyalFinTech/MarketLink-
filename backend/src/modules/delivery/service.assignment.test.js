@@ -217,7 +217,7 @@ describe('vendor and rider assignment lifecycle',()=>{
 
     expect(result.processed).toBe(1);
     expect(clientQuery.mock.calls.some(([sql])=>/SET status='reassigned'/.test(sql))).toBe(true);
-    expect(clientQuery.mock.calls.some(([sql])=>/next_auto_dispatch_at=now\(\)/.test(sql))).toBe(false);
+    expect(clientQuery.mock.calls.some(([sql])=>/next_auto_dispatch_at=now\(\)\+interval '45 seconds'/.test(sql))).toBe(true);
     expect(notificationsService.pushToUser).toHaveBeenCalledWith(riderId,expect.objectContaining({
       title:'Delivery request expired'
     }));
