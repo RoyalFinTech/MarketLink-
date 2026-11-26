@@ -397,7 +397,37 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'GMD',status:'failed'}
     });
 
-    expect(result).toMatchObject({processed:true,data:{status:'rejected',provider_status:'failed'}});
+    expect(result).toMatchObject({duplicate:true,data:{status:'rejected',provider_status:'failed'}});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE withdrawals|UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('a terminal rejected withdrawal does not acknowledge a failure callback with a mismatched provider reference',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const rejected={id:withdrawalId,status:'rejected',provider_status:'failed',provider_ref:'provider-ref-1',amount:'50'};
+    clientQuery.mockResolvedValueOnce({rows:[rejected]});
+
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'wrong-provider-ref',amount:50,currency:'GMD',status:'failed'}
+    });
+
+    expect(result).toEqual({ignored:true,reason:'provider_reference_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE withdrawals|UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('a terminal rejected withdrawal does not acknowledge a failure callback with a mismatched amount',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const rejected={id:withdrawalId,status:'rejected',provider_status:'failed',provider_ref:'provider-ref-1',amount:'50'};
+    clientQuery.mockResolvedValueOnce({rows:[rejected]});
+
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49,currency:'GMD',status:'failed'}
+    });
+
+    expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
     expect(clientQuery).toHaveBeenCalledTimes(1);
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE withdrawals|UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
