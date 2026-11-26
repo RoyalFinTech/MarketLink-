@@ -475,6 +475,25 @@ async function updateSmartRiderDispatchSettings(input, actor) {
        VALUES($1,$2,'delivery.dispatch_policy_updated','system_setting',$3,$4,$5)`,
       [actor.id,actor.role||'admin','smart_rider_dispatch_policy',JSON.stringify(before),JSON.stringify(after)]
     );
+    // Apply changed deadlines to active assignments as well as future requests.
+    // Reminder sent-at markers are deliberately preserved, so a saved policy
+    // cannot cause a reminder to be sent twice.
+    await client.query(
+      `UPDATE rider_assignments ra
+       SET response_deadline_at=ra.created_at+($1::int * interval '1 second')
+       FROM deliveries d
+       WHERE d.id=ra.delivery_id AND d.status='assigned' AND d.rider_id=ra.rider_id
+         AND ra.status='pending'`,
+      [after.responseDeadlineSeconds]
+    );
+    await client.query(
+      `UPDATE rider_assignments ra
+       SET pickup_deadline_at=COALESCE(ra.responded_at,ra.created_at)+($1::int * interval '1 second')
+       FROM deliveries d
+       WHERE d.id=ra.delivery_id AND d.status='assigned' AND d.rider_id=ra.rider_id
+         AND ra.status='accepted'`,
+      [after.pickupDeadlineSeconds]
+    );
     return {settings:after,previousSettings:before,updatedBy:actor.id};
   });
 }
