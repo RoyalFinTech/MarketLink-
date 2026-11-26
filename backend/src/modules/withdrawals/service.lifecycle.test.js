@@ -127,6 +127,24 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
 
+  test.each([
+    ['transfer.failed','completed'],
+    ['transfer.cancelled','succeeded'],
+    ['transfer.succeeded','failed'],
+    ['transfer.flagged','completed'],
+    ['transfer.reversed','failed'],
+  ])('ignores %s when payload status is %s',async(event,status)=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const result=await service.processProviderWebhook({
+      event,
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'GMD',status}
+    });
+    expect(result).toEqual({ignored:true,reason:'event_status_mismatch'});
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+    expect(clientQuery).not.toHaveBeenCalled();
+  });
+
   test('a provider failure with a mismatched reference cannot release a withdrawal reservation',async()=>{
     const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
     clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_ref:'provider-ref-1',amount:'50'}]});
