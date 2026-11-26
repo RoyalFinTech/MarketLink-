@@ -7,7 +7,7 @@ jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn(),failDeposit
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
 const modemPay=require('../../integrations/modempay');
-const {confirmPayment,getPaymentStatus,listPendingCodPayments,initiatePayment,submitCodCashRemittance,processWebhook}=require('./service');
+const {confirmPayment,getPaymentStatus,listPendingCodPayments,initiatePayment,submitCodCashRemittance,verifyCodCashRemittance,processWebhook}=require('./service');
 
 const payment={
  id:'11111111-1111-4111-8111-111111111111',
@@ -191,6 +191,31 @@ describe('Pay on Delivery reconciliation',()=>{
   withTransaction.mockImplementation(async(work)=>work({query:transactionQuery}));
   ordersService.settleOrderFinancials.mockResolvedValue({settled:true,vendorPayout:100,riderPayout:20,affiliatePayout:2,platformNet:23});
  });
+ test('Admin COD remittance review locks payment, order and delivery before the remittance row',async()=>{
+  const remittance={
+   id:'remittance-1',payment_id:payment.id,order_id:payment.order_id,
+   rider_id:'rider-1',amount:'145.00',provider_reference:'WAVE-145',
+   status:'submitted'
+  };
+  transactionQuery.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT payment_id FROM cod_cash_remittances'))return{rows:[{payment_id:payment.id}]};
+   if(sql.includes('FROM payments p JOIN orders o ON o.id=p.order_id')&&sql.includes('FOR UPDATE OF p,o,d')){
+    return{rows:[{method:'cod',amount:'145.00',payment_status:'pending',order_status:'delivered',delivery_status:'delivered',rider_id:'rider-1'}]};
+   }
+   if(sql.startsWith('SELECT * FROM cod_cash_remittances'))return{rows:[remittance]};
+   if(sql.startsWith('UPDATE cod_cash_remittances SET status=$1'))return{rows:[{...remittance,status:'rejected'}]};
+   return{rows:[]};
+  });
+  const result=await verifyCodCashRemittance('remittance-1',{id:'admin-1',role:'admin'},'rejected','Receipt does not match');
+  expect(result).toMatchObject({remittance:{id:'remittance-1',status:'rejected'},settlement:null});
+  expect(transactionQuery.mock.calls[0][0]).toBe('SELECT payment_id FROM cod_cash_remittances WHERE id=$1');
+  expect(transactionQuery.mock.calls[1][0]).toContain('FOR UPDATE OF p,o,d');
+  expect(transactionQuery.mock.calls[2][0]).toBe('SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE');
+  expect(transactionQuery.mock.calls[3][0]).toContain('UPDATE cod_cash_remittances SET status=$1');
+  expect(transactionQuery.mock.calls[4][0]).toContain('INSERT INTO admin_action_logs');
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
+
  test('checkout creates a pending COD payment without treating cash as paid',async()=>{
   transactionQuery.mockImplementation(async(sql)=>{
    if(sql.startsWith('SELECT id, customer_id, total, payment_status'))return{rows:[{id:payment.order_id,customer_id:'customer-id',total:'145.00',payment_status:'pending',payment_method:'cod'}]};
