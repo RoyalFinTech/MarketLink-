@@ -184,7 +184,7 @@ async function assignRider(deliveryId, riderId, actor) {
     await client.query(
       `INSERT INTO rider_assignments (delivery_id, rider_id, assigned_by, assignment_type, status, response_deadline_at)
        VALUES ($1,$2,$3,$4,'pending',$5)`,
-      [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual']
+      [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual', new Date(Date.now()+90*1000)]
     );
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
