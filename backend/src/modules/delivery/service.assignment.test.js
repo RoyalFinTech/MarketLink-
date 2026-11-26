@@ -141,9 +141,11 @@ describe('vendor and rider assignment lifecycle',()=>{
       .mockResolvedValueOnce({rows:[{id:deliveryId,status:'unassigned',rider_id:null}]})
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
     query
       .mockResolvedValueOnce({rows:[{id:deliveryId,vendor_id:vendor.id,status:'unassigned',order_status:'awaiting_rider',delivery_fee_quote_id:null,pickup_lat:null,pickup_lng:null}]})
+      .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
 
     const result=await reassignDelivery(deliveryId,vendor);
@@ -168,6 +170,7 @@ describe('vendor and rider assignment lifecycle',()=>{
         reminder_1_sent_at:null,reminder_2_sent_at:null,pickup_reminder_sent_at:null,
         order_id:'order-1',vendor_id:vendor.id,order_number:'ML-1001'
       }]})
+      .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
 
     const result=await processDispatchTimers();
