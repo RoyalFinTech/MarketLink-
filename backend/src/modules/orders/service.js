@@ -871,6 +871,37 @@ async function updateStatus(orderId,status,userId,roles,note){
     return updatedOrder;
   });
 
+  if(status==='awaiting_rider'){
+    try{
+      const {rows:[vendor]}=await query(
+        'SELECT u.id,u.phone,u.email,o.order_number FROM orders o JOIN users u ON u.id=o.vendor_id WHERE o.id=$1',
+        [orderId]
+      );
+      if(vendor){
+        const assigned=Boolean(result.delivery_rider_id);
+        await notificationsService.send({
+          userId:vendor.id,
+          type:assigned?'order_ready_rider_requested':'order_ready_auto_dispatch_started',
+          title:assigned?'Order ready — rider request sent':'Order ready — finding a rider',
+          body:assigned
+            ?'Order '+vendor.order_number+' is ready. The selected rider has been asked to accept; MarketLink will remind them and automatically seek a replacement if they miss the deadline.'
+            :'Order '+vendor.order_number+' is ready. The selected rider is unavailable, so MarketLink has started automatic replacement search. You can also assign another rider manually.',
+          referenceType:'order',
+          referenceId:orderId,
+          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,data:{orderId:String(orderId),orderNumber:String(vendor.order_number)}}
+        });
+      }
+      if(result.delivery_rider_id){
+        await notificationsService.pushToUser(result.delivery_rider_id,{
+          title:'Order ready — accept delivery',
+          body:'The vendor has prepared order '+(vendor&&vendor.order_number||'')+'. Please accept or decline the delivery request promptly.',
+          data:{orderId:String(orderId),deliveryId:String(result.delivery_id||'')}
+        }).catch(()=>null);
+      }
+    }catch(error){
+      logger.warn('Vendor or rider ready-for-dispatch alert deferred',{orderId,error:error.message});
+    }
+  }
   if(status==='delivered')await settleOrderFinancials(orderId);
   return result;
 }
