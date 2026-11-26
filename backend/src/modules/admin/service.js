@@ -453,6 +453,21 @@ async function getSmartRiderDispatchOverview() {
   };
 }
 
+async function searchSmartRiderDispatch(deliveryId) {
+  const AppError=require('../../middleware/errorHandler').AppError;
+  const {rows:[delivery]}=await query(
+    `SELECT d.id,d.status,o.vendor_id,o.order_number,o.status AS order_status
+     FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id=$1`,
+    [deliveryId]
+  );
+  if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+  if(delivery.status!=='unassigned'||delivery.order_status!=='awaiting_rider'){
+    throw new AppError('A manual rider search is only available for an order waiting for a rider and not yet assigned.',409,'DELIVERY_NOT_SEARCHABLE');
+  }
+  const deliveryService=require('../delivery/service');
+  return deliveryService.dispatchNextRider(delivery.id,delivery.vendor_id,delivery.order_number,true,{automatic:false});
+}
+
 async function updateSmartRiderDispatchSettings(input, actor) {
   const AppError=require('../../middleware/errorHandler').AppError;
   if(!actor || !actor.id) throw new AppError('An authenticated administrator is required.',403,'FORBIDDEN');
@@ -912,4 +927,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSmartRiderDispatchOverview, updateSmartRiderDispatchSettings, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSmartRiderDispatchOverview, updateSmartRiderDispatchSettings, searchSmartRiderDispatch, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
