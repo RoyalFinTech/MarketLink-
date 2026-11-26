@@ -253,9 +253,6 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
       if (!address) throw new AppError('The selected delivery address does not belong to your account.',403,'DELIVERY_ADDRESS_FORBIDDEN');
       deliveryAddress = address;
     }
-    if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
-      throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
-    }
     const { rows: [deliveryQuote] } = await client.query(
       `SELECT * FROM delivery_fee_quotes
        WHERE id=$1 AND customer_id=$2 AND vendor_id=$3 AND delivery_address_id=$4
@@ -274,7 +271,12 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
          FOR UPDATE`,
         [deliveryFeeQuoteId, customerId, vendorId, deliveryAddressId]
       );
-      if (!consumedQuote) throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
+      if (!consumedQuote) {
+        if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
+          throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
+        }
+        throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
+      }
 
       const { rows: [existingOrder] } = await client.query(
         `SELECT * FROM orders
