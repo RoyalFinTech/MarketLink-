@@ -346,10 +346,15 @@ async function processDepositWebhook(client, payload, eventId) {
 async function failDepositWebhook(client, payload, eventType) {
   const metadata = payload?.metadata || {};
   const depositId = metadata.walletDepositId || metadata.wallet_deposit_id || metadata.depositId;
-  if (!depositId) return null;
+  const externalReference = payload?.external_reference || payload?.externalReference ||
+    metadata.idempotencyKey || metadata.idempotency_key;
+  if (!depositId && !externalReference) return null;
+  const where = depositId ? 'id=$1' : 'idempotency_key=$1';
+  const reference = String(depositId || externalReference);
   const { rows: [deposit] } = await client.query(
-    "UPDATE wallet_deposits SET status='failed',provider_status=$2,updated_at=now() WHERE id=$1 AND status IN ('pending','initiating') RETURNING id",
-    [String(depositId), String(eventType || 'failed').slice(0, 40)]
+    `UPDATE wallet_deposits SET status='failed',provider_status=$2,updated_at=now()
+     WHERE ${where} AND status IN ('pending','initiating') RETURNING id`,
+    [reference, String(eventType || 'failed').slice(0, 40)]
   );
   return deposit ? { processed: true, depositId: deposit.id, status: 'failed' } : null;
 }
