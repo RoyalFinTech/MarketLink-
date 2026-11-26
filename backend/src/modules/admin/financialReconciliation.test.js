@@ -54,7 +54,7 @@ describe('admin financial reconciliation', () => {
   });
 
   test('uses the default limit for invalid input', async () => {
-    for (let i = 0; i < 9; i++) query.mockResolvedValueOnce({ rows: [] });
+    for (let i = 0; i < 10; i++) query.mockResolvedValueOnce({ rows: [] });
     const result = await getFinancialReconciliation({ limit: 'not-a-number' });
     expect(result.limit).toBe(50);
     expect(result.totalFindings).toBe(0);
