@@ -777,8 +777,12 @@ async function updateStatus(orderId,status,userId,roles,note){
       );
       if(delivery&&delivery.rider_id&&delivery.kyc_status==='approved'&&delivery.is_online&&!delivery.rider_busy){
         await client.query(
-          "UPDATE deliveries SET status='assigned' WHERE id=$1 AND status='unassigned'",
+          "UPDATE deliveries SET status='assigned',next_auto_dispatch_at=NULL WHERE id=$1 AND status='unassigned'",
           [delivery.delivery_id]
+        );
+        await client.query(
+          "UPDATE rider_assignments SET response_deadline_at=now()+interval '90 seconds',reminder_1_sent_at=NULL,reminder_2_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",
+          [delivery.delivery_id,delivery.rider_id]
         );
         await client.query(
           `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
@@ -793,7 +797,7 @@ async function updateStatus(orderId,status,userId,roles,note){
           [delivery.delivery_id,delivery.rider_id]
         );
         await client.query(
-          "UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1",
+          "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '1 second',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1",
           [delivery.delivery_id]
         );
         await client.query(
