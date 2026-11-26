@@ -64,6 +64,28 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     });
   });
 
+  test('serializes withdrawal reservations on the wallet row and counts existing reservations before inserting',async()=>{
+    clientQuery
+      .mockResolvedValueOnce({rows:[{pin_hash:'hashed-pin',status:'active'}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{user_id:'affiliate-user'}]})
+      .mockResolvedValueOnce({rows:[{value:'0'}]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'100'}]})
+      .mockResolvedValueOnce({rows:[{pending:'60'}]});
+
+    await expect(service.requestWithdrawal('affiliate-user',{
+      amount:50,payoutMethod:'wave',
+      payoutDetails:{account_number:'871234567',beneficiary_name:'Awa Jallow'},pin:'1234'
+    })).rejects.toMatchObject({code:'INSUFFICIENT_BALANCE',statusCode:400});
+
+    const walletLockIndex=clientQuery.mock.calls.findIndex(([sql])=>/FROM wallets WHERE user_id=\$1 FOR UPDATE/.test(sql));
+    const reservationSumIndex=clientQuery.mock.calls.findIndex(([sql])=>/SUM\(COALESCE\(wallet_debit_amount,amount\)\)/.test(sql));
+    expect(walletLockIndex).toBeGreaterThanOrEqual(0);
+    expect(reservationSumIndex).toBeGreaterThan(walletLockIndex);
+    expect(clientQuery.mock.calls.some(([sql])=>/INSERT INTO withdrawals/.test(sql))).toBe(false);
+  });
+
   test('rejects an invalid Gambian payout number before reserving wallet funds',async()=>{
     clientQuery
       .mockResolvedValueOnce({rows:[{pin_hash:'hashed-pin',status:'active'}]})
