@@ -835,7 +835,7 @@ async function updateStatus(orderId,status,userId,roles,note){
           [delivery.delivery_id,delivery.rider_id]
         );
         await client.query(
-          "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '1 second',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1",
+          "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '1 second' WHERE id=$1",
           [delivery.delivery_id]
         );
         await client.query(
