@@ -291,7 +291,6 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       .mockResolvedValueOnce({rows:[{amount:'0'}]})
       .mockResolvedValueOnce({rows:[reserved]})
       .mockResolvedValueOnce({rows:[bound]})
-      .mockResolvedValueOnce({rows:[bound]})
       .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'50'}]})
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[completed]})
