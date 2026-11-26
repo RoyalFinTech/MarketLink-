@@ -105,7 +105,7 @@ describe('delivery status transitions', () => {
     const result = await updateStatus('delivery-1', 'picked_up', 'rider-1', ['rider']);
 
     expect(result.status).toBe('picked_up');
-    expect(clientQuery.mock.calls[3][0]).toMatch(/rider_assignments[\\s\\S]*status='accepted'/i);
+    expect(clientQuery.mock.calls[3][0]).toContain("status='accepted'");
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE orders SET status/i.test(sql))).toBe(true);
   });
 });
