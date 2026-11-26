@@ -8,7 +8,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
   const pageSize = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
   const [
     missingCommission, pendingSettlement, amountMismatches, missingRecipients,
-    missingCredits, withdrawalQueue, walletMismatches, codRemittancesNeedingAttention, duplicateReferences,
+    missingCredits, withdrawalQueue, walletMismatches, codRemittancesNeedingAttention, duplicateReferences, settlementCreditMismatches,
   ] = await Promise.all([
     query(`SELECT o.id, o.order_number, o.total, o.payment_method, o.payment_status,
                   o.vendor_payout, o.rider_payout, o.affiliate_commission_amount,
@@ -137,6 +137,65 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
            FROM withdrawals WHERE provider_ref IS NOT NULL AND btrim(provider_ref)<>''
            GROUP BY provider_ref HAVING count(*)>1
            LIMIT $1`, [pageSize]),
+    query(`SELECT o.id, o.order_number, o.vendor_id, d.rider_id,
+                  o.affiliate_user_id, o.vendor_payout, o.rider_payout,
+                  o.affiliate_commission_amount, o.platform_net_fee,
+                  o.payout_fee_recovery_amount,
+                  COALESCE(vtx.credit_count,0) AS vendor_credit_count,
+                  COALESCE(vtx.credit_amount,0) AS vendor_credit_amount,
+                  COALESCE(vtx.wrong_recipient_count,0) AS vendor_wrong_recipient_count,
+                  COALESCE(rtx.credit_count,0) AS rider_credit_count,
+                  COALESCE(rtx.credit_amount,0) AS rider_credit_amount,
+                  COALESCE(rtx.wrong_recipient_count,0) AS rider_wrong_recipient_count,
+                  COALESCE(atx.credit_count,0) AS affiliate_credit_count,
+                  COALESCE(atx.credit_amount,0) AS affiliate_credit_amount,
+                  COALESCE(atx.wrong_recipient_count,0) AS affiliate_wrong_recipient_count,
+                  COALESCE(pe.earning_count,0) AS platform_earning_count,
+                  COALESCE(pe.commission_amount,0) AS platform_earning_amount,
+                  COALESCE(pe.payout_fee_recovery_amount,0) AS platform_recovery_amount
+           FROM orders o
+           JOIN commission_records c ON c.order_id=o.id AND c.status='paid'
+           LEFT JOIN deliveries d ON d.order_id=o.id
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*) FILTER (WHERE t.type='credit')::int AS credit_count,
+                    COALESCE(SUM(t.amount) FILTER (WHERE t.type='credit'),0) AS credit_amount,
+                    COUNT(*) FILTER (WHERE t.type='credit' AND w.user_id IS DISTINCT FROM o.vendor_id)::int AS wrong_recipient_count
+             FROM transactions t LEFT JOIN wallets w ON w.id=t.wallet_id
+             WHERE t.reference_type='order_vendor_payout' AND t.reference_id=o.id AND t.category='vendor_sale'
+           ) vtx ON TRUE
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*) FILTER (WHERE t.type='credit')::int AS credit_count,
+                    COALESCE(SUM(t.amount) FILTER (WHERE t.type='credit'),0) AS credit_amount,
+                    COUNT(*) FILTER (WHERE t.type='credit' AND w.user_id IS DISTINCT FROM d.rider_id)::int AS wrong_recipient_count
+             FROM transactions t LEFT JOIN wallets w ON w.id=t.wallet_id
+             WHERE t.reference_type='order_rider_payout' AND t.reference_id=o.id AND t.category='delivery_earning'
+           ) rtx ON TRUE
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*) FILTER (WHERE t.type='credit')::int AS credit_count,
+                    COALESCE(SUM(t.amount) FILTER (WHERE t.type='credit'),0) AS credit_amount,
+                    COUNT(*) FILTER (WHERE t.type='credit' AND w.user_id IS DISTINCT FROM o.affiliate_user_id)::int AS wrong_recipient_count
+             FROM transactions t LEFT JOIN wallets w ON w.id=t.wallet_id
+             WHERE t.reference_type='order_affiliate_payout' AND t.reference_id=o.id AND t.category='affiliate_commission'
+           ) atx ON TRUE
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*)::int AS earning_count,
+                    COALESCE(MAX(commission_amount),0) AS commission_amount,
+                    COALESCE(MAX(payout_fee_recovery_amount),0) AS payout_fee_recovery_amount
+             FROM platform_earnings WHERE order_id=o.id AND status='earned'
+           ) pe ON TRUE
+           WHERE o.status='delivered' AND o.payment_status='confirmed'
+             AND (
+               (COALESCE(o.vendor_payout,0)>0 AND (COALESCE(vtx.credit_count,0)<>1 OR ABS(COALESCE(vtx.credit_amount,0)-o.vendor_payout)>$1 OR COALESCE(vtx.wrong_recipient_count,0)>0))
+               OR (COALESCE(o.vendor_payout,0)<=0 AND COALESCE(vtx.credit_count,0)>0)
+               OR (COALESCE(o.rider_payout,0)>0 AND (COALESCE(rtx.credit_count,0)<>1 OR ABS(COALESCE(rtx.credit_amount,0)-o.rider_payout)>$1 OR COALESCE(rtx.wrong_recipient_count,0)>0))
+               OR (COALESCE(o.rider_payout,0)<=0 AND COALESCE(rtx.credit_count,0)>0)
+               OR (COALESCE(o.affiliate_commission_amount,0)>0 AND (COALESCE(atx.credit_count,0)<>1 OR ABS(COALESCE(atx.credit_amount,0)-o.affiliate_commission_amount)>$1 OR COALESCE(atx.wrong_recipient_count,0)>0))
+               OR (COALESCE(o.affiliate_commission_amount,0)<=0 AND COALESCE(atx.credit_count,0)>0)
+               OR COALESCE(pe.earning_count,0)<>1
+               OR ABS(COALESCE(pe.commission_amount,0)-COALESCE(o.platform_net_fee,0))>$1
+               OR ABS(COALESCE(pe.payout_fee_recovery_amount,0)-COALESCE(o.payout_fee_recovery_amount,0))>$1
+             )
+           ORDER BY o.delivered_at DESC NULLS LAST LIMIT $2`, [moneyTolerance, pageSize]),
   ]);
 
   const sections = {
@@ -149,6 +208,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
     walletLedgerMismatches: walletMismatches.rows,
     codRemittancesNeedingAttention: codRemittancesNeedingAttention.rows,
     duplicateReferences: duplicateReferences.rows,
+    settlementCreditMismatches: settlementCreditMismatches.rows,
   };
   const counts = Object.fromEntries(Object.entries(sections).map(([key, rows]) => [key, rows.length]));
   return {

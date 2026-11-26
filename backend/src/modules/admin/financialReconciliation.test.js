@@ -18,6 +18,7 @@ describe('admin financial reconciliation', () => {
       [{ wallet_id: 'wallet-1', difference: '2.00' }],
       [{ remittance_id: 'remit-1', remittance_status: 'submitted', payment_record_status: 'pending' }],
       [{ kind: 'wallet_transaction_reference', duplicate_count: '2' }],
+      [{ id: 'wrong-wallet-credit', vendor_wrong_recipient_count: 1 }],
     ];
     samples.forEach(rows => query.mockResolvedValueOnce({ rows }));
 
@@ -25,7 +26,7 @@ describe('admin financial reconciliation', () => {
 
     expect(result.readOnly).toBe(true);
     expect(result.limit).toBe(100);
-    expect(result.totalFindings).toBe(9);
+    expect(result.totalFindings).toBe(10);
     expect(result.counts.deliveredWithoutCommission).toBe(1);
     expect(result.counts.pendingSettlement).toBe(1);
     expect(result.counts.amountMismatches).toBe(1);
@@ -35,7 +36,11 @@ describe('admin financial reconciliation', () => {
     expect(result.counts.walletLedgerMismatches).toBe(1);
     expect(result.counts.codRemittancesNeedingAttention).toBe(1);
     expect(result.counts.duplicateReferences).toBe(1);
-    expect(query).toHaveBeenCalledTimes(9);
+    expect(result.counts.settlementCreditMismatches).toBe(1);
+    expect(query).toHaveBeenCalledTimes(10);
+    expect(query.mock.calls[9][0]).toMatch(/wrong_recipient_count/i);
+    expect(query.mock.calls[9][0]).toMatch(/credit_amount/i);
+    expect(query.mock.calls[9][0]).toMatch(/payout_fee_recovery_amount/i);
     expect(query.mock.calls[7][0]).toMatch(/FROM cod_cash_remittances/i);
     expect(query.mock.calls[7][0]).toMatch(/r.status='submitted'/i);
     expect(query.mock.calls[7][0]).toMatch(/r.status='verified'/i);
@@ -49,7 +54,7 @@ describe('admin financial reconciliation', () => {
   });
 
   test('uses the default limit for invalid input', async () => {
-    for (let i = 0; i < 9; i++) query.mockResolvedValueOnce({ rows: [] });
+    for (let i = 0; i < 10; i++) query.mockResolvedValueOnce({ rows: [] });
     const result = await getFinancialReconciliation({ limit: 'not-a-number' });
     expect(result.limit).toBe(50);
     expect(result.totalFindings).toBe(0);
