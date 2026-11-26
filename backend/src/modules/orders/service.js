@@ -272,9 +272,6 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
         [deliveryFeeQuoteId, customerId, vendorId, deliveryAddressId]
       );
       if (!consumedQuote) {
-        if (deliveryAddress?.latitude == null || deliveryAddress?.longitude == null) {
-          throw new AppError('Save GPS coordinates for your delivery address before checkout.', 409, 'DELIVERY_GPS_REQUIRED');
-        }
         throw new AppError('This rider price has expired or is no longer available. Refresh delivery prices and choose again.', 409, 'DELIVERY_QUOTE_EXPIRED');
       }
 
