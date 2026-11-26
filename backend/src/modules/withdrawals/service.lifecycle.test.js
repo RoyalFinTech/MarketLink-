@@ -9,6 +9,7 @@ jest.mock('../../integrations/modempay',()=>({
   isH2HApproved:jest.fn(()=>true),
   quoteTransferFee:jest.fn(),
   initiateTransfer:jest.fn(),
+  retrieveTransfer:jest.fn(),
 }));
 
 const {query,withTransaction}=require('../../config/db');
@@ -28,6 +29,64 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     modemPay.isH2H.mockReturnValue(false);
     modemPay.isH2HApproved.mockReturnValue(true);
     modemPay.quoteTransferFee.mockResolvedValue({fee:1,currency:'GMD',network:'wave'});
+  });
+
+  test('Admin reconciliation retrieves and completes a confirmed provider transfer exactly once',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const pending={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'payout_pending',provider_ref:'provider-ref-1',amount:'50',wallet_debit_amount:'50',service_fee_amount:'0'};
+    const completed={...pending,status:'completed',provider_status:'completed'};
+    query.mockResolvedValueOnce({rows:[pending]}).mockResolvedValueOnce({rows:[]});
+    modemPay.retrieveTransfer.mockResolvedValue({
+      id:'provider-ref-1',status:'completed',amount:50,currency:'GMD',fee:0,
+      metadata:{withdrawal_id:withdrawalId}
+    });
+    clientQuery
+      .mockResolvedValueOnce({rows:[pending]})
+      .mockResolvedValueOnce({rows:[{id:'wallet-1',balance:'50'}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[completed]})
+      .mockResolvedValueOnce({rows:[]});
+
+    const result=await service.reconcileProviderWithdrawal(withdrawalId,'admin-user');
+
+    expect(result).toMatchObject({status:'completed'});
+    expect(modemPay.retrieveTransfer).toHaveBeenCalledWith('provider-ref-1');
+    expect(clientQuery.mock.calls.filter(([sql])=>sql.includes('UPDATE wallets SET balance=balance-$1'))).toHaveLength(1);
+    expect(clientQuery.mock.calls.filter(([sql])=>sql.includes("VALUES ($1,'debit','withdrawal'"))).toHaveLength(1);
+  });
+
+  test('Admin reconciliation refuses a provider amount mismatch without changing wallet or withdrawal',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const pending={id:withdrawalId,status:'payout_pending',provider_ref:'provider-ref-1',amount:'50'};
+    query.mockResolvedValueOnce({rows:[pending]});
+    modemPay.retrieveTransfer.mockResolvedValue({
+      id:'provider-ref-1',status:'completed',amount:49,currency:'GMD',
+      metadata:{withdrawal_id:withdrawalId}
+    });
+
+    await expect(service.reconcileProviderWithdrawal(withdrawalId,'admin-user'))
+      .rejects.toMatchObject({code:'PROVIDER_AMOUNT_MISMATCH',statusCode:409});
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(clientQuery).not.toHaveBeenCalled();
+  });
+
+  test('Admin reconciliation keeps a pending provider transfer reserved without debiting wallet',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const pending={id:withdrawalId,status:'payout_pending',provider_ref:'provider-ref-1',amount:'50'};
+    const refreshed={...pending,provider_status:'pending'};
+    query.mockResolvedValueOnce({rows:[pending]}).mockResolvedValueOnce({rows:[]});
+    modemPay.retrieveTransfer.mockResolvedValue({
+      id:'provider-ref-1',status:'pending',amount:50,currency:'GMD',
+      metadata:{withdrawal_id:withdrawalId}
+    });
+    clientQuery
+      .mockResolvedValueOnce({rows:[pending]})
+      .mockResolvedValueOnce({rows:[refreshed]});
+
+    const result=await service.reconcileProviderWithdrawal(withdrawalId,'admin-user');
+
+    expect(result).toMatchObject({status:'payout_pending',provider_status:'pending'});
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
 
   test('enforces the D50 minimum before opening a transaction',async()=>{
