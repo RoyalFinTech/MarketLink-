@@ -518,12 +518,12 @@ async function processDispatchTimers() {
        WHERE d.status='assigned' AND (
          (ra.status='pending' AND (
            ($1::boolean AND ra.response_deadline_at<=now()) OR
-           ($2::boolean AND ra.reminder_1_sent_at IS NULL AND ra.created_at<=now()-($3::int * interval '1 second')) OR
-           ($2::boolean AND ra.reminder_2_sent_at IS NULL AND ra.created_at<=now()-($4::int * interval '1 second'))
+           ($2::boolean AND (ra.response_deadline_at IS NULL OR ra.response_deadline_at>now()) AND ra.reminder_1_sent_at IS NULL AND ra.created_at<=now()-($3::int * interval '1 second')) OR
+           ($2::boolean AND (ra.response_deadline_at IS NULL OR ra.response_deadline_at>now()) AND ra.reminder_2_sent_at IS NULL AND ra.created_at<=now()-($4::int * interval '1 second'))
          )) OR
          (ra.status='accepted' AND (
            ($1::boolean AND ra.pickup_deadline_at<=now()) OR
-           ($2::boolean AND ra.pickup_reminder_sent_at IS NULL AND ra.responded_at<=now()-($5::int * interval '1 second'))
+           ($2::boolean AND (ra.pickup_deadline_at IS NULL OR ra.pickup_deadline_at>now()) AND ra.pickup_reminder_sent_at IS NULL AND ra.responded_at<=now()-($5::int * interval '1 second'))
          ))
        )
        ORDER BY COALESCE(ra.response_deadline_at,ra.pickup_deadline_at,ra.created_at) ASC
