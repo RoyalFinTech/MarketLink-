@@ -3439,7 +3439,7 @@
       if(String(data.status||'').toLowerCase()==='completed'){
         toast('The payment provider confirmed the payout. The DAHA wallet ledger has been reconciled.','success');
       }else if(String(data.status||'').toLowerCase()==='rejected'){
-        toast('Modem Pay reports this transfer failed. The withdrawal reservation has been released.','success');
+        toast('The payment provider reports this transfer failed. The withdrawal reservation has been released.','success');
       }else{
         toast('Provider status: '+providerStatus+'. Funds remain reserved; no new transfer was sent.','info');
       }
