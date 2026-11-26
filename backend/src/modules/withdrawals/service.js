@@ -362,6 +362,22 @@ async function processProviderWebhook(event) {
   if (!withdrawalId) return { ignored:true, reason:'missing_withdrawal_id' };
   if (!/^[0-9a-f-]{36}$/i.test(String(withdrawalId))) return { ignored:true, reason:'invalid_withdrawal_id' };
 
+  // The signed event name and its payload status must agree. A malformed or
+  // misrouted `transfer.failed` event must never release a reservation for a
+  // transfer whose payload actually reports success (or vice versa).
+  const payloadStatus = String(payload.status || '').trim().toLowerCase();
+  const expectedStatuses = {
+    'transfer.succeeded': ['completed','succeeded','success'],
+    'transfer.failed': ['failed','rejected'],
+    'transfer.cancelled': ['cancelled','canceled'],
+    'transfer.flagged': ['flagged'],
+    'transfer.reversed': ['reversed'],
+  };
+  const allowedStatuses = expectedStatuses[event.event];
+  if (allowedStatuses && !allowedStatuses.includes(payloadStatus)) {
+    return { ignored:true, reason:'event_status_mismatch' };
+  }
+
   if (event.event === 'transfer.succeeded') {
     const references = [payload.id,payload.transfer_reference,payload.transaction_reference,payload.reference]
       .filter(Boolean).map(String);
