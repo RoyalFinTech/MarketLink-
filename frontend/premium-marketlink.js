@@ -1059,8 +1059,17 @@
           var items=Array.isArray(o.items)?o.items:[];
           var summary=items.slice(0,3).map(function(it){return esc(it.name||it.product_name_snapshot||'Item')+' × '+Number(it.qty||it.quantity||1);}).join(' · ');
           if(!summary)summary='Order details available';
+          var vendorPhoneDigits=String(o.vendor_phone||'').replace(/\D/g,'');
+          var vendorWaDigits=String(o.vendor_whatsapp_number||o.vendor_phone||'').replace(/\D/g,'');
+          if(vendorPhoneDigits.length===9)vendorPhoneDigits='220'+vendorPhoneDigits;
+          if(vendorWaDigits.length===9)vendorWaDigits='220'+vendorWaDigits;
+          var vendorContactHtml=(vendorPhoneDigits.length>=9||vendorWaDigits.length>=9)
+            ?'<div class="ml-live-order-contact" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">'+
+              (vendorPhoneDigits.length>=9?'<a class="ml-btn ml-btn-secondary" href="tel:'+vendorPhoneDigits+'" style="text-decoration:none">📞 Call shop</a>':'')+
+              (vendorWaDigits.length>=9?'<a class="ml-btn ml-btn-secondary" href="https://wa.me/'+vendorWaDigits+'?text='+encodeURIComponent('Hello, I am contacting you about my MarketLink order '+String(o.order_number||'')+'.')+'" target="_blank" rel="noopener noreferrer" style="text-decoration:none">WhatsApp shop ↗</a>':'')+
+             '</div>':'';
           return '<article class="ml-live-order-card"><div class="ml-live-order-top"><div><span class="ml-live-order-id">'+esc(o.order_number||o.id||'MarketLink order')+'</span><div class="ml-live-order-date">'+mlOrderDate(o.placed_at||o.created_at)+'</div></div><span class="ml-live-order-status '+tone+'">'+esc(mlOrderStatusLabel(status))+'</span></div>'+
-            '<div class="ml-live-order-vendor">🏪 '+esc(o.vendor_name||'MarketLink vendor')+'</div><div class="ml-live-order-items">'+summary+(items.length>3?' · +'+(items.length-3)+' more':'')+'</div>'+
+            '<div class="ml-live-order-vendor">🏪 '+esc(o.vendor_name||'MarketLink vendor')+'</div>'+vendorContactHtml+'<div class="ml-live-order-items">'+summary+(items.length>3?' · +'+(items.length-3)+' more':'')+'</div>'+
             '<div class="ml-live-order-bottom"><div><span>Total</span><strong>'+money(o.total||0)+'</strong><small>'+esc(paymentMethodLabel(o.payment_method)||'Payment method not listed')+'</small></div><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.viewOrder(\''+esc(String(o.id||''))+'\')">View details →</button></div></article>';
         }).join('')+'</div></div>';
     }catch(e){
@@ -1210,7 +1219,16 @@
         return '<div class="ml-tracking-step '+cls+'"><span class="ml-tracking-step-marker">'+mark+'</span><div class="ml-tracking-step-copy"><b>'+esc(st.title)+'</b><p>'+esc(st.body)+'</p><small>'+esc(found?mlTrackingTime(found.changed_at):active?'Current status · '+mlOrderStatusLabel(current):'')+'</small>'+(found&&found.note?'<span class="ml-tracking-note">'+esc(found.note)+'</span>':'')+'</div></div>';
       }).join('');
       var ratio=Math.max(0,Math.min(100,progressIndex/(steps.length-1)*100));
-      var deliveryDetails=o.rider_name?'<div class="ml-tracking-meta-row"><span>Delivery rider</span><b>'+esc(o.rider_name)+'</b></div>':'';
+      var vendorPhoneDigits=String(o.vendor_phone||'').replace(/\D/g,'');
+      var vendorWaDigits=String(o.vendor_whatsapp_number||o.vendor_phone||'').replace(/\D/g,'');
+      if(vendorPhoneDigits.length===9)vendorPhoneDigits='220'+vendorPhoneDigits;
+      if(vendorWaDigits.length===9)vendorWaDigits='220'+vendorWaDigits;
+      var vendorContactHtml=(vendorPhoneDigits.length>=9||vendorWaDigits.length>=9)
+        ?'<div class="ml-tracking-meta-row"><span>Contact vendor</span><div style="display:flex;gap:7px;flex-wrap:wrap">'+
+          (vendorPhoneDigits.length>=9?'<a class="ml-btn ml-btn-secondary" href="tel:'+vendorPhoneDigits+'" style="text-decoration:none">📞 Call shop</a>':'')+
+          (vendorWaDigits.length>=9?'<a class="ml-btn ml-btn-secondary" href="https://wa.me/'+vendorWaDigits+'?text='+encodeURIComponent('Hello, I am contacting you about my MarketLink order '+String(o.order_number||'')+'.')+'" target="_blank" rel="noopener noreferrer" style="text-decoration:none">WhatsApp shop ↗</a>':'')+
+         '</div></div>':'';
+      var deliveryDetails=vendorContactHtml+(o.rider_name?'<div class="ml-tracking-meta-row"><span>Delivery rider</span><b>'+esc(o.rider_name)+'</b></div>':'');
       var riderPhoneDigits=String(liveTracking&&(liveTracking.rider_mobile_number||liveTracking.rider_phone)||o.rider_phone||'').replace(/\D/g,'');
       var riderWaDigits=String(liveTracking&&liveTracking.rider_whatsapp_number||o.rider_whatsapp_number||riderPhoneDigits).replace(/\D/g,'');
       if(!terminal&&o.rider_name&&(riderPhoneDigits.length>=9||riderWaDigits.length>=9)){
