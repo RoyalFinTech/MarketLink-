@@ -502,6 +502,7 @@ async function getById(id, userId, roles) {
        ORDER BY latest_payment.created_at DESC LIMIT 1) AS payment_attempt,
       u.full_name AS customer_name,
       v.business_name AS vendor_name,
+      v.phone AS vendor_phone,v.whatsapp_number AS vendor_whatsapp_number,
       COALESCE(json_agg(json_build_object(
         'name',oi.product_name_snapshot,'qty',oi.quantity,
         'price',oi.unit_price_snapshot,'total',oi.line_total
@@ -527,14 +528,18 @@ async function getById(id, userId, roles) {
     LEFT JOIN order_items oi ON oi.order_id=o.id
     LEFT JOIN deliveries d ON d.order_id=o.id
     WHERE o.id=$1
-    GROUP BY o.id,u.full_name,v.business_name,d.id,d.status,d.rider_id,
+    GROUP BY o.id,u.full_name,v.business_name,v.phone,v.whatsapp_number,d.id,d.status,d.rider_id,
       d.distance_km,d.estimated_minutes,d.picked_up_at,d.delivered_at
   `,[id]);
   if (!rows.length) throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
   const o=rows[0]; const adm=(roles||[]).some(r=>['admin','super_admin'].includes(r));
   if (!adm && o.customer_id!==userId && o.vendor_id!==userId && o.rider_id!==userId) throw new AppError('Forbidden.',403,'FORBIDDEN');
   // Rider WhatsApp is private contact data: expose it only to the customer who owns this order.
-  if (String(o.customer_id)!==String(userId)) delete o.rider_whatsapp_number;
+  if (String(o.customer_id)!==String(userId)) {
+    delete o.rider_whatsapp_number;
+    delete o.vendor_phone;
+    delete o.vendor_whatsapp_number;
+  }
   return o;
 }
 async function listForCustomer(customerId, { page=1, limit=20, status }) {
@@ -543,7 +548,7 @@ async function listForCustomer(customerId, { page=1, limit=20, status }) {
   if (status) { conds.push(`o.status=${params.length+1}`); params.push(status); }
   const { rows } = await query(`
     SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.placed_at,
-           v.business_name AS vendor_name,
+           v.business_name AS vendor_name,v.phone AS vendor_phone,v.whatsapp_number AS vendor_whatsapp_number,
            COALESCE(
              json_agg(
                json_build_object(
@@ -560,7 +565,7 @@ async function listForCustomer(customerId, { page=1, limit=20, status }) {
     JOIN vendors v ON v.user_id=o.vendor_id
     LEFT JOIN order_items oi ON oi.order_id=o.id
     WHERE ${conds.join(' AND ')}
-    GROUP BY o.id, v.business_name
+    GROUP BY o.id, v.business_name,v.phone,v.whatsapp_number
     ORDER BY o.placed_at DESC
     LIMIT ${params.length+1} OFFSET ${params.length+2}
   `,[...params,limit_,off]);
