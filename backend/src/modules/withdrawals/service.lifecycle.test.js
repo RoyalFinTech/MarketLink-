@@ -185,7 +185,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       event:'transfer.succeeded',
       payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49.98,currency:'GMD',status:'succeeded'}
     });
-    expect(result).toEqual({processed:true,data:{ignored:true,reason:'amount_mismatch'}});
+    expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
     expect(clientQuery).toHaveBeenCalledTimes(1);
     expect(clientQuery.mock.calls.some(([sql])=>sql.includes('UPDATE withdrawals SET provider_ref'))).toBe(false);
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
@@ -427,7 +427,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49,currency:'GMD',status:'failed'}
     });
 
-    expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
+    expect(result).toEqual({processed:true,data:{ignored:true,reason:'amount_mismatch'}});
     expect(clientQuery).toHaveBeenCalledTimes(1);
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE withdrawals|UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
