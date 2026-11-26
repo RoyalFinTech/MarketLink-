@@ -483,7 +483,7 @@ async function placeOrder({ customerId, vendorId, items, deliveryAddressId, deli
             ?'Order '+result.order.order_number+' is confirmed as Cash on Delivery for D '+amount+'. Prepare the items and collect payment on delivery.'
             :'Order '+result.order.order_number+' has been placed for D '+amount+'. Payment is not yet confirmed; check payment status before dispatch or handover.',
           referenceType:'order',referenceId:result.order.id,
-          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,
+          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&(process.env.RESEND_API_KEY||process.env.SENDGRID_API_KEY)),emailAddress:vendor.email||null,
             data:{orderId:String(result.order.id),orderNumber:String(result.order.order_number),paymentMethod:String(result.order.payment_method||'')}}
         });
       }
@@ -884,7 +884,7 @@ async function updateStatus(orderId,status,userId,roles,note){
             ?'Order '+vendor.order_number+' is ready. The selected rider has been asked to accept; MarketLink will remind them and automatically seek a replacement if they miss the deadline.'
             :'Order '+vendor.order_number+' is ready. The selected rider is unavailable, so MarketLink has started automatic replacement search. You can also assign another rider manually.',
           referenceType:'order',referenceId:orderId,
-          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,
+          channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&(process.env.RESEND_API_KEY||process.env.SENDGRID_API_KEY)),emailAddress:vendor.email||null,
             data:{orderId:String(orderId),orderNumber:String(vendor.order_number)}}
         });
       }
