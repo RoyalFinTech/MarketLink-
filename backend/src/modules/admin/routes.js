@@ -81,7 +81,7 @@ router.put('/smart-rider-dispatch/settings', authenticate, authorize(...ADMIN), 
   body('responseDeadlineSeconds').isInt({min:10,max:1800}),
   body('pickupReminderSeconds').isInt({min:5,max:1800}),
   body('pickupDeadlineSeconds').isInt({min:10,max:3600}),
-  body('reassignDelaySeconds').isInt({min:5,max:600}),
+  body('reassignDelaySeconds').isInt({min:0,max:600}),
   body('retrySearchIntervalSeconds').isInt({min:5,max:1800}),
   body('maxAutoDispatchAttempts').isInt({min:0,max:100}),
 ], validate, ctrl.updateSmartRiderDispatchSettings);
