@@ -204,7 +204,7 @@ describe('order creation ownership safeguards', () => {
     expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
-  test('recovers the same order when a customer retries after the order response was lost', async()=>{
+  test('recovers the same order after a lost response even if the saved GPS pin was edited', async()=>{
     const order={
       id:'order-recovered',customer_id:'customer-1',vendor_id:'vendor-1',
       delivery_address_id:'address-1',delivery_fee_quote_id:'quote-1',
@@ -223,7 +223,7 @@ describe('order creation ownership safeguards', () => {
       checkout_fingerprint:fingerprint
     };
     clientQuery.mockImplementation(async(sql)=>{
-      if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.45',longitude:'-16.58'}]};
+      if(sql.includes('FROM delivery_addresses'))return{rows:[{id:'address-1',latitude:'13.99',longitude:'-16.99'}]};
       if(sql.includes("status='quoted'"))return{rows:[]};
       if(sql.includes("status='consumed'"))return{rows:[consumedQuote]};
       if(sql.includes('FROM orders'))return{rows:[order]};
