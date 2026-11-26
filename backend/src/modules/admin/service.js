@@ -483,7 +483,7 @@ async function reassignSmartRiderDispatch(deliveryId, actor) {
   if(!before)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
   if(before.status!=='assigned'||!before.rider_id)throw new AppError('Only an assigned delivery before pickup can be reassigned.',409,'DELIVERY_NOT_REASSIGNABLE');
   const deliveryService=require('../delivery/service');
-  const result=await deliveryService.reassignDelivery(deliveryId,{id:actor&&actor.id,roles:[actor&&actor.role||'admin']});
+  const result=await deliveryService.reassignDelivery(deliveryId,{id:actor&&actor.id,roles:actor&&Array.isArray(actor.roles)?actor.roles:[actor&&actor.role||'admin']});
   if(actor&&actor.id)await query(
     `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
      VALUES($1,$2,'delivery.dispatch_manual_reassign','delivery',$3,$4,$5)`,
