@@ -422,6 +422,18 @@ async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
     if (newStatus === 'picked_up' && order.status !== 'rider_assigned') {
       throw new AppError('The vendor must mark the order ready and the rider must accept it before pickup.',409,'ORDER_NOT_READY_FOR_PICKUP');
     }
+    if (newStatus === 'picked_up') {
+      // Vendor assignment advances the order to rider_assigned while the
+      // rider's response is still pending. Require the matching acceptance
+      // record as a separate gate before the rider can confirm collection.
+      const { rows: [acceptedAssignment] } = await client.query(
+        "SELECT id FROM rider_assignments WHERE delivery_id=$1 AND rider_id=$2 AND status='accepted' LIMIT 1",
+        [deliveryId,d.rider_id]
+      );
+      if (!acceptedAssignment) {
+        throw new AppError('Accept this delivery request before confirming pickup.',409,'RIDER_ACCEPTANCE_REQUIRED');
+      }
+    }
     if (newStatus === 'in_transit' && order.status !== 'picked_up') {
       throw new AppError('Confirm pickup before starting the delivery journey.',409,'PICKUP_NOT_CONFIRMED');
     }
