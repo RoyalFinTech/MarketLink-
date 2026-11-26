@@ -472,8 +472,8 @@ async function updateSmartRiderDispatchSettings(input, actor) {
     );
     await client.query(
       `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
-       VALUES($1,$2,'delivery.dispatch_policy_updated','system_setting',$3,$4,$5)`,
-      [actor.id,actor.role||'admin','smart_rider_dispatch_policy',JSON.stringify(before),JSON.stringify(after)]
+       VALUES($1,$2,'delivery.dispatch_policy_updated','system_setting',NULL,$3,$4)`,
+      [actor.id,actor.role||'admin',JSON.stringify(before),JSON.stringify(after)]
     );
     // Apply changed deadlines to active assignments as well as future requests.
     // Reminder sent-at markers are deliberately preserved, so a saved policy
