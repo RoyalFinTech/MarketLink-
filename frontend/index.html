@@ -4414,7 +4414,7 @@ async function vManualAssign(orderId){
     var response=await ML_API.delivery.availableRiders(order.deliveryId);
     AVAILABLE_RIDERS=Array.isArray(response&&response.data)?response.data:[];
     if(!AVAILABLE_RIDERS.length){
-      el.innerHTML='<div style="color:var(--tx);font-size:15px;font-weight:800;margin-bottom:6px;">No riders online right now</div><div style="color:var(--mu);font-size:12px;line-height:1.6;margin-bottom:14px;">Keep the order ready, ask the customer to allow a little extra time, or try again in a few minutes. A rider must be approved and online to appear here.</div><button class="btn btn-p" style="width:100%;" onclick="vManualAssign(\''+String(orderId)+'\')">🔄 Search again</button>';
+      el.innerHTML='<div style="color:var(--tx);font-size:15px;font-weight:800;margin-bottom:6px;">No riders online right now</div><div style="color:var(--mu);font-size:12px;line-height:1.6;margin-bottom:14px;">Keep the order ready. MarketLink will automatically search again when an eligible rider comes online; you can also retry manually.</div><button class="btn btn-p" style="width:100%;" onclick="vManualAssign(\''+String(orderId)+'\')">🔄 Search again</button>';
       return;
     }
     el.innerHTML='<div style="color:var(--tx);font-size:15px;font-weight:800;margin-bottom:5px;">Choose a rider 🛵</div><div style="color:var(--mu);font-size:11px;line-height:1.5;margin-bottom:10px;">'+AVAILABLE_RIDERS.length+' available rider(s). Sorted nearest first when recent GPS is available.</div><input id="v-rider-search" type="search" autocomplete="off" aria-label="Search available riders" placeholder="Search by rider name, vehicle or zone" oninput="vFilterManualRiders(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:9px;padding:11px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--sf);color:var(--tx);font-size:12px;"><div id="v-rider-result-count" style="color:var(--mu);font-size:10px;margin-bottom:8px;"></div><div id="v-rider-results"></div>';
@@ -4451,7 +4451,7 @@ async function vConfirmManualAssign(riderId){
     await ML_API.delivery.assignRider(order.deliveryId,riderId);
     var chosen=AVAILABLE_RIDERS.find(function(r){return String(r.id)===String(riderId);});
     S.vOrders=S.vOrders.map(function(o){return String(o.id)===String(orderId)?Object.assign({},o,{status:'Rider Assigned',rawStatus:'rider_assigned',rider:chosen&&chosen.full_name||'Assigned rider'}):o;});
-    closeSheet('sh-notif');S._vendorLiveLoaded=false;await loadVendorLiveData();toast('Rider request sent. The rider must accept before confirming pickup. MarketLink will send reminders and search again if the timer expires.','success');refreshNotifBadges();
+    closeSheet('sh-notif');await loadVendorLiveData();toast('Rider request sent. The rider must accept before confirming pickup. MarketLink will send reminders and search again if the timer expires.','success');refreshNotifBadges();
   }catch(e){toast(e.error||'Could not assign this rider. Try refreshing the rider list.','error');}
 }
 function vAddProd(){
