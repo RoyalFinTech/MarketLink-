@@ -353,4 +353,31 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     );
     expect(modemPay.initiateTransfer).not.toHaveBeenCalled();
   });
+  test('Admin cannot reject a payout after provider initiation has begun',async()=>{
+    const pending={id:'withdrawal-payout-pending',user_id:'affiliate-user',status:'payout_pending',provider_status:'initiating'};
+    clientQuery.mockResolvedValueOnce({rows:[pending]});
+
+    await expect(service.reject(pending.id,'admin-user'))
+      .rejects.toMatchObject({code:'ALREADY_PROCESSED',statusCode:409});
+
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls[0][0]).toContain('FOR UPDATE');
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE withdrawals|UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('a repeated provider failure after rejection cannot release or debit funds a second time',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const rejected={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'rejected',provider_status:'failed',provider_ref:'provider-ref-1',amount:'50'};
+    clientQuery.mockResolvedValueOnce({rows:[rejected]});
+
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'GMD',status:'failed'}
+    });
+
+    expect(result).toMatchObject({processed:true,data:{status:'rejected',provider_status:'failed'}});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE withdrawals|UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
 });
