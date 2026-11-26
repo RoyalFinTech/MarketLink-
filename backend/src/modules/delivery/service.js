@@ -338,7 +338,7 @@ async function acceptDelivery(deliveryId, riderId) {
     );
     if(!assignment) {
       const { rows:[alreadyAccepted] } = await client.query(
-        "SELECT id FROM rider_assignments WHERE delivery_id=$1 AND rider_id=$2 AND status='accepted' LIMIT 1",
+        "SELECT id FROM rider_assignments WHERE delivery_id=$1 AND rider_id=$2 AND status='accepted' AND (pickup_deadline_at IS NULL OR pickup_deadline_at>now()) LIMIT 1",
         [deliveryId,riderId]
       );
       if(!alreadyAccepted)throw new AppError('This rider request has already expired or been reassigned.',409,'DELIVERY_ASSIGNMENT_EXPIRED');
