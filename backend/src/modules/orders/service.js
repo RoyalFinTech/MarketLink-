@@ -862,9 +862,10 @@ async function updateStatus(orderId,status,userId,roles,note){
     }
     if(status==='awaiting_rider'){
       const { rows:[deliveryState] }=await client.query(
-        'SELECT status,rider_id FROM deliveries WHERE order_id=$1 LIMIT 1',
+        'SELECT id,status,rider_id FROM deliveries WHERE order_id=$1 LIMIT 1',
         [orderId]
       );
+      updatedOrder.delivery_id=deliveryState&&deliveryState.id||null;
       updatedOrder.delivery_status=deliveryState&&deliveryState.status||null;
       updatedOrder.delivery_rider_id=deliveryState&&deliveryState.rider_id||null;
     }
