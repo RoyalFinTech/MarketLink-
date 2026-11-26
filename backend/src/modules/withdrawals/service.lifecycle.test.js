@@ -32,7 +32,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
 
   test('enforces the D50 minimum before opening a transaction',async()=>{
     await expect(service.requestWithdrawal('affiliate-user',{
-      amount:49.99,payoutMethod:'wave',payoutDetails:{account_number:'871234567',beneficiary_name:'Awa Jallow'},pin:'1234'
+      amount:49.98,payoutMethod:'wave',payoutDetails:{account_number:'871234567',beneficiary_name:'Awa Jallow'},pin:'1234'
     })).rejects.toMatchObject({code:'BELOW_MINIMUM',statusCode:400});
     expect(withTransaction).not.toHaveBeenCalled();
   });
@@ -136,6 +136,31 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     });
     expect(result).toEqual({processed:true,data:{ignored:true,reason:'provider_reference_mismatch'}});
     expect(clientQuery).toHaveBeenCalledTimes(1);
+  });
+
+  test('a successful provider webhook with a mismatched amount cannot bind or debit the withdrawal',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_ref:null,amount:'50'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.succeeded',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49.98,currency:'GMD',status:'succeeded'}
+    });
+    expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>sql.includes('UPDATE withdrawals SET provider_ref'))).toBe(false);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('a failed provider webhook with the wrong currency cannot release the withdrawal reservation',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_ref:'provider-ref-1',amount:'50'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'USD',status:'failed'}
+    });
+    expect(result).toMatchObject({processed:true,data:{ignored:true,reason:'currency_mismatch'}});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>sql.includes("status='rejected'"))).toBe(false);
   });
 
   test('a matching successful provider webhook debits the wallet and writes one withdrawal ledger entry',async()=>{
