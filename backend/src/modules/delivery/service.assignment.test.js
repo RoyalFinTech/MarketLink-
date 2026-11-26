@@ -241,19 +241,26 @@ describe('vendor and rider assignment lifecycle',()=>{
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{delivery_id:deliveryId,vendor_id:vendor.id,order_number:'ML-1001'}]});
+    query
+      .mockResolvedValueOnce({rows:[]}) // policy for timer loop
+      .mockResolvedValueOnce({rows:[]}) // policy for automatic search
+      .mockResolvedValueOnce({rows:[{auto_dispatch_attempts:0}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{id:deliveryId,vendor_id:vendor.id,status:'unassigned',order_status:'awaiting_rider',delivery_fee_quote_id:null,pickup_lat:null,pickup_lng:null}]})
+      .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
-    query.mockResolvedValueOnce({rows:[]}); // default dispatch policy
 
     const result=await processDispatchTimers();
 
-    expect(result.processed).toBe(1);
+    expect(result.processed).toBe(2);
     expect(clientQuery.mock.calls.some(([sql])=>/SET status='reassigned'/.test(sql))).toBe(true);
     expect(clientQuery.mock.calls.some(([sql])=>/next_auto_dispatch_at=now\(\)\+\(\$3::int \* interval '1 second'\)/.test(sql))).toBe(true);
     expect(notificationsService.pushToUser).toHaveBeenCalledWith(riderId,expect.objectContaining({
       title:'Delivery request expired'
     }));
-    // The configured reassignment delay is honoured; replacement search is not run early.
-    expect(notificationsService.send).not.toHaveBeenCalledWith(expect.objectContaining({
+    expect(query.mock.calls.some(([sql])=>/auto_dispatch_attempts=COALESCE\(auto_dispatch_attempts,0\)\+1/.test(sql))).toBe(true);
+    expect(notificationsService.send).toHaveBeenCalledWith(expect.objectContaining({
       userId:vendor.id,title:'No replacement rider available yet'
     }));
   });
