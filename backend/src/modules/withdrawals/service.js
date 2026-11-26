@@ -500,7 +500,7 @@ async function processProviderWebhook(event) {
 // Admin recovery path for a payout whose webhook was delayed or lost.
 // Modem Pay documents GET /v1/transfers/:id for retrieving the authoritative
 // transfer object. This never creates or retries a transfer.
-async function reconcileProviderWithdrawal(withdrawalId, adminUserId) {
+async function reconcileProviderWithdrawal(withdrawalId, actor) {
   if (!modemPay.isConfigured()) {
     throw new AppError('Modem Pay is not configured. No reconciliation was performed.',503,'PROVIDER_UNAVAILABLE');
   }
@@ -558,8 +558,8 @@ async function reconcileProviderWithdrawal(withdrawalId, adminUserId) {
   }
 
   await query(
-    "INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES($1,'admin','withdrawal.provider_reconciled','withdrawal',$2,$3)",
-    [adminUserId,wd.id,JSON.stringify({providerStatus:status,marketLinkStatus:result&&result.status||null,providerRef:wd.provider_ref})]
+    "INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data) VALUES($1,$2,'withdrawal.provider_reconciled','withdrawal',$3,$4)",
+    [actor.id,actor.role||'admin',wd.id,JSON.stringify({providerStatus:status,marketLinkStatus:result&&result.status||null,providerRef:wd.provider_ref})]
   ).catch(()=>null);
   return result;
 }
