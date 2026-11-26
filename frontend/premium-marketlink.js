@@ -3505,6 +3505,7 @@
         ['amountMismatches','Order / commission amount mismatches'],
         ['missingRecipients','Missing payout recipients'],
         ['missingWalletCredits','Paid commissions with missing wallet credits'],
+        ['settlementCreditMismatches','Settlement credits with wrong recipient or amount'],
         ['withdrawalsNeedingAttention','Withdrawals needing attention'],
         ['walletLedgerMismatches','Wallet / transaction ledger differences'],
         ['duplicateReferences','Duplicate transaction or provider references']
@@ -3529,6 +3530,14 @@
           if(x.difference!=null)detail.push('Difference: '+money(x.difference));
           if(x.has_no_ledger_entries)detail.push('No ledger transactions recorded');
           if(x.duplicate_count)detail.push('Duplicates: '+x.duplicate_count);
+          if(x.vendor_credit_count!=null)detail.push('Vendor credit: '+x.vendor_credit_count+' · credited '+money(x.vendor_credit_amount||0)+' / expected '+money(x.vendor_payout||0));
+          if(x.vendor_wrong_recipient_count)detail.push('Vendor credit is in the wrong wallet');
+          if(x.rider_credit_count!=null)detail.push('Rider credit: '+x.rider_credit_count+' · credited '+money(x.rider_credit_amount||0)+' / expected '+money(x.rider_payout||0));
+          if(x.rider_wrong_recipient_count)detail.push('Rider credit is in the wrong wallet');
+          if(x.affiliate_credit_count!=null)detail.push('Affiliate credit: '+x.affiliate_credit_count+' · credited '+money(x.affiliate_credit_amount||0)+' / expected '+money(x.affiliate_commission_amount||0));
+          if(x.affiliate_wrong_recipient_count)detail.push('Affiliate credit is in the wrong wallet');
+          if(x.platform_earning_count!=null)detail.push('Platform earning rows: '+x.platform_earning_count+' · net '+money(x.platform_earning_amount||0)+' / expected '+money(x.platform_net_fee||0));
+          if(x.platform_earning_count!=null)detail.push('Payout-fee recovery: '+money(x.platform_recovery_amount||0)+' / expected '+money(x.payout_fee_recovery_amount||0));
           ['vendor_credit_missing','rider_credit_missing','rider_earning_record_missing','affiliate_credit_missing','platform_earning_missing','platform_earning_mismatch'].forEach(function(k){if(x[k])detail.push(k.replace(/_/g,' '));});
           var retryAction=item[0]==='pendingSettlement'&&x.id
             ?'<button type="button" class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.ML_Premium.retryFinancialSettlement(&quot;'+esc(x.id)+'&quot;,&quot;'+esc(ref)+'&quot;)">Retry settlement</button>'
