@@ -7,6 +7,7 @@ exports.list       = wrap(async (req,res) => res.json({ success:true, data: awai
 exports.getById    = wrap(async (req,res) => res.json({ success:true, data: await svc.getById(req.params.id, req.user.id, req.user.roles) }));
 exports.getTracking= wrap(async (req,res) => res.json({ success:true, data: await svc.getTracking(req.params.id,req.user.id,req.user.roles) }));
 exports.availableRiders = wrap(async (req,res) => res.json({ success:true, data: await svc.listAvailableRiders(req.params.id,req.user.id,req.user.roles) }));
+exports.reassign  = wrap(async (req,res) => res.json({ success:true, data: await svc.reassignDelivery(req.params.id, {id:req.user.id,roles:req.user.roles}) }));
 exports.assign     = wrap(async (req,res) => res.json({ success:true, data: await svc.assignRider(req.params.id, req.body.riderId, { id: req.user.id, roles:req.user.roles, isAuto: false }) }));
 exports.accept     = wrap(async (req,res) => res.json({ success:true, data: await svc.acceptDelivery(req.params.id, req.user.id) }));
 exports.decline = wrap(async (req,res) => res.json({ success:true, data: await svc.declineDelivery(req.params.id, req.user.id) }));
