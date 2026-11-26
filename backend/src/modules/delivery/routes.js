@@ -10,6 +10,7 @@ router.get('/', authenticate, authorize(...ADMIN), ctrl.list);
 router.get('/:id', authenticate, [param('id').isUUID()], validate, ctrl.getById);
 router.get('/:id/tracking', authenticate, [param('id').isUUID()], validate, ctrl.getTracking);
 router.get('/:id/available-riders', authenticate, authorize('vendor',...ADMIN), [param('id').isUUID()], validate, ctrl.availableRiders);
+router.post('/:id/reassign', authenticate, authorize('vendor',...ADMIN), [param('id').isUUID()], validate, ctrl.reassign);
 router.post('/:id/assign', authenticate, authorize('vendor',...ADMIN),
   [param('id').isUUID(), body('riderId').isUUID().withMessage('riderId is required.')],
   validate, ctrl.assign);
