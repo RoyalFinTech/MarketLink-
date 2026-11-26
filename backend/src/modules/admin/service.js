@@ -6,7 +6,7 @@ const { validateWithdrawalFeePct } = require('../../utils/walletWithdrawalFees')
 const { validatePayoutFeeRecoveryPct } = require('../../utils/payoutFeeRecovery');
 const { DEFAULT_DELIVERY_PRICING_POLICY, normaliseDeliveryPricingPolicy, validateDeliveryPricingPolicy, validateRiderDeliveryOverride } = require('../../utils/deliveryPricingPolicy');
 const modemPay = require('../../integrations/modempay');
-const { DEFAULT_SMART_RIDER_DISPATCH_POLICY, normaliseSmartRiderDispatchPolicy, validateSmartRiderDispatchPolicy } = require('../delivery/dispatchPolicy');
+const { normaliseSmartRiderDispatchPolicy, validateSmartRiderDispatchPolicy } = require('../delivery/dispatchPolicy');
 
 async function getDashboard() {
   const [customers, vendors, riders, orders, revenue, pendingApprovals, recentOrders, topVendors] = await Promise.all([
