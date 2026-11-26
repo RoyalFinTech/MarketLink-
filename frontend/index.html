@@ -4127,6 +4127,22 @@ function marketlinkDashboardAvatarButton(compact){
     :'<span class="ml-dashboard-avatar-fallback">'+initial+'</span>';
   return '<button type="button" class="ml-dashboard-avatar'+(compact?' ml-dashboard-avatar-compact':'')+'" onclick="switchTab(\'profile\')" aria-label="Open your profile" title="Open your profile">'+image+'</button>';
 }
+var mlVendorDispatchCountdownTimer=null;
+function updateVendorDispatchCountdowns(){
+  var nodes=document.querySelectorAll('[data-ml-rider-deadline]');
+  nodes.forEach(function(node){
+    var remaining=Number(node.getAttribute('data-ml-rider-deadline'))-Date.now();
+    if(!Number.isFinite(remaining)||remaining<=0){
+      node.textContent='00:00 · timer expired';
+      node.style.color='#EF4444';
+      return;
+    }
+    var seconds=Math.ceil(remaining/1000),minutes=Math.floor(seconds/60),rest=String(seconds%60).padStart(2,'0');
+    node.textContent=String(minutes).padStart(2,'0')+':'+rest;
+  });
+  if(mlVendorDispatchCountdownTimer)clearInterval(mlVendorDispatchCountdownTimer);
+  if(nodes.length)mlVendorDispatchCountdownTimer=setInterval(updateVendorDispatchCountdowns,1000);
+}
 function renderVDash(){
   var el=G('vdash-body'); if(!el) return;
   el.classList.add('ml-role-dashboard-premium','ml-vendor-dashboard');
@@ -4170,7 +4186,7 @@ function renderVDash(){
             var wa=String(o.riderWhatsApp||o.riderMobile||o.riderPhone||'').replace(/[^0-9]/g,'');
             var accepted=String(o.assignmentStatus||'').toLowerCase()==='accepted';
             var deadline=accepted?o.pickupDeadlineAt:o.responseDeadlineAt;
-            var deadlineText=deadline?' · deadline '+new Date(deadline).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
+            var deadlineText=deadline?' · <span data-ml-rider-deadline="'+Number(new Date(deadline).getTime())+'">--:--</span> remaining':'';
             return '<div style="width:100%;margin-top:9px;padding:10px;border-radius:11px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.22);">'+
               '<div style="color:#bda9ff;font-size:11px;font-weight:800;">🛵 '+sanitizeText(o.rider||'Assigned rider')+' · '+(accepted?'Accepted · heading to shop':'Waiting for rider acceptance')+'</div>'+
               '<div style="color:var(--mu);font-size:10px;margin-top:4px;">'+(accepted?'Pickup confirmation timer is running':'Rider has 90 seconds to accept')+deadlineText+'</div>'+
@@ -4324,6 +4340,7 @@ function renderVDash(){
       return '<div onclick="S.vSubTab=\''+t+'\';renderVDash();" class="stab" style="font-weight:'+(S.vSubTab===t?700:400)+';color:'+(S.vSubTab===t?'#0D7377':'var(--mu)')+';border-bottom-color:'+(S.vSubTab===t?'#0D7377':'transparent')+';">'+tabLabels[i]+'</div>';
     }).join('')+'</div>'+
     '<div style="padding:13px;">'+content+'</div>';
+  updateVendorDispatchCountdowns();
 }
 function openVendorNotifs(){
   NotificationCenter.markAllRead('vendor');
