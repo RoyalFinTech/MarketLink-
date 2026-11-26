@@ -100,8 +100,10 @@ describe('rider cash remittance controls',()=>{
 
  test('Admin verification refuses a receipt when the payment amount has changed',async()=>{
   tx.mockImplementation(async(sql)=>{
-   if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
+   if(sql.includes('SELECT payment_id FROM cod_cash_remittances WHERE id=$1'))return{rows:[{payment_id:paymentId}]};
+   if(sql.includes('SELECT payment_id FROM cod_cash_remittances WHERE id=$1'))return{rows:[{payment_id:paymentId}]};
    if(sql.includes('SELECT p.method,p.amount'))return{rows:[{method:'cod',amount:'150.00',order_status:'delivered',delivery_status:'delivered',rider_id:riderId}]};
+   if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
    return{rows:[]};
   });
   await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched reference'))
