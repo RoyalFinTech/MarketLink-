@@ -208,6 +208,37 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
 
+  test('a signed failure arriving before the transfer reference is saved binds it and releases the reservation',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    const unbound={id:withdrawalId,user_id:'affiliate-user',status:'payout_pending',provider_ref:null,amount:'50'};
+    const rejected={...unbound,provider_ref:'provider-ref-early',status:'rejected',provider_status:'failed'};
+    clientQuery
+      .mockResolvedValueOnce({rows:[unbound]})
+      .mockResolvedValueOnce({rows:[rejected]})
+      .mockResolvedValueOnce({rows:[]});
+
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-early',amount:50,currency:'GMD',status:'failed'}
+    });
+
+    expect(result).toMatchObject({processed:true,data:{status:'rejected',provider_ref:'provider-ref-early'}});
+    expect(clientQuery.mock.calls[1][0]).toContain('provider_ref=COALESCE(provider_ref,$1)');
+    expect(clientQuery.mock.calls[1][0]).toContain("status='rejected'");
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
+  });
+
+  test('an early failure with multiple distinct references is not allowed to bind',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_ref:null,amount:'50'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.failed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-a',transfer_reference:'provider-ref-b',amount:50,currency:'GMD',status:'failed'}
+    });
+    expect(result).toEqual({processed:true,data:{ignored:true,reason:'ambiguous_provider_reference'}});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+  });
+
   test.each([
     ['transfer.failed','completed'],
     ['transfer.cancelled','succeeded'],
