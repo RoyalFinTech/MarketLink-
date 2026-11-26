@@ -171,6 +171,14 @@ async function initiateTransfer({ amount, currency='GMD', network, accountNumber
   });
 }
 
+async function retrieveTransfer(transferId) {
+  if (isH2H()) throw new AppError('Transfer reconciliation is not supported in H2H mode until the provider confirms the H2H transfer lookup contract.', 409, 'PAYOUT_LOOKUP_UNSUPPORTED');
+  const id=String(transferId||'').trim();
+  if(!id)throw new AppError('A Modem Pay transfer ID is required for reconciliation.',400,'TRANSFER_REFERENCE_REQUIRED');
+  const response=await modemRequest('/transfers/'+encodeURIComponent(id));
+  return response?.data||response;
+}
+
 async function quoteTransferFee({ amount, currency='GMD', network } = {}) {
   const value = Number(amount);
   const rail = String(network || '').trim().toLowerCase();
@@ -205,5 +213,5 @@ function verifyWebhookSignature(rawBody, signature, canonicalBody) {
 
 module.exports = {
   createPaymentIntent, confirmCharge, finalizeCharge, getTransaction,
-  initiateTransfer, quoteTransferFee, verifyWebhookSignature, isH2H, isConfigured, isWebhookConfigured, isH2HApproved,
+  initiateTransfer, retrieveTransfer, quoteTransferFee, verifyWebhookSignature, isH2H, isConfigured, isWebhookConfigured, isH2HApproved,
 };
