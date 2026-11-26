@@ -453,7 +453,7 @@ async function getSmartRiderDispatchOverview() {
   };
 }
 
-async function searchSmartRiderDispatch(deliveryId) {
+async function searchSmartRiderDispatch(deliveryId, actor) {
   const AppError=require('../../middleware/errorHandler').AppError;
   const {rows:[delivery]}=await query(
     `SELECT d.id,d.status,o.vendor_id,o.order_number,o.status AS order_status
@@ -465,7 +465,31 @@ async function searchSmartRiderDispatch(deliveryId) {
     throw new AppError('A manual rider search is only available for an order waiting for a rider and not yet assigned.',409,'DELIVERY_NOT_SEARCHABLE');
   }
   const deliveryService=require('../delivery/service');
-  return deliveryService.dispatchNextRider(delivery.id,delivery.vendor_id,delivery.order_number,true,{automatic:false});
+  const result=await deliveryService.dispatchNextRider(delivery.id,delivery.vendor_id,delivery.order_number,true,{automatic:false});
+  if(actor&&actor.id)await query(
+    `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
+     VALUES($1,$2,'delivery.dispatch_manual_search','delivery',$3,$4,$5)`,
+    [actor.id,actor.role||'admin',delivery.id,JSON.stringify({status:'unassigned'}),JSON.stringify(result)]
+  );
+  return result;
+}
+
+async function reassignSmartRiderDispatch(deliveryId, actor) {
+  const AppError=require('../../middleware/errorHandler').AppError;
+  const {rows:[before]}=await query(
+    'SELECT d.id,d.status,d.rider_id,o.vendor_id FROM deliveries d JOIN orders o ON o.id=d.order_id WHERE d.id=$1',
+    [deliveryId]
+  );
+  if(!before)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+  if(before.status!=='assigned'||!before.rider_id)throw new AppError('Only an assigned delivery before pickup can be reassigned.',409,'DELIVERY_NOT_REASSIGNABLE');
+  const deliveryService=require('../delivery/service');
+  const result=await deliveryService.reassignDelivery(deliveryId,actor);
+  if(actor&&actor.id)await query(
+    `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,before_data,after_data)
+     VALUES($1,$2,'delivery.dispatch_manual_reassign','delivery',$3,$4,$5)`,
+    [actor.id,actor.role||'admin',deliveryId,JSON.stringify({status:before.status,riderId:before.rider_id}),JSON.stringify(result)]
+  );
+  return result;
 }
 
 async function updateSmartRiderDispatchSettings(input, actor) {
@@ -927,4 +951,4 @@ async function sendAdminConversationMessage(conversationId,body,actor) {
   });
 }
 
-module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSmartRiderDispatchOverview, updateSmartRiderDispatchSettings, searchSmartRiderDispatch, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
+module.exports = { getDashboard, getUsers, grantAdminRole, suspendUser, reinstateUser, getAnalytics, getMarketplaceCommissionSettings, updateMarketplaceCommissionSettings, getDeliveryPricingSettings, updateDeliveryPricingSettings, listAdminRiderPricing, updateAdminRiderPricingOverride, listVendorProductPricing, updateVendorProductPriceOverride, getPaymentReadiness, getWithdrawalFeeReport, getSmartRiderDispatchOverview, updateSmartRiderDispatchSettings, searchSmartRiderDispatch, reassignSmartRiderDispatch, getSystemSettings, updateSystemSetting, getAuditLogs, getReports, getAffiliateDirectory, getAdminTransactions, getFailedPayments, retryFinancialSettlement, listSupportTickets, getSupportTicket, updateSupportTicket, replySupportTicket, getCrmProfile, addCrmNote, listAdminConversations, startAdminConversation, getAdminConversationMessages, sendAdminConversationMessage };
