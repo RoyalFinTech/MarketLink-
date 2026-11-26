@@ -352,6 +352,9 @@ assert.match(withdrawalService, /marketlink-withdrawal-/, 'Withdrawal retries mu
 assert.match(withdrawalService, /SELECT \* FROM withdrawals WHERE id=\$1 FOR UPDATE/, 'Admin payout processing must lock the withdrawal record');
 assert.match(withdrawalService, /UPDATE wallets SET balance=balance-\$1/, 'Customer funds must only be debited after verified payout completion');
 assert.match(withdrawalTests, /clamps customer withdrawal history pagination/, 'Customer withdrawal history must clamp pagination');
+assert.match(html, /reconcileWithdrawal: function\(id\)\{return post\('\/admin\/withdrawals\/'\+encodeURIComponent\(id\)\+'\/reconcile'/, 'Admin API client must expose the protected provider reconciliation endpoint');
+assert.match(premiumJs, /async function reconcileDahaWithdrawal/, 'Admin payout page must provide a provider reconciliation action');
+assert.match(premiumJs, /Check provider status/, 'Admin payout queue must expose a status-check control for transfers with provider references');
 
 
 
