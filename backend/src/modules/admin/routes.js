@@ -68,6 +68,22 @@ router.put('/commission-settings', authenticate, authorize(...ADMIN), [
   body('withdrawalServiceFeePct').optional().isFloat({min:0,max:10}),
   body('payoutFeeRecoveryPct').optional().isFloat({min:0,max:10}),
 ], validate, ctrl.updateCommissionSettings);
+router.get('/smart-rider-dispatch', authenticate, authorize(...ADMIN), ctrl.smartRiderDispatch);
+router.put('/smart-rider-dispatch/settings', authenticate, authorize(...ADMIN), [
+  body('automationEnabled').isBoolean(),
+  body('remindersEnabled').isBoolean(),
+  body('autoReassignEnabled').isBoolean(),
+  body('autoSearchEnabled').isBoolean(),
+  body('firstReminderSeconds').isInt({min:5,max:600}),
+  body('secondReminderSeconds').isInt({min:6,max:900}),
+  body('responseDeadlineSeconds').isInt({min:10,max:1800}),
+  body('pickupReminderSeconds').isInt({min:5,max:1800}),
+  body('pickupDeadlineSeconds').isInt({min:10,max:3600}),
+  body('reassignDelaySeconds').isInt({min:5,max:600}),
+  body('retrySearchIntervalSeconds').isInt({min:5,max:1800}),
+  body('maxAutoDispatchAttempts').isInt({min:0,max:100}),
+], validate, ctrl.updateSmartRiderDispatchSettings);
+
 router.get('/settings',    authenticate, authorize(...SA), ctrl.settings);
 router.put('/settings/:key', authenticate, authorize(...SA),
   [param('key').trim().notEmpty(), body('value').exists()], validate, ctrl.setSetting);
