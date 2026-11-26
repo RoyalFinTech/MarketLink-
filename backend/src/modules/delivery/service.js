@@ -417,7 +417,7 @@ async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRide
     const attempts=Number(current.auto_dispatch_attempts||0);
     if(policy.maxAutoDispatchAttempts>0&&attempts>=policy.maxAutoDispatchAttempts){
       await query("UPDATE deliveries SET next_auto_dispatch_at=NULL WHERE id=$1 AND status='unassigned'",[deliveryId]).catch(()=>null);
-      if(notifyNoRider)await notificationsService.send({
+      await notificationsService.send({
         userId:vendorId,type:'delivery_auto_search_paused',title:'Automatic rider search paused',
         body:'MarketLink reached the configured automatic rider-search limit. An Admin or vendor must review this order and request another rider.',
         referenceType:'delivery',referenceId:deliveryId,channels:{push:true,data:{deliveryId:String(deliveryId)}}
