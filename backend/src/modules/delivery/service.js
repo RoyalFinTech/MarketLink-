@@ -4,6 +4,7 @@ const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const ordersService = require('../orders/service');
+const notificationsService = require('../notifications/service');
 const { matchingRouteRate, calculateDeliveryFare } = require('../../utils/deliveryPricing');
 const { normaliseDeliveryPricingPolicy, resolveRiderDeliveryTariff, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
 
@@ -21,6 +22,7 @@ async function getById(deliveryId, actorId, roles) {
   const { rows } = await query(
     `SELECT d.*, o.order_number, o.customer_id, o.vendor_id, o.total,
             u.full_name AS rider_name, u.phone AS rider_phone,
+            r.mobile_number AS rider_mobile_number, r.whatsapp_number AS rider_whatsapp_number,
             v.business_name AS vendor_name,
             cu.full_name AS customer_name, cu.phone AS customer_phone
      FROM deliveries d
@@ -180,8 +182,8 @@ async function assignRider(deliveryId, riderId, actor) {
 
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
     await client.query(
-      `INSERT INTO rider_assignments (delivery_id, rider_id, assigned_by, assignment_type, status)
-       VALUES ($1,$2,$3,$4,'pending')`,
+      `INSERT INTO rider_assignments (delivery_id, rider_id, assigned_by, assignment_type, status, response_deadline_at)
+       VALUES ($1,$2,$3,$4,'pending',$5)`,
       [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual']
     );
     await client.query(
@@ -189,6 +191,11 @@ async function assignRider(deliveryId, riderId, actor) {
        VALUES ($1,'delivery_assigned','New Delivery Request 🛵',
                'You have a new delivery. Tap to view details.','delivery',$2)`,
       [riderId, deliveryId]
+    );
+    await client.query(
+      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'delivery_assignment_sent','Rider request sent 🛵',$2,'delivery',$3)`,
+      [order.vendor_id, 'A delivery request was sent to a rider. MarketLink will remind them and find a replacement if they do not respond in time.', deliveryId]
     );
     logger.info('Rider assigned', { deliveryId, riderId, actor: actor?.id });
     return updated;
@@ -224,7 +231,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
     "FROM riders r JOIN users u ON u.id=r.user_id "+
     "WHERE r.kyc_status=$5 AND r.is_online=TRUE AND (r.delivery_pricing_enabled=TRUE OR r.admin_delivery_pricing_override IS NOT NULL) "+
     "AND NOT EXISTS (SELECT 1 FROM deliveries active JOIN orders reserved_order ON reserved_order.id=active.order_id WHERE active.rider_id=r.user_id AND (active.status IN ('assigned','picked_up','in_transit') OR (active.status='unassigned' AND reserved_order.status IN ('pending','accepted','preparing','awaiting_rider','rider_assigned')))) "+
-    "AND NOT EXISTS (SELECT 1 FROM rider_assignments declined WHERE declined.delivery_id=$4 AND declined.rider_id=r.user_id AND declined.status='declined') "+
+    "AND NOT EXISTS (SELECT 1 FROM rider_assignments declined WHERE declined.delivery_id=$4 AND declined.rider_id=r.user_id AND declined.status IN ('declined','reassigned')) "+
     "ORDER BY distance_km ASC NULLS LAST,r.rating_avg DESC LIMIT 30",
     [hasPickup,delivery.pickup_lat,delivery.pickup_lng,deliveryId,'approved']
   );
@@ -315,7 +322,7 @@ async function acceptDelivery(deliveryId, riderId) {
       throw new AppError('This delivery is not assigned to your rider account. Ask the vendor to assign it first.',409,'DELIVERY_NOT_AVAILABLE');
     }
     const { rows:[assignment] } = await client.query(
-      "UPDATE rider_assignments SET status='accepted',responded_at=now() WHERE delivery_id=$1 AND rider_id=$2 AND status='pending' RETURNING id",
+      "UPDATE rider_assignments SET status='accepted',responded_at=now(),pickup_deadline_at=now()+interval '8 minutes',pickup_reminder_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending' RETURNING id",
       [deliveryId,riderId]
     );
     if(!assignment) {
@@ -387,6 +394,146 @@ async function declineDelivery(deliveryId, riderId) {
     return updated;
   });
 }
+
+async function dispatchNextRider(deliveryId, vendorId, orderNumber) {
+  let candidates = [];
+  try { candidates = await listAvailableRiders(deliveryId, vendorId, ['vendor']); }
+  catch (error) { logger.error('Automatic rider search failed', {deliveryId,error:error.message}); }
+  for (const candidate of candidates) {
+    try {
+      const assigned = await assignRider(deliveryId, candidate.id, {id:null,roles:['admin'],isAuto:true});
+      await notificationsService.pushToUser(candidate.id, {
+        title:'New delivery request 🛵',
+        body:'MarketLink has selected you for order '+(orderNumber||'')+'. Please accept promptly.',
+        data:{deliveryId:String(deliveryId)}
+      }).catch(()=>null);
+      await notificationsService.send({
+        userId:vendorId,type:'delivery_auto_reassigned',title:'MarketLink selected another rider',
+        body:'A new rider request has been sent for order '+(orderNumber||'')+'. The rider has 90 seconds to respond.',
+        referenceType:'delivery',referenceId:deliveryId,channels:{push:true,data:{deliveryId:String(deliveryId)}}
+      }).catch(()=>null);
+      return {assigned:true,riderId:candidate.id,delivery:assigned};
+    } catch (error) {
+      if (!['RIDER_UNAVAILABLE','RIDER_HAS_ACTIVE_DELIVERY','DELIVERY_FEE_MISMATCH','DELIVERY_ALREADY_ASSIGNED','INVALID_STATUS'].includes(error.code)) {
+        logger.warn('Automatic rider candidate could not be assigned', {deliveryId,riderId:candidate.id,code:error.code||null});
+      }
+    }
+  }
+  await notificationsService.send({
+    userId:vendorId,type:'delivery_no_rider_available',title:'No replacement rider available yet',
+    body:'MarketLink could not find an available rider matching this order’s approved delivery price. Your order remains ready; try again shortly or contact support.',
+    referenceType:'delivery',referenceId:deliveryId,channels:{push:true,data:{deliveryId:String(deliveryId)}}
+  }).catch(()=>null);
+  return {assigned:false,reason:'NO_AVAILABLE_RIDER'};
+}
+
+async function reassignDelivery(deliveryId, actor) {
+  const released = await withTransaction(async client => {
+    const {rows:[snapshot]} = await client.query('SELECT order_id FROM deliveries WHERE id=$1',[deliveryId]);
+    if(!snapshot)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const {rows:[order]} = await client.query('SELECT id,vendor_id,status,order_number FROM orders WHERE id=$1 FOR UPDATE',[snapshot.order_id]);
+    if(!order)throw new AppError('Order not found.',404,'ORDER_NOT_FOUND');
+    const {rows:[delivery]} = await client.query('SELECT * FROM deliveries WHERE id=$1 AND order_id=$2 FOR UPDATE',[deliveryId,snapshot.order_id]);
+    if(!delivery)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
+    const roles=actor&&Array.isArray(actor.roles)?actor.roles:[];
+    const admin=roles.some(role=>['admin','super_admin','moderator'].includes(role));
+    if(!admin&&(!roles.includes('vendor')||String(order.vendor_id)!==String(actor.id)))throw new AppError('Only this order’s vendor or an Admin can request another rider.',403,'FORBIDDEN');
+    if(delivery.status!=='assigned'||!delivery.rider_id)throw new AppError('A rider can only be replaced before pickup while the delivery is assigned.',409,'DELIVERY_NOT_REASSIGNABLE');
+    const oldRiderId=delivery.rider_id;
+    await client.query(
+      "UPDATE rider_assignments SET status='reassigned',responded_at=COALESCE(responded_at,now()) WHERE delivery_id=$1 AND rider_id=$2 AND status IN ('pending','accepted')",
+      [deliveryId,oldRiderId]
+    );
+    await client.query(
+      "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",
+      [oldRiderId,deliveryId]
+    );
+    const {rows:[updated]}=await client.query(
+      "UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING *",
+      [deliveryId,oldRiderId]
+    );
+    if(!updated)throw new AppError('This rider has already started or the delivery has changed. Refresh the order.',409,'DELIVERY_STATE_CHANGED');
+    await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[order.id]);
+    await client.query(
+      "INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_reassigned','Delivery request reassigned','The vendor or MarketLink has moved this delivery request to another rider. You are no longer assigned to it.','delivery',$2)",
+      [oldRiderId,deliveryId]
+    );
+    await client.query(
+      "INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_reassigned','Finding another rider','The previous rider has been released. MarketLink is searching for an available replacement now.','delivery',$2)",
+      [order.vendor_id,deliveryId]
+    );
+    return {vendorId:order.vendor_id,oldRiderId,orderNumber:order.order_number};
+  });
+  const result=await dispatchNextRider(deliveryId,released.vendorId,released.orderNumber);
+  return {deliveryId,releasedRiderId:released.oldRiderId,...result};
+}
+
+async function processDispatchTimers() {
+  const actions = await withTransaction(async client => {
+    const {rows:[lock]}=await client.query('SELECT pg_try_advisory_xact_lock(8100420261126) AS locked');
+    if(!lock||!lock.locked)return [];
+    const {rows}=await client.query(
+      `SELECT ra.id,ra.delivery_id,ra.rider_id,ra.status,ra.created_at,ra.responded_at,
+              ra.response_deadline_at,ra.pickup_deadline_at,ra.reminder_1_sent_at,
+              ra.reminder_2_sent_at,ra.pickup_reminder_sent_at,d.order_id,
+              o.vendor_id,o.order_number
+       FROM rider_assignments ra
+       JOIN deliveries d ON d.id=ra.delivery_id AND d.rider_id=ra.rider_id
+       JOIN orders o ON o.id=d.order_id
+       WHERE d.status='assigned' AND (
+         (ra.status='pending' AND (
+           ra.response_deadline_at<=now() OR
+           (ra.reminder_1_sent_at IS NULL AND ra.created_at<=now()-interval '30 seconds') OR
+           (ra.reminder_2_sent_at IS NULL AND ra.created_at<=now()-interval '60 seconds')
+         )) OR
+         (ra.status='accepted' AND (
+           ra.pickup_deadline_at<=now() OR
+           (ra.pickup_reminder_sent_at IS NULL AND ra.responded_at<=now()-interval '4 minutes')
+         ))
+       )
+       ORDER BY COALESCE(ra.response_deadline_at,ra.pickup_deadline_at,ra.created_at) ASC
+       LIMIT 25 FOR UPDATE OF ra,d SKIP LOCKED`
+    );
+    const out=[];
+    for(const row of rows){
+      const expired=(row.status==='pending'&&row.response_deadline_at&&new Date(row.response_deadline_at)<=new Date())||
+        (row.status==='accepted'&&row.pickup_deadline_at&&new Date(row.pickup_deadline_at)<=new Date());
+      if(expired){
+        await client.query("UPDATE rider_assignments SET status='reassigned',responded_at=COALESCE(responded_at,now()) WHERE id=$1 AND status IN ('pending','accepted')",[row.id]);
+        const {rows:[released]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING id",[row.delivery_id,row.rider_id]);
+        if(!released)continue;
+        await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[row.rider_id,row.delivery_id]);
+        await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[row.order_id]);
+        await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_timeout','Delivery request expired','The MarketLink delivery timer expired and this order has been released for reassignment.','delivery',$2)",[row.rider_id,row.delivery_id]);
+        await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_timeout','Rider deadline missed','The rider deadline expired. MarketLink is automatically searching for another available rider.','delivery',$2)",[row.vendor_id,row.delivery_id]);
+        out.push({kind:'reassign',deliveryId:row.delivery_id,riderId:row.rider_id,vendorId:row.vendor_id,orderNumber:row.order_number});
+      } else if(row.status==='pending'&&!row.reminder_1_sent_at&&new Date(row.created_at)<=new Date(Date.now()-30000)){
+        await client.query('UPDATE rider_assignments SET reminder_1_sent_at=now() WHERE id=$1 AND reminder_1_sent_at IS NULL',[row.id]);
+        out.push({kind:'reminder',riderId:row.rider_id,deliveryId:row.delivery_id,title:'Delivery request reminder',body:'You have a pending MarketLink delivery request. Please accept or decline it now.'});
+      } else if(row.status==='pending'&&!row.reminder_2_sent_at&&new Date(row.created_at)<=new Date(Date.now()-60000)){
+        await client.query('UPDATE rider_assignments SET reminder_2_sent_at=now() WHERE id=$1 AND reminder_2_sent_at IS NULL',[row.id]);
+        out.push({kind:'reminder',riderId:row.rider_id,deliveryId:row.delivery_id,title:'Final reminder: delivery request',body:'This delivery request is nearly expired. Accept now if you can complete the pickup on time.'});
+      } else if(row.status==='accepted'&&!row.pickup_reminder_sent_at&&row.responded_at&&new Date(row.responded_at)<=new Date(Date.now()-4*60*1000)){
+        await client.query('UPDATE rider_assignments SET pickup_reminder_sent_at=now() WHERE id=$1 AND pickup_reminder_sent_at IS NULL',[row.id]);
+        out.push({kind:'reminder',riderId:row.rider_id,deliveryId:row.delivery_id,title:'Pickup time reminder',body:'You accepted this delivery. Please proceed to the vendor and confirm pickup promptly.'});
+        out.push({kind:'vendor_reminder',vendorId:row.vendor_id,deliveryId:row.delivery_id,title:'Rider pickup reminder',body:'Your assigned rider has not confirmed pickup yet. You can request another rider if they cannot arrive in time.'});
+      }
+    }
+    return out;
+  });
+  for(const action of actions){
+    if(action.kind==='reminder'){
+      await notificationsService.send({userId:action.riderId,type:'delivery_reminder',title:action.title,body:action.body,referenceType:'delivery',referenceId:action.deliveryId,channels:{push:true,data:{deliveryId:String(action.deliveryId)}}}).catch(()=>null);
+    }else if(action.kind==='vendor_reminder'){
+      await notificationsService.send({userId:action.vendorId,type:'delivery_pickup_delay',title:action.title,body:action.body,referenceType:'delivery',referenceId:action.deliveryId,channels:{push:true,data:{deliveryId:String(action.deliveryId)}}}).catch(()=>null);
+    }else if(action.kind==='reassign'){
+      await notificationsService.pushToUser(action.riderId,{title:'Delivery request expired',body:'The order has been released for reassignment because the delivery timer expired.',data:{deliveryId:String(action.deliveryId)}}).catch(()=>null);
+      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber);
+    }
+  }
+  return {processed:actions.length};
+}
+
 async function updateStatus(deliveryId, newStatus, actorId, roles, extra={}) {
   // Lock order before delivery to match cancellation and rider-accept flows.
   // This gives every delivery state change the same concurrency boundary.
@@ -516,7 +663,8 @@ async function getTracking(deliveryId, actorId, roles) {
             CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.current_lat ELSE NULL END AS current_lat,
             CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.current_lng ELSE NULL END AS current_lng,
             CASE WHEN r.location_sharing_enabled=TRUE AND r.location_sharing_delivery_id=d.id AND d.status IN ('assigned','picked_up','in_transit') THEN r.last_location_at ELSE NULL END AS last_location_at,
-            u.full_name AS rider_name,
+            u.full_name AS rider_name, u.phone AS rider_phone,
+            r.mobile_number AS rider_mobile_number, r.whatsapp_number AS rider_whatsapp_number,
             CASE WHEN r.location_sharing_enabled=TRUE
                        AND r.location_sharing_delivery_id=d.id
                        AND r.user_id=d.rider_id
@@ -544,4 +692,4 @@ async function getTracking(deliveryId, actorId, roles) {
   return d;
 }
 
-module.exports = { getById, list, assignRider, listAvailableRiders, acceptDelivery, declineDelivery, updateStatus, getTracking };
+module.exports = { getById, list, assignRider, listAvailableRiders, acceptDelivery, declineDelivery, reassignDelivery, processDispatchTimers, updateStatus, getTracking };
