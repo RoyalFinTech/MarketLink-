@@ -5,6 +5,14 @@ const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const ordersService = require('../orders/service');
 const notificationsService = require('../notifications/service');
+const { normaliseSmartRiderDispatchPolicy } = require('./dispatchPolicy');
+
+async function getSmartRiderDispatchPolicy() {
+  const result=await query('SELECT value FROM system_settings WHERE key=$1',['smart_rider_dispatch_policy']).catch(()=>null);
+  const row=result&&result.rows&&result.rows[0];
+  return normaliseSmartRiderDispatchPolicy(row&&row.value);
+}
+
 const { matchingRouteRate, calculateDeliveryFare } = require('../../utils/deliveryPricing');
 const { normaliseDeliveryPricingPolicy, resolveRiderDeliveryTariff, applyDeliveryPricingLimits } = require('../../utils/deliveryPricingPolicy');
 
@@ -125,6 +133,7 @@ async function assertRiderMatchesLockedQuote(client, orderId, riderId) {
 }
 
 async function assignRider(deliveryId, riderId, actor) {
+  const dispatchPolicy=await getSmartRiderDispatchPolicy();
   return withTransaction(async (client) => {
     // Follow the global lock order: order first, delivery second. This
     // prevents a vendor assignment racing with the "ready for rider" update.
@@ -185,7 +194,7 @@ async function assignRider(deliveryId, riderId, actor) {
     await client.query(
       `INSERT INTO rider_assignments (delivery_id, rider_id, assigned_by, assignment_type, status, response_deadline_at)
        VALUES ($1,$2,$3,$4,'pending',$5)`,
-      [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual', new Date(Date.now()+90*1000)]
+      [deliveryId, riderId, actor?.id||null, actor?.isAuto ? 'auto' : 'manual', new Date(Date.now()+dispatchPolicy.responseDeadlineSeconds*1000)]
     );
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body, reference_type, reference_id)
@@ -285,6 +294,7 @@ async function listAvailableRiders(deliveryId, actorId, roles) {
 }
 
 async function acceptDelivery(deliveryId, riderId) {
+  const dispatchPolicy=await getSmartRiderDispatchPolicy();
   return withTransaction(async (client) => {
     // Keep the lock order consistent with order status updates: order first,
     // then delivery, then rider. This avoids deadlocks during cancellation
@@ -323,8 +333,8 @@ async function acceptDelivery(deliveryId, riderId) {
       throw new AppError('This delivery is not assigned to your rider account. Ask the vendor to assign it first.',409,'DELIVERY_NOT_AVAILABLE');
     }
     const { rows:[assignment] } = await client.query(
-      "UPDATE rider_assignments SET status='accepted',responded_at=now(),pickup_deadline_at=now()+interval '8 minutes',pickup_reminder_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending' AND (response_deadline_at IS NULL OR response_deadline_at>now()) RETURNING id",
-      [deliveryId,riderId]
+      "UPDATE rider_assignments SET status='accepted',responded_at=now(),pickup_deadline_at=now()+($3::int * interval '1 second'),pickup_reminder_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending' AND (response_deadline_at IS NULL OR response_deadline_at>now()) RETURNING id",
+      [deliveryId,riderId,dispatchPolicy.pickupDeadlineSeconds]
     );
     if(!assignment) {
       const { rows:[alreadyAccepted] } = await client.query(
@@ -396,7 +406,26 @@ async function declineDelivery(deliveryId, riderId) {
   });
 }
 
-async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRider=true) {
+async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRider=true, options={}) {
+  const policy=await getSmartRiderDispatchPolicy();
+  if(options.automatic){
+    const {rows:[current]}=await query(
+      'SELECT auto_dispatch_attempts FROM deliveries WHERE id=$1 AND status=$2',
+      [deliveryId,'unassigned']
+    ).catch(()=>({rows:[]}));
+    if(!current)return {assigned:false,reason:'DELIVERY_NOT_UNASSIGNED'};
+    const attempts=Number(current.auto_dispatch_attempts||0);
+    if(policy.maxAutoDispatchAttempts>0&&attempts>=policy.maxAutoDispatchAttempts){
+      await query("UPDATE deliveries SET next_auto_dispatch_at=NULL WHERE id=$1 AND status='unassigned'",[deliveryId]).catch(()=>null);
+      if(notifyNoRider)await notificationsService.send({
+        userId:vendorId,type:'delivery_auto_search_paused',title:'Automatic rider search paused',
+        body:'MarketLink reached the configured automatic rider-search limit. An Admin or vendor must review this order and request another rider.',
+        referenceType:'delivery',referenceId:deliveryId,channels:{push:true,data:{deliveryId:String(deliveryId)}}
+      }).catch(()=>null);
+      return {assigned:false,reason:'MAX_AUTO_SEARCH_ATTEMPTS'};
+    }
+    await query("UPDATE deliveries SET auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='unassigned'",[deliveryId]).catch(()=>null);
+  }
   let candidates = [];
   try { candidates = await listAvailableRiders(deliveryId, vendorId, ['vendor']); }
   catch (error) { logger.error('Automatic rider search failed', {deliveryId,error:error.message}); }
@@ -410,7 +439,7 @@ async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRide
       }).catch(()=>null);
       await notificationsService.send({
         userId:vendorId,type:'delivery_auto_reassigned',title:'MarketLink selected another rider',
-        body:'A new rider request has been sent for order '+(orderNumber||'')+'. The rider has 90 seconds to respond.',
+        body:'A new rider request has been sent for order '+(orderNumber||'')+'. The rider has '+policy.responseDeadlineSeconds+' seconds to respond.',
         referenceType:'delivery',referenceId:deliveryId,channels:{push:true,data:{deliveryId:String(deliveryId)}}
       }).catch(()=>null);
       return {assigned:true,riderId:candidate.id,delivery:assigned};
@@ -420,7 +449,7 @@ async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRide
       }
     }
   }
-  await query("UPDATE deliveries SET next_auto_dispatch_at=now()+interval '60 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='unassigned'",[deliveryId]).catch(()=>null);
+  await query("UPDATE deliveries SET next_auto_dispatch_at=now()+($2::int * interval '1 second') WHERE id=$1 AND status='unassigned'",[deliveryId,policy.retrySearchIntervalSeconds]).catch(()=>null);
   if(notifyNoRider) await notificationsService.send({
     userId:vendorId,type:'delivery_no_rider_available',title:'No replacement rider available yet',
     body:'MarketLink could not find an available rider matching this order’s approved delivery price. Your order remains ready; the system will search again automatically.',
@@ -451,8 +480,8 @@ async function reassignDelivery(deliveryId, actor) {
       [oldRiderId,deliveryId]
     );
     const {rows:[updated]}=await client.query(
-      "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '45 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING *",
-      [deliveryId,oldRiderId]
+      "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+($3::int * interval '1 second') WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING *",
+      [deliveryId,oldRiderId,(await getSmartRiderDispatchPolicy()).reassignDelaySeconds]
     );
     if(!updated)throw new AppError('This rider has already started or the delivery has changed. Refresh the order.',409,'DELIVERY_STATE_CHANGED');
     await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[order.id]);
@@ -472,6 +501,8 @@ async function reassignDelivery(deliveryId, actor) {
 }
 
 async function processDispatchTimers() {
+  const policy=await getSmartRiderDispatchPolicy();
+  if(!policy.automationEnabled)return {processed:0,disabled:true};
   const actions = await withTransaction(async client => {
     const {rows:[lock]}=await client.query('SELECT pg_try_advisory_xact_lock(8100420261126) AS locked');
     if(!lock||!lock.locked)return [];
@@ -485,25 +516,31 @@ async function processDispatchTimers() {
        JOIN orders o ON o.id=d.order_id
        WHERE d.status='assigned' AND (
          (ra.status='pending' AND (
-           ra.response_deadline_at<=now() OR
-           (ra.reminder_1_sent_at IS NULL AND ra.created_at<=now()-interval '30 seconds') OR
-           (ra.reminder_2_sent_at IS NULL AND ra.created_at<=now()-interval '60 seconds')
+           ($1::boolean AND ra.response_deadline_at<=now()) OR
+           ($2::boolean AND ra.reminder_1_sent_at IS NULL AND ra.created_at<=now()-($3::int * interval '1 second')) OR
+           ($2::boolean AND ra.reminder_2_sent_at IS NULL AND ra.created_at<=now()-($4::int * interval '1 second'))
          )) OR
          (ra.status='accepted' AND (
-           ra.pickup_deadline_at<=now() OR
-           (ra.pickup_reminder_sent_at IS NULL AND ra.responded_at<=now()-interval '4 minutes')
+           ($1::boolean AND ra.pickup_deadline_at<=now()) OR
+           ($2::boolean AND ra.pickup_reminder_sent_at IS NULL AND ra.responded_at<=now()-($5::int * interval '1 second'))
          ))
        )
        ORDER BY COALESCE(ra.response_deadline_at,ra.pickup_deadline_at,ra.created_at) ASC
-       LIMIT 25 FOR UPDATE OF o,d,ra SKIP LOCKED`
+       LIMIT 25 FOR UPDATE OF o,d,ra SKIP LOCKED`,
+      [policy.autoReassignEnabled,policy.remindersEnabled,policy.firstReminderSeconds,policy.secondReminderSeconds,policy.pickupReminderSeconds]
     );
     const out=[];
     for(const row of rows){
-      const expired=(row.status==='pending'&&row.response_deadline_at&&new Date(row.response_deadline_at)<=new Date())||
-        (row.status==='accepted'&&row.pickup_deadline_at&&new Date(row.pickup_deadline_at)<=new Date());
+      const expired=policy.autoReassignEnabled&&(
+        (row.status==='pending'&&row.response_deadline_at&&new Date(row.response_deadline_at)<=new Date())||
+        (row.status==='accepted'&&row.pickup_deadline_at&&new Date(row.pickup_deadline_at)<=new Date())
+      );
       if(expired){
         await client.query("UPDATE rider_assignments SET status='reassigned',responded_at=COALESCE(responded_at,now()) WHERE id=$1 AND status IN ('pending','accepted')",[row.id]);
-        const {rows:[released]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '45 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING id",[row.delivery_id,row.rider_id]);
+        const {rows:[released]}=await client.query(
+          "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+($3::int * interval '1 second') WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING id",
+          [row.delivery_id,row.rider_id,policy.reassignDelaySeconds]
+        );
         if(!released)continue;
         await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[row.rider_id,row.delivery_id]);
         await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[row.order_id]);
@@ -511,29 +548,31 @@ async function processDispatchTimers() {
         await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_timeout','Delivery request expired','The MarketLink delivery timer expired and this order has been released for reassignment.','delivery',$2)",[row.rider_id,row.delivery_id]);
         await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_timeout','Rider deadline missed','The rider deadline expired. MarketLink is automatically searching for another available rider.','delivery',$2)",[row.vendor_id,row.delivery_id]);
         out.push({kind:'reassign',deliveryId:row.delivery_id,riderId:row.rider_id,vendorId:row.vendor_id,orderNumber:row.order_number});
-      } else if(row.status==='pending'&&!row.reminder_1_sent_at&&new Date(row.created_at)<=new Date(Date.now()-30000)){
+      } else if(policy.remindersEnabled&&row.status==='pending'&&!row.reminder_1_sent_at&&new Date(row.created_at)<=new Date(Date.now()-policy.firstReminderSeconds*1000)){
         await client.query('UPDATE rider_assignments SET reminder_1_sent_at=now() WHERE id=$1 AND reminder_1_sent_at IS NULL',[row.id]);
         out.push({kind:'reminder',riderId:row.rider_id,deliveryId:row.delivery_id,title:'Delivery request reminder',body:'You have a pending MarketLink delivery request. Please accept or decline it now.'});
-      } else if(row.status==='pending'&&!row.reminder_2_sent_at&&new Date(row.created_at)<=new Date(Date.now()-60000)){
+      } else if(policy.remindersEnabled&&row.status==='pending'&&!row.reminder_2_sent_at&&new Date(row.created_at)<=new Date(Date.now()-policy.secondReminderSeconds*1000)){
         await client.query('UPDATE rider_assignments SET reminder_2_sent_at=now() WHERE id=$1 AND reminder_2_sent_at IS NULL',[row.id]);
         out.push({kind:'reminder',riderId:row.rider_id,deliveryId:row.delivery_id,title:'Final reminder: delivery request',body:'This delivery request is nearly expired. Accept now if you can complete the pickup on time.'});
-      } else if(row.status==='accepted'&&!row.pickup_reminder_sent_at&&row.responded_at&&new Date(row.responded_at)<=new Date(Date.now()-4*60*1000)){
+      } else if(policy.remindersEnabled&&row.status==='accepted'&&!row.pickup_reminder_sent_at&&row.responded_at&&new Date(row.responded_at)<=new Date(Date.now()-policy.pickupReminderSeconds*1000)){
         await client.query('UPDATE rider_assignments SET pickup_reminder_sent_at=now() WHERE id=$1 AND pickup_reminder_sent_at IS NULL',[row.id]);
         out.push({kind:'reminder',riderId:row.rider_id,deliveryId:row.delivery_id,title:'Pickup time reminder',body:'You accepted this delivery. Please proceed to the vendor and confirm pickup promptly.'});
         out.push({kind:'vendor_reminder',vendorId:row.vendor_id,deliveryId:row.delivery_id,title:'Rider pickup reminder',body:'Your assigned rider has not confirmed pickup yet. You can request another rider if they cannot arrive in time.'});
       }
     }
-    const {rows:retryRows}=await client.query(
-      `SELECT d.id AS delivery_id,o.vendor_id,o.order_number
-       FROM deliveries d JOIN orders o ON o.id=d.order_id
-       WHERE d.status='unassigned' AND o.status='awaiting_rider'
-         AND d.next_auto_dispatch_at IS NOT NULL AND d.next_auto_dispatch_at<=now()
-       ORDER BY d.next_auto_dispatch_at ASC
-       LIMIT 10 FOR UPDATE OF o,d SKIP LOCKED`
-    );
-    for(const row of retryRows){
-      await client.query("UPDATE deliveries SET next_auto_dispatch_at=now()+interval '60 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='unassigned'",[row.delivery_id]);
-      out.push({kind:'search',deliveryId:row.delivery_id,vendorId:row.vendor_id,orderNumber:row.order_number});
+    if(policy.autoSearchEnabled){
+      const {rows:retryRows}=await client.query(
+        `SELECT d.id AS delivery_id,o.vendor_id,o.order_number
+         FROM deliveries d JOIN orders o ON o.id=d.order_id
+         WHERE d.status='unassigned' AND o.status='awaiting_rider'
+           AND d.next_auto_dispatch_at IS NOT NULL AND d.next_auto_dispatch_at<=now()
+         ORDER BY d.next_auto_dispatch_at ASC
+         LIMIT 10 FOR UPDATE OF o,d SKIP LOCKED`
+      );
+      for(const row of retryRows){
+        await client.query("UPDATE deliveries SET next_auto_dispatch_at=now()+($2::int * interval '1 second') WHERE id=$1 AND status='unassigned'",[row.delivery_id,policy.retrySearchIntervalSeconds]);
+        out.push({kind:'search',deliveryId:row.delivery_id,vendorId:row.vendor_id,orderNumber:row.order_number});
+      }
     }
     return out;
   });
@@ -543,10 +582,10 @@ async function processDispatchTimers() {
     }else if(action.kind==='vendor_reminder'){
       await notificationsService.send({userId:action.vendorId,type:'delivery_pickup_delay',title:action.title,body:action.body,referenceType:'delivery',referenceId:action.deliveryId,channels:{push:true,data:{deliveryId:String(action.deliveryId)}}}).catch(()=>null);
     }else if(action.kind==='search'){
-      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,false);
+      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,false,{automatic:true});
     }else if(action.kind==='reassign'){
       await notificationsService.pushToUser(action.riderId,{title:'Delivery request expired',body:'The order has been released for reassignment because the delivery timer expired.',data:{deliveryId:String(action.deliveryId)}}).catch(()=>null);
-      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber);
+      if(policy.autoSearchEnabled)await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,true,{automatic:true});
     }
   }
   return {processed:actions.length};
@@ -710,4 +749,4 @@ async function getTracking(deliveryId, actorId, roles) {
   return d;
 }
 
-module.exports = { getById, list, assignRider, listAvailableRiders, acceptDelivery, declineDelivery, reassignDelivery, processDispatchTimers, updateStatus, getTracking };
+module.exports = { getById, list, assignRider, listAvailableRiders, acceptDelivery, declineDelivery, reassignDelivery, processDispatchTimers, updateStatus, getTracking, dispatchNextRider, getSmartRiderDispatchPolicy };
