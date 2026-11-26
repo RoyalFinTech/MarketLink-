@@ -47,7 +47,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       .mockResolvedValueOnce({rows:[completed]})
       .mockResolvedValueOnce({rows:[]});
 
-    const result=await service.reconcileProviderWithdrawal(withdrawalId,'admin-user');
+    const result=await service.reconcileProviderWithdrawal(withdrawalId,{id:'admin-user',role:'super_admin'});
 
     expect(result).toMatchObject({status:'completed'});
     expect(modemPay.retrieveTransfer).toHaveBeenCalledWith('provider-ref-1');
@@ -64,7 +64,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       metadata:{withdrawal_id:withdrawalId}
     });
 
-    await expect(service.reconcileProviderWithdrawal(withdrawalId,'admin-user'))
+    await expect(service.reconcileProviderWithdrawal(withdrawalId,{id:'admin-user',role:'super_admin'}))
       .rejects.toMatchObject({code:'PROVIDER_AMOUNT_MISMATCH',statusCode:409});
     expect(withTransaction).not.toHaveBeenCalled();
     expect(clientQuery).not.toHaveBeenCalled();
@@ -83,7 +83,7 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
       .mockResolvedValueOnce({rows:[pending]})
       .mockResolvedValueOnce({rows:[refreshed]});
 
-    const result=await service.reconcileProviderWithdrawal(withdrawalId,'admin-user');
+    const result=await service.reconcileProviderWithdrawal(withdrawalId,{id:'admin-user',role:'super_admin'});
 
     expect(result).toMatchObject({status:'payout_pending',provider_status:'pending'});
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
