@@ -175,7 +175,7 @@ async function assignRider(deliveryId, riderId, actor) {
       [d.rider_id,deliveryId]
     );
     const { rows: [updated] } = await client.query(
-      "UPDATE deliveries SET rider_id=$1,status='assigned' WHERE id=$2 AND status IN ('unassigned','failed') RETURNING *",
+      "UPDATE deliveries SET rider_id=$1,status='assigned',next_auto_dispatch_at=NULL WHERE id=$2 AND status IN ('unassigned','failed') RETURNING *",
       [riderId, deliveryId]
     );
     if(!updated)throw new AppError('This delivery has already been assigned. Refresh the order and choose again.',409,'DELIVERY_ALREADY_ASSIGNED');
@@ -395,7 +395,7 @@ async function declineDelivery(deliveryId, riderId) {
   });
 }
 
-async function dispatchNextRider(deliveryId, vendorId, orderNumber) {
+async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRider=true) {
   let candidates = [];
   try { candidates = await listAvailableRiders(deliveryId, vendorId, ['vendor']); }
   catch (error) { logger.error('Automatic rider search failed', {deliveryId,error:error.message}); }
@@ -419,9 +419,10 @@ async function dispatchNextRider(deliveryId, vendorId, orderNumber) {
       }
     }
   }
-  await notificationsService.send({
+  await query("UPDATE deliveries SET next_auto_dispatch_at=now()+interval '60 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='unassigned'",[deliveryId]).catch(()=>null);
+  if(notifyNoRider) await notificationsService.send({
     userId:vendorId,type:'delivery_no_rider_available',title:'No replacement rider available yet',
-    body:'MarketLink could not find an available rider matching this order’s approved delivery price. Your order remains ready; try again shortly or contact support.',
+    body:'MarketLink could not find an available rider matching this order’s approved delivery price. Your order remains ready; the system will search again automatically.',
     referenceType:'delivery',referenceId:deliveryId,channels:{push:true,data:{deliveryId:String(deliveryId)}}
   }).catch(()=>null);
   return {assigned:false,reason:'NO_AVAILABLE_RIDER'};
@@ -449,7 +450,7 @@ async function reassignDelivery(deliveryId, actor) {
       [oldRiderId,deliveryId]
     );
     const {rows:[updated]}=await client.query(
-      "UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING *",
+      "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '45 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING *",
       [deliveryId,oldRiderId]
     );
     if(!updated)throw new AppError('This rider has already started or the delivery has changed. Refresh the order.',409,'DELIVERY_STATE_CHANGED');
@@ -464,7 +465,7 @@ async function reassignDelivery(deliveryId, actor) {
     );
     return {vendorId:order.vendor_id,oldRiderId,orderNumber:order.order_number};
   });
-  const result=await dispatchNextRider(deliveryId,released.vendorId,released.orderNumber);
+  const result=await dispatchNextRider(deliveryId,released.vendorId,released.orderNumber,true);
   return {deliveryId,releasedRiderId:released.oldRiderId,...result};
 }
 
@@ -500,7 +501,7 @@ async function processDispatchTimers() {
         (row.status==='accepted'&&row.pickup_deadline_at&&new Date(row.pickup_deadline_at)<=new Date());
       if(expired){
         await client.query("UPDATE rider_assignments SET status='reassigned',responded_at=COALESCE(responded_at,now()) WHERE id=$1 AND status IN ('pending','accepted')",[row.id]);
-        const {rows:[released]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING id",[row.delivery_id,row.rider_id]);
+        const {rows:[released]}=await client.query("UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '45 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING id",[row.delivery_id,row.rider_id]);
         if(!released)continue;
         await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[row.rider_id,row.delivery_id]);
         await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[row.order_id]);
@@ -519,6 +520,18 @@ async function processDispatchTimers() {
         out.push({kind:'vendor_reminder',vendorId:row.vendor_id,deliveryId:row.delivery_id,title:'Rider pickup reminder',body:'Your assigned rider has not confirmed pickup yet. You can request another rider if they cannot arrive in time.'});
       }
     }
+    const {rows:retryRows}=await client.query(
+      `SELECT d.id AS delivery_id,o.vendor_id,o.order_number
+       FROM deliveries d JOIN orders o ON o.id=d.order_id
+       WHERE d.status='unassigned' AND o.status='awaiting_rider'
+         AND d.next_auto_dispatch_at IS NOT NULL AND d.next_auto_dispatch_at<=now()
+       ORDER BY d.next_auto_dispatch_at ASC
+       LIMIT 10 FOR UPDATE OF o,d SKIP LOCKED`
+    );
+    for(const row of retryRows){
+      await client.query("UPDATE deliveries SET next_auto_dispatch_at=now()+interval '60 seconds',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1 AND status='unassigned'",[row.delivery_id]);
+      out.push({kind:'search',deliveryId:row.delivery_id,vendorId:row.vendor_id,orderNumber:row.order_number});
+    }
     return out;
   });
   for(const action of actions){
@@ -526,6 +539,8 @@ async function processDispatchTimers() {
       await notificationsService.send({userId:action.riderId,type:'delivery_reminder',title:action.title,body:action.body,referenceType:'delivery',referenceId:action.deliveryId,channels:{push:true,data:{deliveryId:String(action.deliveryId)}}}).catch(()=>null);
     }else if(action.kind==='vendor_reminder'){
       await notificationsService.send({userId:action.vendorId,type:'delivery_pickup_delay',title:action.title,body:action.body,referenceType:'delivery',referenceId:action.deliveryId,channels:{push:true,data:{deliveryId:String(action.deliveryId)}}}).catch(()=>null);
+    }else if(action.kind==='search'){
+      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,false);
     }else if(action.kind==='reassign'){
       await notificationsService.pushToUser(action.riderId,{title:'Delivery request expired',body:'The order has been released for reassignment because the delivery timer expired.',data:{deliveryId:String(action.deliveryId)}}).catch(()=>null);
       await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber);
