@@ -563,7 +563,7 @@ async function processDispatchTimers() {
     }
     if(policy.autoSearchEnabled){
       const {rows:retryRows}=await client.query(
-        `SELECT d.id AS delivery_id,o.vendor_id,o.order_number
+        `SELECT d.id AS delivery_id,o.vendor_id,o.order_number,d.auto_dispatch_attempts
          FROM deliveries d JOIN orders o ON o.id=d.order_id
          WHERE d.status='unassigned' AND o.status='awaiting_rider'
            AND d.next_auto_dispatch_at IS NOT NULL AND d.next_auto_dispatch_at<=now()
@@ -572,7 +572,7 @@ async function processDispatchTimers() {
       );
       for(const row of retryRows){
         await client.query("UPDATE deliveries SET next_auto_dispatch_at=now()+($2::int * interval '1 second') WHERE id=$1 AND status='unassigned'",[row.delivery_id,policy.retrySearchIntervalSeconds]);
-        out.push({kind:'search',deliveryId:row.delivery_id,vendorId:row.vendor_id,orderNumber:row.order_number});
+        out.push({kind:'search',deliveryId:row.delivery_id,vendorId:row.vendor_id,orderNumber:row.order_number,notifyNoRider:Number(row.auto_dispatch_attempts||0)===0});
       }
     }
     return out;
@@ -583,7 +583,7 @@ async function processDispatchTimers() {
     }else if(action.kind==='vendor_reminder'){
       await notificationsService.send({userId:action.vendorId,type:'delivery_pickup_delay',title:action.title,body:action.body,referenceType:'delivery',referenceId:action.deliveryId,channels:{push:true,data:{deliveryId:String(action.deliveryId)}}}).catch(()=>null);
     }else if(action.kind==='search'){
-      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,false,{automatic:true});
+      await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,action.notifyNoRider,{automatic:true});
     }else if(action.kind==='reassign'){
       await notificationsService.pushToUser(action.riderId,{title:'Delivery request expired',body:'The order has been released for reassignment because the delivery timer expired.',data:{deliveryId:String(action.deliveryId)}}).catch(()=>null);
       // The configured reassignment delay is respected by the retry queue.
