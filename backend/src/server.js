@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const logger = require('./utils/logger');
+const deliveryService = require('./modules/delivery/service');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
@@ -86,5 +87,8 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, '0.0.0.0', () => {
   logger.info(`MarketLink API on port ${PORT} [${process.env.NODE_ENV||'development'}]`);
   logger.info(`Docs: http://localhost:${PORT}/api-docs`);
+  const dispatchTimer=setInterval(()=>deliveryService.processDispatchTimers().catch(error=>logger.error('Smart rider dispatch timer failed',{error:error.message})),15000);
+  dispatchTimer.unref();
+  deliveryService.processDispatchTimers().catch(error=>logger.error('Initial smart rider dispatch timer failed',{error:error.message}));
 });
 module.exports = app;

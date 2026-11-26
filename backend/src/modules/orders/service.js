@@ -541,7 +541,7 @@ async function listForVendor(vendorId, { page=1, limit=20, status }) {
   const page_=Math.max(parseInt(page,10)||1,1), limit_=Math.min(Math.max(parseInt(limit,10)||20,1),100), off=(page_-1)*limit_;
   const conds=['o.vendor_id=$1'], params=[vendorId];
   if (status) { conds.push(`o.status=$${params.length+1}`); params.push(status); }
-  const { rows } = await query(`SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.payment_status,o.placed_at,u.full_name AS customer_name,d.id AS delivery_id,d.status AS delivery_status,d.rider_id,ru.full_name AS rider_name,d.distance_km,d.estimated_minutes, (SELECT COALESCE(string_agg(oi.product_name_snapshot || ' × ' || oi.quantity::text, ', ' ORDER BY oi.id), 'No order items recorded') FROM order_items oi WHERE oi.order_id=o.id) AS item_summary FROM orders o JOIN users u ON u.id=o.customer_id LEFT JOIN deliveries d ON d.order_id=o.id LEFT JOIN users ru ON ru.id=d.rider_id WHERE ${conds.join(' AND ')} ORDER BY o.placed_at DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,[...params,limit_,off]);
+  const { rows } = await query(`SELECT o.id,o.order_number,o.status,o.total,o.payment_method,o.payment_status,o.placed_at,u.full_name AS customer_name,d.id AS delivery_id,d.status AS delivery_status,d.rider_id,ru.full_name AS rider_name,ru.phone AS rider_phone,rr.mobile_number AS rider_mobile_number,rr.whatsapp_number AS rider_whatsapp_number,ra.status AS rider_assignment_status,ra.response_deadline_at AS rider_response_deadline_at,ra.pickup_deadline_at AS rider_pickup_deadline_at,d.distance_km,d.estimated_minutes, (SELECT COALESCE(string_agg(oi.product_name_snapshot || ' × ' || oi.quantity::text, ', ' ORDER BY oi.id), 'No order items recorded') FROM order_items oi WHERE oi.order_id=o.id) AS item_summary FROM orders o JOIN users u ON u.id=o.customer_id LEFT JOIN deliveries d ON d.order_id=o.id LEFT JOIN users ru ON ru.id=d.rider_id LEFT JOIN riders rr ON rr.user_id=d.rider_id LEFT JOIN LATERAL (SELECT status,response_deadline_at,pickup_deadline_at FROM rider_assignments WHERE delivery_id=d.id AND rider_id=d.rider_id ORDER BY created_at DESC LIMIT 1) ra ON TRUE WHERE ${conds.join(' AND ')} ORDER BY o.placed_at DESC LIMIT ${params.length+1} OFFSET ${params.length+2}`,[...params,limit_,off]);
   return rows;
 }
 
@@ -777,8 +777,12 @@ async function updateStatus(orderId,status,userId,roles,note){
       );
       if(delivery&&delivery.rider_id&&delivery.kyc_status==='approved'&&delivery.is_online&&!delivery.rider_busy){
         await client.query(
-          "UPDATE deliveries SET status='assigned' WHERE id=$1 AND status='unassigned'",
+          "UPDATE deliveries SET status='assigned',next_auto_dispatch_at=NULL WHERE id=$1 AND status='unassigned'",
           [delivery.delivery_id]
+        );
+        await client.query(
+          "UPDATE rider_assignments SET response_deadline_at=now()+interval '90 seconds',reminder_1_sent_at=NULL,reminder_2_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending'",
+          [delivery.delivery_id,delivery.rider_id]
         );
         await client.query(
           `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
@@ -793,7 +797,7 @@ async function updateStatus(orderId,status,userId,roles,note){
           [delivery.delivery_id,delivery.rider_id]
         );
         await client.query(
-          "UPDATE deliveries SET rider_id=NULL,status='unassigned' WHERE id=$1",
+          "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+interval '1 second',auto_dispatch_attempts=COALESCE(auto_dispatch_attempts,0)+1 WHERE id=$1",
           [delivery.delivery_id]
         );
         await client.query(
