@@ -202,6 +202,42 @@ describe('affiliate marketer withdrawal request lifecycle',()=>{
     expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions/.test(sql))).toBe(false);
   });
 
+  test('a reversal webhook with a mismatched amount cannot credit the wallet',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'completed',provider_status:'completed',provider_ref:'provider-ref-1',amount:'50',wallet_id:'wallet-1'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.reversed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49.98,currency:'GMD',status:'reversed'}
+    });
+    expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions|status='rejected'/.test(sql))).toBe(false);
+  });
+
+  test('a reversal webhook with a non-GMD currency cannot credit the wallet',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'completed',provider_status:'completed',provider_ref:'provider-ref-1',amount:'50',wallet_id:'wallet-1'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.reversed',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:50,currency:'USD',status:'reversed'}
+    });
+    expect(result).toEqual({ignored:true,reason:'currency_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE wallets|INSERT INTO transactions|status='rejected'/.test(sql))).toBe(false);
+  });
+
+  test('a flagged payout with a mismatched amount remains reserved and is not marked for review',async()=>{
+    const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
+    clientQuery.mockResolvedValueOnce({rows:[{id:withdrawalId,status:'payout_pending',provider_status:'completed',provider_ref:'provider-ref-1',amount:'50'}]});
+    const result=await service.processProviderWebhook({
+      event:'transfer.flagged',
+      payload:{metadata:{withdrawal_id:withdrawalId},id:'provider-ref-1',amount:49.98,currency:'GMD',status:'flagged'}
+    });
+    expect(result).toEqual({ignored:true,reason:'amount_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery.mock.calls.some(([sql])=>sql.includes("provider_status='flagged'"))).toBe(false);
+  });
+
   test('an unknown provider outcome can be retried only with the same withdrawal idempotency key',async()=>{
     const withdrawalId='8b7d5c24-46e4-4e8b-9db8-0f62b6c5f831';
     const processing={id:withdrawalId,user_id:'affiliate-user',wallet_id:'wallet-1',status:'processing',payout_method:'wave',payout_details:{account_number:'871234567',beneficiary_name:'Awa Jallow'},amount:'50',wallet_debit_amount:'50',service_fee_amount:'0'};
