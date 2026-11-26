@@ -1,4 +1,7 @@
 -- Smart rider dispatch deadlines, reminder idempotency and pickup recovery.
+ALTER TABLE public.deliveries
+  ADD COLUMN IF NOT EXISTS next_auto_dispatch_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS auto_dispatch_attempts INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE public.rider_assignments
   ADD COLUMN IF NOT EXISTS response_deadline_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS reminder_1_sent_at TIMESTAMPTZ,
@@ -25,3 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_rider_assignments_accepted_pickup_deadline
 
 CREATE INDEX IF NOT EXISTS idx_rider_assignments_delivery_rider_status
   ON public.rider_assignments (delivery_id, rider_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_deliveries_auto_dispatch_retry
+  ON public.deliveries (next_auto_dispatch_at)
+  WHERE status = 'unassigned' AND next_auto_dispatch_at IS NOT NULL;
