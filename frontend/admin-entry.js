@@ -1089,7 +1089,7 @@
   window.__ML_ADMIN_DISPATCH_REASSIGN=async function(id){
     if(!window.confirm('Release the currently assigned rider and ask MarketLink to find a replacement? This is only allowed before pickup.'))return;
     try{
-      await adminRequest('/deliveries/'+encodeURIComponent(id)+'/reassign','POST',{});
+      await adminRequest('/admin/smart-rider-dispatch/'+encodeURIComponent(id)+'/reassign','POST',{});
       if(window.toast)window.toast('Rider released. MarketLink has started the replacement search.','success');
       await adminSmartRiderDispatchView();
     }catch(e){if(window.toast)window.toast(e.message||'Could not reassign this delivery.','error');}
