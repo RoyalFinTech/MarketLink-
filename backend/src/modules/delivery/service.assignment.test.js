@@ -190,4 +190,51 @@ describe('vendor and rider assignment lifecycle',()=>{
     expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
+  test('expires an unanswered request, releases the rider and automatically searches for a replacement',async()=>{
+    const past=new Date(Date.now()-10000);
+    clientQuery
+      .mockResolvedValueOnce({rows:[{locked:true}]})
+      .mockResolvedValueOnce({rows:[{
+        id:'assignment-expired',delivery_id:deliveryId,rider_id:riderId,status:'pending',
+        created_at:new Date(Date.now()-120000),response_deadline_at:past,pickup_deadline_at:null,
+        reminder_1_sent_at:new Date(Date.now()-90000),reminder_2_sent_at:new Date(Date.now()-60000),
+        pickup_reminder_sent_at:null,order_id:'order-1',vendor_id:vendor.id,order_number:'ML-1001'
+      }]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[{id:deliveryId}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]});
+    query
+      .mockResolvedValueOnce({rows:[{id:deliveryId,vendor_id:vendor.id,status:'unassigned',order_status:'awaiting_rider',delivery_fee_quote_id:null,pickup_lat:null,pickup_lng:null}]})
+      .mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]});
+
+    const result=await processDispatchTimers();
+
+    expect(result.processed).toBe(1);
+    expect(clientQuery.mock.calls.some(([sql])=>/SET status='reassigned'/.test(sql))).toBe(true);
+    expect(clientQuery.mock.calls.some(([sql])=>/next_auto_dispatch_at=now\(\)/.test(sql))).toBe(false);
+    expect(notificationsService.pushToUser).toHaveBeenCalledWith(riderId,expect.objectContaining({
+      title:'Delivery request expired'
+    }));
+    expect(notificationsService.send).toHaveBeenCalledWith(expect.objectContaining({
+      userId:vendor.id,title:'No replacement rider available yet'
+    }));
+  });
+
+  test('does not allow a vendor to replace a rider after pickup has started',async()=>{
+    clientQuery
+      .mockResolvedValueOnce({rows:[{order_id:'order-1'}]})
+      .mockResolvedValueOnce({rows:[{id:'order-1',vendor_id:vendor.id,status:'picked_up',order_number:'ML-1001'}]})
+      .mockResolvedValueOnce({rows:[{id:deliveryId,order_id:'order-1',rider_id:riderId,status:'picked_up'}]});
+
+    await expect(reassignDelivery(deliveryId,vendor))
+      .rejects.toMatchObject({code:'DELIVERY_NOT_REASSIGNABLE'});
+    expect(clientQuery.mock.calls.some(([sql])=>/UPDATE deliveries SET rider_id=NULL/.test(sql))).toBe(false);
+  });
+
 });
