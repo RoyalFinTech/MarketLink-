@@ -322,7 +322,7 @@ async function acceptDelivery(deliveryId, riderId) {
       throw new AppError('This delivery is not assigned to your rider account. Ask the vendor to assign it first.',409,'DELIVERY_NOT_AVAILABLE');
     }
     const { rows:[assignment] } = await client.query(
-      "UPDATE rider_assignments SET status='accepted',responded_at=now(),pickup_deadline_at=now()+interval '8 minutes',pickup_reminder_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending' RETURNING id",
+      "UPDATE rider_assignments SET status='accepted',responded_at=now(),pickup_deadline_at=now()+interval '8 minutes',pickup_reminder_sent_at=NULL WHERE delivery_id=$1 AND rider_id=$2 AND status='pending' AND (response_deadline_at IS NULL OR response_deadline_at>now()) RETURNING id",
       [deliveryId,riderId]
     );
     if(!assignment) {
@@ -492,7 +492,7 @@ async function processDispatchTimers() {
          ))
        )
        ORDER BY COALESCE(ra.response_deadline_at,ra.pickup_deadline_at,ra.created_at) ASC
-       LIMIT 25 FOR UPDATE OF ra,d SKIP LOCKED`
+       LIMIT 25 FOR UPDATE OF o,d,ra SKIP LOCKED`
     );
     const out=[];
     for(const row of rows){
