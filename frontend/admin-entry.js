@@ -1026,10 +1026,72 @@
     catch(e){if(window.toast)window.toast(e.message||'Could not restore the vendor price.','error');}
   };
 
+  var adminDispatchPolicyCache = null;
+  async function adminSmartRiderDispatchView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><h3>Smart Rider Dispatcher</h3><p>Loading live dispatch queue and Admin timer controls…</p></div>';
+    try{
+      var data=await adminRequest('/admin/smart-rider-dispatch','GET');
+      var p=data.settings||{},rows=Array.isArray(data.deliveries)?data.deliveries:[];
+      adminDispatchPolicyCache=p;
+      function toggle(id,label,description){return '<label style="display:flex;gap:10px;align-items:flex-start;padding:11px;border:1px solid var(--bd);border-radius:12px;min-width:220px;flex:1"><input type="checkbox" id="'+id+'" '+(p[id]?'checked':'')+' style="margin-top:3px"><span><b>'+label+'</b><small style="display:block;color:var(--mu);margin-top:3px">'+description+'</small></span></label>';}
+      function timer(id,label,help){return '<label style="display:block"><span class="ml-admin-label">'+label+'</span><input class="inp" type="number" min="5" max="3600" step="1" id="'+id+'" value="'+Number(p[id]||0)+'"><small style="display:block;color:var(--mu);margin-top:4px">'+help+'</small></label>';}
+      var settingsHTML='<div class="ml-profile-card" style="padding:15px;margin:12px 0"><div class="ml-section-head"><div><h3>Automation controls</h3><p>These settings are enforced by the backend dispatcher, not just the dashboard.</p></div><span class="ml-status-pill '+(p.automationEnabled?'is-active':'')+'">'+(p.automationEnabled?'Automation on':'Automation paused')+'</span></div>'+
+        '<div style="display:flex;gap:9px;flex-wrap:wrap">'+
+        toggle('automationEnabled','Dispatcher enabled','Master switch for scheduled reminders, deadlines and automatic rider recovery.')+
+        toggle('remindersEnabled','Rider reminders','Send the first, second and pickup reminders.')+
+        toggle('autoReassignEnabled','Automatic reassignment','Release a rider when the configured response or pickup deadline expires.')+
+        toggle('autoSearchEnabled','Automatic rider search','Search for available replacement riders and retry when none are available.')+
+        '</div><h4 style="margin:18px 0 10px">Rider response timers (seconds)</h4><div class="ml-stat-grid">'+
+        timer('firstReminderSeconds','First reminder','Sent after assignment.')+
+        timer('secondReminderSeconds','Second reminder','Final reminder before the response deadline.')+
+        timer('responseDeadlineSeconds','Response deadline','Pending request expires after this time.')+
+        '</div><h4 style="margin:18px 0 10px">Pickup and recovery timers</h4><div class="ml-stat-grid">'+
+        timer('pickupReminderSeconds','Pickup reminder (seconds)','Sent after rider acceptance.')+
+        timer('pickupDeadlineSeconds','Pickup deadline (seconds)','Accepted rider is released if pickup is not confirmed.')+
+        timer('reassignDelaySeconds','Reassignment delay (seconds)','Delay before the replacement search is eligible.')+
+        timer('retrySearchIntervalSeconds','Retry interval (seconds)','Wait between searches when no eligible rider is found.')+
+        timer('maxAutoDispatchAttempts','Maximum automatic searches','0 means unlimited. Maximum allowed is 100.')+
+        '</div><p style="color:var(--mu);font-size:11px;margin:12px 0">Validation: first reminder must be before second reminder; second reminder must be before response deadline; pickup reminder must be before pickup deadline. Changes apply to new assignments and subsequent dispatcher cycles. Existing assignment deadlines are not rewritten retroactively.</p>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ml-btn ml-btn-primary" id="ml-dispatch-save" onclick="window.__ML_ADMIN_DISPATCH_SAVE()">Save dispatch settings</button><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_DISPATCH()">Discard / reload</button></div></div>';
+      var queueHTML='<div class="ml-section-head"><div><h3>Live dispatch queue</h3><p>Assigned requests awaiting rider action and orders waiting for a rider.</p></div><button class="ml-btn ml-btn-secondary" onclick="window.__ML_ADMIN_DISPATCH()">Refresh</button></div>'+
+        '<div class="ml-stat-grid"><div class="ml-stat"><div class="ml-stat-label">Assigned</div><div class="ml-stat-value">'+Number(data.counts&&data.counts.assigned||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Awaiting rider</div><div class="ml-stat-value">'+Number(data.counts&&data.counts.awaitingRider||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Awaiting response</div><div class="ml-stat-value">'+Number(data.counts&&data.counts.responsePending||0)+'</div></div><div class="ml-stat"><div class="ml-stat-label">Awaiting pickup</div><div class="ml-stat-value">'+Number(data.counts&&data.counts.pickupPending||0)+'</div></div></div>'+
+        (rows.length?'<div class="ml-profile-card">'+rows.map(function(x){
+          var rider=x.rider_name||'No rider assigned',deadline=x.assignment_status==='accepted'?x.pickup_deadline_at:x.response_deadline_at;
+          var contact=x.rider_whatsapp_number||x.rider_mobile_number||x.rider_phone||'No contact on file';
+          return '<div class="ml-profile-row" style="align-items:flex-start"><div class="ico">🛵</div><div class="copy"><b>Order '+adminSafe(x.order_number||x.id)+'</b><span>'+adminSafe(x.vendor_name||'Vendor')+' · '+adminSafe(x.status)+' · '+adminSafe(x.assignment_status||'no active assignment')+'</span><small>Rider: '+adminSafe(rider)+' · Contact: '+adminSafe(contact)+'</small><small>Deadline: '+adminFormatDate(deadline)+' · Next search: '+adminFormatDate(x.next_auto_dispatch_at)+' · Automatic searches: '+Number(x.auto_dispatch_attempts||0)+'</small>'+
+          (x.status==='assigned'?'<button class="ml-btn ml-btn-secondary" style="margin-top:8px" onclick="window.__ML_ADMIN_DISPATCH_REASSIGN(\''+adminSafe(x.id)+'\')">Release and find another rider</button>':'<small style="display:block;margin-top:8px;color:var(--mu)">Waiting for the next configured rider search.</small>')+
+          '</div></div>';
+        }).join('')+'</div>':'<div class="ml-empty"><b>No active rider dispatches</b><span>There are no orders currently assigned or waiting for a rider.</span></div>');
+      root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">DELIVERY OPERATIONS</div><h3>Smart Rider Dispatcher</h3><p>Control rider reminders, response deadlines, pickup deadlines, automatic replacement and retry behaviour.</p>'+settingsHTML+queueHTML+'</div>';
+    }catch(e){root.innerHTML='<div class="ml-empty"><b>Smart Rider Dispatcher unavailable</b><span>'+adminSafe(e.message||'Could not load dispatch controls.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.__ML_ADMIN_DISPATCH()">Retry</button></div>';}
+  }
+  window.__ML_ADMIN_DISPATCH=adminSmartRiderDispatchView;
+  window.__ML_ADMIN_DISPATCH_SAVE=async function(){
+    var ids=['firstReminderSeconds','secondReminderSeconds','responseDeadlineSeconds','pickupReminderSeconds','pickupDeadlineSeconds','reassignDelaySeconds','retrySearchIntervalSeconds','maxAutoDispatchAttempts'];
+    var payload={automationEnabled:!!document.getElementById('automationEnabled').checked,remindersEnabled:!!document.getElementById('remindersEnabled').checked,autoReassignEnabled:!!document.getElementById('autoReassignEnabled').checked,autoSearchEnabled:!!document.getElementById('autoSearchEnabled').checked};
+    ids.forEach(function(id){payload[id]=Number(document.getElementById(id).value);});
+    var button=document.getElementById('ml-dispatch-save');if(button){button.disabled=true;button.textContent='Saving…';}
+    try{
+      await adminRequest('/admin/smart-rider-dispatch/settings','PUT',payload);
+      if(window.toast)window.toast('Smart Rider Dispatch settings saved and applied by the backend.','success');
+      await adminSmartRiderDispatchView();
+    }catch(e){if(window.toast)window.toast(e.message||'Could not save dispatch settings.','error');if(button){button.disabled=false;button.textContent='Save dispatch settings';}}
+  };
+  window.__ML_ADMIN_DISPATCH_REASSIGN=async function(id){
+    if(!window.confirm('Release the currently assigned rider and ask MarketLink to find a replacement? This is only allowed before pickup.'))return;
+    try{
+      await adminRequest('/deliveries/'+encodeURIComponent(id)+'/reassign','POST',{});
+      if(window.toast)window.toast('Rider released. MarketLink has started the replacement search.','success');
+      await adminSmartRiderDispatchView();
+    }catch(e){if(window.toast)window.toast(e.message||'Could not reassign this delivery.','error');}
+  };
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
       overview: function () { if (api.adminRefresh) api.adminRefresh(); },
+      dispatch: adminSmartRiderDispatchView,
       audit: adminAuditView,
       support: adminSupportQueue,
       chat: adminChatView,
@@ -1106,6 +1168,7 @@
       '<button data-ml-admin-route="overview" class="is-active"><span>🏠</span>Overview</button>' +
       '<button data-ml-admin-route="vendors"><span>🏪</span>Vendor approvals</button>' +
       '<button data-ml-admin-route="riders"><span>🛵</span>Rider approvals</button>' +
+      '<button data-ml-admin-route="dispatch"><span>⏱️</span>Smart Rider Dispatcher</button>' +
       '<button data-ml-admin-route="promotions"><span>🎯</span>Promotions</button>' +
       '<button data-ml-admin-route="affiliates"><span>🔗</span>Affiliate partners</button>' +
       '<button data-ml-admin-route="affiliateApplications"><span>🪪</span>Affiliate Marketer KYC</button>' +
