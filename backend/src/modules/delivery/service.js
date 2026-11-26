@@ -181,6 +181,7 @@ async function assignRider(deliveryId, riderId, actor) {
     if(!updated)throw new AppError('This delivery has already been assigned. Refresh the order and choose again.',409,'DELIVERY_ALREADY_ASSIGNED');
 
     await client.query("UPDATE orders SET status='rider_assigned' WHERE id=$1",[updated.order_id]);
+    await client.query("INSERT INTO order_status_history(order_id,status,note) VALUES($1,'rider_assigned',$2)",[updated.order_id,actor?.isAuto?'MarketLink automatically sent a rider request.':'Vendor assigned a rider; awaiting rider acceptance.']);
     await client.query(
       `INSERT INTO rider_assignments (delivery_id, rider_id, assigned_by, assignment_type, status, response_deadline_at)
        VALUES ($1,$2,$3,$4,'pending',$5)`,
@@ -455,6 +456,7 @@ async function reassignDelivery(deliveryId, actor) {
     );
     if(!updated)throw new AppError('This rider has already started or the delivery has changed. Refresh the order.',409,'DELIVERY_STATE_CHANGED');
     await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[order.id]);
+    await client.query("INSERT INTO order_status_history(order_id,status,note) VALUES($1,'awaiting_rider','Previous rider released before pickup; MarketLink is searching for a replacement.')",[order.id]);
     await client.query(
       "INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_reassigned','Delivery request reassigned','The vendor or MarketLink has moved this delivery request to another rider. You are no longer assigned to it.','delivery',$2)",
       [oldRiderId,deliveryId]
@@ -505,6 +507,7 @@ async function processDispatchTimers() {
         if(!released)continue;
         await client.query("UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE user_id=$1 AND location_sharing_delivery_id=$2",[row.rider_id,row.delivery_id]);
         await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[row.order_id]);
+        await client.query("INSERT INTO order_status_history(order_id,status,note) VALUES($1,'awaiting_rider','Rider deadline expired before pickup; MarketLink is searching for a replacement.')",[row.order_id]);
         await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_timeout','Delivery request expired','The MarketLink delivery timer expired and this order has been released for reassignment.','delivery',$2)",[row.rider_id,row.delivery_id]);
         await client.query("INSERT INTO notifications(user_id,type,title,body,reference_type,reference_id) VALUES($1,'delivery_timeout','Rider deadline missed','The rider deadline expired. MarketLink is automatically searching for another available rider.','delivery',$2)",[row.vendor_id,row.delivery_id]);
         out.push({kind:'reassign',deliveryId:row.delivery_id,riderId:row.rider_id,vendorId:row.vendor_id,orderNumber:row.order_number});
