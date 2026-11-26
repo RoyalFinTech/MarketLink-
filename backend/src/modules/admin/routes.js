@@ -70,6 +70,7 @@ router.put('/commission-settings', authenticate, authorize(...ADMIN), [
 ], validate, ctrl.updateCommissionSettings);
 router.get('/smart-rider-dispatch', authenticate, authorize(...ADMIN), ctrl.smartRiderDispatch);
 router.post('/smart-rider-dispatch/:id/search', authenticate, authorize(...ADMIN), [param('id').isUUID()], validate, ctrl.searchSmartRiderDispatch);
+router.post('/smart-rider-dispatch/:id/reassign', authenticate, authorize(...ADMIN), [param('id').isUUID()], validate, ctrl.reassignSmartRiderDispatch);
 router.put('/smart-rider-dispatch/settings', authenticate, authorize(...ADMIN), [
   body('automationEnabled').isBoolean(),
   body('remindersEnabled').isBoolean(),
