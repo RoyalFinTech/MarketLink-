@@ -3431,13 +3431,13 @@
     if(!ML_API.admin||typeof ML_API.admin.reconcileWithdrawal!=='function'){
       toast('The secure provider reconciliation endpoint is unavailable. No payout was initiated.','error');return;
     }
-    if(!window.confirm('Check the existing Modem Pay transfer status for this withdrawal? This is a read-only lookup. It will not send another transfer or release reserved funds unless the provider confirms a terminal result.'))return;
+    if(!window.confirm('Check the existing payment-provider transfer status for this withdrawal? This is a read-only lookup. It will not send another transfer or release reserved funds unless the provider confirms a terminal result.'))return;
     try{
       var result=await ML_API.admin.reconcileWithdrawal(id);
       var data=result&&result.data||{};
       var providerStatus=String(data.provider_status||'unknown').replace(/_/g,' ');
       if(String(data.status||'').toLowerCase()==='completed'){
-        toast('Modem Pay confirmed the payout. The DAHA wallet ledger has been reconciled.','success');
+        toast('The payment provider confirmed the payout. The DAHA wallet ledger has been reconciled.','success');
       }else if(String(data.status||'').toLowerCase()==='rejected'){
         toast('Modem Pay reports this transfer failed. The withdrawal reservation has been released.','success');
       }else{
