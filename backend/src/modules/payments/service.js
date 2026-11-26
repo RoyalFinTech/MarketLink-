@@ -609,7 +609,7 @@ async function notifyVendorPaymentConfirmed({vendorId,orderId,orderNumber,amount
       title:'Customer payment confirmed',
       body:'Payment of D '+Number(amount||0).toFixed(2)+' for order '+(orderNumber||orderId)+' is confirmed. You may continue the order workflow.',
       referenceType:'order',referenceId:orderId,
-      channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&process.env.RESEND_API_KEY),emailAddress:vendor.email||null,
+      channels:{push:true,sms:true,phone:vendor.phone||null,email:!!(vendor.email&&(process.env.RESEND_API_KEY||process.env.SENDGRID_API_KEY)),emailAddress:vendor.email||null,
         data:{orderId:String(orderId),orderNumber:String(orderNumber||''),paymentMethod:String(method||'')}}
     });
   }catch(error){logger.warn('Vendor payment confirmation notification deferred',{orderId,error:error.message});}
