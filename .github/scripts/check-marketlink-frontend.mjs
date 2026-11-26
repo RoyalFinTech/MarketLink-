@@ -386,3 +386,7 @@ assert.match(customerServiceTests, /saves the selected Gambian place pin and pre
 assert.match(premiumJs, /async function cancelEditAddress/, 'Customers must be able to cancel address edits without changing saved data');
 assert.match(premiumJs, /updateAddress\(liveAddressEditId,\{label:label,fullAddress:full,area:area\|\|null,latitude:latitude,longitude:longitude\}\)/, 'Editing a saved delivery address must preserve or update its GPS coordinates');
 assert.match(serviceWorker, /\.\/data\/gambia-address-index\.json/, 'PWA cache must keep Gambian place suggestions available offline');
+
+assert.match(premiumJs, /settlementCreditMismatches/, 'Admin financial reconciliation must display exact settlement recipient and amount mismatches');
+assert.match(premiumJs, /Vendor credit is in the wrong wallet/, 'Admin financial reconciliation must identify vendor credits sent to the wrong wallet');
+assert.match(premiumJs, /Affiliate credit is in the wrong wallet/, 'Admin financial reconciliation must identify affiliate credits sent to the wrong wallet');
