@@ -459,6 +459,7 @@ async function dispatchNextRider(deliveryId, vendorId, orderNumber, notifyNoRide
 }
 
 async function reassignDelivery(deliveryId, actor) {
+  const dispatchPolicy=await getSmartRiderDispatchPolicy();
   const released = await withTransaction(async client => {
     const {rows:[snapshot]} = await client.query('SELECT order_id FROM deliveries WHERE id=$1',[deliveryId]);
     if(!snapshot)throw new AppError('Delivery not found.',404,'DELIVERY_NOT_FOUND');
@@ -481,7 +482,7 @@ async function reassignDelivery(deliveryId, actor) {
     );
     const {rows:[updated]}=await client.query(
       "UPDATE deliveries SET rider_id=NULL,status='unassigned',next_auto_dispatch_at=now()+($3::int * interval '1 second') WHERE id=$1 AND status='assigned' AND rider_id=$2 RETURNING *",
-      [deliveryId,oldRiderId,(await getSmartRiderDispatchPolicy()).reassignDelaySeconds]
+      [deliveryId,oldRiderId,dispatchPolicy.reassignDelaySeconds]
     );
     if(!updated)throw new AppError('This rider has already started or the delivery has changed. Refresh the order.',409,'DELIVERY_STATE_CHANGED');
     await client.query("UPDATE orders SET status='awaiting_rider' WHERE id=$1",[order.id]);
@@ -585,7 +586,7 @@ async function processDispatchTimers() {
       await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,false,{automatic:true});
     }else if(action.kind==='reassign'){
       await notificationsService.pushToUser(action.riderId,{title:'Delivery request expired',body:'The order has been released for reassignment because the delivery timer expired.',data:{deliveryId:String(action.deliveryId)}}).catch(()=>null);
-      if(policy.autoSearchEnabled)await dispatchNextRider(action.deliveryId,action.vendorId,action.orderNumber,true,{automatic:true});
+      // The configured reassignment delay is respected by the retry queue.
     }
   }
   return {processed:actions.length};
