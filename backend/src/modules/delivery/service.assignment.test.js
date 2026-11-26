@@ -144,6 +144,8 @@ describe('vendor and rider assignment lifecycle',()=>{
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
     query
+      .mockResolvedValueOnce({rows:[]}) // dispatch policy defaults
+      .mockResolvedValueOnce({rows:[]}) // dispatch policy for the follow-up search
       .mockResolvedValueOnce({rows:[{id:deliveryId,vendor_id:vendor.id,status:'unassigned',order_status:'awaiting_rider',delivery_fee_quote_id:null,pickup_lat:null,pickup_lng:null}]})
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
@@ -208,20 +210,18 @@ describe('vendor and rider assignment lifecycle',()=>{
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]})
       .mockResolvedValueOnce({rows:[]});
-    query
-      .mockResolvedValueOnce({rows:[{id:deliveryId,vendor_id:vendor.id,status:'unassigned',order_status:'awaiting_rider',delivery_fee_quote_id:null,pickup_lat:null,pickup_lng:null}]})
-      .mockResolvedValueOnce({rows:[]})
-      .mockResolvedValueOnce({rows:[]});
+    query.mockResolvedValueOnce({rows:[]}); // default dispatch policy
 
     const result=await processDispatchTimers();
 
     expect(result.processed).toBe(1);
     expect(clientQuery.mock.calls.some(([sql])=>/SET status='reassigned'/.test(sql))).toBe(true);
-    expect(clientQuery.mock.calls.some(([sql])=>/next_auto_dispatch_at=now\(\)\+interval '45 seconds'/.test(sql))).toBe(true);
+    expect(clientQuery.mock.calls.some(([sql])=>/next_auto_dispatch_at=now\(\)\+\(\$3::int \* interval '1 second'\)/.test(sql))).toBe(true);
     expect(notificationsService.pushToUser).toHaveBeenCalledWith(riderId,expect.objectContaining({
       title:'Delivery request expired'
     }));
-    expect(notificationsService.send).toHaveBeenCalledWith(expect.objectContaining({
+    // The configured reassignment delay is honoured; replacement search is not run early.
+    expect(notificationsService.send).not.toHaveBeenCalledWith(expect.objectContaining({
       userId:vendor.id,title:'No replacement rider available yet'
     }));
   });
