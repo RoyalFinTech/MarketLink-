@@ -1606,7 +1606,7 @@ var ML_API = (function(){
     initiate: function(orderId, method, amount, accountNumber){ return post('/payments/initiate', {orderId:orderId, method:method, amount:amount, accountNumber:accountNumber||undefined}); },
     continue: function(id, action, pin){ return post('/payments/'+id+'/continue', {action:action, pin:pin||undefined}); },
     status: function(id){ return get('/payments/'+id+'/status'); },
-    confirm:  function(id){ return post('/payments/'+id+'/confirm'); },
+    confirm:  function(id,credentials){ return post('/payments/'+id+'/confirm',credentials||{}); },
     pendingCod: function(qs){ return get('/payments/cod/pending', qs); },
     codRemittanceInstructions: function(){ return get('/payments/cod/remittance-instructions'); },
     submitCodRemittance: function(id,data){ return post('/payments/cod/'+id+'/remittance',data); },
