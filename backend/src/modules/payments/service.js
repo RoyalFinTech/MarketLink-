@@ -936,6 +936,14 @@ async function refund(paymentId,{amount,reason},actor){
       await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});
     }
 
+    if(existingReversal&&!settlementAlreadyPaid){
+      throw new AppError(
+        'A refund already has a recovery record, but its original settlement evidence has changed. No customer credit or beneficiary balance change was made. Admin Finance must reconcile the source settlement before retrying.',
+        409,
+        'REFUND_REVERSAL_SETTLEMENT_EVIDENCE_CHANGED'
+      );
+    }
+
     if(settlementAlreadyPaid){
       let reversal=existingReversal;
       if(reversal&&reversal.status!=='recovery_required')
