@@ -561,7 +561,7 @@ async function listCodCashRemittances({page=1,limit=30,status='submitted'}={}){
 
 async function verifyCodCashRemittance(remittanceId,actor,decision='verified',note='',pin){
   pin=String(pin||'');
-  if(!/^\\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
+  if(!/^\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
   if(!['verified','rejected'].includes(decision))throw new AppError('Invalid cash remittance decision.',400,'COD_REMITTANCE_DECISION_INVALID');
   const {rows:[remittance]}=await withTransaction(async(client)=>{
     // Verify the acting administrator's PIN inside the same transaction as the review.
