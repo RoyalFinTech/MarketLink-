@@ -133,8 +133,8 @@ router.post('/financial-reconciliation/orders/:id/retry-settlement',
     param('id').isUUID(),
     body('confirmation').equals('RETRY_SETTLEMENT'),
     body('reason').trim().notEmpty().isLength({max:500}),
-    body('pin').optional().matches(/^\\d{4}$/),
-    body('totpCode').optional().matches(/^\\d{6}$/),
+    body('pin').optional().matches(/^\d{4}$/),
+    body('totpCode').optional().matches(/^\d{6}$/),
   ],
   validate, requireAdminFactor, ctrl.retryFinancialSettlement);
 
@@ -144,13 +144,13 @@ router.get('/withdrawals',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
   validate, ctrl.pendingWithdrawals);
 router.post('/withdrawals/:id/approve', authenticate, authorize(...ADMIN), adminFactorLimiter,
-  [param('id').isUUID(),body('pin').optional().matches(/^\\d{4}$/),body('totpCode').optional().matches(/^\\d{6}$/)],
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate, requireAdminFactor, ctrl.approveWithdrawal);
 router.post('/withdrawals/:id/reconcile', authenticate, authorize(...ADMIN), adminFactorLimiter,
-  [param('id').isUUID(),body('pin').optional().matches(/^\\d{4}$/),body('totpCode').optional().matches(/^\\d{6}$/)],
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate, requireAdminFactor, ctrl.reconcileWithdrawal);
 router.post('/withdrawals/:id/reject',  authenticate, authorize(...ADMIN), adminFactorLimiter,
-  [param('id').isUUID(),body('pin').optional().matches(/^\\d{4}$/),body('totpCode').optional().matches(/^\\d{6}$/)],
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate, requireAdminFactor, ctrl.rejectWithdrawal);
 
 // ── AI Knowledge Training Center ────────────────────────────────────
