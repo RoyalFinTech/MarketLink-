@@ -25,7 +25,7 @@ describe('Admin financial factor guard',()=>{
   expect(bcrypt.compare).not.toHaveBeenCalled();
  });
  test('accepts valid TOTP for enabled Admin account',async()=>{
-  query.mockResolvedValue({rows:[{pin_hash:'hash',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:'cipher'}]});
+  withTransaction.mockImplementation(fn=>fn({query:jest.fn().mockResolvedValue({rows:[{pin_hash:'hash',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:'cipher',admin_totp_last_used_step:null}]})}));
   const result=await run({totpCode:'123456'});
   expect(totp.matchingStep).toHaveBeenCalledWith('secret','123456');
   expect(result.req.adminFactor).toBe('totp');
