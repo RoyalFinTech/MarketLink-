@@ -84,6 +84,7 @@ async function login({phone,pin}) {
   if(isAdmin&&user.admin_totp_enabled) {
     const jti=crypto.randomUUID();
     const expiresAt=new Date(Date.now()+5*60*1000);
+    await query('DELETE FROM admin_totp_login_challenges WHERE expires_at<now() OR consumed_at IS NOT NULL');
     await query('INSERT INTO admin_totp_login_challenges(user_id,token_jti,expires_at) VALUES($1,$2,$3)',[user.id,jti,expiresAt]);
     const challengeToken=jwt.sign({sub:user.id,purpose:'admin_totp_login',jti},process.env.JWT_ACCESS_SECRET,{expiresIn:'5m'});
     return {requiresTwoFactor:true,challengeToken,expiresIn:300,message:'Enter the current code from your authenticator app.'};
@@ -98,13 +99,16 @@ async function verifyAdminTotpLogin(challengeToken,code) {
   const result=await withTransaction(async client=>{
     const {rows:[challenge]}=await client.query('SELECT * FROM admin_totp_login_challenges WHERE token_jti=$1 AND user_id=$2 FOR UPDATE',[decoded.jti,decoded.sub]);
     if(!challenge||challenge.consumed_at||new Date(challenge.expires_at)<=new Date())throw new AppError('This authenticator challenge has expired or was already used. Sign in again.',401,'ADMIN_TOTP_CHALLENGE_INVALID');
-    const {rows:[user]}=await client.query('SELECT u.id,u.full_name,u.phone,u.status,u.admin_totp_enabled,u.admin_totp_secret_encrypted,(SELECT array_agg(r.name) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id) AS roles,(SELECT affiliate_code FROM affiliates a WHERE a.user_id=u.id) AS affiliate_code FROM users u WHERE u.id=$1 FOR UPDATE',[decoded.sub]);
+    const {rows:[user]}=await client.query('SELECT u.id,u.full_name,u.phone,u.status,u.admin_totp_enabled,u.admin_totp_secret_encrypted,u.admin_totp_last_used_step,(SELECT array_agg(r.name) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id) AS roles,(SELECT affiliate_code FROM affiliates a WHERE a.user_id=u.id) AS affiliate_code FROM users u WHERE u.id=$1 FOR UPDATE',[decoded.sub]);
     if(!user||user.status!=='active'||!user.admin_totp_enabled||!user.admin_totp_secret_encrypted)throw new AppError('Authenticator protection is no longer active. Sign in again.',401,'ADMIN_TOTP_NOT_ENABLED');
     const roles=(user.roles||[]).filter(Boolean);
     if(!roles.some(role=>['admin','super_admin'].includes(role)))throw new AppError('Administrator access is required.',403,'FORBIDDEN');
     let secret;
     try{secret=adminTotp.decryptSecret(user.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
-    if(!adminTotp.verifyCode(secret,code))throw new AppError('Incorrect authenticator code. Try the current 6-digit code.',401,'INVALID_ADMIN_TOTP');
+    const usedStep=adminTotp.matchingStep(secret,code);
+    if(usedStep===null)throw new AppError('Incorrect authenticator code. Try the current 6-digit code.',401,'INVALID_ADMIN_TOTP');
+    if(user.admin_totp_last_used_step!==null&&user.admin_totp_last_used_step!==undefined&&usedStep<=Number(user.admin_totp_last_used_step))throw new AppError('This authenticator code has already been used. Wait for the next code.',401,'ADMIN_TOTP_REPLAYED');
+    await client.query('UPDATE users SET admin_totp_last_used_step=$1 WHERE id=$2',[usedStep,user.id]);
     await client.query('UPDATE admin_totp_login_challenges SET consumed_at=now() WHERE id=$1',[challenge.id]);
     return user;
   });
@@ -132,8 +136,9 @@ async function enableAdminTotp(userId,code) {
   if(!user.admin_totp_pending_secret_encrypted)throw new AppError('Start authenticator setup first.',409,'ADMIN_TOTP_SETUP_REQUIRED');
   let secret;
   try{secret=adminTotp.decryptSecret(user.admin_totp_pending_secret_encrypted);}catch{throw new AppError('Authenticator setup expired. Start again.',409,'ADMIN_TOTP_SETUP_INVALID');}
-  if(!adminTotp.verifyCode(secret,code))throw new AppError('The authenticator code is incorrect. Scan the QR code and try again.',400,'INVALID_ADMIN_TOTP');
-  await query('UPDATE users SET admin_totp_secret_encrypted=admin_totp_pending_secret_encrypted,admin_totp_pending_secret_encrypted=NULL,admin_totp_enabled=TRUE,admin_totp_enabled_at=now() WHERE id=$1',[userId]);
+  const usedStep=adminTotp.matchingStep(secret,code);
+  if(usedStep===null)throw new AppError('The authenticator code is incorrect. Scan the QR code and try again.',400,'INVALID_ADMIN_TOTP');
+  await query('UPDATE users SET admin_totp_secret_encrypted=admin_totp_pending_secret_encrypted,admin_totp_pending_secret_encrypted=NULL,admin_totp_enabled=TRUE,admin_totp_enabled_at=now(),admin_totp_last_used_step=$1 WHERE id=$2',[usedStep,userId]);
   logger.info('Admin authenticator enabled',{userId});
   return {enabled:true,message:'Two-factor authentication is now enabled for this administrator.'};
 }
@@ -146,8 +151,10 @@ async function disableAdminTotp(userId,{pin,code}) {
   if(!await bcrypt.compare(String(pin),user.pin_hash||''))throw new AppError('Incorrect Admin PIN. Two-factor authentication remains enabled.',401,'INVALID_PIN');
   let secret;
   try{secret=adminTotp.decryptSecret(user.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
-  if(!adminTotp.verifyCode(secret,code))throw new AppError('Incorrect authenticator code. Two-factor authentication remains enabled.',401,'INVALID_ADMIN_TOTP');
-  await query('UPDATE users SET admin_totp_enabled=FALSE,admin_totp_secret_encrypted=NULL,admin_totp_pending_secret_encrypted=NULL,admin_totp_enabled_at=NULL WHERE id=$1',[userId]);
+  const usedStep=adminTotp.matchingStep(secret,code);
+  if(usedStep===null)throw new AppError('Incorrect authenticator code. Two-factor authentication remains enabled.',401,'INVALID_ADMIN_TOTP');
+  if(user.admin_totp_last_used_step!==null&&user.admin_totp_last_used_step!==undefined&&usedStep<=Number(user.admin_totp_last_used_step))throw new AppError('This authenticator code has already been used. Wait for the next code.',401,'ADMIN_TOTP_REPLAYED');
+  await query('UPDATE users SET admin_totp_enabled=FALSE,admin_totp_secret_encrypted=NULL,admin_totp_pending_secret_encrypted=NULL,admin_totp_enabled_at=NULL,admin_totp_last_used_step=NULL WHERE id=$1',[userId]);
   logger.info('Admin authenticator disabled',{userId});
   return {enabled:false,message:'Two-factor authentication has been disabled. Admin PIN remains active.'};
 }
