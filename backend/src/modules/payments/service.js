@@ -877,9 +877,7 @@ async function processWebhook({ event, rawBody }) {
 }
 
 async function refund(paymentId,{amount,reason},actor){
-  return withTransaction(async(client)=>{
-    // Use the same order-first lock order as payment webhooks and cancellation.
-    // The initial lookup is deliberately non-locking; order_id is immutable.
+  const outcome=await withTransaction(async(client)=>{
     const {rows:[paymentReference]}=await client.query(
       'SELECT order_id FROM payments WHERE id=$1',[paymentId]);
     if(!paymentReference)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
@@ -889,23 +887,27 @@ async function refund(paymentId,{amount,reason},actor){
     const {rows:[payment]}=await client.query(
       'SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,paymentReference.order_id]);
     if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
-    if(['processed','requested'].includes(String(payment.refund_status||'none')))
-      throw new AppError('A refund has already been processed or is awaiting reconciliation.',409,'ALREADY_REFUNDED');
+    const {rows:[existingReversal]}=await client.query(
+      'SELECT * FROM financial_reversals WHERE payment_id=$1 FOR UPDATE',[paymentId]);
+    if(payment.refund_status==='processed'||payment.status==='refunded'||existingReversal?.status==='completed')
+      throw new AppError('A refund has already been completed for this payment.',409,'ALREADY_REFUNDED');
+    if(payment.refund_status==='requested'&&!existingReversal)
+      throw new AppError('A refund request is already awaiting reconciliation. Admin must inspect the payment before retrying.',409,'REFUND_ALREADY_REQUESTED');
     if(payment.status!=='confirmed')
       throw new AppError('Only confirmed payments can be refunded.',400,'NOT_CONFIRMED');
-    const requestedAmount=amount==null?Number(payment.amount):Number(amount);
+
     const paymentAmount=Math.round(Number(payment.amount)*100)/100;
+    const requestedAmount=existingReversal?Number(existingReversal.amount):(amount==null?paymentAmount:Number(amount));
     const refundAmount=Math.round(requestedAmount*100)/100;
     if(!Number.isFinite(requestedAmount)||!Number.isFinite(refundAmount)||refundAmount<=0||refundAmount>paymentAmount)
       throw new AppError('Enter a valid refund amount not exceeding the payment amount.',400,'INVALID_AMOUNT');
-    if(refundAmount!==paymentAmount)
+    if(Math.abs(refundAmount-paymentAmount)>0.001)
       throw new AppError('Partial refunds are not enabled yet. Process a full refund so the customer ledger and revenue reconciliation remain consistent.',409,'PARTIAL_REFUND_NOT_SUPPORTED');
+    if(existingReversal&&amount!=null&&Math.abs(Number(amount)-Number(existingReversal.amount))>0.001)
+      throw new AppError('A recovery retry must use the original refund amount.',409,'REFUND_AMOUNT_CHANGED');
 
-    // A settled order has already credited vendor, rider and/or affiliate wallets.
-    // Do not credit the customer while leaving those earnings untouched. A
-    // separate Admin reversal workflow must reconcile paid earnings first.
     const {rows:[settlementEvidence]}=await client.query(
-      `SELECT
+      \`SELECT
          (SELECT status FROM commission_records WHERE order_id=$1) AS commission_status,
          EXISTS (
            SELECT 1 FROM transactions
@@ -913,78 +915,338 @@ async function refund(paymentId,{amount,reason},actor){
              AND reference_type IN ('order_vendor_payout','order_rider_payout','order_affiliate_payout')
              AND type='credit'
          ) AS has_settlement_credits,
-         (SELECT status FROM platform_earnings WHERE order_id=$1) AS platform_earning_status`,
+         (SELECT status FROM platform_earnings WHERE order_id=$1) AS platform_earning_status\`,
       [payment.order_id]);
     const settlementAlreadyPaid =
       String(settlementEvidence?.commission_status||'')==='paid' ||
       Boolean(settlementEvidence?.has_settlement_credits) ||
       String(settlementEvidence?.platform_earning_status||'')==='earned';
-    if(settlementAlreadyPaid){
-      throw new AppError(
-        'This order has already been financially settled. The earnings-reversal workflow is not enabled, so no refund was issued. Admin Finance must reconcile the vendor, rider and affiliate credits first.',
-        409,
-        'REFUND_SETTLEMENT_REVERSAL_REQUIRED'
-      );
-    }
 
     const orderStatus=String(customerOrder.status||'');
     const cancelUndispatchedOrder=['pending','accepted','preparing','awaiting_rider'].includes(orderStatus);
-    if(['rider_assigned','picked_up','on_the_way'].includes(orderStatus)){
-      throw new AppError(
-        'This order is already assigned to a rider or in transit. Reconcile the delivery or return first; MarketLink has not issued a refund.',
-        409,
-        'REFUND_ORDER_IN_PROGRESS'
-      );
-    }
-    if(!cancelUndispatchedOrder&&!['cancelled','delivered'].includes(orderStatus)){
-      throw new AppError(
-        'This order is not in a supported refund state. Admin must reconcile its delivery status before issuing a refund.',
-        409,
-        'REFUND_ORDER_STATE_UNSUPPORTED'
-      );
-    }
+    if(['rider_assigned','picked_up','on_the_way'].includes(orderStatus))
+      throw new AppError('This order is already assigned to a rider or in transit. Reconcile the delivery or return first; MarketLink has not issued a refund.',409,'REFUND_ORDER_IN_PROGRESS');
+    if(!cancelUndispatchedOrder&&!['cancelled','delivered'].includes(orderStatus))
+      throw new AppError('This order is not in a supported refund state. Admin must reconcile its delivery status before issuing a refund.',409,'REFUND_ORDER_STATE_UNSUPPORTED');
 
-    const fullRefund=true;
     if(payment.method!=='cod'&&payment.method!=='wallet'){
       const provider=PROVIDERS[payment.method];
       if(!provider||typeof provider.refund!=='function')
         throw new AppError('Refunds are not available for this payment method.',503,'REFUND_PROVIDER_UNAVAILABLE');
-      // Provider confirmation is required before the local ledger is updated.
-      // The payment row stays locked so duplicate Admin requests cannot race.
       await provider.refund({providerRef:payment.provider_ref,amount:refundAmount});
     }
-    if(fullRefund){
-      if(cancelUndispatchedOrder){
-        const {rows:items}=await client.query(
-          'SELECT product_id,quantity FROM order_items WHERE order_id=$1',[payment.order_id]);
-        for(const item of items){
-          const {rows:[restored]}=await client.query(
-            'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL RETURNING product_id',
-            [item.quantity,item.product_id]);
-          if(!restored){
-            throw new AppError(
-              'MarketLink could not restore inventory for this refunded order. The refund has been rolled back; Admin must reconcile the stock record first.',
-              409,
-              'REFUND_INVENTORY_RESTORE_FAILED'
-            );
-          }
-        }
-        const cancellationReason='Payment refunded by Admin: '+(String(reason||'Customer refund').trim().slice(0,400)||'Customer refund');
-        await client.query(
-          "UPDATE orders SET payment_status='refunded',status='cancelled',cancellation_reason=$2 WHERE id=$1",
-          [payment.order_id,cancellationReason]);
-        await client.query(
-          "INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,'cancelled',$2,$3)",
-          [payment.order_id,actor.id,cancellationReason]);
-        await client.query(
-          "UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered','cancelled')",
-          [payment.order_id]);
-        await client.query(
-          "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE location_sharing_delivery_id IN (SELECT id FROM deliveries WHERE order_id=$1)",
-          [payment.order_id]);
-      }else{
-        await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
+
+    if(settlementAlreadyPaid){
+      let reversal=existingReversal;
+      if(reversal&&reversal.status!=='recovery_required')
+        throw new AppError('This reversal is not in a retryable recovery state.',409,'REFUND_REVERSAL_STATE_INVALID');
+      if(!reversal){
+        const {rows:[created]}=await client.query(
+          \`INSERT INTO financial_reversals
+            (payment_id,order_id,amount,currency,status,reason,requested_by)
+           VALUES($1,$2,$3,'GMD','recovery_required',$4,$5)
+           RETURNING *\`,
+          [paymentId,payment.order_id,refundAmount,String(reason||'Admin refund').trim().slice(0,500),actor.id]);
+        reversal=created;
       }
+      if(!reversal||!reversal.id)
+        throw new AppError('MarketLink could not create the refund recovery record. No wallet was changed.',500,'REFUND_REVERSAL_RECORD_FAILED');
+
+      const markRecoveryRequired=async(code,message,details={})=>{
+        await client.query(
+          \`UPDATE financial_reversals
+           SET status='recovery_required',recovery_reason=$1,recovery_details=$2,
+               attempt_count=attempt_count+1,updated_at=now()
+           WHERE id=$3\`,
+          [code,JSON.stringify(details),reversal.id]);
+        await client.query("UPDATE payments SET refund_status='requested' WHERE id=$1 AND refund_status<>'processed'",[paymentId]);
+        await client.query(
+          \`INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+           VALUES($1,$2,'financial.refund_recovery_required','financial_reversal',$3,$4)\`,
+          [actor.id,actor.role||'admin',reversal.id,JSON.stringify({paymentId,orderId:payment.order_id,code,message,details})]);
+        return {recoveryRequired:true,message,code};
+      };
+
+      const {rows:[orderLedger]}=await client.query(
+        \`SELECT id,vendor_id,vendor_payout,rider_payout,affiliate_user_id,
+                affiliate_commission_amount,platform_net_fee,platform_fee,
+                payout_fee_recovery_amount,total
+         FROM orders WHERE id=$1 FOR UPDATE\`,
+        [payment.order_id]);
+      const {rows:[commission]}=await client.query(
+        'SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE',[payment.order_id]);
+      const {rows:[delivery]}=await client.query(
+        'SELECT id,rider_id,status FROM deliveries WHERE order_id=$1 FOR UPDATE',[payment.order_id]);
+      const {rows:[platformEarning]}=await client.query(
+        'SELECT * FROM platform_earnings WHERE order_id=$1 FOR UPDATE',[payment.order_id]);
+
+      const sameMoney=(a,b)=>Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<=0.01;
+      const invalid=[];
+      if(!orderLedger||!commission||commission.status!=='paid')invalid.push('COMMISSION_LEDGER_NOT_PAID');
+      if(!platformEarning||platformEarning.status!=='earned')invalid.push('PLATFORM_EARNING_NOT_EARNED');
+      if(orderLedger&&commission&&(
+        String(commission.vendor_id)!==String(orderLedger.vendor_id) ||
+        String(commission.affiliate_user_id||'')!==String(orderLedger.affiliate_user_id||'') ||
+        !sameMoney(commission.order_total,orderLedger.total) ||
+        !sameMoney(commission.vendor_payout,orderLedger.vendor_payout) ||
+        !sameMoney(commission.rider_payout,orderLedger.rider_payout) ||
+        !sameMoney(commission.affiliate_commission_amount,orderLedger.affiliate_commission_amount) ||
+        !sameMoney(commission.platform_net_amount,orderLedger.platform_net_fee) ||
+        !sameMoney(commission.commission_amount,orderLedger.platform_fee))){
+        invalid.push('COMMISSION_ORDER_AMOUNT_MISMATCH');
+      }
+      if(orderLedger&&platformEarning&&(
+        !sameMoney(platformEarning.commission_amount,orderLedger.platform_net_fee) ||
+        !sameMoney(platformEarning.payout_fee_recovery_amount||0,orderLedger.payout_fee_recovery_amount||0))){
+        invalid.push('PLATFORM_EARNING_AMOUNT_MISMATCH');
+      }
+      const vendorAmount=Number(orderLedger?.vendor_payout||0);
+      const riderAmount=Number(orderLedger?.rider_payout||0);
+      const affiliateAmount=Number(orderLedger?.affiliate_commission_amount||0);
+      if([vendorAmount,riderAmount,affiliateAmount,Number(orderLedger?.platform_net_fee||0),
+          Number(orderLedger?.payout_fee_recovery_amount||0)].some(value=>!Number.isFinite(value)||value<0))
+        invalid.push('SETTLEMENT_AMOUNT_INVALID');
+      if(vendorAmount>0&&!orderLedger?.vendor_id)invalid.push('VENDOR_RECIPIENT_MISSING');
+      if(riderAmount>0&&(!delivery?.rider_id||delivery.status!=='delivered'))invalid.push('RIDER_RECIPIENT_MISSING');
+      if(affiliateAmount>0&&!orderLedger?.affiliate_user_id)invalid.push('AFFILIATE_RECIPIENT_MISSING');
+
+      const refs=['order_vendor_payout','order_rider_payout','order_affiliate_payout'];
+      const {rows:originalCredits}=await client.query(
+        \`SELECT t.id,t.wallet_id,t.amount,t.category,t.reference_type,w.user_id
+         FROM transactions t JOIN wallets w ON w.id=t.wallet_id
+         WHERE t.reference_id=$1 AND t.type='credit'
+           AND t.reference_type=ANY($2::text[])
+         ORDER BY t.reference_type,t.id
+         FOR UPDATE OF t\`,
+        [payment.order_id,refs]);
+      const expected=[
+        {type:'vendor',userId:orderLedger?.vendor_id,amount:vendorAmount,referenceType:'order_vendor_payout',category:'vendor_sale'},
+        {type:'rider',userId:delivery?.rider_id,amount:riderAmount,referenceType:'order_rider_payout',category:'delivery_earning'},
+        {type:'affiliate',userId:orderLedger?.affiliate_user_id,amount:affiliateAmount,referenceType:'order_affiliate_payout',category:'affiliate_commission'},
+      ];
+      for(const item of expected){
+        const matches=originalCredits.filter(row=>row.reference_type===item.referenceType);
+        if(item.amount>0){
+          if(matches.length!==1||String(matches[0]?.user_id||'')!==String(item.userId||'')||
+             matches[0]?.category!==item.category||!sameMoney(matches[0]?.amount,item.amount))
+            invalid.push(item.type.toUpperCase()+'_ORIGINAL_CREDIT_MISMATCH');
+        }else if(matches.length!==0)invalid.push(item.type.toUpperCase()+'_UNEXPECTED_CREDIT');
+        item.originalTransaction=matches.length===1?matches[0]:null;
+      }
+
+      if(riderAmount>0){
+        const {rows:riderRows}=await client.query(
+          \`SELECT id,amount FROM rider_earnings
+           WHERE order_id=$1 AND rider_id=$2 AND type='delivery' FOR UPDATE\`,
+          [payment.order_id,delivery.rider_id]);
+        if(riderRows.length!==1||!sameMoney(riderRows[0]?.amount,riderAmount))
+          invalid.push('RIDER_EARNING_RECORD_MISMATCH');
+      }
+      if(invalid.length){
+        return markRecoveryRequired(
+          'SETTLEMENT_LEDGER_MISMATCH',
+          'The original settlement records do not agree. No customer refund or beneficiary debit was issued. Admin Finance must reconcile the source ledger first.',
+          {findings:invalid});
+      }
+
+      const userIds=[customerOrder.customer_id,...expected.filter(x=>x.amount>0).map(x=>x.userId)];
+      const uniqueUserIds=[...new Set(userIds.map(String))];
+      const {rows:lockedWallets}=await client.query(
+        \`SELECT id,user_id,balance,currency FROM wallets
+         WHERE user_id=ANY($1::uuid[]) ORDER BY id FOR UPDATE\`,
+        [uniqueUserIds]);
+      const walletByUser=new Map(lockedWallets.map(wallet=>[String(wallet.user_id),wallet]));
+      const missingWallets=uniqueUserIds.filter(userId=>!walletByUser.has(userId));
+      if(missingWallets.length){
+        return markRecoveryRequired(
+          'BENEFICIARY_WALLET_MISSING',
+          'A customer or earnings wallet is missing. No refund or reversal was issued until Admin Finance restores the correct wallet record.',
+          {missingUserIds:missingWallets});
+      }
+      const wrongCurrency=lockedWallets.filter(wallet=>String(wallet.currency||'GMD').toUpperCase()!=='GMD');
+      if(wrongCurrency.length){
+        return markRecoveryRequired(
+          'BENEFICIARY_WALLET_CURRENCY_MISMATCH',
+          'A wallet involved in this refund is not denominated in GMD. No balances were changed.',
+          {walletIds:wrongCurrency.map(wallet=>wallet.id)});
+      }
+      const {rows:reservations}=await client.query(
+        \`SELECT user_id,COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS reserved
+         FROM withdrawals
+         WHERE user_id=ANY($1::uuid[]) AND status IN ('processing','payout_pending')
+         GROUP BY user_id\`,
+        [uniqueUserIds]);
+      const reservedByUser=new Map(reservations.map(row=>[String(row.user_id),Number(row.reserved||0)]));
+
+      const earningLines=expected.filter(item=>item.amount>0).map(item=>({
+        beneficiaryType:item.type,beneficiaryUserId:item.userId,
+        walletId:walletByUser.get(String(item.userId)).id,
+        originalTransactionId:item.originalTransaction.id,amount:item.amount,
+      }));
+      const platformAmount=Number(platformEarning.commission_amount||0)+Number(platformEarning.payout_fee_recovery_amount||0);
+      if(platformAmount>0)earningLines.push({
+        beneficiaryType:'platform',beneficiaryUserId:null,walletId:null,
+        originalTransactionId:null,platformEarningId:platformEarning.id,amount:platformAmount,
+      });
+      const customerWallet=walletByUser.get(String(customerOrder.customer_id));
+      const lineSpecs=[
+        ...earningLines,
+        {beneficiaryType:'customer',beneficiaryUserId:customerOrder.customer_id,
+         walletId:customerWallet.id,originalTransactionId:null,amount:refundAmount},
+      ];
+      for(const line of lineSpecs){
+        await client.query(
+          \`INSERT INTO financial_reversal_lines
+            (reversal_id,beneficiary_type,beneficiary_user_id,wallet_id,
+             original_transaction_id,platform_earning_id,amount,currency)
+           VALUES($1,$2,$3,$4,$5,$6,$7,'GMD')
+           ON CONFLICT(reversal_id,beneficiary_type) DO NOTHING\`,
+          [reversal.id,line.beneficiaryType,line.beneficiaryUserId,line.walletId,
+           line.originalTransactionId,line.platformEarningId||null,line.amount]);
+      }
+      const {rows:savedLines}=await client.query(
+        'SELECT * FROM financial_reversal_lines WHERE reversal_id=$1 FOR UPDATE',[reversal.id]);
+      const savedByType=new Map(savedLines.map(line=>[line.beneficiary_type,line]));
+      const lineMismatch=lineSpecs.filter(line=>{
+        const saved=savedByType.get(line.beneficiaryType);
+        return !saved||!sameMoney(saved.amount,line.amount)||
+          String(saved.wallet_id||'')!==String(line.walletId||'')||
+          String(saved.beneficiary_user_id||'')!==String(line.beneficiaryUserId||'')||
+          String(saved.original_transaction_id||'')!==String(line.originalTransactionId||'')||
+          String(saved.platform_earning_id||'')!==String(line.platformEarningId||'');
+      });
+      if(lineMismatch.length||savedLines.length!==lineSpecs.length){
+        return markRecoveryRequired('REVERSAL_PLAN_MISMATCH',
+          'The saved reversal plan does not match the original payout records. No wallet was changed.',
+          {lineTypes:lineMismatch.map(line=>line.beneficiaryType)});
+      }
+
+      const requiredByUser=new Map();
+      for(const item of earningLines.filter(line=>line.beneficiaryType!=='platform')){
+        const userId=String(item.beneficiaryUserId);
+        requiredByUser.set(userId,(requiredByUser.get(userId)||0)+item.amount);
+      }
+      const insufficient=[];
+      for(const [userId,required] of requiredByUser){
+        const wallet=walletByUser.get(userId);
+        const reserved=reservedByUser.get(userId)||0;
+        const available=Math.max(0,Number(wallet.balance)-reserved);
+        if(available+0.0001<required)insufficient.push({userId,walletId:wallet.id,required,available,reserved});
+      }
+      if(insufficient.length){
+        return markRecoveryRequired(
+          'INSUFFICIENT_BENEFICIARY_BALANCE',
+          'One or more vendor, rider or affiliate wallets no longer contain enough unreserved funds to reverse this order. No customer refund or beneficiary debit was issued. Recover the outstanding funds, then retry this same Admin refund.',
+          {insufficient});
+      }
+
+      for(const item of earningLines.filter(line=>line.beneficiaryType!=='platform')){
+        const {rows:[debited]}=await client.query(
+          \`UPDATE wallets SET balance=balance-$1,updated_at=now()
+           WHERE id=$2 AND balance >= $1 RETURNING balance\`,
+          [item.amount,item.walletId]);
+        if(!debited)throw new AppError('A beneficiary balance changed during reversal. The refund transaction was rolled back.',409,'REFUND_BALANCE_CHANGED');
+        const refType='order_'+item.beneficiaryType+'_reversal';
+        const {rows:[reversalTransaction]}=await client.query(
+          \`INSERT INTO transactions
+            (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
+           VALUES($1,'debit','refund_reversal',$2,$3,$4,$5,$6) RETURNING id\`,
+          [item.walletId,item.amount,Number(debited.balance),refType,payment.order_id,
+           'Compensating reversal of MarketLink '+item.beneficiaryType+' payout for refund '+paymentId]);
+        await client.query(
+          'UPDATE financial_reversal_lines SET reversal_transaction_id=$1 WHERE id=$2',
+          [reversalTransaction.id,savedByType.get(item.beneficiaryType).id]);
+        if(item.beneficiaryType==='vendor'){
+          await client.query(
+            \`UPDATE vendors
+             SET total_sales=GREATEST(COALESCE(total_sales,0)-1,0),
+                 total_revenue=GREATEST(COALESCE(total_revenue,0)-$1,0),updated_at=now()
+             WHERE user_id=$2\`,
+            [item.amount,item.beneficiaryUserId]);
+        }else if(item.beneficiaryType==='rider'){
+          await client.query(
+            \`INSERT INTO rider_earnings
+              (rider_id,delivery_id,order_id,amount,type,description,paid_at)
+             VALUES($1,$2,$3,$4,'deduction',$5,now())\`,
+            [item.beneficiaryUserId,delivery.id,payment.order_id,item.amount,
+             'Compensating reversal of delivery earning for refunded MarketLink order '+paymentId]);
+          await client.query(
+            \`UPDATE riders
+             SET total_earnings=GREATEST(COALESCE(total_earnings,0)-$1,0),
+                 total_deliveries=GREATEST(COALESCE(total_deliveries,0)-1,0)
+             WHERE user_id=$2\`,
+            [item.amount,item.beneficiaryUserId]);
+        }else if(item.beneficiaryType==='affiliate'){
+          await client.query(
+            \`UPDATE affiliates
+             SET total_earnings=GREATEST(COALESCE(total_earnings,0)-$1,0),
+                 total_orders=GREATEST(COALESCE(total_orders,0)-1,0)
+             WHERE user_id=$2\`,
+            [item.amount,item.beneficiaryUserId]);
+        }
+      }
+      if(platformAmount>0)await client.query(
+        "UPDATE platform_earnings SET status='reversed',reversed_at=now() WHERE id=$1 AND status='earned'",
+        [platformEarning.id]);
+
+      const {rows:[creditedCustomer]}=await client.query(
+        'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
+        [refundAmount,customerWallet.id]);
+      if(!creditedCustomer)throw new AppError('The customer DAHA Wallet could not be credited. The reversal was rolled back.',409,'REFUND_CUSTOMER_WALLET_MISSING');
+      const {rows:[customerTransaction]}=await client.query(
+        \`INSERT INTO transactions
+          (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
+         VALUES($1,'credit','refund',$2,$3,'payment_refund_credit',$4,$5) RETURNING id\`,
+        [customerWallet.id,refundAmount,Number(creditedCustomer.balance),paymentId,
+         String(existingReversal?.reason||reason||'Order refund').trim().slice(0,500)]);
+      await client.query(
+        "UPDATE financial_reversal_lines SET reversal_transaction_id=$1 WHERE reversal_id=$2 AND beneficiary_type='customer'",
+        [customerTransaction.id,reversal.id]);
+      await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
+      const {rows:[updated]}=await client.query(
+        "UPDATE payments SET refund_status='processed',refund_amount=$1,status='refunded' WHERE id=$2 RETURNING *",
+        [refundAmount,paymentId]);
+      await client.query(
+        \`UPDATE financial_reversals
+         SET status='completed',recovery_reason=NULL,recovery_details='{}'::jsonb,
+             completed_by=$1,completed_at=now(),updated_at=now()
+         WHERE id=$2\`,
+        [actor.id,reversal.id]);
+      await client.query(
+        \`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+         VALUES($1,'payment_refunded','Refund processed',$2,'payment',$3)\`,
+        [customerOrder.customer_id,'A refund of D '+refundAmount.toFixed(2)+' has been credited to your DAHA Wallet after the order earnings were reversed.',paymentId]);
+      await client.query(
+        \`INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+         VALUES($1,$2,'payment.refunded','payment',$3,$4)\`,
+        [actor.id,actor.role||'admin',paymentId,JSON.stringify({
+          refundAmount,fullRefund:true,reason:String(existingReversal?.reason||reason||'').trim().slice(0,500),
+          reversalId:reversal.id,settledEarningsReversed:earningLines.map(line=>({beneficiaryType:line.beneficiaryType,amount:line.amount}))
+        })]);
+      return updated;
+    }
+
+    if(cancelUndispatchedOrder){
+      const {rows:items}=await client.query('SELECT product_id,quantity FROM order_items WHERE order_id=$1',[payment.order_id]);
+      for(const item of items){
+        const {rows:[restored]}=await client.query(
+          'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL RETURNING product_id',
+          [item.quantity,item.product_id]);
+        if(!restored)throw new AppError('MarketLink could not restore inventory for this refunded order. The refund has been rolled back; Admin must reconcile the stock record first.',409,'REFUND_INVENTORY_RESTORE_FAILED');
+      }
+      const cancellationReason='Payment refunded by Admin: '+(String(reason||'Customer refund').trim().slice(0,400)||'Customer refund');
+      await client.query(
+        "UPDATE orders SET payment_status='refunded',status='cancelled',cancellation_reason=$2 WHERE id=$1",
+        [payment.order_id,cancellationReason]);
+      await client.query(
+        "INSERT INTO order_status_history (order_id,status,changed_by,note) VALUES($1,'cancelled',$2,$3)",
+        [payment.order_id,actor.id,cancellationReason]);
+      await client.query("UPDATE deliveries SET status='cancelled' WHERE order_id=$1 AND status NOT IN ('delivered','cancelled')",[payment.order_id]);
+      await client.query(
+        "UPDATE riders SET location_sharing_enabled=FALSE,location_sharing_delivery_id=NULL,current_lat=NULL,current_lng=NULL,last_location_at=NULL WHERE location_sharing_delivery_id IN (SELECT id FROM deliveries WHERE order_id=$1)",
+        [payment.order_id]);
+    }else{
+      await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
     }
     const {rows:[wallet]}=await client.query(
       'SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE',[customerOrder.customer_id]);
@@ -992,27 +1254,24 @@ async function refund(paymentId,{amount,reason},actor){
     const balanceAfter=Number(wallet.balance)+refundAmount;
     await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[balanceAfter,wallet.id]);
     await client.query(
-      `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,
+      \`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
+       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)\`,
       [wallet.id,refundAmount,balanceAfter,paymentId,String(reason||'Order refund').trim().slice(0,500)||'Order refund']);
     const {rows:[updated]}=await client.query(
-      `UPDATE payments SET refund_status='processed',refund_amount=$1,
-         status=CASE WHEN $2 THEN 'refunded' ELSE 'partially_refunded' END
-       WHERE id=$3 RETURNING *`,
-      [refundAmount,fullRefund,paymentId]);
-    if(fullRefund&&!cancelUndispatchedOrder){
-      await client.query("UPDATE orders SET payment_status='refunded' WHERE id=$1",[payment.order_id]);
-    }
+      "UPDATE payments SET refund_status='processed',refund_amount=$1,status='refunded' WHERE id=$2 RETURNING *",
+      [refundAmount,paymentId]);
     await client.query(
-      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
-       VALUES ($1,'payment_refunded','Refund processed',$2,'payment',$3)`,
+      \`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'payment_refunded','Refund processed',$2,'payment',$3)\`,
       [customerOrder.customer_id,'A refund of D '+refundAmount.toFixed(2)+' has been credited to your DAHA Wallet.',paymentId]);
     await client.query(
-      `INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data)
-       VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,
-      [actor.id,actor.role||'admin',paymentId,JSON.stringify({refundAmount,fullRefund,reason:String(reason||'').trim().slice(0,500)})]);
+      \`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES ($1,$2,'payment.refunded','payment',$3,$4)\`,
+      [actor.id,actor.role||'admin',paymentId,JSON.stringify({refundAmount,fullRefund:true,reason:String(reason||'').trim().slice(0,500)})]);
     return updated;
   });
+  if(outcome&&outcome.recoveryRequired)throw new AppError(outcome.message,409,'REFUND_RECOVERY_REQUIRED');
+  return outcome;
 }
 async function getHistory(customerId,{page=1,limit=20}){const limit_=Math.min(parseInt(limit)||20,100);const offset=(Math.max(parseInt(page)||1,1)-1)*limit_;const {rows}=await query(`SELECT p.*,o.order_number FROM payments p JOIN orders o ON o.id=p.order_id WHERE o.customer_id=$1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,[customerId,limit_,offset]);return rows;}
 module.exports={initiatePayment,continuePayment,getPaymentStatus,confirmPayment,listPendingCodPayments,getCodRemittanceInstructions,submitCodCashRemittance,listMyCodCashRemittances,listCodCashRemittances,verifyCodCashRemittance,refund,getHistory,processWebhook,markPaymentConfirmed};
