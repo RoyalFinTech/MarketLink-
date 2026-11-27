@@ -38,9 +38,14 @@ async function requireAdminFactor(req,res,next){
     return next();
   }catch(error){return next(error);}
 }
+function adminFactorLimiterIfAdmin(req,res,next){
+  const roles=Array.isArray(req.user&&req.user.roles)?req.user.roles:[];
+  if(!roles.some(role=>['admin','super_admin'].includes(role)))return next();
+  return adminFactorLimiter(req,res,next);
+}
 function requireAdminFactorIfAdmin(req,res,next){
   const roles=Array.isArray(req.user&&req.user.roles)?req.user.roles:[];
   if(!roles.some(role=>['admin','super_admin'].includes(role)))return next();
   return requireAdminFactor(req,res,next);
 }
-module.exports={adminFactorLimiter,requireAdminFactor,requireAdminFactorIfAdmin};
+module.exports={adminFactorLimiter,adminFactorLimiterIfAdmin,requireAdminFactor,requireAdminFactorIfAdmin};
