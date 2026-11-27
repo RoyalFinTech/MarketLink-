@@ -22,7 +22,7 @@ router.post('/cod/:id/remittance', authenticate, authorize('rider'),
 router.get('/cod/remittances/mine',authenticate,authorize('rider'),ctrl.myCodRemittances);
 router.get('/cod/remittances',authenticate,authorize(...ADMIN),ctrl.codRemittances);
 router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),remittancePinLimiter,
-  [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500}),body('pin').matches(/^\d{4}$/).withMessage('Enter your 4-digit Admin PIN.')],
+  [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500}),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate,ctrl.reviewCodRemittance);
 router.get('/:id/status', authenticate, [param('id').isUUID()], validate, ctrl.status);
 router.post('/:id/confirm', authenticate,
