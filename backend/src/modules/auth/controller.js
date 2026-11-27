@@ -4,6 +4,11 @@ const wrap = (fn) => async (req, res, next) => { try { await fn(req, res); } cat
 exports.registerInitiate = wrap(async (req, res) => res.json({ success: true, ...await svc.registerInitiate(req.body) }));
 exports.registerComplete = wrap(async (req, res) => res.status(201).json({ success: true, data: await svc.registerComplete(req.body) }));
 exports.login            = wrap(async (req, res) => res.json({ success: true, data: await svc.login(req.body) }));
+exports.verifyAdminTotpLogin = wrap(async (req,res) => res.json({success:true,data:await svc.verifyAdminTotpLogin(req.body.challengeToken,req.body.code)}));
+exports.adminTotpStatus = wrap(async(req,res) => res.json({success:true,data:await svc.getAdminTotpStatus(req.user.id)}));
+exports.adminTotpSetup = wrap(async(req,res) => res.json({success:true,data:await svc.beginAdminTotpSetup(req.user.id)}));
+exports.adminTotpEnable = wrap(async(req,res) => res.json({success:true,data:await svc.enableAdminTotp(req.user.id,req.body.code)}));
+exports.adminTotpDisable = wrap(async(req,res) => res.json({success:true,data:await svc.disableAdminTotp(req.user.id,req.body)}));
 exports.refreshToken     = wrap(async (req, res) => res.json({ success: true, data: await svc.refreshAccessToken(req.body.refreshToken) }));
 exports.logout           = wrap(async (req, res) => { await svc.logout(req.user.id, req.body.refreshToken); res.json({ success: true, message: 'Logged out.' }); });
 exports.requestPinReset  = wrap(async (req, res) => res.json({ success: true, ...await svc.requestPinReset(req.body.phone) }));
