@@ -115,10 +115,12 @@ async function getAdminTotpStatus(userId) {
   if(!user)throw new AppError('Administrator account not found.',404,'USER_NOT_FOUND');
   return {enabled:!!user.enabled,setupPending:!!user.admin_totp_pending_secret_encrypted,issuer:'MarketLink Gambia'};
 }
-async function beginAdminTotpSetup(userId) {
+async function beginAdminTotpSetup(userId,pin) {
   const {rows:[user]}=await query('SELECT full_name,phone,COALESCE(admin_totp_enabled,FALSE) AS enabled FROM users WHERE id=$1 AND status=$2',[userId,'active']);
   if(!user)throw new AppError('Active administrator account not found.',404,'USER_NOT_FOUND');
   if(user.enabled)throw new AppError('Two-factor authentication is already enabled.',409,'ADMIN_TOTP_ALREADY_ENABLED');
+  const {rows:[account]}=await query('SELECT pin_hash FROM users WHERE id=$1',[userId]);
+  if(!account||!account.pin_hash||!await bcrypt.compare(String(pin||''),account.pin_hash))throw new AppError('Enter your correct 4-digit Admin PIN before setting up an authenticator.',401,'INVALID_PIN');
   const secret=adminTotp.generateSecret();
   await query('UPDATE users SET admin_totp_pending_secret_encrypted=$1 WHERE id=$2',[adminTotp.encryptSecret(secret),userId]);
   return {secret,otpauthUrl:adminTotp.provisioningUri(secret,user.phone||user.full_name),issuer:'MarketLink Gambia',account:user.phone||user.full_name};
