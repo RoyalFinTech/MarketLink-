@@ -3,7 +3,7 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS admin_totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS admin_totp_secret_encrypted TEXT,
   ADD COLUMN IF NOT EXISTS admin_totp_pending_secret_encrypted TEXT,
-  ADD COLUMN IF NOT EXISTS admin_totp_enabled_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS admin_totp_enabled_at TIMESTAMPTZ,\n  ADD COLUMN IF NOT EXISTS admin_totp_last_used_step BIGINT;
 
 CREATE TABLE IF NOT EXISTS admin_totp_login_challenges (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
