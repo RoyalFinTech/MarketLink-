@@ -6,7 +6,7 @@ const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
 const remittancePinLimiter = require('./remittancePinLimiter');
-const {adminFactorLimiter,requireAdminFactor}=require('../../middleware/adminFactor');
+const {adminFactorLimiter,requireAdminFactor,requireAdminFactorIfAdmin}=require('../../middleware/adminFactor');
 const ADMIN = ['admin','super_admin'];
 router.get('/methods', authenticate, authorize('customer','vendor','rider'), ctrl.methods);
 router.post('/initiate', authenticate, authorize('customer'),
@@ -26,8 +26,9 @@ router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),remit
   [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500}),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate,ctrl.reviewCodRemittance);
 router.get('/:id/status', authenticate, [param('id').isUUID()], validate, ctrl.status);
-router.post('/:id/confirm', authenticate,
-  [param('id').isUUID()], validate, ctrl.confirm);
+router.post('/:id/confirm', authenticate, adminFactorLimiter,
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
+  validate, requireAdminFactorIfAdmin, ctrl.confirm);
 router.post('/:id/refund', authenticate, authorize(...ADMIN), adminFactorLimiter,
   [param('id').isUUID(), body('amount').optional().isFloat({min:0}), body('reason').optional().trim(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate, requireAdminFactor, ctrl.refund);
