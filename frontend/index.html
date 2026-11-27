@@ -1601,7 +1601,7 @@ var ML_API = (function(){
     submitCodRemittance: function(id,data){ return post('/payments/cod/'+id+'/remittance',data); },
     myCodRemittances: function(qs){ return get('/payments/cod/remittances/mine',qs); },
     codRemittances: function(qs){ return get('/payments/cod/remittances',qs); },
-    reviewCodRemittance: function(id,decision,note){ return post('/payments/cod/remittances/'+id+'/review',{decision:decision,note:note||''}); },
+    reviewCodRemittance: function(id,decision,note,pin){ return post('/payments/cod/remittances/'+id+'/review',{decision:decision,note:note||'',pin:pin||''}); },
     history:  function(qs){ return get('/payments/history', qs); },
   };
 
