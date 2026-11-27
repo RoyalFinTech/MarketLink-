@@ -257,7 +257,7 @@
     var pinEl=G('ml-modem-payment-pin'),pin='';
     if(action==='pin'){
       pin=String(pinEl&&pinEl.value||'').trim();
-      if(!/^\\d{4,8}$/.test(pin)){toast('Enter the provider authorization code requested for this payment.','error');return;}
+      if(!/^\d{4,8}$/.test(pin)){toast('Enter the provider authorization code requested for this payment.','error');return;}
     }
     try{
       var response=await ML_API.payments.continue(pending.payment.id,action,action==='pin'?pin:undefined);
@@ -570,8 +570,8 @@
       if(loginResponse&&loginResponse.requiresTwoFactor){
         var challengeCode=window.prompt('MarketLink Admin two-factor is enabled. Enter the current 6-digit code from your authenticator app:');
         if(challengeCode===null)throw {error:'Authenticator verification cancelled. No Admin session was created.'};
-        challengeCode=String(challengeCode||'').replace(/\\s/g,'');
-        if(!/^\\d{6}$/.test(challengeCode))throw {error:'Enter the 6-digit authenticator code to finish Admin sign-in.'};
+        challengeCode=String(challengeCode||'').replace(/\s/g,'');
+        if(!/^\d{6}$/.test(challengeCode))throw {error:'Enter the 6-digit authenticator code to finish Admin sign-in.'};
         loginResponse=await ML_API.auth.verifyAdminTwoFactor(loginResponse.challengeToken,challengeCode);
       }
 
@@ -776,12 +776,12 @@
         credential=window.prompt('Two-factor authentication is enabled. Enter the current 6-digit authenticator code to '+(decision==='verified'?'approve':'reject')+' this remittance:');
         if(credential===null)return;
         credential=String(credential||'').trim();
-        if(!/^\\d{6}$/.test(credential)){toast('A valid 6-digit authenticator code is required. No decision was submitted.','error');return;}
+        if(!/^\d{6}$/.test(credential)){toast('A valid 6-digit authenticator code is required. No decision was submitted.','error');return;}
       }else{
         credential=window.prompt('Enter your 4-digit MarketLink Admin PIN to '+(decision==='verified'?'approve':'reject')+' this remittance:');
         if(credential===null)return;
         credential=String(credential||'').trim();
-        if(!/^\\d{4}$/.test(credential)){toast('A valid 4-digit Admin PIN is required. No decision was submitted.','error');return;}
+        if(!/^\d{4}$/.test(credential)){toast('A valid 4-digit Admin PIN is required. No decision was submitted.','error');return;}
       }
       var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note,credential,credentialType),data=response&&response.data||response||{};
       var settlement=data.settlement;
