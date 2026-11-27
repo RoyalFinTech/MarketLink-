@@ -22,6 +22,14 @@ CREATE TABLE IF NOT EXISTS public.financial_reversals (
 CREATE INDEX IF NOT EXISTS idx_financial_reversals_status_created
   ON public.financial_reversals(status, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_financial_reversals_order
+  ON public.financial_reversals(order_id);
+CREATE INDEX IF NOT EXISTS idx_financial_reversals_requested_by
+  ON public.financial_reversals(requested_by);
+CREATE INDEX IF NOT EXISTS idx_financial_reversals_completed_by
+  ON public.financial_reversals(completed_by)
+  WHERE completed_by IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS public.financial_reversal_lines (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   reversal_id UUID NOT NULL REFERENCES public.financial_reversals(id) ON DELETE RESTRICT,
@@ -46,6 +54,19 @@ CREATE TABLE IF NOT EXISTS public.financial_reversal_lines (
 
 CREATE INDEX IF NOT EXISTS idx_financial_reversal_lines_reversal
   ON public.financial_reversal_lines(reversal_id);
+
+CREATE INDEX IF NOT EXISTS idx_financial_reversal_lines_beneficiary
+  ON public.financial_reversal_lines(beneficiary_user_id)
+  WHERE beneficiary_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_financial_reversal_lines_wallet
+  ON public.financial_reversal_lines(wallet_id)
+  WHERE wallet_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_financial_reversal_lines_original_tx
+  ON public.financial_reversal_lines(original_transaction_id)
+  WHERE original_transaction_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_financial_reversal_lines_platform
+  ON public.financial_reversal_lines(platform_earning_id)
+  WHERE platform_earning_id IS NOT NULL;
 
 -- Idempotency keys for appended reversal debits and the customer refund credit.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_order_financial_reversal
