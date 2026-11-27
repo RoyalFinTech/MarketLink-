@@ -565,13 +565,16 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
   if(!['verified','rejected'].includes(decision))throw new AppError('Invalid cash remittance decision.',400,'COD_REMITTANCE_DECISION_INVALID');
   const {rows:[remittance]}=await withTransaction(async(client)=>{
     // Enforce the account's configured factor; never silently fall back from TOTP to PIN.
-    const {rows:[admin]}=await client.query('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled,admin_totp_secret_encrypted FROM users WHERE id=$1 FOR SHARE',[actor.id]);
+    const {rows:[admin]}=await client.query('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled,admin_totp_secret_encrypted,admin_totp_last_used_step FROM users WHERE id=$1 FOR UPDATE',[actor.id]);
     if(!admin||admin.status!=='active')throw new AppError('Your administrator account is not active.',403,'ADMIN_ACCOUNT_NOT_ACTIVE');
     if(admin.admin_totp_enabled){
       if(!/^\d{6}$/.test(totpCode))throw new AppError('Enter the current 6-digit authenticator code to review this remittance.',400,'COD_REMITTANCE_TOTP_REQUIRED');
       let secret;
       try{secret=adminTotp.decryptSecret(admin.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
-      if(!adminTotp.verifyCode(secret,totpCode))throw new AppError('Incorrect authenticator code. No remittance decision was saved.',401,'INVALID_ADMIN_TOTP');
+      const usedStep=adminTotp.matchingStep(secret,totpCode);
+      if(usedStep===null)throw new AppError('Incorrect authenticator code. No remittance decision was saved.',401,'INVALID_ADMIN_TOTP');
+      if(admin.admin_totp_last_used_step!==null&&admin.admin_totp_last_used_step!==undefined&&usedStep<=Number(admin.admin_totp_last_used_step))throw new AppError('This authenticator code has already been used. Wait for the next code.',401,'ADMIN_TOTP_REPLAYED');
+      await client.query('UPDATE users SET admin_totp_last_used_step=$1 WHERE id=$2',[usedStep,actor.id]);
     }else{
       if(!/^\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
       if(!admin.pin_hash||!await bcrypt.compare(pin,admin.pin_hash))throw new AppError('Incorrect Admin PIN. No remittance decision was saved.',401,'INVALID_COD_REMITTANCE_PIN');
