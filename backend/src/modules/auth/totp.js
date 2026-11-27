@@ -22,7 +22,7 @@ function base32Decode(input) {
   return Buffer.from(out);
 }
 function encryptionKey() {
-  const master = String(process.env.JWT_ACCESS_SECRET || '');
+  const master = String(process.env.ADMIN_TOTP_ENCRYPTION_KEY || process.env.JWT_ACCESS_SECRET || '');
   if (master.length < 32) throw new Error('JWT_ACCESS_SECRET must be configured with at least 32 characters before Admin authenticator setup.');
   return crypto.createHash('sha256').update('MarketLink Admin TOTP encryption v1:').update(master).digest();
 }
