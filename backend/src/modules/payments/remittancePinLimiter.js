@@ -9,7 +9,9 @@ module.exports = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true,
+  // Only a wrong-PIN response (401) consumes the budget. Other errors such as
+  // a temporary database/settlement failure must not lock an Admin out.
+  skip: (_req, res) => res.statusCode !== 401,
   message: {
     success: false,
     error: 'Too many unsuccessful Admin PIN attempts. Try again in 15 minutes.',
