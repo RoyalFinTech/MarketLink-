@@ -3525,8 +3525,9 @@
     if(!window.confirm('Retry the settlement for '+String(orderReference||'this order')+'? This runs the existing locked, idempotent settlement routine. It will not override ledger mismatches or missing payout recipients.'))return;
     var reason=window.prompt('Enter the reason for this Admin settlement retry (for example, verified cash receipt):','');
     if(!reason||!reason.trim())return;
+    var factor=await promptAdminFinancialFactor('retry this financial settlement');if(!factor)return;
     try{
-      var result=await ML_API.admin.retryFinancialSettlement(orderId,{confirmation:'RETRY_SETTLEMENT',reason:reason.trim()});
+      var result=await ML_API.admin.retryFinancialSettlement(orderId,Object.assign({confirmation:'RETRY_SETTLEMENT',reason:reason.trim()},factor));
       toast(result&&result.message||'Settlement retry completed.','success');
     }catch(e){
       toast(e.error||e.message||'Settlement retry was not completed. No unsafe repair was attempted.','error');
