@@ -145,7 +145,7 @@ async function enableAdminTotp(userId,code) {
 async function disableAdminTotp(userId,{pin,code}) {
   if(!/^\d{4}$/.test(String(pin||'')))throw new AppError('Enter your 4-digit Admin PIN to disable two-factor authentication.',400,'ADMIN_PIN_REQUIRED');
   if(!/^\d{6}$/.test(String(code||'')))throw new AppError('Enter the current 6-digit authenticator code.',400,'ADMIN_TOTP_REQUIRED');
-  const {rows:[user]}=await query('SELECT pin_hash,admin_totp_secret_encrypted,COALESCE(admin_totp_enabled,FALSE) AS enabled FROM users WHERE id=$1 AND status=$2',[userId,'active']);
+  const {rows:[user]}=await query('SELECT pin_hash,admin_totp_secret_encrypted,admin_totp_last_used_step,COALESCE(admin_totp_enabled,FALSE) AS enabled FROM users WHERE id=$1 AND status=$2',[userId,'active']);
   if(!user)throw new AppError('Active administrator account not found.',404,'USER_NOT_FOUND');
   if(!user.enabled) return {enabled:false,message:'Two-factor authentication is already disabled.'};
   if(!await bcrypt.compare(String(pin),user.pin_hash||''))throw new AppError('Incorrect Admin PIN. Two-factor authentication remains enabled.',401,'INVALID_PIN');
