@@ -635,6 +635,13 @@ async function markPaymentConfirmed(paymentId,actor=null){
       'SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,paymentReference.order_id]);
     if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
     if(payment.status==='confirmed')return {payment,newlyConfirmed:false};
+    if(payment.status!=='pending'){
+      throw new AppError(
+        'This payment is no longer pending and cannot be confirmed again. Finance must reconcile its terminal status before any manual confirmation.',
+        409,
+        'PAYMENT_TERMINAL_STATE'
+      );
+    }
     const {rows:[updated]}=await client.query(
       `UPDATE payments SET status='confirmed',paid_at=now() WHERE id=$1 RETURNING *`,
       [paymentId]
