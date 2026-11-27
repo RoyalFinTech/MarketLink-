@@ -1489,7 +1489,7 @@ var ML_API = (function(){
       return data.data;
     },
     adminTotpStatus: function(){return get('/auth/admin/totp/status');},
-    beginAdminTotpSetup: function(){return post('/auth/admin/totp/setup',{});},
+    beginAdminTotpSetup: function(pin){return post('/auth/admin/totp/setup',{pin:pin});},
     enableAdminTotp: function(code){return post('/auth/admin/totp/enable',{code:code});},
     disableAdminTotp: function(pin,code){return post('/auth/admin/totp/disable',{pin:pin,code:code});},
     logout: async function(){
