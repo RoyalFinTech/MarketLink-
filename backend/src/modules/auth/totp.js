@@ -47,19 +47,24 @@ function hotp(secret, counter) {
   const binary = ((digest[offset]&127)<<24)|((digest[offset+1]&255)<<16)|((digest[offset+2]&255)<<8)|(digest[offset+3]&255);
   return String(binary % 1000000).padStart(6,'0');
 }
-function verifyCode(secret, code, now = Date.now()) {
+function matchingStep(secret, code, now = Date.now()) {
   const value = String(code || '').replace(/\s/g,'');
-  if (!/^\d{6}$/.test(value)) return false;
+  if (!/^\d{6}$/.test(value)) return null;
   const counter = Math.floor(now / 30000);
-  for (let drift=-1; drift<=1; drift++) {
-    const expected = hotp(secret,counter+drift);
+  for (const drift of [0,-1,1]) {
+    const step=counter+drift;
+    if(step<0)continue;
+    const expected = hotp(secret,step);
     const a=Buffer.from(expected), b=Buffer.from(value);
-    if (a.length===b.length && crypto.timingSafeEqual(a,b)) return true;
+    if (a.length===b.length && crypto.timingSafeEqual(a,b)) return step;
   }
-  return false;
+  return null;
+}
+function verifyCode(secret, code, now = Date.now()) {
+  return matchingStep(secret,code,now)!==null;
 }
 function provisioningUri(secret, account) {
   const label = encodeURIComponent('MarketLink Gambia:' + String(account || 'Administrator'));
   return 'otpauth://totp/' + label + '?secret=' + secret + '&issuer=MarketLink%20Gambia&algorithm=SHA1&digits=6&period=30';
 }
-module.exports = { generateSecret, encryptSecret, decryptSecret, verifyCode, provisioningUri };
+module.exports = { generateSecret, encryptSecret, decryptSecret, verifyCode, matchingStep, provisioningUri };
