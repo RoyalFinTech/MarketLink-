@@ -3,7 +3,7 @@ jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
 jest.mock('bcryptjs',()=>({compare:jest.fn(),hash:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 jest.mock('../notifications/service',()=>({sendSms:jest.fn()}));
-jest.mock('./totp',()=>({generateSecret:jest.fn(),encryptSecret:jest.fn(),decryptSecret:jest.fn(),verifyCode:jest.fn(),provisioningUri:jest.fn()}));
+jest.mock('./totp',()=>({generateSecret:jest.fn(),encryptSecret:jest.fn(),decryptSecret:jest.fn(),verifyCode:jest.fn(),matchingStep:jest.fn(),provisioningUri:jest.fn()}));
 const {query,withTransaction}=require('../../config/db');
 const bcrypt=require('bcryptjs');
 const jwt=require('jsonwebtoken');
@@ -16,7 +16,7 @@ describe('conditional Admin authenticator login',()=>{
   process.env.JWT_ACCESS_SECRET='marketlink-test-access-secret-with-at-least-32-characters';
   process.env.JWT_REFRESH_SECRET='marketlink-test-refresh-secret-with-at-least-32-characters';
   bcrypt.compare.mockResolvedValue(true);bcrypt.hash.mockResolvedValue('refresh-hash');
-  totp.decryptSecret.mockReturnValue('BASE32SECRET');totp.verifyCode.mockReturnValue(true);
+  totp.decryptSecret.mockReturnValue('BASE32SECRET');totp.verifyCode.mockReturnValue(true);totp.matchingStep.mockReturnValue(12345);
   query.mockResolvedValue({rows:[]});
  });
  test('returns a short-lived challenge and no session tokens when Admin two-factor is enabled',async()=>{
@@ -46,7 +46,7 @@ describe('conditional Admin authenticator login',()=>{
    .mockResolvedValueOnce({rows:[]});
   withTransaction.mockImplementation(fn=>fn({query:clientQuery}));
   const result=await verifyAdminTotpLogin(challengeToken,'123456');
-  expect(totp.verifyCode).toHaveBeenCalledWith('BASE32SECRET','123456');
+  expect(totp.matchingStep).toHaveBeenCalledWith('BASE32SECRET','123456');
   expect(clientQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE admin_totp_login_challenges'),['challenge-id']);
   expect(result.accessToken).toBeTruthy();expect(result.refreshToken).toBeTruthy();
  });
@@ -55,7 +55,7 @@ describe('conditional Admin authenticator login',()=>{
   withTransaction.mockImplementation(fn=>fn({query:jest.fn()
    .mockResolvedValueOnce({rows:[{id:'challenge-id',expires_at:new Date(Date.now()+60000),consumed_at:null}]})
    .mockResolvedValueOnce({rows:[{...admin,admin_totp_secret_encrypted:'cipher'}]})}));
-  totp.verifyCode.mockReturnValue(false);
+  totp.matchingStep.mockReturnValue(null);
   await expect(verifyAdminTotpLogin(challengeToken,'000000')).rejects.toMatchObject({code:'INVALID_ADMIN_TOTP',statusCode:401});
   expect(query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO refresh_tokens'),expect.any(Array));
  });
