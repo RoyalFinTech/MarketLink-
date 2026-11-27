@@ -1,4 +1,5 @@
 jest.mock('../../config/db',()=>({query:jest.fn(),withTransaction:jest.fn()}));
+jest.mock('bcryptjs',()=>({compare:jest.fn()}));
 jest.mock('../../utils/logger',()=>({info:jest.fn(),warn:jest.fn(),error:jest.fn()}));
 jest.mock('../../integrations/modempay',()=>({isConfigured:jest.fn(()=>false),isWebhookConfigured:jest.fn(()=>false),isH2H:jest.fn(()=>false)}));
 jest.mock('../orders/service',()=>({settleOrderFinancials:jest.fn()}));
@@ -6,6 +7,7 @@ jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn()}));
 
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
+const bcrypt=require('bcryptjs');
 const {submitCodCashRemittance,verifyCodCashRemittance,getCodRemittanceInstructions}=require('./service');
 
 const paymentId='11111111-1111-4111-8111-111111111111';
@@ -21,11 +23,13 @@ describe('rider cash remittance controls',()=>{
  let tx;
  beforeEach(()=>{
   jest.clearAllMocks();
+  bcrypt.compare.mockResolvedValue(true);
   process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER='871234567';
   process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME='MarketLink Gambia';
   process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER='861234567';
   process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NAME='MarketLink Gambia';
   tx=jest.fn(async(sql,params=[])=>{
+   if(sql.includes('SELECT pin_hash,status FROM users'))return{rows:[{pin_hash:'hashed-admin-pin',status:'active'}]};
    if(sql.includes('SELECT id FROM file_uploads'))return{rows:[{id:proofFileId}]};
    if(sql.includes('SELECT payment_id FROM cod_cash_remittances WHERE id=$1'))return{rows:[{payment_id:paymentId}]};
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,payment_status:'pending',order_status:'delivered',order_payment_status:'pending',delivery_id:'delivery-1',rider_id:riderId,delivery_status:'delivered'}]};
@@ -88,8 +92,20 @@ describe('rider cash remittance controls',()=>{
    .rejects.toMatchObject({statusCode:409,code:'COD_REMITTANCE_NOT_DELIVERED'});
  });
 
+ test('requires a four-digit Admin PIN before making any remittance decision',async()=>{
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','No PIN'))
+   .rejects.toMatchObject({statusCode:400,code:'COD_REMITTANCE_PIN_REQUIRED'});
+  expect(withTransaction).not.toHaveBeenCalled();
+ });
+ test('rejects an incorrect Admin PIN without saving a remittance decision',async()=>{
+  bcrypt.compare.mockResolvedValue(false);
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Wrong PIN','9999'))
+   .rejects.toMatchObject({statusCode:401,code:'INVALID_COD_REMITTANCE_PIN'});
+  expect(tx).toHaveBeenCalledTimes(1);
+  expect(tx.mock.calls[0][0]).toContain('SELECT pin_hash,status FROM users');
+ });
  test('Admin verification records review and only then confirms and settles the order',async()=>{
-  const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched statement');
+  const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched statement','1234');
   expect(result.remittance).toMatchObject({id:remittanceId,status:'verified'});
   expect(result.payment).toMatchObject({id:paymentId,status:'confirmed'});
   expect(result.settlement).toMatchObject({settled:true});
@@ -106,12 +122,12 @@ describe('rider cash remittance controls',()=>{
    if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[remittance]};
    return{rows:[]};
   });
-  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched reference'))
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched reference','1234'))
    .rejects.toMatchObject({statusCode:409,code:'COD_REMITTANCE_AMOUNT_MISMATCH'});
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
  test('rejecting a remittance does not confirm payment or release wallet settlement',async()=>{
-  const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'rejected','Reference not found');
+  const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'rejected','Reference not found','1234');
   expect(result.remittance).toMatchObject({status:'rejected'});
   expect(result.settlement).toBeNull();
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
