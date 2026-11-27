@@ -1,3 +1,10 @@
+-- Reversed commissions must be explicit; do not leave reversed orders marked paid.
+ALTER TABLE public.commission_records
+  DROP CONSTRAINT IF EXISTS commission_records_status_check;
+ALTER TABLE public.commission_records
+  ADD CONSTRAINT commission_records_status_check
+  CHECK (status IN ('pending','paid','reversed'));
+
 -- Financial reversals for settled order refunds.
 -- Original credits are immutable; reversals are appended as debit transactions.
 CREATE TABLE IF NOT EXISTS public.financial_reversals (
