@@ -200,7 +200,7 @@ describe('Pay on Delivery reconciliation',()=>{
    status:'submitted'
   };
   transactionQuery.mockImplementation(async(sql)=>{
-   if(sql.includes('SELECT pin_hash,status FROM users'))return{rows:[{pin_hash:'hashed-admin-pin',status:'active'}]};
+   if(sql.includes('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled,admin_totp_secret_encrypted,admin_totp_last_used_step FROM users'))return{rows:[{pin_hash:'hashed-admin-pin',status:'active',admin_totp_enabled:false,admin_totp_last_used_step:null}]};
    if(sql.startsWith('SELECT payment_id FROM cod_cash_remittances'))return{rows:[{payment_id:payment.id}]};
    if(sql.includes('FROM payments p JOIN orders o ON o.id=p.order_id')&&sql.includes('FOR UPDATE OF p,o,d')){
     return{rows:[{method:'cod',amount:'145.00',payment_status:'pending',order_status:'delivered',delivery_status:'delivered',rider_id:'rider-1'}]};
@@ -211,7 +211,7 @@ describe('Pay on Delivery reconciliation',()=>{
   });
   const result=await verifyCodCashRemittance('remittance-1',{id:'admin-1',role:'admin'},'rejected','Receipt does not match','1234');
   expect(result).toMatchObject({remittance:{id:'remittance-1',status:'rejected'},settlement:null});
-  expect(transactionQuery.mock.calls[0][0]).toContain('SELECT pin_hash,status FROM users');
+  expect(transactionQuery.mock.calls[0][0]).toContain('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled,admin_totp_secret_encrypted,admin_totp_last_used_step FROM users');
   expect(transactionQuery.mock.calls[1][0]).toBe('SELECT payment_id FROM cod_cash_remittances WHERE id=$1');
   expect(transactionQuery.mock.calls[2][0]).toContain('FOR UPDATE OF p,o,d');
   expect(transactionQuery.mock.calls[3][0]).toBe('SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE');
