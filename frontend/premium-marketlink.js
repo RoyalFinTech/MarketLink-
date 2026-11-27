@@ -567,6 +567,13 @@
       }
       adminAuthErr('Server connected. Verifying your administrator account…');
       var loginResponse=await ML_API.auth.login(phone,pin);
+      if(loginResponse&&loginResponse.requiresTwoFactor){
+        var challengeCode=window.prompt('MarketLink Admin two-factor is enabled. Enter the current 6-digit code from your authenticator app:');
+        if(challengeCode===null)throw {error:'Authenticator verification cancelled. No Admin session was created.'};
+        challengeCode=String(challengeCode||'').replace(/\\s/g,'');
+        if(!/^\\d{6}$/.test(challengeCode))throw {error:'Enter the 6-digit authenticator code to finish Admin sign-in.'};
+        loginResponse=await ML_API.auth.verifyAdminTwoFactor(loginResponse.challengeToken,challengeCode);
+      }
 
       // Normalize the authenticated user across the direct API result and
       // older nested controller envelopes. Roles always come from the server.
