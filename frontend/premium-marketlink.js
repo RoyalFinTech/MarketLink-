@@ -740,8 +740,9 @@
       ?'This COD payment is already marked as cash received. Retry the outstanding wallet settlement for this delivered order?'
       :'Confirm that the collected cash for this delivered order has been received and reconciled? This will mark the COD payment as paid and may release the vendor/rider/affiliate settlement.';
     if(!window.confirm(question))return;
+    var factor=await promptAdminFinancialFactor('confirm this COD cash payment');if(!factor)return;
     try{
-      var response=await ML_API.payments.confirm(paymentId);
+      var response=await ML_API.payments.confirm(paymentId,factor);
       var data=response&&response.data||response||{};
       var settlement=data.settlement||null;
       if(settlement&&settlement.settled===false){
