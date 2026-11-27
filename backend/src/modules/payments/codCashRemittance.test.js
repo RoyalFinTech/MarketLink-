@@ -74,6 +74,7 @@ describe('rider cash remittance controls',()=>{
 
  test('rejects a rider who is not assigned to the delivery',async()=>{
   tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT pin_hash,status FROM users'))return{rows:[{pin_hash:'hashed-admin-pin',status:'active'}]};
    if(sql.includes('SELECT id FROM file_uploads'))return{rows:[{id:proofFileId}]};
    if(sql.includes('SELECT p.id,p.order_id'))return{rows:[{...payment,order_status:'delivered',delivery_status:'delivered',rider_id:'another-rider'}]};
    return{rows:[]};
