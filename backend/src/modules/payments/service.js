@@ -1,6 +1,7 @@
 // src/modules/payments/service.js
 'use strict';
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
@@ -558,9 +559,16 @@ async function listCodCashRemittances({page=1,limit=30,status='submitted'}={}){
   return rows;
 }
 
-async function verifyCodCashRemittance(remittanceId,actor,decision='verified',note=''){
+async function verifyCodCashRemittance(remittanceId,actor,decision='verified',note='',pin){
+  pin=String(pin||'');
+  if(!/^\\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
   if(!['verified','rejected'].includes(decision))throw new AppError('Invalid cash remittance decision.',400,'COD_REMITTANCE_DECISION_INVALID');
   const {rows:[remittance]}=await withTransaction(async(client)=>{
+    // Verify the acting administrator's PIN inside the same transaction as the review.
+    // Never persist or log the clear PIN; bcrypt hash remains the source of truth.
+    const {rows:[admin]}=await client.query('SELECT pin_hash,status FROM users WHERE id=$1 FOR SHARE',[actor.id]);
+    if(!admin||admin.status!=='active')throw new AppError('Your administrator account is not active.',403,'ADMIN_ACCOUNT_NOT_ACTIVE');
+    if(!admin.pin_hash||!await bcrypt.compare(pin,admin.pin_hash))throw new AppError('Incorrect Admin PIN. No remittance decision was saved.',401,'INVALID_COD_REMITTANCE_PIN');
     // Read the immutable payment reference first, then lock payment/order/
     // delivery before the remittance row. Rider resubmission uses that same
     // order, so this avoids the remittance-first lock inversion and deadlocks.
