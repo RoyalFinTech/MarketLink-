@@ -1172,8 +1172,7 @@ async function refund(paymentId,{amount,reason},actor){
              'Compensating reversal of delivery earning for refunded MarketLink order '+paymentId]);
           await client.query(
             \`UPDATE riders
-             SET total_earnings=GREATEST(COALESCE(total_earnings,0)-$1,0),
-                 total_deliveries=GREATEST(COALESCE(total_deliveries,0)-1,0)
+             SET total_earnings=GREATEST(COALESCE(total_earnings,0)-$1,0)
              WHERE user_id=$2\`,
             [item.amount,item.beneficiaryUserId]);
         }else if(item.beneficiaryType==='affiliate'){
