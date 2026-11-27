@@ -388,6 +388,24 @@ describe('Pay on Delivery reconciliation',()=>{
   expect(withTransaction).not.toHaveBeenCalled();
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
+ test('does not let Admin confirmation revive a failed COD payment',async()=>{
+  query.mockImplementation(async(sql)=>{
+   if(sql.includes('FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.id=$1'))return{rows:[{...payment,status:'failed',customer_id:deliveredOrder.customer_id}]};
+   if(sql.includes('SELECT status FROM cod_cash_remittances'))return{rows:[{status:'verified'}]};
+   if(sql.startsWith('SELECT status FROM orders'))return{rows:[{status:'delivered'}]};
+   return{rows:[]};
+  });
+  transactionQuery.mockImplementation(async(sql)=>{
+   if(sql.startsWith('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:payment.order_id}]};
+   if(sql.startsWith('SELECT id,customer_id,total,status,order_number FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:payment.order_id,...deliveredOrder}]};
+   if(sql.startsWith('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{...payment,status:'failed'}]};
+   return{rows:[]};
+  });
+  await expect(confirmPayment(payment.id,'admin-id',['admin']))
+   .rejects.toMatchObject({statusCode:409,code:'PAYMENT_TERMINAL_STATE'});
+  expect(transactionQuery.mock.calls.some(([sql])=>sql.includes("UPDATE payments SET status='confirmed'"))).toBe(false);
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
  test('records the Admin actor in the payment audit log and settles once confirmed',async()=>{
   const result=await confirmPayment(payment.id,'admin-id',['admin']);
   expect(transactionQuery.mock.calls[1][0]).toContain('orders WHERE id=$1 FOR UPDATE');
