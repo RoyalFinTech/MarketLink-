@@ -197,6 +197,7 @@ describe('customer payment refunds',()=>{
    expect(tx.mock.calls.filter(([sql])=>sql.includes("INSERT INTO transactions")&&sql.includes("'debit'")&&sql.includes("'refund_reversal'"))).toHaveLength(3);
    expect(tx.mock.calls.some(([sql])=>sql.includes('payment_refund_credit'))).toBe(true);
    expect(tx.mock.calls.some(([sql])=>sql.includes("SET status='reversed'")&&sql.includes('platform_earnings'))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes("UPDATE commission_records SET status='reversed'"))).toBe(true);
    expect(tx.mock.calls.some(([sql])=>sql.includes("type='deduction'")&&sql.includes('rider_earnings'))).toBe(true);
    expect(tx.mock.calls.some(([sql])=>sql.includes("SET status='completed'")&&sql.includes('financial_reversals'))).toBe(true);
    expect(lineRows.map(line=>line.beneficiary_type).sort()).toEqual(['affiliate','customer','platform','rider','vendor']);
