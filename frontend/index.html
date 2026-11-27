@@ -1364,7 +1364,7 @@ var ML_API = (function(){
     }
     // Invalid credentials and other public auth flows must return their own
     // server error; do not replace "Incorrect PIN" with a stale-token refresh.
-    var skipRefresh = /^\/auth\/(?:login|register\/(?:initiate|complete)|refresh|pin-reset\/(?:request|confirm))$/.test(path);
+    var skipRefresh = /^\\/auth\\/(?:login|admin\\/totp\\/login|register\\/(?:initiate|complete)|refresh|pin-reset\\/(?:request|confirm))$/.test(path);
 
     try {
       var res = await fetch(url, fetchOpts);
