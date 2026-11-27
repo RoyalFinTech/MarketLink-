@@ -8,7 +8,7 @@ const {query,withTransaction}=require('../../config/db');
 const bcrypt=require('bcryptjs');
 const jwt=require('jsonwebtoken');
 const totp=require('./totp');
-const {login,verifyAdminTotpLogin}=require('./service');
+const {login,verifyAdminTotpLogin,beginAdminTotpSetup,enableAdminTotp,disableAdminTotp}=require('./service');
 const admin={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',full_name:'MarketLink Admin',phone:'+220871234567',pin_hash:'hash',status:'active',admin_totp_enabled:true,roles:['admin'],affiliate_code:null};
 describe('conditional Admin authenticator login',()=>{
  beforeEach(()=>{
@@ -18,6 +18,31 @@ describe('conditional Admin authenticator login',()=>{
   bcrypt.compare.mockResolvedValue(true);bcrypt.hash.mockResolvedValue('refresh-hash');
   totp.decryptSecret.mockReturnValue('BASE32SECRET');totp.verifyCode.mockReturnValue(true);totp.matchingStep.mockReturnValue(12345);
   query.mockResolvedValue({rows:[]});
+ });
+ test('requires the existing PIN before creating a pending authenticator secret',async()=>{
+  totp.generateSecret.mockReturnValue('BASE32SECRET');
+  totp.encryptSecret.mockReturnValue('encrypted-pending');
+  totp.provisioningUri.mockReturnValue('otpauth://totp/MarketLink');
+  query.mockImplementation(async sql=>{
+   if(sql.includes('SELECT full_name,phone'))return{rows:[{full_name:admin.full_name,phone:admin.phone,enabled:false}]};
+   if(sql.includes('SELECT pin_hash FROM users'))return{rows:[{pin_hash:'hash'}]};
+   return{rows:[]};
+  });
+  const result=await beginAdminTotpSetup(admin.id,'1234');
+  expect(result.secret).toBe('BASE32SECRET');
+  expect(result.otpauthUrl).toContain('otpauth://');
+  expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE users SET admin_totp_pending_secret_encrypted'),['encrypted-pending',admin.id]);
+ });
+ test('enables authenticator only after a valid first code',async()=>{
+  query.mockImplementation(async sql=>{
+   if(sql.includes('SELECT admin_totp_pending_secret_encrypted'))return{rows:[{admin_totp_pending_secret_encrypted:'encrypted-pending',enabled:false}]};
+   return{rows:[]};
+  });
+  const result=await enableAdminTotp(admin.id,'123456');
+  expect(totp.decryptSecret).toHaveBeenCalledWith('encrypted-pending');
+  expect(totp.matchingStep).toHaveBeenCalledWith('BASE32SECRET','123456');
+  expect(query).toHaveBeenCalledWith(expect.stringContaining('admin_totp_last_used_step=$1'),[12345,admin.id]);
+  expect(result.enabled).toBe(true);
  });
  test('returns a short-lived challenge and no session tokens when Admin two-factor is enabled',async()=>{
   query.mockImplementation(async sql=>sql.startsWith('SELECT u.id,u.full_name')?{rows:[admin]}:{rows:[]});
