@@ -349,14 +349,76 @@ async function failDepositWebhook(client, payload, eventType) {
   const externalReference = payload?.external_reference || payload?.externalReference ||
     metadata.idempotencyKey || metadata.idempotency_key;
   if (!depositId && !externalReference) return null;
-  const where = depositId ? 'id=$1' : 'idempotency_key=$1';
-  const reference = String(depositId || externalReference);
-  const { rows: [deposit] } = await client.query(
-    `UPDATE wallet_deposits SET status='failed',provider_status=$2,updated_at=now()
-     WHERE ${where} AND status IN ('pending','initiating') RETURNING id`,
-    [reference, String(eventType || 'failed').slice(0, 40)]
+  const allowedFailureEvents = new Set([
+    'charge.cancelled', 'charge.failed', 'charge.expired',
+    'payment_intent.cancelled', 'payment_intent.expired',
+  ]);
+  if (!allowedFailureEvents.has(String(eventType || ''))) {
+    return { processed: true, ignored: true, reason: 'unsupported_failure_event' };
+  }
+  const callbackStatus = String(payload?.status || '').trim().toLowerCase();
+  const allowedStatuses = {
+    'charge.cancelled': ['cancelled', 'canceled'],
+    'charge.failed': ['failed', 'failure', 'declined', 'rejected'],
+    'charge.expired': ['expired'],
+    'payment_intent.cancelled': ['cancelled', 'canceled'],
+    'payment_intent.expired': ['expired'],
+  }[String(eventType)];
+  if (callbackStatus && !allowedStatuses.includes(callbackStatus)) {
+    return { processed: true, ignored: true, reason: 'event_status_mismatch' };
+  }
+
+  // Lock and resolve the exact deposit before changing its reservation state.
+  let deposit;
+  if (depositId) {
+    const { rows: [byId] } = await client.query(
+      'SELECT * FROM wallet_deposits WHERE id=$1 FOR UPDATE', [String(depositId)]
+    );
+    deposit = byId;
+  }
+  if (!deposit && externalReference) {
+    const { rows: [byReference] } = await client.query(
+      'SELECT * FROM wallet_deposits WHERE idempotency_key=$1 FOR UPDATE',
+      [String(externalReference)]
+    );
+    deposit = byReference;
+  }
+  if (!deposit) return null;
+  if (deposit.status === 'failed') return { processed: true, duplicate: true, depositId: deposit.id, status: 'failed' };
+  if (!['pending', 'initiating'].includes(String(deposit.status))) {
+    return { processed: true, ignored: true, depositId: deposit.id, reason: 'deposit_not_pending' };
+  }
+
+  const providerRefs = [...new Set([
+    payload?.payment_intent_id, payload?.paymentIntentId, payload?.id,
+    payload?.transaction_reference, payload?.transaction_id, payload?.transactionId,
+    payload?.reference,
+  ].filter(Boolean).map(String))];
+  if (deposit.provider_ref && !providerRefs.includes(String(deposit.provider_ref))) {
+    return { processed: true, ignored: true, depositId: deposit.id, reason: 'provider_reference_mismatch' };
+  }
+  if (externalReference && String(externalReference) !== String(deposit.idempotency_key)) {
+    return { processed: true, ignored: true, depositId: deposit.id, reason: 'idempotency_reference_mismatch' };
+  }
+  const providerAmount = Number(payload?.amount);
+  if (!Number.isFinite(providerAmount) || Math.abs(providerAmount - Number(deposit.amount)) > 0.01) {
+    return { processed: true, ignored: true, depositId: deposit.id, reason: 'amount_mismatch' };
+  }
+  if (String(payload?.currency || '').toUpperCase() !== String(deposit.currency || 'GMD').toUpperCase()) {
+    return { processed: true, ignored: true, depositId: deposit.id, reason: 'currency_mismatch' };
+  }
+
+  const providerRef = deposit.provider_ref || (providerRefs.length === 1 ? providerRefs[0] : null);
+  const { rows: [updated] } = await client.query(
+    `UPDATE wallet_deposits
+       SET provider_ref=COALESCE(provider_ref,$1),status='failed',provider_status=$2,updated_at=now()
+     WHERE id=$3 AND status IN ('pending','initiating')
+       AND (provider_ref IS NULL OR provider_ref=$1) RETURNING id`,
+    [providerRef, String(eventType).slice(0, 40), deposit.id]
   );
-  return deposit ? { processed: true, depositId: deposit.id, status: 'failed' } : null;
+  return updated
+    ? { processed: true, depositId: updated.id, status: 'failed' }
+    : { processed: true, ignored: true, depositId: deposit.id, reason: 'deposit_state_changed' };
 }
 
 module.exports = {

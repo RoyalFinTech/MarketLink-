@@ -50,16 +50,44 @@ describe('DAHA deposit Gambian mobile number handling', () => {
     }));
   });
 
-  test('marks a failed DAHA deposit by external idempotency reference when metadata ID is absent', async () => {
-    const clientQuery=jest.fn().mockResolvedValue({rows:[{id:'deposit-123'}]});
+  test('marks a failed DAHA deposit only after matching identity, amount, currency and provider reference', async () => {
+    const deposit={id:'deposit-123',idempotency_key:'marketlink-daha-deposit-deposit-123',provider_ref:'provider-ref-123',amount:'50.00',currency:'GMD',status:'pending'};
+    const clientQuery=jest.fn()
+      .mockResolvedValueOnce({rows:[deposit]})
+      .mockResolvedValueOnce({rows:[{id:'deposit-123'}]});
     const result=await service.failDepositWebhook({query:clientQuery},{
-      external_reference:'marketlink-daha-deposit-deposit-123'
+      external_reference:'marketlink-daha-deposit-deposit-123',
+      id:'provider-ref-123',amount:50,currency:'GMD',status:'failed'
     },'charge.failed');
     expect(result).toEqual({processed:true,depositId:'deposit-123',status:'failed'});
-    expect(clientQuery).toHaveBeenCalledWith(
-      expect.stringContaining('WHERE idempotency_key=$1'),
-      ['marketlink-daha-deposit-deposit-123','charge.failed']
-    );
+    expect(clientQuery.mock.calls[0][0]).toContain('SELECT * FROM wallet_deposits WHERE idempotency_key=$1 FOR UPDATE');
+    expect(clientQuery.mock.calls[1][0]).toContain("status='failed'");
+    expect(clientQuery.mock.calls[1][1]).toEqual(['provider-ref-123','charge.failed','deposit-123']);
+  });
+
+  test('does not release a deposit when the failure event contradicts its payload status',async()=>{
+    const deposit={id:'deposit-123',idempotency_key:'marketlink-daha-deposit-deposit-123',provider_ref:'provider-ref-123',amount:'50.00',currency:'GMD',status:'pending'};
+    const clientQuery=jest.fn().mockResolvedValueOnce({rows:[deposit]});
+    const result=await service.failDepositWebhook({query:clientQuery},{
+      external_reference:'marketlink-daha-deposit-deposit-123',
+      id:'provider-ref-123',amount:50,currency:'GMD',status:'completed'
+    },'charge.failed');
+    expect(result).toMatchObject({processed:true,ignored:true,reason:'event_status_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(0);
+  });
+
+  test.each([
+    ['amount_mismatch',{id:'provider-ref-123',amount:49,currency:'GMD'}],
+    ['currency_mismatch',{id:'provider-ref-123',amount:50,currency:'USD'}],
+    ['provider_reference_mismatch',{id:'another-provider-ref',amount:50,currency:'GMD'}],
+  ])('does not fail a DAHA deposit when the signed callback has %s',async(reason,payload)=>{
+    const deposit={id:'deposit-123',idempotency_key:'marketlink-daha-deposit-deposit-123',provider_ref:'provider-ref-123',amount:'50.00',currency:'GMD',status:'pending'};
+    const clientQuery=jest.fn().mockResolvedValueOnce({rows:[deposit]});
+    const result=await service.failDepositWebhook({query:clientQuery},{
+      ...payload,external_reference:'marketlink-daha-deposit-deposit-123'
+    },'charge.failed');
+    expect(result).toMatchObject({processed:true,ignored:true,reason});
+    expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
   test('rejects legacy seven-digit input instead of silently treating it as a full number', async () => {

@@ -333,11 +333,19 @@ async function failProviderWithdrawal(withdrawalId, transfer = {}) {
     if (metadata.withdrawal_id && String(metadata.withdrawal_id) !== String(wd.id)) {
       return { ignored: true, reason: 'withdrawal_metadata_mismatch' };
     }
-    const references = [
+    const references = [...new Set([
       transfer.id, transfer.transfer_reference, transfer.transaction_reference, transfer.reference,
-    ].filter(Boolean).map(String);
-    if (!wd.provider_ref || !references.includes(String(wd.provider_ref))) {
+    ].filter(Boolean).map(String))];
+    // When the signed failure arrives before the synchronous /transfers
+    // response is saved, bind its single unambiguous provider reference here.
+    // The caller reaches this function only after HMAC verification; metadata
+    // withdrawal_id was used to select this exact row. Amount and currency
+    // are still independently validated before the reservation can be released.
+    if (wd.provider_ref && !references.includes(String(wd.provider_ref))) {
       return { ignored: true, reason: 'provider_reference_mismatch' };
+    }
+    if (!wd.provider_ref && references.length !== 1) {
+      return { ignored: true, reason: references.length ? 'ambiguous_provider_reference' : 'missing_provider_reference' };
     }
     const transferAmount = Number(transfer.amount);
     if (!Number.isFinite(transferAmount) || Math.abs(transferAmount - Number(wd.amount)) > 0.01) {
@@ -349,9 +357,11 @@ async function failProviderWithdrawal(withdrawalId, transfer = {}) {
     if (wd.status === 'rejected') return { duplicate: true, data: wd };
     if (wd.status === 'completed') return { ignored: true, reason: 'already_completed' };
     if (wd.status !== 'payout_pending') return { ignored: true, reason: 'withdrawal_not_pending' };
+    const providerRef = wd.provider_ref || references[0];
     const { rows: [updated] } = await client.query(
-      "UPDATE withdrawals SET status='rejected',provider_status=$1,provider_response=$2,processed_at=now(),updated_at=now() WHERE id=$3 RETURNING *",
-      [String(transfer.status || 'failed').slice(0,40), JSON.stringify(transfer), wd.id]);
+      "UPDATE withdrawals SET provider_ref=COALESCE(provider_ref,$1),status='rejected',provider_status=$2,provider_response=$3,processed_at=now(),updated_at=now() WHERE id=$4 AND status='payout_pending' AND (provider_ref IS NULL OR provider_ref=$1) RETURNING *",
+      [providerRef, String(transfer.status || 'failed').slice(0,40), JSON.stringify(transfer), wd.id]);
+    if (!updated) return { ignored: true, reason: 'withdrawal_state_changed' };
     await client.query(
       "INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id) VALUES ($1,'withdrawal_failed','DAHA withdrawal not completed',$2,'withdrawal',$3)",
       [wd.user_id, 'Your DAHA Wallet withdrawal of D ' + Number(wd.amount).toFixed(2) + ' was not completed. Your reserved funds are available again.', wd.id]);

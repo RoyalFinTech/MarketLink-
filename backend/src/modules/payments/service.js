@@ -568,7 +568,7 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
       'SELECT payment_id FROM cod_cash_remittances WHERE id=$1',[remittanceId]);
     if(!reference)throw new AppError('Cash remittance record not found.',404,'COD_REMITTANCE_NOT_FOUND');
     const {rows:[paymentCheck]}=await client.query(
-      `SELECT p.method,p.amount,p.status AS payment_status,o.status AS order_status,
+      `SELECT p.method,p.amount,p.currency,p.status AS payment_status,o.status AS order_status,
               d.status AS delivery_status,d.rider_id
        FROM payments p JOIN orders o ON o.id=p.order_id
        JOIN deliveries d ON d.order_id=o.id
@@ -578,6 +578,7 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
       'SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE',[remittanceId]);
     if(!r||String(r.payment_id)!==String(reference.payment_id))throw new AppError('Cash remittance record changed during review. Reload the queue and try again.',409,'COD_REMITTANCE_CHANGED');
     if(Math.abs(Number(paymentCheck.amount)-Number(r.amount))>0.01)throw new AppError('The remittance amount no longer matches the order payment.',409,'COD_REMITTANCE_AMOUNT_MISMATCH');
+    if(String(r.currency||'GMD').toUpperCase()!==String(paymentCheck.currency||'GMD').toUpperCase())throw new AppError('The remittance currency does not match the COD payment currency.',409,'COD_REMITTANCE_CURRENCY_MISMATCH');
     if(paymentCheck.order_status!=='delivered'||paymentCheck.delivery_status!=='delivered')throw new AppError('The order must remain delivered before its cash remittance can be verified.',409,'COD_REMITTANCE_NOT_DELIVERED');
     if(String(paymentCheck.rider_id)!==String(r.rider_id))throw new AppError('The remittance rider no longer matches the assigned delivery rider.',409,'COD_REMITTANCE_RIDER_MISMATCH');
     if(r.status===decision)return{rows:[r]};
@@ -635,6 +636,13 @@ async function markPaymentConfirmed(paymentId,actor=null){
       'SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE',[paymentId,paymentReference.order_id]);
     if(!payment)throw new AppError('Payment not found.',404,'PAYMENT_NOT_FOUND');
     if(payment.status==='confirmed')return {payment,newlyConfirmed:false};
+    if(payment.status!=='pending'){
+      throw new AppError(
+        'This payment is no longer pending and cannot be confirmed again. Finance must reconcile its terminal status before any manual confirmation.',
+        409,
+        'PAYMENT_TERMINAL_STATE'
+      );
+    }
     const {rows:[updated]}=await client.query(
       `UPDATE payments SET status='confirmed',paid_at=now() WHERE id=$1 RETURNING *`,
       [paymentId]
@@ -777,7 +785,29 @@ async function processWebhook({ event, rawBody }) {
         return { processed: true, ignored: true, eventId, eventType, reason: 'currency_mismatch' };
       }
 
-      await client.query("UPDATE payments SET status='confirmed',paid_at=now() WHERE id=$1", [payment.id]);
+      // A provider callback must be bound to the same charge created for this
+      // payment. The only replaceable reference is our own initiation idempotency
+      // key, which can still be present when the webhook beats the HTTP response.
+      const distinctProviderRefs = [...new Set(providerRefs)];
+      const pendingIdempotencyRef = 'marketlink-payment-' + payment.id;
+      let verifiedProviderRef = payment.provider_ref;
+      if (verifiedProviderRef && verifiedProviderRef !== pendingIdempotencyRef) {
+        if (!distinctProviderRefs.includes(String(verifiedProviderRef))) {
+          logger.error('Modem Pay provider reference mismatch', { eventId, orderId, paymentId: payment.id });
+          return { processed: true, ignored: true, eventId, eventType, reason: 'provider_reference_mismatch' };
+        }
+      } else {
+        if (distinctProviderRefs.length !== 1) {
+          logger.error('Modem Pay callback has no unambiguous provider reference', { eventId, orderId, paymentId: payment.id });
+          return { processed: true, ignored: true, eventId, eventType, reason: 'provider_reference_ambiguous' };
+        }
+        verifiedProviderRef = distinctProviderRefs[0];
+      }
+
+      await client.query(
+        "UPDATE payments SET provider_ref=$2,status='confirmed',paid_at=now() WHERE id=$1 AND status='pending'",
+        [payment.id, verifiedProviderRef]
+      );
       await client.query("UPDATE orders SET payment_status='confirmed' WHERE id=$1", [payment.order_id]);
       const { rows: [order] } = await client.query(
         'SELECT customer_id,vendor_id,total,order_number FROM orders WHERE id=$1',
@@ -824,7 +854,38 @@ async function processWebhook({ event, rawBody }) {
       }
 
       if (payment) {
-        await client.query("UPDATE payments SET status='failed' WHERE id=$1 AND status='pending'", [payment.id]);
+        const providerAmount = Number(payload.amount);
+        if (!Number.isFinite(providerAmount) || Math.abs(providerAmount - Number(payment.amount)) > 0.01) {
+          logger.error('Modem Pay failure callback amount mismatch', {
+            eventId, orderId, paymentId: payment.id, expected: payment.amount, received: payload.amount,
+          });
+          return { processed: true, ignored: true, eventId, eventType, reason: 'amount_mismatch' };
+        }
+        if (String(payload.currency || '').toUpperCase() !== String(payment.currency || 'GMD').toUpperCase()) {
+          logger.error('Modem Pay failure callback currency mismatch', {
+            eventId, orderId, paymentId: payment.id, expected: payment.currency, received: payload.currency,
+          });
+          return { processed: true, ignored: true, eventId, eventType, reason: 'currency_mismatch' };
+        }
+        const distinctProviderRefs = [...new Set(providerRefs)];
+        const pendingIdempotencyRef = 'marketlink-payment-' + payment.id;
+        let verifiedProviderRef = payment.provider_ref;
+        if (verifiedProviderRef && verifiedProviderRef !== pendingIdempotencyRef) {
+          if (!distinctProviderRefs.includes(String(verifiedProviderRef))) {
+            logger.error('Modem Pay failure callback provider reference mismatch', { eventId, orderId, paymentId: payment.id });
+            return { processed: true, ignored: true, eventId, eventType, reason: 'provider_reference_mismatch' };
+          }
+        } else {
+          if (distinctProviderRefs.length !== 1) {
+            logger.error('Modem Pay failure callback has no unambiguous provider reference', { eventId, orderId, paymentId: payment.id });
+            return { processed: true, ignored: true, eventId, eventType, reason: 'provider_reference_ambiguous' };
+          }
+          verifiedProviderRef = distinctProviderRefs[0];
+        }
+        await client.query(
+          "UPDATE payments SET provider_ref=$2,status='failed' WHERE id=$1 AND status='pending'",
+          [payment.id, verifiedProviderRef]
+        );
         const order = lockedOrder;
         if (order && !['cancelled','delivered'].includes(order.status)) {
           const { rows: items } = await client.query(
@@ -832,10 +893,17 @@ async function processWebhook({ event, rawBody }) {
             [payment.order_id]
           );
           for (const item of items) {
-            await client.query(
-              'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL',
+            const { rows: [restored] } = await client.query(
+              'UPDATE inventory SET quantity=quantity+$1 WHERE product_id=$2 AND variant_id IS NULL AND quantity IS NOT NULL RETURNING product_id',
               [item.quantity, item.product_id]
             );
+            if (!restored) {
+              throw new AppError(
+                'Payment failed, but MarketLink could not restore the reserved inventory. The failure transaction was rolled back for Admin reconciliation.',
+                409,
+                'PAYMENT_FAILURE_INVENTORY_RESTORE_FAILED'
+              );
+            }
           }
           await client.query(
             "UPDATE orders SET status='cancelled',payment_status='failed',cancellation_reason=$2 WHERE id=$1",

@@ -110,6 +110,17 @@ describe('rider cash remittance controls',()=>{
    .rejects.toMatchObject({statusCode:409,code:'COD_REMITTANCE_AMOUNT_MISMATCH'});
   expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
+ test('Admin verification refuses a receipt with a mismatched currency',async()=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT payment_id FROM cod_cash_remittances WHERE id=$1'))return{rows:[{payment_id:paymentId}]};
+   if(sql.includes('SELECT p.method,p.amount'))return{rows:[{method:'cod',amount:'145.00',currency:'GMD',order_status:'delivered',delivery_status:'delivered',rider_id:riderId}]};
+   if(sql.includes('SELECT * FROM cod_cash_remittances WHERE id'))return{rows:[{...remittance,currency:'USD'}]};
+   return{rows:[]};
+  });
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Currency mismatch'))
+   .rejects.toMatchObject({statusCode:409,code:'COD_REMITTANCE_CURRENCY_MISMATCH'});
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
+ });
  test('rejecting a remittance does not confirm payment or release wallet settlement',async()=>{
   const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'rejected','Reference not found');
   expect(result.remittance).toMatchObject({status:'rejected'});
