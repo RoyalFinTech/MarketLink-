@@ -235,6 +235,20 @@ describe('customer payment refunds',()=>{
    expect(balances.get(vendorWallet)).toBe(70);
    expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO financial_reversals'))).toBe(false);
   });
+
+  test('does not fall back to an unsettled refund when prior recovery settlement evidence changes',async()=>{
+   prepare({existing:true});
+   const base=tx.getMockImplementation();
+   tx.mockImplementation(async(sql,params=[])=>{
+     if(sql.includes('AS has_settlement_credits'))
+       return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:'reversed'}]};
+     return base(sql,params);
+   });
+   await expect(refund(paymentId,{},actor))
+    .rejects.toMatchObject({statusCode:409,code:'REFUND_REVERSAL_SETTLEMENT_EVIDENCE_CHANGED'});
+   expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('payment_refund_credit'))).toBe(false);
+  });
  });
 
 });
