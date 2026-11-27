@@ -153,6 +153,7 @@ describe('payment webhook lock ordering',()=>{
    .mockResolvedValueOnce({rows:[{...payment,id:payment.id,order_id:payment.order_id,status:'pending',method:'wave'}]})
    .mockResolvedValueOnce({rows:[]})
    .mockResolvedValueOnce({rows:[{product_id:'product-1',quantity:2}]})
+   .mockResolvedValueOnce({rows:[{product_id:'product-1'}]})
    .mockResolvedValue({rows:[]});
   withTransaction.mockImplementation(async work=>work({query:clientQuery}));
   await processWebhook({
