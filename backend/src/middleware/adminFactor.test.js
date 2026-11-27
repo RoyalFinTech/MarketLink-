@@ -37,4 +37,10 @@ describe('Admin financial factor guard',()=>{
   const result=await run({totpCode:'000000'});
   expect(result.next).toHaveBeenCalledWith(expect.objectContaining({code:'INVALID_ADMIN_TOTP'}));
  });
+ test('rejects a TOTP time step that has already authorized another financial action',async()=>{
+  withTransaction.mockImplementation(fn=>fn({query:jest.fn().mockResolvedValue({rows:[{pin_hash:'hash',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:'cipher',admin_totp_last_used_step:123}]})}));
+  totp.matchingStep.mockReturnValue(123);
+  const result=await run({totpCode:'123456'});
+  expect(result.next).toHaveBeenCalledWith(expect.objectContaining({code:'ADMIN_TOTP_REPLAYED'}));
+ });
 });
