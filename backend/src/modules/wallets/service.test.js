@@ -65,6 +65,17 @@ describe('DAHA deposit Gambian mobile number handling', () => {
     expect(clientQuery.mock.calls[1][1]).toEqual(['provider-ref-123','charge.failed','deposit-123']);
   });
 
+  test('does not release a deposit when the failure event contradicts its payload status',async()=>{
+    const deposit={id:'deposit-123',idempotency_key:'marketlink-daha-deposit-deposit-123',provider_ref:'provider-ref-123',amount:'50.00',currency:'GMD',status:'pending'};
+    const clientQuery=jest.fn().mockResolvedValueOnce({rows:[deposit]});
+    const result=await service.failDepositWebhook({query:clientQuery},{
+      external_reference:'marketlink-daha-deposit-deposit-123',
+      id:'provider-ref-123',amount:50,currency:'GMD',status:'completed'
+    },'charge.failed');
+    expect(result).toMatchObject({processed:true,ignored:true,reason:'event_status_mismatch'});
+    expect(clientQuery).toHaveBeenCalledTimes(0);
+  });
+
   test.each([
     ['amount_mismatch',{id:'provider-ref-123',amount:49,currency:'GMD'}],
     ['currency_mismatch',{id:'provider-ref-123',amount:50,currency:'USD'}],
