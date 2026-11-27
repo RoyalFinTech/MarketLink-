@@ -45,7 +45,7 @@ describe('Modem Pay charge success webhook reconciliation',()=>{
   expect(clientQuery.mock.calls[0][0]).toContain('ON CONFLICT (provider,event_id) DO NOTHING');
   expect(clientQuery.mock.calls[1][0]).toContain('orders WHERE id=$1 FOR UPDATE');
   expect(clientQuery.mock.calls[2][0]).toContain('payments p');
-  expect(clientQuery.mock.calls[3][0]).toContain("UPDATE payments SET status='confirmed'");
+  expect(clientQuery.mock.calls[3][0]).toContain("SET provider_ref=$2,status='confirmed'");
   expect(clientQuery.mock.calls[4][0]).toContain("UPDATE orders SET payment_status='confirmed'");
   expect(ordersService.settleOrderFinancials).toHaveBeenCalledTimes(1);
   expect(ordersService.settleOrderFinancials).toHaveBeenCalledWith(payment.order_id);
@@ -150,14 +150,14 @@ describe('payment webhook lock ordering',()=>{
   const clientQuery=jest.fn()
    .mockResolvedValueOnce({rows:[{id:'webhook-event-1'}]})
    .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
-   .mockResolvedValueOnce({rows:[{id:payment.id,order_id:payment.order_id,status:'pending',method:'wave'}]})
+   .mockResolvedValueOnce({rows:[{...payment,id:payment.id,order_id:payment.order_id,status:'pending',method:'wave'}]})
    .mockResolvedValueOnce({rows:[]})
    .mockResolvedValueOnce({rows:[{product_id:'product-1',quantity:2}]})
    .mockResolvedValue({rows:[]});
   withTransaction.mockImplementation(async work=>work({query:clientQuery}));
   await processWebhook({
    event:{event:'charge.failed',payload:{
-    id:'provider-charge-1',status:'failed',
+    id:'provider-charge-1',status:'failed',amount:145,currency:'GMD',
     metadata:{orderId:payment.order_id,paymentId:payment.id}
    }},
    rawBody:'{}'
@@ -165,7 +165,43 @@ describe('payment webhook lock ordering',()=>{
   expect(clientQuery.mock.calls[1][0]).toContain('FROM orders WHERE id=$1 FOR UPDATE');
   expect(clientQuery.mock.calls[2][0]).toContain('FROM payments p');
   expect(clientQuery.mock.calls[2][0]).toContain('FOR UPDATE');
-  expect(clientQuery.mock.calls[3][0]).toContain("UPDATE payments SET status='failed'");
+  expect(clientQuery.mock.calls[3][0]).toContain("SET provider_ref=$2,status='failed'");
+ });
+
+ test('does not release stock when a failure callback amount does not match the pending charge',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'webhook-event-bad-failure-amount'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{...payment,method:'wave',status:'pending'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const result=await processWebhook({
+   event:{event:'charge.failed',payload:{
+    id:'provider-charge-amount-mismatch',status:'failed',amount:1,currency:'GMD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+   }},
+   rawBody:'failure-amount-mismatch'
+  });
+  expect(result).toMatchObject({processed:true,ignored:true,reason:'amount_mismatch'});
+  expect(clientQuery.mock.calls.some(([sql])=>sql.includes("UPDATE payments SET")&&sql.includes("status='failed'"))).toBe(false);
+  expect(clientQuery.mock.calls.some(([sql])=>sql.includes('UPDATE inventory'))).toBe(false);
+ });
+
+ test('does not confirm a successful charge when its provider reference conflicts with the saved charge',async()=>{
+  const clientQuery=jest.fn()
+   .mockResolvedValueOnce({rows:[{id:'webhook-event-ref-mismatch'}]})
+   .mockResolvedValueOnce({rows:[{id:payment.order_id,status:'pending',payment_status:'pending'}]})
+   .mockResolvedValueOnce({rows:[{...payment,method:'wave',status:'pending',provider_ref:'saved-provider-ref'}]});
+  withTransaction.mockImplementation(async work=>work({query:clientQuery}));
+  const result=await processWebhook({
+   event:{event:'charge.succeeded',payload:{
+    id:'different-provider-ref',status:'completed',amount:145,currency:'GMD',
+    metadata:{orderId:payment.order_id,paymentId:payment.id}
+   }},
+   rawBody:'success-reference-mismatch'
+  });
+  expect(result).toMatchObject({processed:true,ignored:true,reason:'provider_reference_mismatch'});
+  expect(clientQuery.mock.calls.some(([sql])=>sql.includes("status='confirmed'"))).toBe(false);
+  expect(ordersService.settleOrderFinancials).not.toHaveBeenCalled();
  });
 });
 
