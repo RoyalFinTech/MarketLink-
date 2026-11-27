@@ -1113,8 +1113,8 @@
           var script=document.createElement('script');script.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';script.onload=drawQr;script.onerror=function(){if(qr)qr.textContent='QR library unavailable. Use the setup key above.';};document.head.appendChild(script);
         }
         document.getElementById('ml-admin-totp-enable').addEventListener('click',async function(){
-          var code=String(document.getElementById('ml-admin-totp-enable-code').value||'').replace(/\\s/g,'');
-          if(!/^\\d{6}$/.test(code)){if(window.toast)window.toast('Enter the current 6-digit authenticator code.','error');return;}
+          var code=String(document.getElementById('ml-admin-totp-enable-code').value||'').replace(/\s/g,'');
+          if(!/^\d{6}$/.test(code)){if(window.toast)window.toast('Enter the current 6-digit authenticator code.','error');return;}
           this.disabled=true;this.textContent='Verifying…';
           try{await ML_API.auth.enableAdminTotp(code);if(window.toast)window.toast('Two-factor authentication enabled.','success');await adminTwoFactorView();}
           catch(error){if(window.toast)window.toast(error.error||error.message||'Could not enable authenticator.','error');this.disabled=false;this.textContent='Verify and enable';}
