@@ -3492,10 +3492,31 @@
     await renderFinancialReconciliation();
   }
 
+  async function promptAdminRefundFactor(actionLabel){
+    try{
+      var statusResponse=await ML_API.admin.adminFactorStatus(),status=statusResponse&&statusResponse.data||{};
+      if(status.enabled){
+        var code=window.prompt('Two-factor authentication is enabled. Enter the current 6-digit authenticator code to '+actionLabel+':');
+        if(code===null)return null;
+        code=String(code||'').trim();
+        if(!/^\d{6}$/.test(code)){toast('A valid 6-digit authenticator code is required.','error');return null;}
+        return {totpCode:code};
+      }
+      var pin=window.prompt('Enter your 4-digit Admin PIN to '+actionLabel+':');
+      if(pin===null)return null;
+      pin=String(pin||'').trim();
+      if(!/^\d{4}$/.test(pin)){toast('A valid 4-digit Admin PIN is required.','error');return null;}
+      return {pin:pin};
+    }catch(error){
+      toast(error.error||error.message||'Could not check the Admin security setting.','error');
+      return null;
+    }
+  }
+
   async function retryAdminRefund(paymentId,orderReference){
     if(!paymentId){toast('A valid payment record is required.','error');return;}
     if(!window.confirm('Retry the existing full refund for '+String(orderReference||'this order')+'? MarketLink will first recheck the original settlement and every beneficiary wallet. It will issue the customer credit only if all required reversals can complete.'))return;
-    var factor=await promptAdminFinancialFactor('retry this refund');if(!factor)return;
+    var factor=await promptAdminRefundFactor('retry this refund');if(!factor)return;
     try{
       var result=await ML_API.admin.refundPayment(paymentId,Object.assign({reason:'Admin refund recovery retry'},factor));
       toast(result&&result.message||'The refund reversal completed and the customer wallet was credited.','success');
