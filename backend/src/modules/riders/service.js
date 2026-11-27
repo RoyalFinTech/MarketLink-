@@ -402,8 +402,8 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
      ) p ON TRUE
      LEFT JOIN cod_cash_remittances ccr ON ccr.payment_id=p.id
      LEFT JOIN LATERAL (
-       SELECT amount FROM rider_earnings re
-       WHERE re.delivery_id=d.id ORDER BY re.created_at DESC,re.id DESC LIMIT 1
+       SELECT COALESCE(SUM(CASE WHEN re.type='deduction' THEN -re.amount ELSE re.amount END),0) AS amount
+       FROM rider_earnings re WHERE re.delivery_id=d.id
      ) re ON TRUE
      WHERE ${conditions.join(' AND ')}
      ORDER BY d.created_at DESC
