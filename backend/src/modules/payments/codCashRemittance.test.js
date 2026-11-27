@@ -8,6 +8,7 @@ jest.mock('../wallets/service',()=>({processDepositWebhook:jest.fn()}));
 const {query,withTransaction}=require('../../config/db');
 const ordersService=require('../orders/service');
 const bcrypt=require('bcryptjs');
+const adminTotp=require('../auth/totp');
 const {submitCodCashRemittance,verifyCodCashRemittance,getCodRemittanceInstructions}=require('./service');
 
 const paymentId='11111111-1111-4111-8111-111111111111';
@@ -24,6 +25,7 @@ describe('rider cash remittance controls',()=>{
  beforeEach(()=>{
   jest.clearAllMocks();
   bcrypt.compare.mockResolvedValue(true);
+  process.env.JWT_ACCESS_SECRET='marketlink-test-access-secret-with-at-least-32-characters';
   process.env.MARKETLINK_COD_WAVE_ACCOUNT_NUMBER='871234567';
   process.env.MARKETLINK_COD_WAVE_ACCOUNT_NAME='MarketLink Gambia';
   process.env.MARKETLINK_COD_AFRIMONEY_ACCOUNT_NUMBER='861234567';
@@ -103,7 +105,28 @@ describe('rider cash remittance controls',()=>{
   await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Wrong PIN','9999'))
    .rejects.toMatchObject({statusCode:401,code:'INVALID_COD_REMITTANCE_PIN'});
   expect(tx).toHaveBeenCalledTimes(1);
-  expect(tx.mock.calls[0][0]).toContain('SELECT pin_hash,status FROM users');
+  expect(tx.mock.calls[0][0]).toContain('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled');
+ });
+ test('requires authenticator code instead of PIN when two-factor is enabled',async()=>{
+  const encrypted=adminTotp.encryptSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled'))return{rows:[{pin_hash:'hashed-admin-pin',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:encrypted}]};
+   return{rows:[]};
+  });
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','PIN fallback attempt','1234'))
+   .rejects.toMatchObject({statusCode:400,code:'COD_REMITTANCE_TOTP_REQUIRED'});
+  expect(bcrypt.compare).not.toHaveBeenCalled();
+  expect(tx).toHaveBeenCalledTimes(1);
+ });
+ test('rejects an invalid authenticator code without falling back to PIN',async()=>{
+  const encrypted=adminTotp.encryptSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled'))return{rows:[{pin_hash:'hashed-admin-pin',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:encrypted}]};
+   return{rows:[]};
+  });
+  await expect(verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Bad TOTP','1234','000000'))
+   .rejects.toMatchObject({statusCode:401,code:'INVALID_ADMIN_TOTP'});
+  expect(bcrypt.compare).not.toHaveBeenCalled();
  });
  test('Admin verification records review and only then confirms and settles the order',async()=>{
   const result=await verifyCodCashRemittance(remittanceId,{id:adminId,role:'admin'},'verified','Matched statement','1234');
