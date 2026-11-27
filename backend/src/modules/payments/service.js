@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { query, withTransaction } = require('../../config/db');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const adminTotp = require('../auth/totp');
 const modemPay = require('../../integrations/modempay');
 const ordersService = require('../orders/service');
 const notificationsService = require('../notifications/service');
@@ -566,9 +567,17 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
   const {rows:[remittance]}=await withTransaction(async(client)=>{
     // Verify the acting administrator's PIN inside the same transaction as the review.
     // Never persist or log the clear PIN; bcrypt hash remains the source of truth.
-    const {rows:[admin]}=await client.query('SELECT pin_hash,status FROM users WHERE id=$1 FOR SHARE',[actor.id]);
+    const {rows:[admin]}=await client.query('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled,admin_totp_secret_encrypted FROM users WHERE id=$1 FOR SHARE',[actor.id]);
     if(!admin||admin.status!=='active')throw new AppError('Your administrator account is not active.',403,'ADMIN_ACCOUNT_NOT_ACTIVE');
-    if(!admin.pin_hash||!await bcrypt.compare(pin,admin.pin_hash))throw new AppError('Incorrect Admin PIN. No remittance decision was saved.',401,'INVALID_COD_REMITTANCE_PIN');
+    if(admin.admin_totp_enabled){
+      if(!/^\\d{6}$/.test(totpCode))throw new AppError('Enter the current 6-digit authenticator code to review this remittance.',400,'COD_REMITTANCE_TOTP_REQUIRED');
+      let secret;
+      try{secret=adminTotp.decryptSecret(admin.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
+      if(!adminTotp.verifyCode(secret,totpCode))throw new AppError('Incorrect authenticator code. No remittance decision was saved.',401,'INVALID_ADMIN_TOTP');
+    }else{
+      if(!/^\\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
+      if(!admin.pin_hash||!await bcrypt.compare(pin,admin.pin_hash))throw new AppError('Incorrect Admin PIN. No remittance decision was saved.',401,'INVALID_COD_REMITTANCE_PIN');
+    }
     // Read the immutable payment reference first, then lock payment/order/
     // delivery before the remittance row. Rider resubmission uses that same
     // order, so this avoids the remittance-first lock inversion and deadlocks.
