@@ -5,6 +5,7 @@ const { body, param } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
+const remittancePinLimiter = require('./remittancePinLimiter');
 const ADMIN = ['admin','super_admin'];
 router.get('/methods', authenticate, authorize('customer','vendor','rider'), ctrl.methods);
 router.post('/initiate', authenticate, authorize('customer'),
@@ -20,7 +21,7 @@ router.post('/cod/:id/remittance', authenticate, authorize('rider'),
   validate,ctrl.submitCodRemittance);
 router.get('/cod/remittances/mine',authenticate,authorize('rider'),ctrl.myCodRemittances);
 router.get('/cod/remittances',authenticate,authorize(...ADMIN),ctrl.codRemittances);
-router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),
+router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),remittancePinLimiter,
   [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500}),body('pin').matches(/^\d{4}$/).withMessage('Enter your 4-digit Admin PIN.')],
   validate,ctrl.reviewCodRemittance);
 router.get('/:id/status', authenticate, [param('id').isUUID()], validate, ctrl.status);
