@@ -568,7 +568,7 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
       'SELECT payment_id FROM cod_cash_remittances WHERE id=$1',[remittanceId]);
     if(!reference)throw new AppError('Cash remittance record not found.',404,'COD_REMITTANCE_NOT_FOUND');
     const {rows:[paymentCheck]}=await client.query(
-      `SELECT p.method,p.amount,p.status AS payment_status,o.status AS order_status,
+      `SELECT p.method,p.amount,p.currency,p.status AS payment_status,o.status AS order_status,
               d.status AS delivery_status,d.rider_id
        FROM payments p JOIN orders o ON o.id=p.order_id
        JOIN deliveries d ON d.order_id=o.id
@@ -578,6 +578,7 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
       'SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE',[remittanceId]);
     if(!r||String(r.payment_id)!==String(reference.payment_id))throw new AppError('Cash remittance record changed during review. Reload the queue and try again.',409,'COD_REMITTANCE_CHANGED');
     if(Math.abs(Number(paymentCheck.amount)-Number(r.amount))>0.01)throw new AppError('The remittance amount no longer matches the order payment.',409,'COD_REMITTANCE_AMOUNT_MISMATCH');
+    if(String(r.currency||'GMD').toUpperCase()!==String(paymentCheck.currency||'GMD').toUpperCase())throw new AppError('The remittance currency does not match the COD payment currency.',409,'COD_REMITTANCE_CURRENCY_MISMATCH');
     if(paymentCheck.order_status!=='delivered'||paymentCheck.delivery_status!=='delivered')throw new AppError('The order must remain delivered before its cash remittance can be verified.',409,'COD_REMITTANCE_NOT_DELIVERED');
     if(String(paymentCheck.rider_id)!==String(r.rider_id))throw new AppError('The remittance rider no longer matches the assigned delivery rider.',409,'COD_REMITTANCE_RIDER_MISMATCH');
     if(r.status===decision)return{rows:[r]};
