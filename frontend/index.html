@@ -1480,9 +1480,18 @@ var ML_API = (function(){
       // Render Free web services can take about a minute to wake after idle.
       var loginTimeout = 120000; // Free-plan cold starts and first DB round trips must not be cut off at 45 seconds.
       var data = await post('/auth/login', {phone:phone, pin:pin}, {timeoutMs:loginTimeout});
-      saveTokens(data.data.accessToken, data.data.refreshToken);
+      if(data.data&&data.data.accessToken)saveTokens(data.data.accessToken, data.data.refreshToken);
       return data.data;
     },
+    verifyAdminTwoFactor: async function(challengeToken,code){
+      var data=await post('/auth/admin/totp/login',{challengeToken:challengeToken,code:code},{timeoutMs:30000});
+      if(data.data&&data.data.accessToken)saveTokens(data.data.accessToken,data.data.refreshToken);
+      return data.data;
+    },
+    adminTotpStatus: function(){return get('/auth/admin/totp/status');},
+    beginAdminTotpSetup: function(){return post('/auth/admin/totp/setup',{});},
+    enableAdminTotp: function(code){return post('/auth/admin/totp/enable',{code:code});},
+    disableAdminTotp: function(pin,code){return post('/auth/admin/totp/disable',{pin:pin,code:code});},
     logout: async function(){
       var pending=null;
       try{pending=post('/auth/logout', {refreshToken: _refreshToken});}catch(e){}
@@ -1601,7 +1610,7 @@ var ML_API = (function(){
     submitCodRemittance: function(id,data){ return post('/payments/cod/'+id+'/remittance',data); },
     myCodRemittances: function(qs){ return get('/payments/cod/remittances/mine',qs); },
     codRemittances: function(qs){ return get('/payments/cod/remittances',qs); },
-    reviewCodRemittance: function(id,decision,note,pin){ return post('/payments/cod/remittances/'+id+'/review',{decision:decision,note:note||'',pin:pin||''}); },
+    reviewCodRemittance: function(id,decision,note,credential,credentialType){ var payload={decision:decision,note:note||''};payload[credentialType==='totp'?'totpCode':'pin']=credential||'';return post('/payments/cod/remittances/'+id+'/review',payload); },
     history:  function(qs){ return get('/payments/history', qs); },
   };
 
