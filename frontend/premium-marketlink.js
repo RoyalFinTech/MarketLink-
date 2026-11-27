@@ -768,17 +768,27 @@
       if(note===null)return;
       if(!String(note).trim()){toast('A rejection reason is required.','error');return;}
     }
-    var pin=window.prompt('Enter your 4-digit MarketLink Admin PIN to '+(decision==='verified'?'approve':'reject')+' this remittance:');
-    if(pin===null)return;
-    pin=String(pin||'').trim();
-    if(!/^\d{4}$/.test(pin)){toast('A valid 4-digit Admin PIN is required. No decision was submitted.','error');return;}
+    var credential='',credentialType='pin';
     try{
-      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note,pin),data=response&&response.data||response||{};
+      var factorResponse=await ML_API.auth.adminTotpStatus(),factor=factorResponse&&factorResponse.data||{};
+      if(factor.enabled){
+        credentialType='totp';
+        credential=window.prompt('Two-factor authentication is enabled. Enter the current 6-digit authenticator code to '+(decision==='verified'?'approve':'reject')+' this remittance:');
+        if(credential===null)return;
+        credential=String(credential||'').trim();
+        if(!/^\\d{6}$/.test(credential)){toast('A valid 6-digit authenticator code is required. No decision was submitted.','error');return;}
+      }else{
+        credential=window.prompt('Enter your 4-digit MarketLink Admin PIN to '+(decision==='verified'?'approve':'reject')+' this remittance:');
+        if(credential===null)return;
+        credential=String(credential||'').trim();
+        if(!/^\\d{4}$/.test(credential)){toast('A valid 4-digit Admin PIN is required. No decision was submitted.','error');return;}
+      }
+      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note,credential,credentialType),data=response&&response.data||response||{};
       var settlement=data.settlement;
       if(decision==='verified'&&settlement&&settlement.settled===false){
         toast('Deposit verified, but order settlement needs Admin review: '+String(settlement.reason||'Settlement pending')+'.','warning');
       }else if(decision==='verified'){
-        toast('Deposit verified. Vendor, rider, affiliate and platform settlement processed through DAHA.','success');
+        toast('Deposit verified. Eligible vendor, rider, affiliate and platform settlement processed through DAHA.','success');
       }else{
         toast('Cash remittance rejected. The rider can review the note and submit a corrected reference.','success');
       }
