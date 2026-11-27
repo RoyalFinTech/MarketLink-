@@ -16,7 +16,7 @@ router.post('/register/complete', lim, [body('fullName').trim().notEmpty(), body
 router.post('/login', lim, [body('phone').trim().notEmpty(), body('pin').isLength({min:4,max:4}).isNumeric()], validate, ctrl.login);
 router.post('/admin/totp/login', totpLoginLim, [body('challengeToken').notEmpty(),body('code').matches(/^\d{6}$/)], validate, ctrl.verifyAdminTotpLogin);
 router.get('/admin/totp/status', authenticate, authorize(...ADMIN), ctrl.adminTotpStatus);
-router.post('/admin/totp/setup', authenticate, authorize(...ADMIN), totpSetupLim, ctrl.adminTotpSetup);
+router.post('/admin/totp/setup', authenticate, authorize(...ADMIN), totpSetupLim, [body('pin').matches(/^\d{4}$/)], validate, ctrl.adminTotpSetup);
 router.post('/admin/totp/enable', authenticate, authorize(...ADMIN), totpLoginLim, [body('code').matches(/^\d{6}$/)], validate, ctrl.adminTotpEnable);
 router.post('/admin/totp/disable', authenticate, authorize(...ADMIN), totpLoginLim, [body('pin').matches(/^\d{4}$/),body('code').matches(/^\d{6}$/)], validate, ctrl.adminTotpDisable);
 router.post('/refresh', refreshLim, [body('refreshToken').notEmpty()], validate, ctrl.refreshToken);
