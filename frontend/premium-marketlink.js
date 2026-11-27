@@ -3403,6 +3403,24 @@
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Revenue report unavailable</b><span>'+esc(e.error||e.message||'Could not load the live finance report.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.ML_Premium.refreshAdminRevenue()">Retry</button></div>';}
   }
 
+  async function promptAdminFinancialFactor(actionLabel){
+    try{
+      var statusResponse=await ML_API.auth.adminTotpStatus(),status=statusResponse&&statusResponse.data||{};
+      if(status.enabled){
+        var code=window.prompt('Two-factor authentication is enabled. Enter the current 6-digit authenticator code to '+actionLabel+':');
+        if(code===null)return null;
+        code=String(code||'').trim();
+        if(!/^\d{6}$/.test(code)){toast('A valid 6-digit authenticator code is required.','error');return null;}
+        return {totpCode:code};
+      }
+      var pin=window.prompt('Enter your 4-digit Admin PIN to '+actionLabel+':');
+      if(pin===null)return null;
+      pin=String(pin||'').trim();
+      if(!/^\d{4}$/.test(pin)){toast('A valid 4-digit Admin PIN is required.','error');return null;}
+      return {pin:pin};
+    }catch(error){toast(error.error||error.message||'Could not check the Admin security setting.','error');return null;}
+  }
+
   // Admin DAHA withdrawal actions. These deliberately call the protected backend;
   // payout initiation remains blocked server-side until configured payout-provider credentials and
   // webhook verification are configured.
@@ -3413,8 +3431,9 @@
       toast('The secure Admin payout endpoint is unavailable. No payout was sent.','error');return;
     }
     if(!window.confirm(retrySameRequest?'The provider response for this payout is unknown. Retry the same withdrawal using its original idempotency key so the provider can return the original transfer instead of creating a second payout? Check the recipient and amount first.':'Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
+    var factor=await promptAdminFinancialFactor('approve this payout');if(!factor)return;
     try{
-      var result=await ML_API.admin.approveWithdrawal(id);
+      var result=await ML_API.admin.approveWithdrawal(id,factor);
       var data=result&&result.data||{};
       var status=String(data.status||'').toLowerCase();
       if(status==='payout_pending'){
@@ -3436,8 +3455,9 @@
       toast('The secure Admin rejection endpoint is unavailable. No record was changed.','error');return;
     }
     if(!window.confirm('Reject this withdrawal request? This is only allowed before a payout has entered provider processing.'))return;
+    var factor=await promptAdminFinancialFactor('reject this withdrawal');if(!factor)return;
     try{
-      var result=await ML_API.admin.rejectWithdrawal(id);
+      var result=await ML_API.admin.rejectWithdrawal(id,factor);
       toast(result&&result.message||'Withdrawal request rejected. No money was sent.','success');
       await renderLiveAdminPayouts();
     }catch(e){
@@ -3453,8 +3473,9 @@
       toast('The secure provider reconciliation endpoint is unavailable. No payout was initiated.','error');return;
     }
     if(!window.confirm('Check the existing payment-provider transfer status for this withdrawal? This is a read-only lookup. It will not send another transfer or release reserved funds unless the provider confirms a terminal result.'))return;
+    var factor=await promptAdminFinancialFactor('reconcile this payout status');if(!factor)return;
     try{
-      var result=await ML_API.admin.reconcileWithdrawal(id);
+      var result=await ML_API.admin.reconcileWithdrawal(id,factor);
       var data=result&&result.data||{};
       var providerStatus=String(data.provider_status||'unknown').replace(/_/g,' ');
       if(String(data.status||'').toLowerCase()==='completed'){
