@@ -356,6 +356,17 @@ async function failDepositWebhook(client, payload, eventType) {
   if (!allowedFailureEvents.has(String(eventType || ''))) {
     return { processed: true, ignored: true, reason: 'unsupported_failure_event' };
   }
+  const callbackStatus = String(payload?.status || '').trim().toLowerCase();
+  const allowedStatuses = {
+    'charge.cancelled': ['cancelled', 'canceled'],
+    'charge.failed': ['failed', 'failure', 'declined', 'rejected'],
+    'charge.expired': ['expired'],
+    'payment_intent.cancelled': ['cancelled', 'canceled'],
+    'payment_intent.expired': ['expired'],
+  }[String(eventType)];
+  if (callbackStatus && !allowedStatuses.includes(callbackStatus)) {
+    return { processed: true, ignored: true, reason: 'event_status_mismatch' };
+  }
 
   // Lock and resolve the exact deposit before changing its reservation state.
   let deposit;
