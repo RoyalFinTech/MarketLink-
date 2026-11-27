@@ -1477,6 +1477,8 @@ var ML_API = (function(){
     // Step 2: verify OTP + set PIN
     registerComplete: function(fullName, phone, otp, pin){ return post('/auth/register/complete', {fullName:fullName, phone:phone, otp:otp, pin:pin}); },
     login: async function(phone, pin){
+      // A fresh credential flow must never inherit a stale authenticated session.
+      clearTokens();
       // Render Free web services can take about a minute to wake after idle.
       var loginTimeout = 120000; // Free-plan cold starts and first DB round trips must not be cut off at 45 seconds.
       var data = await post('/auth/login', {phone:phone, pin:pin}, {timeoutMs:loginTimeout});
