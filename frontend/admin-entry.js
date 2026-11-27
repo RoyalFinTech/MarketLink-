@@ -1121,7 +1121,7 @@
         });
       }
       if(status.enabled){
-        root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3><div class="ml-profile-card" style="padding:18px;margin-top:14px"><div style="font-size:34px">🔐</div><b>Authenticator protection is ON</b><p style="color:var(--mu);margin:8px 0 14px">Admin login and sensitive COD remittance approvals require a current code from your authenticator app. Your Admin PIN remains the active method whenever two-factor is disabled.</p><button type="button" class="ml-btn ml-btn-secondary" id="ml-admin-totp-disable">Turn off two-factor authentication</button></div></div>';
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3><div class="ml-profile-card" style="padding:18px;margin-top:14px"><div style="font-size:34px">🔐</div><b>Authenticator protection is ON</b><p style="color:var(--mu);margin:8px 0 14px">Admin login and sensitive COD remittance approvals require a current code from your authenticator app. Your Admin PIN remains the active method whenever two-factor is disabled.</p><button type="button" role="switch" aria-checked="true" class="ml-btn ml-btn-secondary" id="ml-admin-totp-disable">Two-Factor: ON · Turn off</button></div></div>';
         document.getElementById('ml-admin-totp-disable').addEventListener('click',async function(){
           if(!window.confirm('Turn off authenticator protection? Admin login and financial approvals will return to the 4-digit PIN requirement.'))return;
           var pin=window.prompt('Enter your 4-digit Admin PIN to disable two-factor authentication:');if(pin===null)return;
@@ -1130,13 +1130,13 @@
           catch(error){if(window.toast)window.toast(error.error||error.message||'Could not disable authenticator.','error');}
         });
       }else{
-        root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3><div class="ml-profile-card" style="padding:18px;margin-top:14px"><div style="font-size:34px">🔐</div><b>Authenticator protection is OFF</b><p style="color:var(--mu);margin:8px 0 14px">Your existing 4-digit Admin PIN remains the active sign-in and financial approval method. Enabling this feature adds authenticator verification to Admin login and sensitive money approvals.</p><button type="button" class="ml-btn ml-btn-primary" id="ml-admin-totp-start">Set up authenticator</button></div></div>';
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3><div class="ml-profile-card" style="padding:18px;margin-top:14px"><div style="font-size:34px">🔐</div><b>Authenticator protection is OFF</b><p style="color:var(--mu);margin:8px 0 14px">Your existing 4-digit Admin PIN remains the active sign-in and financial approval method. Enabling this feature adds authenticator verification to Admin login and sensitive money approvals.</p><button type="button" role="switch" aria-checked="false" class="ml-btn ml-btn-primary" id="ml-admin-totp-start">Two-Factor: OFF · Enable authenticator</button></div></div>';
         document.getElementById('ml-admin-totp-start').addEventListener('click',async function(){
           var pin=window.prompt('Enter your 4-digit Admin PIN to begin authenticator setup:');if(pin===null)return;
           if(!/^\d{4}$/.test(String(pin).trim())){if(window.toast)window.toast('Enter your 4-digit Admin PIN.','error');return;}
           this.disabled=true;this.textContent='Preparing secure setup…';
           try{var setupResponse=await ML_API.auth.beginAdminTotpSetup(String(pin).trim()),setup=setupResponse&&setupResponse.data||{};if(!setup.secret||!setup.otpauthUrl)throw new Error('The server did not return a valid authenticator setup.');paintSetup(setup);}
-          catch(error){if(window.toast)window.toast(error.error||error.message||'Could not start authenticator setup.','error');this.disabled=false;this.textContent='Set up authenticator';}
+          catch(error){if(window.toast)window.toast(error.error||error.message||'Could not start authenticator setup.','error');this.disabled=false;this.textContent='Two-Factor: OFF · Enable authenticator';}
         });
       }
     }catch(error){root.innerHTML='<div class="ml-empty"><b>Authenticator settings unavailable</b><span>'+adminSafe(error.error||error.message||'Could not load two-factor status.')+'</span></div>';}
