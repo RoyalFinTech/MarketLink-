@@ -1184,9 +1184,12 @@ async function refund(paymentId,{amount,reason},actor){
             [item.amount,item.beneficiaryUserId]);
         }
       }
-      if(platformAmount>0)await client.query(
+      await client.query(
         "UPDATE platform_earnings SET status='reversed',reversed_at=now() WHERE id=$1 AND status='earned'",
         [platformEarning.id]);
+      await client.query(
+        "UPDATE commission_records SET status='reversed' WHERE id=$1 AND status='paid'",
+        [commission.id]);
 
       const {rows:[creditedCustomer]}=await client.query(
         'UPDATE wallets SET balance=balance+$1,updated_at=now() WHERE id=$2 RETURNING balance',
