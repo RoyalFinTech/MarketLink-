@@ -560,29 +560,23 @@ async function listCodCashRemittances({page=1,limit=30,status='submitted'}={}){
   return rows;
 }
 
-async function verifyCodCashRemittance(remittanceId,actor,decision='verified',note='',pin){
-  pin=String(pin||'');
-  if(!/^\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
+async function verifyCodCashRemittance(remittanceId,actor,decision='verified',note='',pin,totpCode){
+  pin=String(pin||'');totpCode=String(totpCode||'');
   if(!['verified','rejected'].includes(decision))throw new AppError('Invalid cash remittance decision.',400,'COD_REMITTANCE_DECISION_INVALID');
   const {rows:[remittance]}=await withTransaction(async(client)=>{
-    // Verify the acting administrator's PIN inside the same transaction as the review.
-    // Never persist or log the clear PIN; bcrypt hash remains the source of truth.
+    // Enforce the account's configured factor; never silently fall back from TOTP to PIN.
     const {rows:[admin]}=await client.query('SELECT pin_hash,status,COALESCE(admin_totp_enabled,FALSE) AS admin_totp_enabled,admin_totp_secret_encrypted FROM users WHERE id=$1 FOR SHARE',[actor.id]);
     if(!admin||admin.status!=='active')throw new AppError('Your administrator account is not active.',403,'ADMIN_ACCOUNT_NOT_ACTIVE');
     if(admin.admin_totp_enabled){
-      if(!/^\\d{6}$/.test(totpCode))throw new AppError('Enter the current 6-digit authenticator code to review this remittance.',400,'COD_REMITTANCE_TOTP_REQUIRED');
+      if(!/^\d{6}$/.test(totpCode))throw new AppError('Enter the current 6-digit authenticator code to review this remittance.',400,'COD_REMITTANCE_TOTP_REQUIRED');
       let secret;
       try{secret=adminTotp.decryptSecret(admin.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
       if(!adminTotp.verifyCode(secret,totpCode))throw new AppError('Incorrect authenticator code. No remittance decision was saved.',401,'INVALID_ADMIN_TOTP');
     }else{
-      if(!/^\\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
+      if(!/^\d{4}$/.test(pin))throw new AppError('Enter your 4-digit Admin PIN to approve or reject this remittance.',400,'COD_REMITTANCE_PIN_REQUIRED');
       if(!admin.pin_hash||!await bcrypt.compare(pin,admin.pin_hash))throw new AppError('Incorrect Admin PIN. No remittance decision was saved.',401,'INVALID_COD_REMITTANCE_PIN');
     }
-    // Read the immutable payment reference first, then lock payment/order/
-    // delivery before the remittance row. Rider resubmission uses that same
-    // order, so this avoids the remittance-first lock inversion and deadlocks.
-    const {rows:[reference]}=await client.query(
-      'SELECT payment_id FROM cod_cash_remittances WHERE id=$1',[remittanceId]);
+    const {rows:[reference]}=await client.query('SELECT payment_id FROM cod_cash_remittances WHERE id=$1',[remittanceId]);
     if(!reference)throw new AppError('Cash remittance record not found.',404,'COD_REMITTANCE_NOT_FOUND');
     const {rows:[paymentCheck]}=await client.query(
       `SELECT p.method,p.amount,p.status AS payment_status,o.status AS order_status,
@@ -591,8 +585,7 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
        JOIN deliveries d ON d.order_id=o.id
        WHERE p.id=$1 FOR UPDATE OF p,o,d`,[reference.payment_id]);
     if(!paymentCheck||paymentCheck.method!=='cod')throw new AppError('The linked COD payment could not be validated.',409,'COD_PAYMENT_INVALID');
-    const {rows:[r]}=await client.query(
-      'SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE',[remittanceId]);
+    const {rows:[r]}=await client.query('SELECT * FROM cod_cash_remittances WHERE id=$1 FOR UPDATE',[remittanceId]);
     if(!r||String(r.payment_id)!==String(reference.payment_id))throw new AppError('Cash remittance record changed during review. Reload the queue and try again.',409,'COD_REMITTANCE_CHANGED');
     if(Math.abs(Number(paymentCheck.amount)-Number(r.amount))>0.01)throw new AppError('The remittance amount no longer matches the order payment.',409,'COD_REMITTANCE_AMOUNT_MISMATCH');
     if(paymentCheck.order_status!=='delivered'||paymentCheck.delivery_status!=='delivered')throw new AppError('The order must remain delivered before its cash remittance can be verified.',409,'COD_REMITTANCE_NOT_DELIVERED');
@@ -607,7 +600,7 @@ async function verifyCodCashRemittance(remittanceId,actor,decision='verified',no
       `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
        VALUES($1,$2,$3,'cod_cash_remittance',$4,$5)`,
       [actor.id,actor.role||'admin','payment.cod_remittance_'+decision,remittanceId,
-       JSON.stringify({paymentId:r.payment_id,orderId:r.order_id,amount:Number(r.amount),reference:r.provider_reference,note:String(note||'').trim().slice(0,500)})]);
+       JSON.stringify({paymentId:r.payment_id,orderId:r.order_id,amount:Number(r.amount),reference:r.provider_reference,note:String(note||'').trim().slice(0,500),factor:admin.admin_totp_enabled?'totp':'pin'})]);
     return{rows:[updated]};
   });
   if(decision==='rejected')return{remittance,settlement:null};
