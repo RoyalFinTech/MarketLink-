@@ -32,7 +32,7 @@ describe('Admin financial factor guard',()=>{
   expect(result.next).toHaveBeenCalledWith();
  });
  test('rejects an invalid TOTP code without performing the protected action',async()=>{
-  query.mockResolvedValue({rows:[{pin_hash:'hash',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:'cipher'}]});
+  withTransaction.mockImplementation(fn=>fn({query:jest.fn().mockResolvedValue({rows:[{pin_hash:'hash',status:'active',admin_totp_enabled:true,admin_totp_secret_encrypted:'cipher',admin_totp_last_used_step:null}]})}));
   totp.matchingStep.mockReturnValue(null);
   const result=await run({totpCode:'000000'});
   expect(result.next).toHaveBeenCalledWith(expect.objectContaining({code:'INVALID_ADMIN_TOTP'}));
