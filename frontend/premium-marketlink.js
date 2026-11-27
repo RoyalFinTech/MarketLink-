@@ -761,8 +761,12 @@
       if(note===null)return;
       if(!String(note).trim()){toast('A rejection reason is required.','error');return;}
     }
+    var pin=window.prompt('Enter your 4-digit MarketLink Admin PIN to '+(decision==='verified'?'approve':'reject')+' this remittance:');
+    if(pin===null)return;
+    pin=String(pin||'').trim();
+    if(!/^\\d{4}$/.test(pin)){toast('A valid 4-digit Admin PIN is required. No decision was submitted.','error');return;}
     try{
-      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note),data=response&&response.data||response||{};
+      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note,pin),data=response&&response.data||response||{};
       var settlement=data.settlement;
       if(decision==='verified'&&settlement&&settlement.settled===false){
         toast('Deposit verified, but order settlement needs Admin review: '+String(settlement.reason||'Settlement pending')+'.','warning');
