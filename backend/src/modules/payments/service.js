@@ -907,7 +907,7 @@ async function refund(paymentId,{amount,reason},actor){
       throw new AppError('A recovery retry must use the original refund amount.',409,'REFUND_AMOUNT_CHANGED');
 
     const {rows:[settlementEvidence]}=await client.query(
-      \`SELECT
+      `SELECT
          (SELECT status FROM commission_records WHERE order_id=$1) AS commission_status,
          EXISTS (
            SELECT 1 FROM transactions
@@ -915,7 +915,7 @@ async function refund(paymentId,{amount,reason},actor){
              AND reference_type IN ('order_vendor_payout','order_rider_payout','order_affiliate_payout')
              AND type='credit'
          ) AS has_settlement_credits,
-         (SELECT status FROM platform_earnings WHERE order_id=$1) AS platform_earning_status\`,
+         (SELECT status FROM platform_earnings WHERE order_id=$1) AS platform_earning_status`,
       [payment.order_id]);
     const settlementAlreadyPaid =
       String(settlementEvidence?.commission_status||'')==='paid' ||
@@ -942,10 +942,10 @@ async function refund(paymentId,{amount,reason},actor){
         throw new AppError('This reversal is not in a retryable recovery state.',409,'REFUND_REVERSAL_STATE_INVALID');
       if(!reversal){
         const {rows:[created]}=await client.query(
-          \`INSERT INTO financial_reversals
+          `INSERT INTO financial_reversals
             (payment_id,order_id,amount,currency,status,reason,requested_by)
            VALUES($1,$2,$3,'GMD','recovery_required',$4,$5)
-           RETURNING *\`,
+           RETURNING *`,
           [paymentId,payment.order_id,refundAmount,String(reason||'Admin refund').trim().slice(0,500),actor.id]);
         reversal=created;
       }
@@ -954,24 +954,24 @@ async function refund(paymentId,{amount,reason},actor){
 
       const markRecoveryRequired=async(code,message,details={})=>{
         await client.query(
-          \`UPDATE financial_reversals
+          `UPDATE financial_reversals
            SET status='recovery_required',recovery_reason=$1,recovery_details=$2,
                attempt_count=attempt_count+1,updated_at=now()
-           WHERE id=$3\`,
+           WHERE id=$3`,
           [code,JSON.stringify(details),reversal.id]);
         await client.query("UPDATE payments SET refund_status='requested' WHERE id=$1 AND refund_status<>'processed'",[paymentId]);
         await client.query(
-          \`INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
-           VALUES($1,$2,'financial.refund_recovery_required','financial_reversal',$3,$4)\`,
+          `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+           VALUES($1,$2,'financial.refund_recovery_required','financial_reversal',$3,$4)`,
           [actor.id,actor.role||'admin',reversal.id,JSON.stringify({paymentId,orderId:payment.order_id,code,message,details})]);
         return {recoveryRequired:true,message,code};
       };
 
       const {rows:[orderLedger]}=await client.query(
-        \`SELECT id,vendor_id,vendor_payout,rider_payout,affiliate_user_id,
+        `SELECT id,vendor_id,vendor_payout,rider_payout,affiliate_user_id,
                 affiliate_commission_amount,platform_net_fee,platform_fee,
                 payout_fee_recovery_amount,total
-         FROM orders WHERE id=$1 FOR UPDATE\`,
+         FROM orders WHERE id=$1 FOR UPDATE`,
         [payment.order_id]);
       const {rows:[commission]}=await client.query(
         'SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE',[payment.order_id]);
@@ -1012,12 +1012,12 @@ async function refund(paymentId,{amount,reason},actor){
 
       const refs=['order_vendor_payout','order_rider_payout','order_affiliate_payout'];
       const {rows:originalCredits}=await client.query(
-        \`SELECT t.id,t.wallet_id,t.amount,t.category,t.reference_type,w.user_id
+        `SELECT t.id,t.wallet_id,t.amount,t.category,t.reference_type,w.user_id
          FROM transactions t JOIN wallets w ON w.id=t.wallet_id
          WHERE t.reference_id=$1 AND t.type='credit'
            AND t.reference_type=ANY($2::text[])
          ORDER BY t.reference_type,t.id
-         FOR UPDATE OF t\`,
+         FOR UPDATE OF t`,
         [payment.order_id,refs]);
       const expected=[
         {type:'vendor',userId:orderLedger?.vendor_id,amount:vendorAmount,referenceType:'order_vendor_payout',category:'vendor_sale'},
@@ -1036,8 +1036,8 @@ async function refund(paymentId,{amount,reason},actor){
 
       if(riderAmount>0){
         const {rows:riderRows}=await client.query(
-          \`SELECT id,amount FROM rider_earnings
-           WHERE order_id=$1 AND rider_id=$2 AND type='delivery' FOR UPDATE\`,
+          `SELECT id,amount FROM rider_earnings
+           WHERE order_id=$1 AND rider_id=$2 AND type='delivery' FOR UPDATE`,
           [payment.order_id,delivery.rider_id]);
         if(riderRows.length!==1||!sameMoney(riderRows[0]?.amount,riderAmount))
           invalid.push('RIDER_EARNING_RECORD_MISMATCH');
@@ -1052,8 +1052,8 @@ async function refund(paymentId,{amount,reason},actor){
       const userIds=[customerOrder.customer_id,...expected.filter(x=>x.amount>0).map(x=>x.userId)];
       const uniqueUserIds=[...new Set(userIds.map(String))];
       const {rows:lockedWallets}=await client.query(
-        \`SELECT id,user_id,balance,currency FROM wallets
-         WHERE user_id=ANY($1::uuid[]) ORDER BY id FOR UPDATE\`,
+        `SELECT id,user_id,balance,currency FROM wallets
+         WHERE user_id=ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
         [uniqueUserIds]);
       const walletByUser=new Map(lockedWallets.map(wallet=>[String(wallet.user_id),wallet]));
       const missingWallets=uniqueUserIds.filter(userId=>!walletByUser.has(userId));
@@ -1071,10 +1071,10 @@ async function refund(paymentId,{amount,reason},actor){
           {walletIds:wrongCurrency.map(wallet=>wallet.id)});
       }
       const {rows:reservations}=await client.query(
-        \`SELECT user_id,COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS reserved
+        `SELECT user_id,COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS reserved
          FROM withdrawals
          WHERE user_id=ANY($1::uuid[]) AND status IN ('processing','payout_pending')
-         GROUP BY user_id\`,
+         GROUP BY user_id`,
         [uniqueUserIds]);
       const reservedByUser=new Map(reservations.map(row=>[String(row.user_id),Number(row.reserved||0)]));
 
@@ -1096,11 +1096,11 @@ async function refund(paymentId,{amount,reason},actor){
       ];
       for(const line of lineSpecs){
         await client.query(
-          \`INSERT INTO financial_reversal_lines
+          `INSERT INTO financial_reversal_lines
             (reversal_id,beneficiary_type,beneficiary_user_id,wallet_id,
              original_transaction_id,platform_earning_id,amount,currency)
            VALUES($1,$2,$3,$4,$5,$6,$7,'GMD')
-           ON CONFLICT(reversal_id,beneficiary_type) DO NOTHING\`,
+           ON CONFLICT(reversal_id,beneficiary_type) DO NOTHING`,
           [reversal.id,line.beneficiaryType,line.beneficiaryUserId,line.walletId,
            line.originalTransactionId,line.platformEarningId||null,line.amount]);
       }
@@ -1142,15 +1142,15 @@ async function refund(paymentId,{amount,reason},actor){
 
       for(const item of earningLines.filter(line=>line.beneficiaryType!=='platform')){
         const {rows:[debited]}=await client.query(
-          \`UPDATE wallets SET balance=balance-$1,updated_at=now()
-           WHERE id=$2 AND balance >= $1 RETURNING balance\`,
+          `UPDATE wallets SET balance=balance-$1,updated_at=now()
+           WHERE id=$2 AND balance >= $1 RETURNING balance`,
           [item.amount,item.walletId]);
         if(!debited)throw new AppError('A beneficiary balance changed during reversal. The refund transaction was rolled back.',409,'REFUND_BALANCE_CHANGED');
         const refType='order_'+item.beneficiaryType+'_reversal';
         const {rows:[reversalTransaction]}=await client.query(
-          \`INSERT INTO transactions
+          `INSERT INTO transactions
             (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-           VALUES($1,'debit','refund_reversal',$2,$3,$4,$5,$6) RETURNING id\`,
+           VALUES($1,'debit','refund_reversal',$2,$3,$4,$5,$6) RETURNING id`,
           [item.walletId,item.amount,Number(debited.balance),refType,payment.order_id,
            'Compensating reversal of MarketLink '+item.beneficiaryType+' payout for refund '+paymentId]);
         await client.query(
@@ -1158,29 +1158,29 @@ async function refund(paymentId,{amount,reason},actor){
           [reversalTransaction.id,savedByType.get(item.beneficiaryType).id]);
         if(item.beneficiaryType==='vendor'){
           await client.query(
-            \`UPDATE vendors
+            `UPDATE vendors
              SET total_sales=GREATEST(COALESCE(total_sales,0)-1,0),
                  total_revenue=GREATEST(COALESCE(total_revenue,0)-$1,0),updated_at=now()
-             WHERE user_id=$2\`,
+             WHERE user_id=$2`,
             [item.amount,item.beneficiaryUserId]);
         }else if(item.beneficiaryType==='rider'){
           await client.query(
-            \`INSERT INTO rider_earnings
+            `INSERT INTO rider_earnings
               (rider_id,delivery_id,order_id,amount,type,description,paid_at)
-             VALUES($1,$2,$3,$4,'deduction',$5,now())\`,
+             VALUES($1,$2,$3,$4,'deduction',$5,now())`,
             [item.beneficiaryUserId,delivery.id,payment.order_id,item.amount,
              'Compensating reversal of delivery earning for refunded MarketLink order '+paymentId]);
           await client.query(
-            \`UPDATE riders
+            `UPDATE riders
              SET total_earnings=GREATEST(COALESCE(total_earnings,0)-$1,0)
-             WHERE user_id=$2\`,
+             WHERE user_id=$2`,
             [item.amount,item.beneficiaryUserId]);
         }else if(item.beneficiaryType==='affiliate'){
           await client.query(
-            \`UPDATE affiliates
+            `UPDATE affiliates
              SET total_earnings=GREATEST(COALESCE(total_earnings,0)-$1,0),
                  total_orders=GREATEST(COALESCE(total_orders,0)-1,0)
-             WHERE user_id=$2\`,
+             WHERE user_id=$2`,
             [item.amount,item.beneficiaryUserId]);
         }
       }
@@ -1193,9 +1193,9 @@ async function refund(paymentId,{amount,reason},actor){
         [refundAmount,customerWallet.id]);
       if(!creditedCustomer)throw new AppError('The customer DAHA Wallet could not be credited. The reversal was rolled back.',409,'REFUND_CUSTOMER_WALLET_MISSING');
       const {rows:[customerTransaction]}=await client.query(
-        \`INSERT INTO transactions
+        `INSERT INTO transactions
           (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-         VALUES($1,'credit','refund',$2,$3,'payment_refund_credit',$4,$5) RETURNING id\`,
+         VALUES($1,'credit','refund',$2,$3,'payment_refund_credit',$4,$5) RETURNING id`,
         [customerWallet.id,refundAmount,Number(creditedCustomer.balance),paymentId,
          String(existingReversal?.reason||reason||'Order refund').trim().slice(0,500)]);
       await client.query(
@@ -1206,18 +1206,18 @@ async function refund(paymentId,{amount,reason},actor){
         "UPDATE payments SET refund_status='processed',refund_amount=$1,status='refunded' WHERE id=$2 RETURNING *",
         [refundAmount,paymentId]);
       await client.query(
-        \`UPDATE financial_reversals
+        `UPDATE financial_reversals
          SET status='completed',recovery_reason=NULL,recovery_details='{}'::jsonb,
              completed_by=$1,completed_at=now(),updated_at=now()
-         WHERE id=$2\`,
+         WHERE id=$2`,
         [actor.id,reversal.id]);
       await client.query(
-        \`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
-         VALUES($1,'payment_refunded','Refund processed',$2,'payment',$3)\`,
+        `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+         VALUES($1,'payment_refunded','Refund processed',$2,'payment',$3)`,
         [customerOrder.customer_id,'A refund of D '+refundAmount.toFixed(2)+' has been credited to your DAHA Wallet after the order earnings were reversed.',paymentId]);
       await client.query(
-        \`INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
-         VALUES($1,$2,'payment.refunded','payment',$3,$4)\`,
+        `INSERT INTO admin_action_logs(actor_id,actor_role,action,entity_type,entity_id,after_data)
+         VALUES($1,$2,'payment.refunded','payment',$3,$4)`,
         [actor.id,actor.role||'admin',paymentId,JSON.stringify({
           refundAmount,fullRefund:true,reason:String(existingReversal?.reason||reason||'').trim().slice(0,500),
           reversalId:reversal.id,settledEarningsReversed:earningLines.map(line=>({beneficiaryType:line.beneficiaryType,amount:line.amount}))
@@ -1253,19 +1253,19 @@ async function refund(paymentId,{amount,reason},actor){
     const balanceAfter=Number(wallet.balance)+refundAmount;
     await client.query('UPDATE wallets SET balance=$1,updated_at=now() WHERE id=$2',[balanceAfter,wallet.id]);
     await client.query(
-      \`INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
-       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)\`,
+      `INSERT INTO transactions (wallet_id,type,category,amount,balance_after,reference_type,reference_id,description)
+       VALUES ($1,'credit','refund',$2,$3,'payment',$4,$5)`,
       [wallet.id,refundAmount,balanceAfter,paymentId,String(reason||'Order refund').trim().slice(0,500)||'Order refund']);
     const {rows:[updated]}=await client.query(
       "UPDATE payments SET refund_status='processed',refund_amount=$1,status='refunded' WHERE id=$2 RETURNING *",
       [refundAmount,paymentId]);
     await client.query(
-      \`INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
-       VALUES ($1,'payment_refunded','Refund processed',$2,'payment',$3)\`,
+      `INSERT INTO notifications (user_id,type,title,body,reference_type,reference_id)
+       VALUES ($1,'payment_refunded','Refund processed',$2,'payment',$3)`,
       [customerOrder.customer_id,'A refund of D '+refundAmount.toFixed(2)+' has been credited to your DAHA Wallet.',paymentId]);
     await client.query(
-      \`INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data)
-       VALUES ($1,$2,'payment.refunded','payment',$3,$4)\`,
+      `INSERT INTO admin_action_logs (actor_id,actor_role,action,entity_type,entity_id,after_data)
+       VALUES ($1,$2,'payment.refunded','payment',$3,$4)`,
       [actor.id,actor.role||'admin',paymentId,JSON.stringify({refundAmount,fullRefund:true,reason:String(reason||'').trim().slice(0,500)})]);
     return updated;
   });
