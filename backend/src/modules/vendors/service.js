@@ -34,7 +34,7 @@ function actorLog(actor, action, entityId, before, after) {
 // ── REGISTER (called after user account already exists) ──────────────
 async function register(userId, data) {
   const { businessName, businessCategory, businessCategoryGroup, businessAddress, phone, email, whatsappNumber,
-          description, servicesOffered, workingDays, openingTime, closingTime, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude } = data;
+          description, servicesOffered, workingDays, openingTime, closingTime, nationalId, idDocumentUrl, shopPhotoUrl, logoUrl, latitude, longitude, socialLinks } = data;
 
   if (!businessName?.trim()) throw new AppError('Business name is required.', 400, 'VALIDATION_ERROR');
   const vendorFiles = [
@@ -51,6 +51,7 @@ async function register(userId, data) {
   }
   const normalizedBusinessPhone = normalizeGambianContact(phone, 'Business phone');
   const normalizedWhatsapp = normalizeGambianContact(whatsappNumber, 'WhatsApp contact');
+  const safeSocialLinks = Object.fromEntries(['facebook','instagram','tiktok','youtube','website'].map(key => [key, String(socialLinks?.[key] || '').trim()]).filter(([,value]) => value).map(([key,value]) => { const url = new URL(value); if (!['http:','https:'].includes(url.protocol)) throw new AppError('Social profile links must use HTTPS or HTTP.',400,'VALIDATION_ERROR'); return [key,url.toString()]; }));
   let resolvedBusinessCategory = businessCategory ? String(businessCategory).trim() : null;
   let resolvedBusinessCategoryGroup = businessCategoryGroup || null;
   if (resolvedBusinessCategory) {
@@ -76,13 +77,13 @@ async function register(userId, data) {
     const { rows: [vendor] } = await client.query(
       `INSERT INTO vendors
          (user_id, business_name, business_category, business_category_group, business_address, phone, email, whatsapp_number,
-          description, services_offered, working_days, opening_time, closing_time, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, kyc_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending') RETURNING *`,
+          description, services_offered, working_days, opening_time, closing_time, national_id, id_document_url, shop_photo_url, logo_url, latitude, longitude, social_links, kyc_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pending') RETURNING *`,
       [userId, businessName.trim(), resolvedBusinessCategory, resolvedBusinessCategoryGroup, businessAddress || null,
        normalizedBusinessPhone, email || null, normalizedWhatsapp, description || null, servicesOffered || null,
        Array.isArray(workingDays) ? workingDays : [], openingTime || null, closingTime || null,
        nationalId || null, idDocumentUrl || null, shopPhotoUrl || null, logoUrl || shopPhotoUrl || null,
-       latitude ?? null, longitude ?? null]
+       latitude ?? null, longitude ?? null, JSON.stringify(safeSocialLinks)]
     );
 
     // Grant vendor role to user
@@ -197,7 +198,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
       `SELECT v.user_id, v.business_name, v.business_category, v.business_category_group, v.business_address,
               v.latitude, v.longitude, v.whatsapp_number, v.logo_url, v.banner_url, v.description, v.services_offered, v.working_days, v.opening_time, v.closing_time, v.rating_avg, v.rating_count,
               v.is_open, v.vacation_mode, v.kyc_status, v.created_at
-              ${isAdmin ? ', v.commission_pct, v.total_sales, v.total_revenue' : ''},
+              ${isAdmin ? ', v.commission_pct, v.total_sales, v.total_revenue, v.social_links' : ''},
               u.full_name AS owner_name
               ${isAdmin ? `, v.phone AS business_phone, v.email AS business_email,
                 v.id_document_url, v.shop_photo_url, u.phone AS owner_phone, u.email AS owner_email` : ''}
@@ -232,7 +233,7 @@ async function updateProfile(userId, data) {
     description: 'description', servicesOffered: 'services_offered', workingDays: 'working_days', openingTime: 'opening_time', closingTime: 'closing_time', logoUrl: 'logo_url', bannerUrl: 'banner_url',
     returnPolicy: 'return_policy', minOrderValue: 'min_order_value',
     deliveryTimeMin: 'delivery_time_min', deliveryTimeMax: 'delivery_time_max',
-    latitude: 'latitude', longitude: 'longitude',
+    latitude: 'latitude', longitude: 'longitude', socialLinks: 'social_links',
     isOpen: 'is_open', vacationMode: 'vacation_mode',
   };
 
@@ -245,7 +246,7 @@ async function updateProfile(userId, data) {
         : jsKey === 'whatsappNumber'
           ? normalizeGambianContact(data[jsKey], 'WhatsApp contact')
           : data[jsKey];
-      params.push(value);
+      params.push(jsKey === 'socialLinks' ? JSON.stringify(value) : value);
     }
   }
   if (!sets.length) throw new AppError('No valid fields to update.', 400, 'VALIDATION_ERROR');
