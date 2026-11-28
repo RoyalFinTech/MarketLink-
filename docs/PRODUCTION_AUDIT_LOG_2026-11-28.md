@@ -3,7 +3,8 @@
 ## Release status
 
 - Repository: `RoyalFinTech/MarketLink-`, branch: `main`.
-- Final release commit: `955e0b04b1786fcdbbaae42543afe7423a0e4d69`.
+- Main financial/security release commit: `955e0b04b1786fcdbbaae42543afe7423a0e4d69`.
+- Latest wallet privacy UI follow-up: `aad4823ec5ced710ee0a44868ce582beae6b9de0`.
 - Pull request #77 (Admin TOTP + COD remittance safeguards): merged as `4330b5e6622b75e2473e331614a806c57611bc79`.
 - Pull request #79 (integrated settled-order refund reversals): merged as `955e0b04b1786fcdbbaae42543afe7423a0e4d69`.
 - Superseded original PR #78 was closed after its safe changes were integrated into PR #79.
@@ -57,9 +58,10 @@ All three are present in Supabase migration history. The new event/authenticator
 ## Production deployment verification
 
 - Render backend service `srv-d9utunmgekts73dakq40`: deploy `dep-dc5fgg8ae00c73eogq60`, status `live`, application commit `955e0b0`.
-- Render customer frontend `srv-db3rtgijnfac738i81mg`: status `live`; latest static-site commit `23a4737` is documentation-only and includes the deployed application release `955e0b0`.
-- Render Admin site `srv-dbunj95g1s2s73cdi7m0`: status `live`; latest static-site commit `23a4737` is documentation-only and includes the deployed application release `955e0b0`.
-- Vercel production deployment: `READY`, latest commit `23a4737` (documentation-only; application release `955e0b0` is included).
+- Render customer frontend `srv-db3rtgijnfac738i81mg`: deploy `dep-dc5fho0ae00c73eoi7m0`, status `live`, UI commit `aad4823`.
+- Render Admin site `srv-dbunj95g1s2s73cdi7m0`: deploy `dep-dc5fho0ae00c73eoi7o0`, status `live`, UI commit `aad4823`.
+- Vercel production deployment: `READY`, UI commit `aad4823`.
+- The backend remains live on application commit `955e0b0`; the later commits are frontend UI/documentation-only.
 - At the end of this audit, there are zero open pull requests in the repository; PR #77 and #79 are merged and the superseded PR #78 is closed.
 
 ## Production data reality — no fabricated settlement records
