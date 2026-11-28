@@ -2169,8 +2169,8 @@
         '<div class="ml-daha-topbar"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><div class="ml-daha-brand"><div><span>SECURE DIGITAL WALLET</span><h3>DAHA Wallet</h3><small>Powered by Royal FinTech</small></div><img src="./assets/daha-wallet-eagle.webp" alt="DAHA Wallet eagle logo" loading="eager"></div></div>'+
         '<section class="ml-wallet-hero ml-daha-balance"><span>Available to spend</span><div class="ml-daha-balance-row"><strong id="ml-daha-balance-value">'+(dahaBalanceVisible?money(available):'********')+'</strong><button type="button" id="ml-daha-balance-toggle" class="ml-daha-balance-toggle" aria-label="'+(dahaBalanceVisible?'Hide balance':'Show balance')+'" aria-pressed="'+String(dahaBalanceVisible)+'" title="'+(dahaBalanceVisible?'Hide balance':'Show balance')+'">'+(dahaBalanceVisible?'👁':'🙈')+'</button></div><small>Your available DAHA Wallet balance</small><span class="ml-daha-ledger-note">Live balance from the secure MarketLink wallet ledger · GMD</span></section>'+
         '<section class="ml-daha-summary-grid" aria-label="DAHA Wallet overview">'+
-          '<div><span>Total wallet balance</span><b>'+money(balance)+'</b><small>Before pending reserves</small></div>'+
-          '<div><span>Reserved balance</span><b>'+money(Number(wallet.reserved_balance||0))+'</b><small>Pending payout requests</small></div>'+
+          '<div><span>Total wallet balance</span><b id="ml-daha-total-balance-value">'+(dahaBalanceVisible?money(balance):'********')+'</b><small>Before pending reserves</small></div>'+
+          '<div><span>Reserved balance</span><b id="ml-daha-reserved-balance-value">'+(dahaBalanceVisible?money(Number(wallet.reserved_balance||0)):'********')+'</b><small>Pending payout requests</small></div>'+
           '<div><span>Cash-out service fee</span><b>'+dahaWithdrawalServiceFeePct.toFixed(2)+'%</b><small>'+(dahaWithdrawalServiceFeePct>0?'Customer cash-outs only · no checkout fee':'No second fee on marketplace payee withdrawals')+'</small></div>'+
         '</section>'+
         '<div class="ml-daha-actions"><button type="button" class="ml-btn ml-btn-primary" onclick="document.getElementById(\'ml-daha-deposit\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">＋ Add funds</button><button type="button" class="ml-btn ml-btn-secondary" onclick="document.getElementById(\'ml-daha-withdraw\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">↗ Cash out</button><button type="button" class="ml-btn ml-btn-secondary" onclick="document.getElementById(\'ml-daha-activity\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">↔ Activity</button><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.refreshWallet()">↻ Refresh</button></div>'+
@@ -2205,7 +2205,11 @@
       if(balanceToggle)balanceToggle.addEventListener('click',function(){
         dahaBalanceVisible=!dahaBalanceVisible;
         var value=root.querySelector('#ml-daha-balance-value');
+        var totalValue=root.querySelector('#ml-daha-total-balance-value');
+        var reservedValue=root.querySelector('#ml-daha-reserved-balance-value');
         if(value)value.textContent=dahaBalanceVisible?money(available):'********';
+        if(totalValue)totalValue.textContent=dahaBalanceVisible?money(balance):'********';
+        if(reservedValue)reservedValue.textContent=dahaBalanceVisible?money(Number(wallet.reserved_balance||0)):'********';
         this.setAttribute('aria-pressed',String(dahaBalanceVisible));
         this.setAttribute('aria-label',dahaBalanceVisible?'Hide balance':'Show balance');
         this.title=dahaBalanceVisible?'Hide balance':'Show balance';
