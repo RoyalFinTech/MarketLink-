@@ -111,9 +111,9 @@ Therefore, the settlement code and reconciliation controls are deployed, but the
 
 ### Deployment verification for form update
 
-- Render backend: deploy `dep-dc5gesvdtqpc73d4qblg`, `live`, commit `71951f2`.
-- Render customer frontend: deploy `dep-dc5gf8oae00c73epmqtg`, `live`, commit `e43ab51`.
-- Render Admin frontend: deploy `dep-dc5gf8oae00c73epmqrg`, `live`, commit `e43ab51`.
-- Vercel production: `READY`, commit `e43ab51`; Vercel status check passed.
+- Render backend: deploy `dep-dc5gfu7dtqpc73d4r0tg`, `live`, commit `a732a45`.
+- Render customer frontend: deploy `dep-dc5gfu6jts4c73dl10tg`, `live`, commit `a732a45`.
+- Render Admin frontend: deploy `dep-dc5gfu4o3iic73dbgbtg`, `live`, commit `a732a45`.
+- Vercel production: `READY`, commit `a732a45`; Vercel status check passed.
 - Supabase migration history includes `049_vendor_rider_social_profiles`; both `vendors.social_links` and `riders.social_links` exist as non-null JSONB columns.
 - No real applications or sample applicant data were created during verification.
