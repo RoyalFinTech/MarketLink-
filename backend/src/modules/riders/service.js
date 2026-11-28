@@ -97,7 +97,7 @@ async function getById(userId, includePrivate = false) {
     `SELECT r.*,
             u.full_name, u.phone, u.email,
             (SELECT count(*) FROM deliveries d WHERE d.rider_id = r.user_id AND d.status = 'delivered') AS completed_deliveries,
-            (SELECT coalesce(sum(amount),0) FROM rider_earnings re WHERE re.rider_id = r.user_id AND re.paid_at IS NOT NULL) AS total_paid
+            (SELECT coalesce(sum(CASE WHEN re.type='deduction' THEN -re.amount ELSE re.amount END),0) FROM rider_earnings re WHERE re.rider_id = r.user_id AND re.paid_at IS NOT NULL) AS total_paid
      FROM riders r
      JOIN users u ON u.id = r.user_id
      WHERE r.user_id = $1`,
@@ -402,8 +402,8 @@ async function getDeliveryHistory(riderId, { page = 1, limit = 20, status }) {
      ) p ON TRUE
      LEFT JOIN cod_cash_remittances ccr ON ccr.payment_id=p.id
      LEFT JOIN LATERAL (
-       SELECT amount FROM rider_earnings re
-       WHERE re.delivery_id=d.id ORDER BY re.created_at DESC,re.id DESC LIMIT 1
+       SELECT COALESCE(SUM(CASE WHEN re.type='deduction' THEN -re.amount ELSE re.amount END),0) AS amount
+       FROM rider_earnings re WHERE re.delivery_id=d.id
      ) re ON TRUE
      WHERE ${conditions.join(' AND ')}
      ORDER BY d.created_at DESC
@@ -422,9 +422,9 @@ async function getEarnings(riderId, { page = 1, limit = 20, period = '30d' }) {
   const [summary, entries] = await Promise.all([
     query(
       `SELECT
-         coalesce(sum(amount),0)                      AS total_earnings,
-         coalesce(sum(amount) FILTER (WHERE paid_at IS NOT NULL),0) AS paid_earnings,
-         coalesce(sum(amount) FILTER (WHERE paid_at IS NULL),0)     AS pending_earnings,
+         coalesce(sum(CASE WHEN type='deduction' THEN -amount ELSE amount END),0) AS total_earnings,
+         coalesce(sum(CASE WHEN paid_at IS NOT NULL THEN CASE WHEN type='deduction' THEN -amount ELSE amount END ELSE 0 END),0) AS paid_earnings,
+         coalesce(sum(CASE WHEN paid_at IS NULL THEN CASE WHEN type='deduction' THEN -amount ELSE amount END ELSE 0 END),0) AS pending_earnings,
          count(*)                                     AS total_entries
        FROM rider_earnings
        WHERE rider_id = $1
