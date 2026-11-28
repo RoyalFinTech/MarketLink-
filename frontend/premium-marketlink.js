@@ -2102,6 +2102,7 @@
   }
 
   var dahaWithdrawalServiceFeePct=2;
+  var dahaBalanceVisible=true;
   async function renderPremiumWalletPage(root){
     if(!root)return;
     root.innerHTML='<div class="ml-profile-shell"><div class="ml-loading">Loading DAHA Wallet…</div></div>';
@@ -2166,7 +2167,7 @@
       }
       root.innerHTML='<div class="ml-profile-shell ml-daha-shell">'+
         '<div class="ml-daha-topbar"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><div class="ml-daha-brand"><div><span>SECURE DIGITAL WALLET</span><h3>DAHA Wallet</h3><small>Powered by Royal FinTech</small></div><img src="./assets/daha-wallet-eagle.webp" alt="DAHA Wallet eagle logo" loading="eager"></div></div>'+
-        '<section class="ml-wallet-hero ml-daha-balance"><span>Available to spend</span><strong>'+money(available)+'</strong><small>Your available DAHA Wallet balance</small><span class="ml-daha-ledger-note">Live balance from the secure MarketLink wallet ledger · GMD</span></section>'+
+        '<section class="ml-wallet-hero ml-daha-balance"><span>Available to spend</span><div class="ml-daha-balance-row"><strong id="ml-daha-balance-value">'+(dahaBalanceVisible?money(available):'********')+'</strong><button type="button" id="ml-daha-balance-toggle" class="ml-daha-balance-toggle" aria-label="'+(dahaBalanceVisible?'Hide balance':'Show balance')+'" aria-pressed="'+String(dahaBalanceVisible)+'" title="'+(dahaBalanceVisible?'Hide balance':'Show balance')+'">'+(dahaBalanceVisible?'👁':'🙈')+'</button></div><small>Your available DAHA Wallet balance</small><span class="ml-daha-ledger-note">Live balance from the secure MarketLink wallet ledger · GMD</span></section>'+
         '<section class="ml-daha-summary-grid" aria-label="DAHA Wallet overview">'+
           '<div><span>Total wallet balance</span><b>'+money(balance)+'</b><small>Before pending reserves</small></div>'+
           '<div><span>Reserved balance</span><b>'+money(Number(wallet.reserved_balance||0))+'</b><small>Pending payout requests</small></div>'+
@@ -2200,6 +2201,16 @@
         '<div class="ml-section-head" id="ml-daha-withdraw-history"><h3>Withdrawal requests</h3></div>'+
         (withdrawals.length?'<div class="ml-profile-card">'+withdrawals.map(function(w){return '<div class="ml-wallet-transaction"><span class="ml-wallet-tx-icon debit">↗</span><div class="copy"><b>'+esc(String(w.payout_method||'').toUpperCase())+' · '+esc(String(w.status||'processing').replace(/_/g,' '))+'</b><span>'+esc(w.created_at?new Date(w.created_at).toLocaleString():'Date unavailable')+'</span></div><strong>'+money(w.amount)+'</strong></div>';}).join('')+'</div>':'<div class="ml-empty"><span>No withdrawal requests yet.</span></div>')+
         '<footer class="ml-app-footer"><span>DAHA Wallet · Powered by MarketLink Gambia</span></footer></div>';
+      var balanceToggle=root.querySelector('#ml-daha-balance-toggle');
+      if(balanceToggle)balanceToggle.addEventListener('click',function(){
+        dahaBalanceVisible=!dahaBalanceVisible;
+        var value=root.querySelector('#ml-daha-balance-value');
+        if(value)value.textContent=dahaBalanceVisible?money(available):'********';
+        this.setAttribute('aria-pressed',String(dahaBalanceVisible));
+        this.setAttribute('aria-label',dahaBalanceVisible?'Hide balance':'Show balance');
+        this.title=dahaBalanceVisible?'Hide balance':'Show balance';
+        this.textContent=dahaBalanceVisible?'👁':'🙈';
+      });
     }catch(e){
       root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><button type="button" class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.openProfilePage(null)">← Profile</button><h3>DAHA Wallet</h3></div><div class="ml-empty"><b>Wallet data unavailable</b><span>'+esc(e.error||'The live DAHA Wallet service could not be reached.')+'</span><button type="button" class="ml-btn ml-btn-primary" style="margin-top:14px" onclick="window.ML_Premium.refreshWallet()">Retry</button></div></div>';
     }
