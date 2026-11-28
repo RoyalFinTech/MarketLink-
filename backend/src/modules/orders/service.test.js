@@ -196,6 +196,49 @@ describe('order financial settlement safeguards', () => {
     expect(clientQuery.mock.calls.some(([sql]) => /UPDATE wallets/i.test(sql))).toBe(false);
   });
 
+  test('rolls back an affiliate wallet credit when its affiliate ledger profile is missing', async () => {
+    const order = {
+      ...baseOrder,
+      vendor_payout: 0,
+      rider_payout: 0,
+      affiliate_user_id: 'affiliate-1',
+      affiliate_commission_pct: 2,
+      affiliate_commission_amount: 2,
+      platform_net_fee: 3,
+      platform_fee: 5,
+      subtotal: 100,
+      payout_fee_recovery_pct: 0,
+      payout_fee_recovery_amount: 0,
+    };
+    const commission = {
+      ...baseCommission,
+      vendor_payout: 0,
+      rider_payout: 0,
+      affiliate_user_id: 'affiliate-1',
+      affiliate_commission_pct: 2,
+      affiliate_commission_amount: 2,
+      platform_net_amount: 3,
+      commission_amount: 5,
+      order_total: 125,
+    };
+    clientQuery.mockImplementation(async (sql) => {
+      if (sql.includes('SELECT o.*, d.id AS delivery_id')) return { rows: [order] };
+      if (sql.includes('SELECT * FROM commission_records')) return { rows: [commission] };
+      if (sql.includes('SELECT id FROM wallets')) return { rows: [{ id: 'affiliate-wallet' }] };
+      if (sql.includes('UPDATE wallets')) return { rows: [{ balance: '2.00' }] };
+      if (sql.includes('UPDATE affiliates')) return { rows: [] };
+      return { rows: [] };
+    });
+
+    await expect(require('./service').settleOrderFinancials('order-1'))
+      .rejects.toMatchObject({ code: 'SETTLEMENT_AFFILIATE_PROFILE_MISSING' });
+
+    expect(clientQuery.mock.calls.some(([sql]) => /INSERT INTO transactions/i.test(sql))).toBe(true);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE affiliates.*RETURNING user_id/i.test(sql))).toBe(true);
+    expect(clientQuery.mock.calls.some(([sql]) => /INSERT INTO platform_earnings/i.test(sql))).toBe(false);
+    expect(clientQuery.mock.calls.some(([sql]) => /UPDATE commission_records SET status='paid'/i.test(sql))).toBe(false);
+  });
+
   test('refuses settlement when an affiliate reward has no affiliate recipient', async () => {
     clientQuery
       .mockResolvedValueOnce({ rows: [{ ...baseOrder, affiliate_commission_amount: 2 }] })
