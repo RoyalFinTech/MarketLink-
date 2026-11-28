@@ -8,8 +8,9 @@ describe('withdrawal history pagination',()=>{
   await listMine('customer-id',{page:-3,limit:-5});
   expect(query).toHaveBeenCalledWith(expect.stringContaining('LIMIT $2 OFFSET $3'),['customer-id',1,0]);
  });
- test('clamps Admin withdrawal queue pagination',async()=>{
+ test('clamps Admin withdrawal queue pagination and includes every reserved state',async()=>{
   await listPendingForAdmin({page:-2,limit:500});
+  expect(query).toHaveBeenCalledWith(expect.stringContaining("status IN ('initiating','processing','payout_pending')"),[100,0]);
   expect(query).toHaveBeenCalledWith(expect.stringContaining('LIMIT $1 OFFSET $2'),[100,0]);
  });
  test('preserves customer and status parameter ordering',async()=>{
