@@ -86,19 +86,21 @@ describe('customer payment refunds',()=>{
   expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
  });
- test('blocks a refund when vendor, rider or affiliate earnings have already been settled',async()=>{
-  tx.mockImplementation(async(sql)=>{
+ test('records a recovery-required case and issues no refund when settled earnings exist',async()=>{
+  tx.mockImplementation(async(sql,params=[])=>{
    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
    if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100.00',status:'confirmed',refund_status:'none'}]};
    if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'paid',has_settlement_credits:true,platform_earning_status:'earned'}]};
+   if(sql.includes('INSERT INTO financial_reversals'))return{rows:[{id:'reversal-1',payment_id:paymentId,amount:100,status:'recovery_required'}]};
    return{rows:[]};
   });
   await expect(refund(paymentId,{reason:'Customer refund request'},actor))
-   .rejects.toMatchObject({statusCode:409,code:'REFUND_SETTLEMENT_REVERSAL_REQUIRED'});
+   .rejects.toMatchObject({statusCode:409,code:'REFUND_RECOVERY_REQUIRED'});
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO financial_reversals'))).toBe(true);
+  expect(tx.mock.calls.some(([sql])=>sql.includes("UPDATE payments SET refund_status='requested'"))).toBe(true);
   expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
-  expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE payments SET refund_status'))).toBe(false);
  });
  test('rejects partial refunds until refund reconciliation supports them',async()=>{
   await expect(refund(paymentId,{amount:20,reason:'Partial adjustment'},actor))
@@ -130,4 +132,137 @@ describe('customer payment refunds',()=>{
   await expect(refund(paymentId,{},actor)).rejects.toMatchObject({statusCode:409,code:'REFUND_WALLET_MISSING'});
   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
  });
+ describe('settled order financial reversals',()=>{
+  const reversalId='66666666-6666-4666-8666-666666666666';
+  const vendorId='77777777-7777-4777-8777-777777777777';
+  const riderId='88888888-8888-4888-8888-888888888888';
+  const affiliateId='99999999-9999-4999-8999-999999999999';
+  const vendorWallet='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const riderWallet='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const affiliateWallet='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const customerWallet='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function prepare({vendorBalance=150,wrongVendor=false,existing=false}={}){
+   const lineRows=[];
+   const balances=new Map([
+    [vendorWallet,vendorBalance],[riderWallet,50],[affiliateWallet,10],[customerWallet,5]
+   ]);
+   const wallets=[
+    {id:vendorWallet,user_id:vendorId,balance:String(vendorBalance),currency:'GMD'},
+    {id:riderWallet,user_id:riderId,balance:'50',currency:'GMD'},
+    {id:affiliateWallet,user_id:affiliateId,balance:'10',currency:'GMD'},
+    {id:customerWallet,user_id:customerId,balance:'5',currency:'GMD'},
+   ];
+   const original=[
+    {id:'original-vendor',wallet_id:vendorWallet,amount:'80',category:'vendor_sale',reference_type:'order_vendor_payout',user_id:wrongVendor?'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee':vendorId},
+    {id:'original-rider',wallet_id:riderWallet,amount:'15',category:'delivery_earning',reference_type:'order_rider_payout',user_id:riderId},
+    {id:'original-affiliate',wallet_id:affiliateWallet,amount:'2',category:'affiliate_commission',reference_type:'order_affiliate_payout',user_id:affiliateId},
+   ];
+   tx.mockImplementation(async(sql,params=[])=>{
+    if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+    if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
+    if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'cod',amount:'100',status:'confirmed',refund_status:existing?'requested':'none',refund_amount:'0'}]};
+    if(sql.includes('SELECT * FROM financial_reversals WHERE payment_id=$1 FOR UPDATE'))return{rows:existing?[{id:reversalId,payment_id:paymentId,order_id:orderId,amount:'100',status:'recovery_required',reason:'Customer refund'}]:[]};
+    if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'paid',has_settlement_credits:true,platform_earning_status:'earned'}]};
+    if(sql.includes('INSERT INTO financial_reversals'))return{rows:[{id:reversalId,payment_id:paymentId,amount:'100',status:'recovery_required',reason:'Customer refund'}]};
+    if(sql.includes('SELECT id,vendor_id,vendor_payout'))return{rows:[{id:orderId,vendor_id:vendorId,vendor_payout:'80',rider_payout:'15',affiliate_user_id:affiliateId,affiliate_commission_amount:'2',platform_net_fee:'3',platform_fee:'5',payout_fee_recovery_amount:'0',total:'100'}]};
+    if(sql.includes('SELECT * FROM commission_records WHERE order_id=$1 FOR UPDATE'))return{rows:[{id:'commission-1',status:'paid',vendor_id:vendorId,affiliate_user_id:affiliateId,order_total:'100',vendor_payout:'80',rider_payout:'15',affiliate_commission_amount:'2',platform_net_amount:'3',commission_amount:'5'}]};
+    if(sql.includes('SELECT id,rider_id,status FROM deliveries WHERE order_id=$1 FOR UPDATE'))return{rows:[{id:'delivery-1',rider_id:riderId,status:'delivered'}]};
+    if(sql.includes('SELECT * FROM platform_earnings WHERE order_id=$1 FOR UPDATE'))return{rows:[{id:'platform-1',status:'earned',commission_amount:'3',payout_fee_recovery_amount:'0'}]};
+    if(sql.includes('reference_type=ANY($2::text[])'))return{rows:original};
+    if(sql.includes("FROM rider_earnings")&&sql.includes("type='delivery'"))return{rows:[{id:'rider-earning-1',amount:'15'}]};
+    if(sql.includes('WHERE user_id=ANY($1::uuid[])'))return{rows:wallets};
+    if(sql.includes('FROM withdrawals'))return{rows:[]};
+    if(sql.includes('INSERT INTO financial_reversal_lines')){
+      const line={id:'line-'+params[1],reversal_id:params[0],beneficiary_type:params[1],beneficiary_user_id:params[2],wallet_id:params[3],original_transaction_id:params[4],platform_earning_id:params[5],amount:String(params[6])};
+      lineRows.push(line);return{rows:[line]};
+    }
+    if(sql.includes('SELECT * FROM financial_reversal_lines WHERE reversal_id=$1 FOR UPDATE'))return{rows:lineRows};
+    if(sql.includes('UPDATE wallets SET balance=balance-$1')){
+      const next=balances.get(params[1])-Number(params[0]);balances.set(params[1],next);return{rows:[{balance:String(next)}]};
+    }
+    if(sql.includes('UPDATE wallets SET balance=balance+$1')){
+      const next=balances.get(params[1])+Number(params[0]);balances.set(params[1],next);return{rows:[{balance:String(next)}]};
+    }
+    if(sql.includes('INSERT INTO transactions')&&sql.includes("'debit'"))return{rows:[{id:'debit-'+params[3]}]};
+    if(sql.includes('INSERT INTO transactions')&&sql.includes('payment_refund_credit'))return{rows:[{id:'customer-refund-credit'}]};
+    if(sql.includes("UPDATE payments SET refund_status='processed'"))return{rows:[{id:paymentId,status:'refunded',refund_status:'processed',refund_amount:100}]};
+    return{rows:[]};
+   });
+   return{lineRows,balances};
+  }
+
+  test('reverses settled vendor, rider and affiliate credits before crediting the customer',async()=>{
+   const {lineRows,balances}=prepare();
+   const result=await refund(paymentId,{reason:'Approved customer refund'},actor);
+   expect(result).toMatchObject({id:paymentId,status:'refunded',refund_status:'processed'});
+   expect(tx.mock.calls.filter(([sql])=>sql.includes("INSERT INTO transactions")&&sql.includes("'debit'")&&sql.includes("'refund_reversal'"))).toHaveLength(3);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('payment_refund_credit'))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes("SET status='reversed'")&&sql.includes('platform_earnings'))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes("UPDATE commission_records SET status='reversed'"))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO rider_earnings')&&sql.includes("'deduction'"))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes("SET status='completed'")&&sql.includes('financial_reversals'))).toBe(true);
+   expect(lineRows.map(line=>line.beneficiary_type).sort()).toEqual(['affiliate','customer','platform','rider','vendor']);
+   expect(balances.get(vendorWallet)).toBe(70);
+   expect(balances.get(riderWallet)).toBe(35);
+   expect(balances.get(affiliateWallet)).toBe(8);
+   expect(balances.get(customerWallet)).toBe(105);
+  });
+
+  test('holds the refund for recovery when a beneficiary has withdrawn or reserved too much',async()=>{
+   prepare({vendorBalance:20});
+   await expect(refund(paymentId,{reason:'Approved customer refund'},actor))
+    .rejects.toMatchObject({statusCode:409,code:'REFUND_RECOVERY_REQUIRED'});
+   expect(tx.mock.calls.some(([sql])=>sql.includes("SET status='recovery_required'")&&sql.includes('financial_reversals'))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes("UPDATE payments SET refund_status='requested'"))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets SET balance=balance-'))).toBe(false);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('payment_refund_credit'))).toBe(false);
+  });
+
+  test('holds the refund when the original credit is missing or belongs to the wrong wallet owner',async()=>{
+   prepare({wrongVendor:true});
+   await expect(refund(paymentId,{reason:'Approved customer refund'},actor))
+    .rejects.toMatchObject({statusCode:409,code:'REFUND_RECOVERY_REQUIRED'});
+   expect(tx.mock.calls.some(([sql])=>sql.includes("UPDATE payments SET refund_status='requested'"))).toBe(true);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets SET balance=balance-'))).toBe(false);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('payment_refund_credit'))).toBe(false);
+  });
+
+  test('allows a recovery retry using the original amount after beneficiary funds are restored',async()=>{
+   const {balances}=prepare({vendorBalance:150,existing:true});
+   const result=await refund(paymentId,{},actor);
+   expect(result).toMatchObject({id:paymentId,status:'refunded',refund_status:'processed'});
+   expect(balances.get(vendorWallet)).toBe(70);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO financial_reversals'))).toBe(false);
+  });
+
+  test('does not fall back to an unsettled refund when prior recovery settlement evidence changes',async()=>{
+   prepare({existing:true});
+   const base=tx.getMockImplementation();
+   tx.mockImplementation(async(sql,params=[])=>{
+     if(sql.includes('AS has_settlement_credits'))
+       return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:'reversed'}]};
+     return base(sql,params);
+   });
+   await expect(refund(paymentId,{},actor))
+    .rejects.toMatchObject({statusCode:409,code:'REFUND_REVERSAL_SETTLEMENT_EVIDENCE_CHANGED'});
+   expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
+   expect(tx.mock.calls.some(([sql])=>sql.includes('payment_refund_credit'))).toBe(false);
+  });
+ });
+
+ test('keeps external provider refunds disabled until a durable idempotent adapter is available',async()=>{
+  tx.mockImplementation(async(sql)=>{
+   if(sql.includes('SELECT order_id FROM payments WHERE id=$1'))return{rows:[{order_id:orderId}]};
+   if(sql.includes('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE'))return{rows:[{id:orderId,customer_id:customerId,status:'delivered'}]};
+   if(sql.includes('SELECT * FROM payments WHERE id=$1 AND order_id=$2 FOR UPDATE'))return{rows:[{id:paymentId,order_id:orderId,method:'modempay',amount:'100.00',status:'confirmed',refund_status:'none'}]};
+   if(sql.includes('AS has_settlement_credits'))return{rows:[{commission_status:'pending',has_settlement_credits:false,platform_earning_status:null}]};
+   return{rows:[]};
+  });
+  await expect(refund(paymentId,{reason:'Provider refund safety check'},actor))
+   .rejects.toMatchObject({statusCode:503,code:'REFUND_PROVIDER_UNAVAILABLE'});
+  expect(tx.mock.calls.some(([sql])=>sql.includes('UPDATE wallets'))).toBe(false);
+  expect(tx.mock.calls.some(([sql])=>sql.includes('INSERT INTO transactions'))).toBe(false);
+ });
+
 });
