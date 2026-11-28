@@ -37,7 +37,7 @@ function auditLog(actor, action, entityId, before, after) {
 async function register(userId, data) {
   const { vehicleType, plateNumber, licenseNumber, nationalId, idDocumentUrl,
           licenseDocumentUrl, vehiclePhotoUrl, profilePhotoUrl, emergencyContact, address, deliveryZone,
-          mobileNumber, whatsappNumber, latitude, longitude } = data;
+          mobileNumber, whatsappNumber, latitude, longitude, socialLinks } = data;
   const normalizedMobileNumber = normalizeGambianContact(mobileNumber, 'Rider mobile number');
   const riderFiles = [
     [idDocumentUrl, 'rider-document', 'document', 'Rider identity document'],
@@ -49,6 +49,7 @@ async function register(userId, data) {
     if (url) await assertOwnedUploadReference(url, userId, purpose, type, label);
   }
   const normalizedWhatsapp = normalizeGambianContact(whatsappNumber, 'Rider WhatsApp contact');
+  const safeSocialLinks = Object.fromEntries(['facebook','instagram','tiktok','youtube','website'].map(key => [key, String(socialLinks?.[key] || '').trim()]).filter(([,value]) => value).map(([key,value]) => { const url = new URL(value); if (!['http:','https:'].includes(url.protocol)) throw new AppError('Social profile links must use HTTPS or HTTP.',400,'VALIDATION_ERROR'); return [key,url.toString()]; }));
 
   const { rows: existing } = await query(
     'SELECT user_id FROM riders WHERE user_id = $1', [userId]);
@@ -59,11 +60,11 @@ async function register(userId, data) {
       `INSERT INTO riders
          (user_id, vehicle_type, plate_number, license_number, national_id,
           id_document_url, license_document_url, vehicle_photo_url, profile_photo_url,
-          emergency_contact, address, delivery_zone, mobile_number, whatsapp_number, current_lat, current_lng, kyc_status, is_online)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE) RETURNING *`,
+          emergency_contact, address, delivery_zone, mobile_number, whatsapp_number, current_lat, current_lng, social_links, kyc_status, is_online)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'pending',FALSE) RETURNING *`,
       [userId, vehicleType || null, plateNumber || null, licenseNumber || null,
        nationalId || null, idDocumentUrl || null, licenseDocumentUrl || null, vehiclePhotoUrl || null, profilePhotoUrl || null,
-       emergencyContact || null, address || null, deliveryZone || null, normalizedMobileNumber, normalizedWhatsapp, latitude ?? null, longitude ?? null]
+       emergencyContact || null, address || null, deliveryZone || null, normalizedMobileNumber, normalizedWhatsapp, latitude ?? null, longitude ?? null, JSON.stringify(safeSocialLinks)]
     );
 
     // Grant rider role
@@ -163,7 +164,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, isOnline, zone, i
               u.full_name
               ${isAdmin ? `, r.plate_number, r.total_earnings, r.current_lat, r.current_lng, r.last_location_at,
                 u.phone, r.address, r.emergency_contact, r.license_number, r.national_id,
-                r.id_document_url, r.license_document_url, r.vehicle_photo_url, r.mobile_number, r.whatsapp_number, u.email` : ''}
+                r.id_document_url, r.license_document_url, r.vehicle_photo_url, r.mobile_number, r.whatsapp_number, r.social_links, u.email` : ''}
        FROM riders r
        JOIN users u ON u.id = r.user_id
        ${where}
@@ -189,7 +190,7 @@ async function updateProfile(userId, data) {
     vehicleType: 'vehicle_type', plateNumber: 'plate_number',
     licenseNumber: 'license_number', emergencyContact: 'emergency_contact',
     address: 'address', deliveryZone: 'delivery_zone', mobileNumber: 'mobile_number', whatsappNumber: 'whatsapp_number',
-    profilePhotoUrl: 'profile_photo_url',
+    profilePhotoUrl: 'profile_photo_url', socialLinks: 'social_links',
   };
   const sets = [], params = []; let pi = 1;
   for (const [jsKey, col] of Object.entries(allowed)) {
@@ -200,7 +201,7 @@ async function updateProfile(userId, data) {
         : jsKey === 'whatsappNumber'
           ? normalizeGambianContact(data[jsKey], 'Rider WhatsApp contact')
           : data[jsKey];
-      params.push(value);
+      params.push(jsKey === 'socialLinks' ? JSON.stringify(value) : value);
     }
   }
   if (!sets.length) throw new AppError('No valid fields to update.', 400, 'VALIDATION_ERROR');
