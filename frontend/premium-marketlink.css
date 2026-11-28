@@ -2405,3 +2405,10 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-daha-balance-row strong{min-width:0;overflow-wrap:anywhere;}
 .ml-daha-balance-toggle{display:inline-grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(255,255,255,.12);color:#fff;font-size:16px;line-height:1;cursor:pointer;}
 .ml-daha-balance-toggle:focus-visible{outline:2px solid #f5b83d;outline-offset:3px;}
+
+#app.lm #profile-body #ml-affiliate-marketer-form>label:not(.ml-affiliate-form-field){color:#203b49!important;font-size:13px!important;font-weight:750!important;line-height:1.45}
+#app:not(.lm) #profile-body #ml-affiliate-marketer-form>label:not(.ml-affiliate-form-field){color:#e4edf2!important;font-size:13px!important;font-weight:750!important;line-height:1.45}
+#app.lm #profile-body #ml-affiliate-marketer-form .ml-affiliate-footnote{color:#536c79!important}
+#app:not(.lm) #profile-body #ml-affiliate-marketer-form .ml-affiliate-footnote{color:#b3c3cc!important}
+#app.lm #profile-body .ml-affiliate-application-form{background:#fff!important;border-color:#d4dfe4!important}
+#app:not(.lm) #profile-body .ml-affiliate-application-form{background:#102432!important;border-color:rgba(255,255,255,.13)!important}
