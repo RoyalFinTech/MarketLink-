@@ -8,7 +8,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
   const pageSize = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
   const [
     missingCommission, pendingSettlement, amountMismatches, missingRecipients,
-    missingCredits, withdrawalQueue, walletMismatches, codRemittancesNeedingAttention, duplicateReferences, settlementCreditMismatches,
+    missingCredits, withdrawalQueue, walletMismatches, codRemittancesNeedingAttention, duplicateReferences, settlementCreditMismatches, refundReversalRecovery,
   ] = await Promise.all([
     query(`SELECT o.id, o.order_number, o.total, o.payment_method, o.payment_status,
                   o.vendor_payout, o.rider_payout, o.affiliate_commission_amount,
@@ -196,6 +196,17 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
                OR ABS(COALESCE(pe.payout_fee_recovery_amount,0)-COALESCE(o.payout_fee_recovery_amount,0))>$1
              )
            ORDER BY o.delivered_at DESC NULLS LAST LIMIT $2`, [moneyTolerance, pageSize]),
+    query(`SELECT fr.id AS reversal_id,fr.payment_id,fr.order_id,fr.amount,fr.currency,
+                  fr.recovery_reason,fr.recovery_details,fr.attempt_count,fr.created_at,fr.updated_at,
+                  p.method AS payment_method,p.status AS payment_status,p.refund_status,
+                  o.order_number,o.status AS order_status,o.payment_status AS order_payment_status,
+                  requested_by.full_name AS requested_by_name
+           FROM financial_reversals fr
+           JOIN payments p ON p.id=fr.payment_id
+           JOIN orders o ON o.id=fr.order_id
+           LEFT JOIN users requested_by ON requested_by.id=fr.requested_by
+           WHERE fr.status='recovery_required'
+           ORDER BY fr.updated_at ASC LIMIT $1`, [pageSize])
   ]);
 
   const sections = {
@@ -209,6 +220,7 @@ async function getFinancialReconciliation({ limit = 50 } = {}) {
     codRemittancesNeedingAttention: codRemittancesNeedingAttention.rows,
     duplicateReferences: duplicateReferences.rows,
     settlementCreditMismatches: settlementCreditMismatches.rows,
+    refundsNeedingRecovery: refundReversalRecovery.rows,
   };
   const counts = Object.fromEntries(Object.entries(sections).map(([key, rows]) => [key, rows.length]));
   return {
