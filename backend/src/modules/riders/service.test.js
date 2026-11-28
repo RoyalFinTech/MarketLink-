@@ -6,7 +6,7 @@ jest.mock('../uploads/service',()=>({assertOwnedUploadReference:jest.fn().mockRe
 const {query,withTransaction}=require('../../config/db');
 const notificationsService=require('../notifications/service');
 const {assertOwnedUploadReference}=require('../uploads/service');
-const {getDeliveryHistory,updateLocation,register,approve,updateProfile,setAvailability,updateDeliveryPricing}=require('./service');
+const {getDeliveryHistory,getEarnings,updateLocation,register,approve,updateProfile,setAvailability,updateDeliveryPricing}=require('./service');
 
 describe('rider profile updates',()=>{
  const riderId='33333333-3333-4333-8333-333333333333';
@@ -38,6 +38,31 @@ describe('rider delivery history cash reconciliation data',()=>{
  });
 });
 
+
+
+describe('rider earnings reversal accounting',()=>{
+ beforeEach(()=>jest.clearAllMocks());
+
+ test('summarises deduction entries as negative amounts instead of extra earnings',async()=>{
+  query.mockResolvedValueOnce({rows:[{
+   total_earnings:'93.00',paid_earnings:'93.00',pending_earnings:'0.00',total_entries:4
+  }]}).mockResolvedValueOnce({rows:[]});
+  const result=await getEarnings('rider-1',{page:1,limit:20,period:'30d'});
+  expect(result.summary).toMatchObject({total_earnings:'93.00',paid_earnings:'93.00'});
+  expect(query.mock.calls[0][0]).toContain("CASE WHEN type='deduction' THEN -amount ELSE amount END");
+  expect(query.mock.calls[0][0]).toContain('AS total_earnings');
+  expect(query.mock.calls[0][0]).toContain('AS paid_earnings');
+  expect(query.mock.calls[0][0]).toContain('AS pending_earnings');
+ });
+
+ test('delivery history nets an order reversal deduction against the original delivery earning',async()=>{
+  query.mockResolvedValueOnce({rows:[{amount:'0.00'}]});
+  const result=await getDeliveryHistory('rider-1',{page:1,limit:20});
+  expect(result[0].amount).toBe('0.00');
+  expect(query.mock.calls[0][0]).toContain("CASE WHEN re.type='deduction' THEN -re.amount ELSE re.amount END");
+  expect(query.mock.calls[0][0]).toContain('SUM');
+ });
+});
 
 describe('rider live GPS and arrival alerts', () => {
   let clientQuery;
