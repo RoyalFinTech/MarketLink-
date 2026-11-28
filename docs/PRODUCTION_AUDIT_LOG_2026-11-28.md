@@ -56,10 +56,11 @@ All three are present in Supabase migration history. The new event/authenticator
 
 ## Production deployment verification
 
-- Render backend service `srv-d9utunmgekts73dakq40`: deploy `dep-dc5fgg8ae00c73eogq60`, status `live`, commit `955e0b0`.
-- Render customer frontend `srv-db3rtgijnfac738i81mg`: deploy `dep-dc5fgg8ae00c73eogqf0`, status `live`, commit `955e0b0`.
-- Render Admin site `srv-dbunj95g1s2s73cdi7m0`: deploy `dep-dc5fgg8ae00c73eogqh0`, status `live`, commit `955e0b0`.
-- Vercel production deployment: `READY`, commit `955e0b0`.
+- Render backend service `srv-d9utunmgekts73dakq40`: deploy `dep-dc5fgg8ae00c73eogq60`, status `live`, application commit `955e0b0`.
+- Render customer frontend `srv-db3rtgijnfac738i81mg`: status `live`; latest static-site commit `23a4737` is documentation-only and includes the deployed application release `955e0b0`.
+- Render Admin site `srv-dbunj95g1s2s73cdi7m0`: status `live`; latest static-site commit `23a4737` is documentation-only and includes the deployed application release `955e0b0`.
+- Vercel production deployment: `READY`, latest commit `23a4737` (documentation-only; application release `955e0b0` is included).
+- At the end of this audit, there are zero open pull requests in the repository; PR #77 and #79 are merged and the superseded PR #78 is closed.
 
 ## Production data reality — no fabricated settlement records
 
