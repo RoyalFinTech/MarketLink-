@@ -142,6 +142,7 @@ async function getById(userId, includePrivate = false) {
       latitude: v.latitude,
       longitude: v.longitude,
       whatsapp_number: v.whatsapp_number,
+      social_links: v.social_links || {},
       services_offered: v.services_offered,
       working_days: v.working_days,
       opening_time: v.opening_time,
@@ -196,7 +197,7 @@ async function list({ page = 1, limit = 20, search, kycStatus, category, isOpen,
   const [data, count] = await Promise.all([
     query(
       `SELECT v.user_id, v.business_name, v.business_category, v.business_category_group, v.business_address,
-              v.latitude, v.longitude, v.whatsapp_number, v.logo_url, v.banner_url, v.description, v.services_offered, v.working_days, v.opening_time, v.closing_time, v.rating_avg, v.rating_count,
+              v.latitude, v.longitude, v.whatsapp_number, v.social_links, v.logo_url, v.banner_url, v.description, v.services_offered, v.working_days, v.opening_time, v.closing_time, v.rating_avg, v.rating_count,
               v.is_open, v.vacation_mode, v.kyc_status, v.created_at
               ${isAdmin ? ', v.commission_pct, v.total_sales, v.total_revenue, v.social_links' : ''},
               u.full_name AS owner_name
