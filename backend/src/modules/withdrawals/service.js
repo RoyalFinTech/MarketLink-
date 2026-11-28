@@ -15,7 +15,7 @@ async function getBalance(userId) {
   const { rows: [w] } = await query('SELECT id,balance,currency FROM wallets WHERE user_id=$1', [userId]);
   if (!w) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
   const { rows: [pending] } = await query(
-    "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')",
+    "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND status IN ('initiating','processing','payout_pending')",
     [userId]
   );
   const reserved = Number(pending && pending.amount || 0);
@@ -86,7 +86,7 @@ async function requestWithdrawal(userId, { amount, payoutMethod, payoutDetails, 
     const { rows: [wallet] } = await client.query('SELECT id,balance FROM wallets WHERE user_id=$1 FOR UPDATE', [userId]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
     const { rows: [pendingRow] } = await client.query(
-      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS pending FROM withdrawals WHERE user_id=$1 AND status IN ('processing','payout_pending')", [userId]);
+      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS pending FROM withdrawals WHERE user_id=$1 AND status IN ('initiating','processing','payout_pending')", [userId]);
     const available = Number(wallet.balance) - Number(pendingRow.pending || 0);
     if (debit.walletDebitAmount - available > 0.0001) {
       throw new AppError('Insufficient available balance. Available: D ' + Math.max(0,available).toFixed(2) +
@@ -123,7 +123,7 @@ async function listPendingForAdmin({ page = 1, limit = 20 } = {}) {
      LEFT JOIN vendors v ON v.user_id = w.user_id
      LEFT JOIN riders  r ON r.user_id = w.user_id
      LEFT JOIN affiliates a ON a.user_id = w.user_id
-     WHERE w.status IN ('processing','payout_pending')
+     WHERE w.status IN ('initiating','processing','payout_pending')
      ORDER BY w.created_at ASC LIMIT $1 OFFSET $2`,
     [safeLimit, off]);
   return rows;
@@ -169,7 +169,7 @@ async function approve(withdrawalId, adminUserId) {
       'SELECT id,balance FROM wallets WHERE id=$1 FOR UPDATE', [wd.wallet_id]);
     if (!wallet) throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
     const { rows: [otherPending] } = await client.query(
-      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND id<>$2 AND status IN ('processing','payout_pending')",
+      "SELECT COALESCE(SUM(COALESCE(wallet_debit_amount,amount)),0) AS amount FROM withdrawals WHERE user_id=$1 AND id<>$2 AND status IN ('initiating','processing','payout_pending')",
       [wd.user_id, wd.id]);
     const available = Number(wallet.balance) - Number(otherPending.amount || 0);
     const requiredWalletDebit = Number(wd.wallet_debit_amount || (Number(wd.amount) + Number(wd.service_fee_amount || 0)));
