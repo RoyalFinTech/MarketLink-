@@ -105,6 +105,8 @@ router.post('/register',
     body('whatsappNumber')
       .optional({ nullable: true }).custom(value => (String(value).startsWith('+220') ? /^\+220\d{9}$/.test(String(value)) : /^\+?[1-9]\d{7,14}$/.test(String(value)))).withMessage('Enter a valid Gambian 9-digit contact number or an international number.'),
 
+    body('socialLinks').optional().isObject(),
+    ...['facebook','instagram','tiktok','youtube','website'].map(key => body('socialLinks.' + key).optional({ checkFalsy: true }).isURL({ require_protocol: true })),
     body('businessAddress')
       .optional().trim().isLength({ max: 500 }),
     body('phone')
