@@ -1964,9 +1964,9 @@
       root.innerHTML='<div class="ml-profile-shell"><div class="ml-section-head"><div><div class="ml-eyebrow">BECOME AN OFFICIAL PARTNER</div><h3 style="color:#fff;margin:7px 0 0;font-size:22px">Apply as an Affiliate Marketer</h3></div><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.showProfileOverview()">← Profile</button></div>'+
         (state==='rejected'?'<div class="ml-wallet-note" style="margin-bottom:12px"><b>Previous application not approved.</b><p>'+esc(rejection||'Please review your documents and application details before resubmitting.')+'</p></div>':'')+
         '<p class="ml-affiliate-footnote">This is a separate professional programme. You must submit identity verification and a short marketing plan. Your application is reviewed by MarketLink Admin. You will not earn commissions before approval.</p>'+
-        '<form id="ml-affiliate-marketer-form" class="ml-profile-card" style="padding:16px;display:grid;gap:12px">'+
-        '<label>Full legal name<input name="legalName" required maxlength="150" autocomplete="name" placeholder="Name as shown on your ID"></label>'+
-        '<label>Residential address<textarea name="residentialAddress" required maxlength="500" rows="2" placeholder="Your current address in The Gambia"></textarea></label>'+
+        '<form id="ml-affiliate-marketer-form" class="ml-profile-card ml-affiliate-application-form" style="padding:20px;display:grid;gap:16px">'+
+        '<label class="ml-affiliate-form-field" for="ml-affiliate-legal-name"><span>Full legal name <i>*</i></span><input id="ml-affiliate-legal-name" name="legalName" required maxlength="150" autocomplete="name" placeholder="Enter your full name as shown on your ID"></label>'+
+        '<label class="ml-affiliate-form-field" for="ml-affiliate-residential-address"><span>Residential address <i>*</i></span><textarea id="ml-affiliate-residential-address" name="residentialAddress" required maxlength="500" rows="3" placeholder="House number, street or area, town and nearby landmark in The Gambia"></textarea></label>'+
         '<section class="ml-affiliate-channel-section"><div class="ml-affiliate-form-heading"><span class="ml-affiliate-step">01</span><div><b>Where do you reach your audience?</b><small>Select every platform you actively use.</small></div></div><div class="ml-affiliate-channel-grid">'+
         [['whatsapp','WhatsApp','whatsapp.svg'],['facebook','Facebook','brand-facebook.svg'],['instagram','Instagram','brand-instagram.svg'],['tiktok','TikTok','brand-tiktok.svg'],['youtube','YouTube','brand-youtube.svg'],['website','Website',''],['community','Community groups',''],['other','Other','']].map(function(x){var icon=x[2]?'<img class="ml-affiliate-social-icon" src="./assets/'+x[2]+'" alt="" loading="lazy">':'<span class="ml-affiliate-social-emoji">'+(x[0]==='website'?'🌐':x[0]==='community'?'👥':'✨')+'</span>';return '<label class="ml-affiliate-channel"><input type="checkbox" name="marketingChannels" value="'+x[0]+'"><span class="ml-affiliate-channel-icon">'+icon+'</span><span class="ml-affiliate-channel-name">'+x[1]+'</span><span class="ml-affiliate-channel-check">✓</span></label>';}).join('')+
         '</div></section>'+
@@ -2867,7 +2867,8 @@
         idDocumentUrl:idUpload&&idUpload.url,
         shopPhotoUrl:shopPhotoUrl,
         logoUrl:shopPhotoUrl,
-        description:businessDescription||undefined
+        description:businessDescription||undefined,
+        socialLinks:f.socialLinks||{}
       });
       closeSheet('sh-vapp');
       toast('Vendor application submitted. Your logo and documents have been saved for Admin review.','success');
@@ -2925,7 +2926,8 @@
         profilePhotoUrl:riderPhoto&&riderPhoto.url,
         idDocumentUrl:idUpload&&idUpload.url,
         licenseDocumentUrl:licenseUpload&&licenseUpload.url,
-        vehiclePhotoUrl:vehiclePhotoUrl
+        vehiclePhotoUrl:vehiclePhotoUrl,
+        socialLinks:f.socialLinks||{}
       });
       closeSheet('sh-rapp');
       toast('Rider application submitted. Your documents are saved securely for Admin review.','success');
