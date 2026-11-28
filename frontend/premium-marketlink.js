@@ -832,6 +832,10 @@
       function doc(label,url){
         return url?'<button type="button" class="ml-btn ml-btn-secondary" style="font-size:10px;padding:8px 10px;margin:4px 5px 0 0;" onclick="window.ML_Premium.viewApplicationDocument(&quot;'+esc(url)+'&quot;,&quot;'+esc(label)+'&quot;)">View '+esc(label)+'</button>':'';
       }
+      function socialSummary(value){
+        var links=value&&typeof value==='object'?value:{};
+        return ['facebook','instagram','tiktok','youtube','website'].filter(function(key){return links[key];}).map(function(key){return key.charAt(0).toUpperCase()+key.slice(1)+': '+links[key];}).join(' · ');
+      }
       root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><h3>Pending '+label+' applications</h3><span style="display:block;color:#91a4b4;font-size:11px;margin-top:4px">'+rows.length+' pending · refreshed '+esc(new Date().toLocaleTimeString())+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap"><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.adminApprovals(\''+kind+'\')">↻ Refresh applications</button><button class="ml-btn ml-btn-secondary" onclick="window.ML_Premium.adminRefresh()">← Dashboard</button></div></div>'+
       (rows.length?'<div style="display:grid;gap:12px;">'+rows.map(function(a){
         var id=a.user_id||a.id,name=a.owner_name||a.full_name||'Applicant';
@@ -839,8 +843,8 @@
         var logo=kind==='vendor'?(a.logo_url||a.shop_photo_url||''):(a.profile_photo_url||a.vehicle_photo_url||'');
         var image=logo?'<img src="'+esc(logo)+'" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:#fff;">':'<div class="ico">'+(kind==='vendor'?'🏪':'🛵')+'</div>';
         var details=kind==='vendor'
-          ?field('Owner',name)+field('Account phone',a.owner_phone||'')+field('Account email',a.owner_email||'')+field('Business name',a.business_name)+field('Shop phone',a.business_phone||'')+field('Business email',a.business_email||'')+field('Category',a.business_category)+field('Marketplace group',a.business_category_group)+field('WhatsApp',a.whatsapp_number)+field('Address',a.business_address)+field('GPS',a.latitude!=null&&a.longitude!=null?a.latitude+', '+a.longitude:'')+field('Description',a.description)
-          :field('Full name',name)+field('Phone',a.phone||a.mobile_number||'')+field('Email',a.email)+field('Residential address',a.address)+field('Emergency contact',a.emergency_contact)+field('WhatsApp',a.whatsapp_number)+field('GPS',a.current_lat!=null&&a.current_lng!=null?a.current_lat+', '+a.current_lng:'')+field('Vehicle type',a.vehicle_type)+field('Plate number',a.plate_number)+field('Licence number',a.license_number)+field('Delivery zone',a.delivery_zone);
+          ?field('Owner',name)+field('Account phone',a.owner_phone||'')+field('Account email',a.owner_email||'')+field('Business name',a.business_name)+field('Shop phone',a.business_phone||'')+field('Business email',a.business_email||'')+field('Category',a.business_category)+field('Marketplace group',a.business_category_group)+field('WhatsApp',a.whatsapp_number)+field('Address',a.business_address)+field('GPS',a.latitude!=null&&a.longitude!=null?a.latitude+', '+a.longitude:'')+field('Description',a.description)+field('Social profiles',socialSummary(a.social_links))
+          :field('Full name',name)+field('Phone',a.phone||a.mobile_number||'')+field('Email',a.email)+field('Residential address',a.address)+field('Emergency contact',a.emergency_contact)+field('WhatsApp',a.whatsapp_number)+field('GPS',a.current_lat!=null&&a.current_lng!=null?a.current_lat+', '+a.current_lng:'')+field('Vehicle type',a.vehicle_type)+field('Plate number',a.plate_number)+field('Licence number',a.license_number)+field('Delivery zone',a.delivery_zone)+field('Social profiles',socialSummary(a.social_links));
         var docs=kind==='vendor'
           ?doc('National ID / Passport',a.id_document_url)+doc('Shop photo',a.shop_photo_url)
           :doc('National ID / Passport',a.id_document_url)+doc('Driver licence',a.license_document_url)+doc('Rider profile photo',a.profile_photo_url)+doc('Vehicle photo',a.vehicle_photo_url);
