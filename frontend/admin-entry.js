@@ -1095,6 +1095,53 @@
     }catch(e){if(window.toast)window.toast(e.message||'Could not reassign this delivery.','error');}
   };
 
+  async function adminTwoFactorView(){
+    var root=document.getElementById('adash-body');if(!root)return;
+    root.innerHTML='<div class="ml-premium-home"><div class="ml-hero-title">Two-Factor Authenticator</div><p>Loading your administrator security settings…</p></div>';
+    try{
+      var response=await ML_API.auth.adminTotpStatus(),status=response&&response.data||{};
+      function paintSetup(setup){
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-section-head"><div><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3></div><span class="ml-admin-live">Setup pending</span></div>'+
+          '<div class="ml-profile-card" style="padding:18px;margin-top:14px"><b>Connect your authenticator app</b><p style="margin:8px 0;color:var(--mu)">Scan this QR code using Google Authenticator, Microsoft Authenticator, or another app that supports time-based one-time passwords (TOTP). The code refreshes every 30 seconds.</p>'+
+          '<div id="ml-admin-totp-qr" style="width:220px;height:220px;background:#fff;padding:10px;border-radius:12px;margin:16px auto;display:flex;align-items:center;justify-content:center"></div>'+
+          '<p style="font-size:12px;color:var(--mu)">If scanning is unavailable, enter this setup key manually:</p><code style="display:block;overflow-wrap:anywhere;background:#f1f5f9;color:#102a43;padding:12px;border-radius:8px;margin:8px 0;font-weight:700">'+adminSafe(setup.secret)+'</code>'+
+          '<label for="ml-admin-totp-enable-code" style="display:block;margin-top:14px;font-weight:700">6-digit authenticator code</label><input id="ml-admin-totp-enable-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:10px;margin:7px 0 12px;font-size:20px;letter-spacing:6px;text-align:center" placeholder="000000">'+
+          '<button type="button" class="ml-btn ml-btn-primary" id="ml-admin-totp-enable">Verify and enable</button><p style="font-size:11px;color:var(--mu);margin-top:10px">Two-factor stays OFF until the first code is verified. Keep your authenticator app available before enabling.</p></div></div>';
+        var qr=document.getElementById('ml-admin-totp-qr');
+        function drawQr(){try{if(window.QRCode&&qr)new window.QRCode(qr,{text:setup.otpauthUrl,width:200,height:200,colorDark:'#102a43',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});}catch(e){if(qr)qr.textContent='QR could not be rendered. Use the setup key above.';}}
+        if(window.QRCode)drawQr();else{
+          var script=document.createElement('script');script.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';script.onload=drawQr;script.onerror=function(){if(qr)qr.textContent='QR library unavailable. Use the setup key above.';};document.head.appendChild(script);
+        }
+        document.getElementById('ml-admin-totp-enable').addEventListener('click',async function(){
+          var code=String(document.getElementById('ml-admin-totp-enable-code').value||'').replace(/\s/g,'');
+          if(!/^\d{6}$/.test(code)){if(window.toast)window.toast('Enter the current 6-digit authenticator code.','error');return;}
+          this.disabled=true;this.textContent='Verifying…';
+          try{await ML_API.auth.enableAdminTotp(code);if(window.toast)window.toast('Two-factor authentication enabled.','success');await adminTwoFactorView();}
+          catch(error){if(window.toast)window.toast(error.error||error.message||'Could not enable authenticator.','error');this.disabled=false;this.textContent='Verify and enable';}
+        });
+      }
+      if(status.enabled){
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3><div class="ml-profile-card" style="padding:18px;margin-top:14px"><div style="font-size:34px">🔐</div><b>Authenticator protection is ON</b><p style="color:var(--mu);margin:8px 0 14px">Admin login and sensitive COD remittance approvals require a current code from your authenticator app. Your Admin PIN remains the active method whenever two-factor is disabled.</p><button type="button" role="switch" aria-checked="true" class="ml-btn ml-btn-secondary" id="ml-admin-totp-disable">Two-Factor: ON · Turn off</button></div></div>';
+        document.getElementById('ml-admin-totp-disable').addEventListener('click',async function(){
+          if(!window.confirm('Turn off authenticator protection? Admin login and financial approvals will return to the 4-digit PIN requirement.'))return;
+          var pin=window.prompt('Enter your 4-digit Admin PIN to disable two-factor authentication:');if(pin===null)return;
+          var code=window.prompt('Enter the current 6-digit authenticator code:');if(code===null)return;
+          try{await ML_API.auth.disableAdminTotp(String(pin).trim(),String(code).trim());if(window.toast)window.toast('Two-factor authentication disabled. PIN protection remains active.','success');await adminTwoFactorView();}
+          catch(error){if(window.toast)window.toast(error.error||error.message||'Could not disable authenticator.','error');}
+        });
+      }else{
+        root.innerHTML='<div class="ml-premium-home"><div class="ml-eyebrow">ADMIN ACCOUNT SECURITY</div><h3>Two-Factor Authenticator</h3><div class="ml-profile-card" style="padding:18px;margin-top:14px"><div style="font-size:34px">🔐</div><b>Authenticator protection is OFF</b><p style="color:var(--mu);margin:8px 0 14px">Your existing 4-digit Admin PIN remains the active sign-in and financial approval method. Enabling this feature adds authenticator verification to Admin login and sensitive money approvals.</p><button type="button" role="switch" aria-checked="false" class="ml-btn ml-btn-primary" id="ml-admin-totp-start">Two-Factor: OFF · Enable authenticator</button></div></div>';
+        document.getElementById('ml-admin-totp-start').addEventListener('click',async function(){
+          var pin=window.prompt('Enter your 4-digit Admin PIN to begin authenticator setup:');if(pin===null)return;
+          if(!/^\d{4}$/.test(String(pin).trim())){if(window.toast)window.toast('Enter your 4-digit Admin PIN.','error');return;}
+          this.disabled=true;this.textContent='Preparing secure setup…';
+          try{var setupResponse=await ML_API.auth.beginAdminTotpSetup(String(pin).trim()),setup=setupResponse&&setupResponse.data||{};if(!setup.secret||!setup.otpauthUrl)throw new Error('The server did not return a valid authenticator setup.');paintSetup(setup);}
+          catch(error){if(window.toast)window.toast(error.error||error.message||'Could not start authenticator setup.','error');this.disabled=false;this.textContent='Two-Factor: OFF · Enable authenticator';}
+        });
+      }
+    }catch(error){root.innerHTML='<div class="ml-empty"><b>Authenticator settings unavailable</b><span>'+adminSafe(error.error||error.message||'Could not load two-factor status.')+'</span></div>';}
+  }
+
   function adminNavigate(key) {
     var api = window.ML_Premium || {};
     var routes = {
@@ -1106,6 +1153,7 @@
       communications: adminCampaignView,
       crm: adminCrmView,
       access: adminAccessManagement,
+      security: adminTwoFactorView,
       settings: adminSettingsView,
       vendors: function () { if (api.adminApprovals) api.adminApprovals('vendor'); },
       riders: function () { if (api.adminApprovals) api.adminApprovals('rider'); },
@@ -1196,6 +1244,7 @@
       '<button data-ml-admin-route="communications"><span>📨</span>Communications</button>' +
       '<button data-ml-admin-route="crm"><span>👥</span>CRM directory</button>' +
       '<button data-ml-admin-route="access"><span>🛡️</span>Staff & access</button>' +
+      '<button data-ml-admin-route="security"><span>🔐</span>Two-Factor Authenticator</button>' +
       '<button data-ml-admin-route="settings"><span>⚙️</span>System settings</button>' +
       '<button data-ml-admin-route="ai"><span>🤖</span>AI operations</button>' +
       '</nav><div class="ml-admin-side-foot"><span class="ml-admin-secure-dot"></span> Protected operations<br><small>Powered by Royal FinTech</small></div></aside>' +

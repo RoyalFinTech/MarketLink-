@@ -5,6 +5,8 @@ const { body, param } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
 const ctrl = require('./controller');
+const remittancePinLimiter = require('./remittancePinLimiter');
+const {adminFactorLimiter,adminFactorLimiterIfAdmin,requireAdminFactor,requireAdminFactorIfAdmin}=require('../../middleware/adminFactor');
 const ADMIN = ['admin','super_admin'];
 router.get('/methods', authenticate, authorize('customer','vendor','rider'), ctrl.methods);
 router.post('/initiate', authenticate, authorize('customer'),
@@ -20,15 +22,16 @@ router.post('/cod/:id/remittance', authenticate, authorize('rider'),
   validate,ctrl.submitCodRemittance);
 router.get('/cod/remittances/mine',authenticate,authorize('rider'),ctrl.myCodRemittances);
 router.get('/cod/remittances',authenticate,authorize(...ADMIN),ctrl.codRemittances);
-router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),
-  [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500})],
+router.post('/cod/remittances/:id/review',authenticate,authorize(...ADMIN),remittancePinLimiter,
+  [param('id').isUUID(),body('decision').isIn(['verified','rejected']),body('note').optional().trim().isLength({max:500}),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
   validate,ctrl.reviewCodRemittance);
 router.get('/:id/status', authenticate, [param('id').isUUID()], validate, ctrl.status);
-router.post('/:id/confirm', authenticate,
-  [param('id').isUUID()], validate, ctrl.confirm);
-router.post('/:id/refund', authenticate, authorize(...ADMIN),
-  [param('id').isUUID(), body('amount').optional().isFloat({min:0}), body('reason').optional().trim()],
-  validate, ctrl.refund);
+router.post('/:id/confirm', authenticate, adminFactorLimiterIfAdmin,
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
+  validate, requireAdminFactorIfAdmin, ctrl.confirm);
+router.post('/:id/refund', authenticate, authorize(...ADMIN), adminFactorLimiter,
+  [param('id').isUUID(), body('amount').optional().isFloat({min:0}), body('reason').optional().trim(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
+  validate, requireAdminFactor, ctrl.refund);
 router.get('/history', authenticate, ctrl.history);
 router.post('/webhook/:provider', ctrl.webhook);
 module.exports = router;

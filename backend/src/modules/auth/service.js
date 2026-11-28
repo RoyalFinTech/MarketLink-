@@ -7,6 +7,7 @@ const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const { normalizePhone } = require('../../utils/phone');
 const notificationsService = require('../notifications/service');
+const adminTotp = require('./totp');
 function signAccess(id, roles) { return jwt.sign({ sub: id, roles }, process.env.JWT_ACCESS_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }); }
 function signRefresh(id) { return jwt.sign({ sub: id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }); }
 function genOtp() { return String(crypto.randomInt(100000, 999999)); }
@@ -60,7 +61,103 @@ async function registerComplete({fullName,phone,otp,pin}){const e164=canonicalRe
   await client.query('INSERT INTO wallets (user_id) VALUES($1)',[user.id]);
   const affiliateCode=await createAffiliateForCustomer(client,user.id);
   const accessToken=signAccess(user.id,types);const rt=signRefresh(user.id);const rth=await bcrypt.hash(rt,8);await client.query('INSERT INTO refresh_tokens (user_id,token_hash,expires_at) VALUES($1,$2,$3)',[user.id,rth,new Date(Date.now()+30*24*60*60*1000)]);return{user,accessToken,refreshToken:rt,roles:types,affiliateCode};});}
-async function login({phone,pin}){const e164=canonicalPhone(phone);const {rows}=await query('SELECT u.id,u.full_name,u.phone,u.pin_hash,u.status,array_agg(r.name) AS roles,(SELECT affiliate_code FROM affiliates a WHERE a.user_id=u.id) AS affiliate_code FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.phone=$1 GROUP BY u.id',[e164]);if(!rows.length)throw new AppError('No account found with this phone number.',401,'USER_NOT_FOUND');const user=rows[0];if(user.status==='suspended')throw new AppError('Account suspended. Contact support.',403,'ACCOUNT_SUSPENDED');if(!user.pin_hash)throw new AppError('Account setup incomplete.',401,'INCOMPLETE_SETUP');if(!await bcrypt.compare(pin,user.pin_hash))throw new AppError('Incorrect PIN.',401,'INVALID_PIN');await query('UPDATE users SET last_login_at=now() WHERE id=$1',[user.id]);const roles=(user.roles||[]).filter(Boolean);const accessToken=signAccess(user.id,roles);const rt=signRefresh(user.id);const rth=await bcrypt.hash(rt,8);await query('INSERT INTO refresh_tokens (user_id,token_hash,expires_at) VALUES($1,$2,$3)',[user.id,rth,new Date(Date.now()+30*24*60*60*1000)]);return{user:{id:user.id,fullName:user.full_name,phone:user.phone,roles,affiliateCode:user.affiliate_code||null},accessToken,refreshToken:rt};}
+async function issueSessionForUser(user) {
+  const roles=(user.roles||[]).filter(Boolean);
+  const accessToken=signAccess(user.id,roles);
+  const rt=signRefresh(user.id);
+  const rth=await bcrypt.hash(rt,8);
+  await query('INSERT INTO refresh_tokens (user_id,token_hash,expires_at) VALUES($1,$2,$3)',[user.id,rth,new Date(Date.now()+30*24*60*60*1000)]);
+  await query('UPDATE users SET last_login_at=now() WHERE id=$1',[user.id]);
+  return {user:{id:user.id,fullName:user.full_name,phone:user.phone,roles,affiliateCode:user.affiliate_code||null},accessToken,refreshToken:rt};
+}
+async function login({phone,pin}) {
+  const e164=canonicalPhone(phone);
+  const {rows}=await query('SELECT u.id,u.full_name,u.phone,u.pin_hash,u.status,COALESCE(u.admin_totp_enabled,FALSE) AS admin_totp_enabled,array_agg(r.name) AS roles,(SELECT affiliate_code FROM affiliates a WHERE a.user_id=u.id) AS affiliate_code FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.phone=$1 GROUP BY u.id',[e164]);
+  if(!rows.length)throw new AppError('No account found with this phone number.',401,'USER_NOT_FOUND');
+  const user=rows[0];
+  if(user.status==='suspended')throw new AppError('Account suspended. Contact support.',403,'ACCOUNT_SUSPENDED');
+  if(user.status==='deleted')throw new AppError('Account unavailable.',403,'ACCOUNT_UNAVAILABLE');
+  if(!user.pin_hash)throw new AppError('Account setup incomplete.',401,'INCOMPLETE_SETUP');
+  if(!await bcrypt.compare(pin,user.pin_hash))throw new AppError('Incorrect PIN.',401,'INVALID_PIN');
+  const roles=(user.roles||[]).filter(Boolean);
+  const isAdmin=roles.some(role=>['admin','super_admin'].includes(role));
+  if(isAdmin&&user.admin_totp_enabled) {
+    const jti=crypto.randomUUID();
+    const expiresAt=new Date(Date.now()+5*60*1000);
+    await query('DELETE FROM admin_totp_login_challenges WHERE expires_at<now() OR consumed_at IS NOT NULL');
+    await query('INSERT INTO admin_totp_login_challenges(user_id,token_jti,expires_at) VALUES($1,$2,$3)',[user.id,jti,expiresAt]);
+    const challengeToken=jwt.sign({sub:user.id,purpose:'admin_totp_login',jti},process.env.JWT_ACCESS_SECRET,{expiresIn:'5m'});
+    return {requiresTwoFactor:true,challengeToken,expiresIn:300,message:'Enter the current code from your authenticator app.'};
+  }
+  return issueSessionForUser(user);
+}
+async function verifyAdminTotpLogin(challengeToken,code) {
+  let decoded;
+  try { decoded=jwt.verify(String(challengeToken||''),process.env.JWT_ACCESS_SECRET); }
+  catch { throw new AppError('Your authenticator login challenge has expired. Sign in again.',401,'ADMIN_TOTP_CHALLENGE_INVALID'); }
+  if(!decoded||decoded.purpose!=='admin_totp_login'||!decoded.sub||!decoded.jti)throw new AppError('Invalid authenticator login challenge.',401,'ADMIN_TOTP_CHALLENGE_INVALID');
+  const result=await withTransaction(async client=>{
+    const {rows:[challenge]}=await client.query('SELECT * FROM admin_totp_login_challenges WHERE token_jti=$1 AND user_id=$2 FOR UPDATE',[decoded.jti,decoded.sub]);
+    if(!challenge||challenge.consumed_at||new Date(challenge.expires_at)<=new Date())throw new AppError('This authenticator challenge has expired or was already used. Sign in again.',401,'ADMIN_TOTP_CHALLENGE_INVALID');
+    const {rows:[user]}=await client.query('SELECT u.id,u.full_name,u.phone,u.status,u.admin_totp_enabled,u.admin_totp_secret_encrypted,u.admin_totp_last_used_step,(SELECT array_agg(r.name) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id) AS roles,(SELECT affiliate_code FROM affiliates a WHERE a.user_id=u.id) AS affiliate_code FROM users u WHERE u.id=$1 FOR UPDATE',[decoded.sub]);
+    if(!user||user.status!=='active'||!user.admin_totp_enabled||!user.admin_totp_secret_encrypted)throw new AppError('Authenticator protection is no longer active. Sign in again.',401,'ADMIN_TOTP_NOT_ENABLED');
+    const roles=(user.roles||[]).filter(Boolean);
+    if(!roles.some(role=>['admin','super_admin'].includes(role)))throw new AppError('Administrator access is required.',403,'FORBIDDEN');
+    let secret;
+    try{secret=adminTotp.decryptSecret(user.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
+    const usedStep=adminTotp.matchingStep(secret,code);
+    if(usedStep===null)throw new AppError('Incorrect authenticator code. Try the current 6-digit code.',401,'INVALID_ADMIN_TOTP');
+    if(user.admin_totp_last_used_step!==null&&user.admin_totp_last_used_step!==undefined&&usedStep<=Number(user.admin_totp_last_used_step))throw new AppError('This authenticator code has already been used. Wait for the next code.',401,'ADMIN_TOTP_REPLAYED');
+    await client.query('UPDATE users SET admin_totp_last_used_step=$1 WHERE id=$2',[usedStep,user.id]);
+    await client.query('UPDATE admin_totp_login_challenges SET consumed_at=now() WHERE id=$1',[challenge.id]);
+    return user;
+  });
+  return issueSessionForUser(result);
+}
+async function getAdminTotpStatus(userId) {
+  const {rows:[user]}=await query('SELECT COALESCE(admin_totp_enabled,FALSE) AS enabled,admin_totp_pending_secret_encrypted FROM users WHERE id=$1',[userId]);
+  if(!user)throw new AppError('Administrator account not found.',404,'USER_NOT_FOUND');
+  return {enabled:!!user.enabled,setupPending:!!user.admin_totp_pending_secret_encrypted,issuer:'MarketLink Gambia'};
+}
+async function beginAdminTotpSetup(userId,pin) {
+  const {rows:[user]}=await query('SELECT full_name,phone,COALESCE(admin_totp_enabled,FALSE) AS enabled FROM users WHERE id=$1 AND status=$2',[userId,'active']);
+  if(!user)throw new AppError('Active administrator account not found.',404,'USER_NOT_FOUND');
+  if(user.enabled)throw new AppError('Two-factor authentication is already enabled.',409,'ADMIN_TOTP_ALREADY_ENABLED');
+  const {rows:[account]}=await query('SELECT pin_hash FROM users WHERE id=$1',[userId]);
+  if(!account||!account.pin_hash||!await bcrypt.compare(String(pin||''),account.pin_hash))throw new AppError('Enter your correct 4-digit Admin PIN before setting up an authenticator.',401,'INVALID_PIN');
+  const secret=adminTotp.generateSecret();
+  await query('UPDATE users SET admin_totp_pending_secret_encrypted=$1 WHERE id=$2',[adminTotp.encryptSecret(secret),userId]);
+  return {secret,otpauthUrl:adminTotp.provisioningUri(secret,user.phone||user.full_name),issuer:'MarketLink Gambia',account:user.phone||user.full_name};
+}
+async function enableAdminTotp(userId,code) {
+  const {rows:[user]}=await query('SELECT admin_totp_pending_secret_encrypted,COALESCE(admin_totp_enabled,FALSE) AS enabled FROM users WHERE id=$1 AND status=$2',[userId,'active']);
+  if(!user)throw new AppError('Active administrator account not found.',404,'USER_NOT_FOUND');
+  if(user.enabled)throw new AppError('Two-factor authentication is already enabled.',409,'ADMIN_TOTP_ALREADY_ENABLED');
+  if(!user.admin_totp_pending_secret_encrypted)throw new AppError('Start authenticator setup first.',409,'ADMIN_TOTP_SETUP_REQUIRED');
+  let secret;
+  try{secret=adminTotp.decryptSecret(user.admin_totp_pending_secret_encrypted);}catch{throw new AppError('Authenticator setup expired. Start again.',409,'ADMIN_TOTP_SETUP_INVALID');}
+  const usedStep=adminTotp.matchingStep(secret,code);
+  if(usedStep===null)throw new AppError('The authenticator code is incorrect. Scan the QR code and try again.',400,'INVALID_ADMIN_TOTP');
+  await query('UPDATE users SET admin_totp_secret_encrypted=admin_totp_pending_secret_encrypted,admin_totp_pending_secret_encrypted=NULL,admin_totp_enabled=TRUE,admin_totp_enabled_at=now(),admin_totp_last_used_step=$1 WHERE id=$2',[usedStep,userId]);
+  logger.info('Admin authenticator enabled',{userId});
+  return {enabled:true,message:'Two-factor authentication is now enabled for this administrator.'};
+}
+async function disableAdminTotp(userId,{pin,code}) {
+  if(!/^\d{4}$/.test(String(pin||'')))throw new AppError('Enter your 4-digit Admin PIN to disable two-factor authentication.',400,'ADMIN_PIN_REQUIRED');
+  if(!/^\d{6}$/.test(String(code||'')))throw new AppError('Enter the current 6-digit authenticator code.',400,'ADMIN_TOTP_REQUIRED');
+  const {rows:[user]}=await query('SELECT pin_hash,admin_totp_secret_encrypted,admin_totp_last_used_step,COALESCE(admin_totp_enabled,FALSE) AS enabled FROM users WHERE id=$1 AND status=$2',[userId,'active']);
+  if(!user)throw new AppError('Active administrator account not found.',404,'USER_NOT_FOUND');
+  if(!user.enabled) return {enabled:false,message:'Two-factor authentication is already disabled.'};
+  if(!await bcrypt.compare(String(pin),user.pin_hash||''))throw new AppError('Incorrect Admin PIN. Two-factor authentication remains enabled.',401,'INVALID_PIN');
+  let secret;
+  try{secret=adminTotp.decryptSecret(user.admin_totp_secret_encrypted);}catch{throw new AppError('Authenticator configuration needs administrator recovery.',503,'ADMIN_TOTP_CONFIGURATION_ERROR');}
+  const usedStep=adminTotp.matchingStep(secret,code);
+  if(usedStep===null)throw new AppError('Incorrect authenticator code. Two-factor authentication remains enabled.',401,'INVALID_ADMIN_TOTP');
+  if(user.admin_totp_last_used_step!==null&&user.admin_totp_last_used_step!==undefined&&usedStep<=Number(user.admin_totp_last_used_step))throw new AppError('This authenticator code has already been used. Wait for the next code.',401,'ADMIN_TOTP_REPLAYED');
+  await query('UPDATE users SET admin_totp_enabled=FALSE,admin_totp_secret_encrypted=NULL,admin_totp_pending_secret_encrypted=NULL,admin_totp_enabled_at=NULL,admin_totp_last_used_step=NULL WHERE id=$1',[userId]);
+  logger.info('Admin authenticator disabled',{userId});
+  return {enabled:false,message:'Two-factor authentication has been disabled. Admin PIN remains active.'};
+}
 async function requestPinReset(rawPhone){
   const phone=canonicalPhone(rawPhone);
   const {rows}=await query('SELECT id FROM users WHERE phone=$1 AND status <> $2 LIMIT 1',[phone,'deleted']);
@@ -123,4 +220,4 @@ async function refreshAccessToken(rt) {
   return {accessToken:signAccess(decoded.sub,roles),refreshToken:newRt};
 }
 async function logout(userId,rt){if(!rt)return;const {rows}=await query('SELECT id,token_hash FROM refresh_tokens WHERE user_id=$1 AND revoked_at IS NULL',[userId]);for(const row of rows){if(await bcrypt.compare(rt,row.token_hash)){await query('UPDATE refresh_tokens SET revoked_at=now() WHERE id=$1',[row.id]);break;}}}
-module.exports={registerInitiate,registerComplete,login,refreshAccessToken,logout,requestPinReset,confirmPinReset};
+module.exports={registerInitiate,registerComplete,login,verifyAdminTotpLogin,getAdminTotpStatus,beginAdminTotpSetup,enableAdminTotp,disableAdminTotp,refreshAccessToken,logout,requestPinReset,confirmPinReset};

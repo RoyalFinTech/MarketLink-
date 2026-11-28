@@ -4,6 +4,7 @@ const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const { validate } = require('../../middleware/validate');
 const { authenticate, authorize } = require('../../middleware/auth');
+const {adminFactorLimiter,requireAdminFactor}=require('../../middleware/adminFactor');
 const ctrl = require('./controller');
 const knowledgeCtrl = require('../assistant/adminController');
 const knowledgeRepo = require('../assistant/knowledgeRepo');
@@ -127,25 +128,30 @@ router.get('/failed-payments', authenticate, authorize(...ADMIN),
   ], validate, ctrl.failedPayments);
 
 router.post('/financial-reconciliation/orders/:id/retry-settlement',
-  authenticate, authorize(...ADMIN),
+  authenticate, authorize(...ADMIN), adminFactorLimiter,
   [
     param('id').isUUID(),
     body('confirmation').equals('RETRY_SETTLEMENT'),
     body('reason').trim().notEmpty().isLength({max:500}),
+    body('pin').optional().matches(/^\d{4}$/),
+    body('totpCode').optional().matches(/^\d{6}$/),
   ],
-  validate, ctrl.retryFinancialSettlement);
+  validate, requireAdminFactor, ctrl.retryFinancialSettlement);
 
 router.get('/withdrawal-fees', authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})], validate, ctrl.withdrawalFeeReport);
 router.get('/withdrawals',  authenticate, authorize(...ADMIN),
   [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100})],
   validate, ctrl.pendingWithdrawals);
-router.post('/withdrawals/:id/approve', authenticate, authorize(...ADMIN),
-  [param('id').isUUID()], validate, ctrl.approveWithdrawal);
-router.post('/withdrawals/:id/reconcile', authenticate, authorize(...ADMIN),
-  [param('id').isUUID()], validate, ctrl.reconcileWithdrawal);
-router.post('/withdrawals/:id/reject',  authenticate, authorize(...ADMIN),
-  [param('id').isUUID()], validate, ctrl.rejectWithdrawal);
+router.post('/withdrawals/:id/approve', authenticate, authorize(...ADMIN), adminFactorLimiter,
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
+  validate, requireAdminFactor, ctrl.approveWithdrawal);
+router.post('/withdrawals/:id/reconcile', authenticate, authorize(...ADMIN), adminFactorLimiter,
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
+  validate, requireAdminFactor, ctrl.reconcileWithdrawal);
+router.post('/withdrawals/:id/reject',  authenticate, authorize(...ADMIN), adminFactorLimiter,
+  [param('id').isUUID(),body('pin').optional().matches(/^\d{4}$/),body('totpCode').optional().matches(/^\d{6}$/)],
+  validate, requireAdminFactor, ctrl.rejectWithdrawal);
 
 // ── AI Knowledge Training Center ────────────────────────────────────
 // Only admin/super_admin — never customers, vendors, or riders — can

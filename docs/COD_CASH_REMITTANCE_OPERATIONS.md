@@ -36,6 +36,9 @@ Do not substitute a rider's personal number or the general company contact numbe
 
 ## Admin controls and audit
 
+Every Admin approval or rejection must include the current four-digit MarketLink account PIN. The backend verifies the PIN hash for the authenticated, active administrator inside the review transaction; an incorrect or missing PIN saves no decision. The clear PIN is not stored in the remittance record. Two-factor authentication is a separate future enhancement.
+
+
 The Admin cash deposit verification desk lists submitted references, amounts, rider, vendor, order and optional proof link. Admin must verify against the actual account statement. Both verification and rejection are written to `admin_action_logs`. Duplicate receipt references are rejected by a unique database index. Each COD payment can have one current remittance record; a rejected record can be resubmitted with a corrected reference.
 
 ## Reconciliation behavior

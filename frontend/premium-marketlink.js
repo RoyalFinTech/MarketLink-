@@ -257,7 +257,7 @@
     var pinEl=G('ml-modem-payment-pin'),pin='';
     if(action==='pin'){
       pin=String(pinEl&&pinEl.value||'').trim();
-      if(!/^\\d{4,8}$/.test(pin)){toast('Enter the provider authorization code requested for this payment.','error');return;}
+      if(!/^\d{4,8}$/.test(pin)){toast('Enter the provider authorization code requested for this payment.','error');return;}
     }
     try{
       var response=await ML_API.payments.continue(pending.payment.id,action,action==='pin'?pin:undefined);
@@ -567,6 +567,13 @@
       }
       adminAuthErr('Server connected. Verifying your administrator account…');
       var loginResponse=await ML_API.auth.login(phone,pin);
+      if(loginResponse&&loginResponse.requiresTwoFactor){
+        var challengeCode=window.prompt('MarketLink Admin two-factor is enabled. Enter the current 6-digit code from your authenticator app:');
+        if(challengeCode===null)throw {error:'Authenticator verification cancelled. No Admin session was created.'};
+        challengeCode=String(challengeCode||'').replace(/\s/g,'');
+        if(!/^\d{6}$/.test(challengeCode))throw {error:'Enter the 6-digit authenticator code to finish Admin sign-in.'};
+        loginResponse=await ML_API.auth.verifyAdminTwoFactor(loginResponse.challengeToken,challengeCode);
+      }
 
       // Normalize the authenticated user across the direct API result and
       // older nested controller envelopes. Roles always come from the server.
@@ -733,8 +740,9 @@
       ?'This COD payment is already marked as cash received. Retry the outstanding wallet settlement for this delivered order?'
       :'Confirm that the collected cash for this delivered order has been received and reconciled? This will mark the COD payment as paid and may release the vendor/rider/affiliate settlement.';
     if(!window.confirm(question))return;
+    var factor=await promptAdminFinancialFactor('confirm this COD cash payment');if(!factor)return;
     try{
-      var response=await ML_API.payments.confirm(paymentId);
+      var response=await ML_API.payments.confirm(paymentId,factor);
       var data=response&&response.data||response||{};
       var settlement=data.settlement||null;
       if(settlement&&settlement.settled===false){
@@ -761,13 +769,27 @@
       if(note===null)return;
       if(!String(note).trim()){toast('A rejection reason is required.','error');return;}
     }
+    var credential='',credentialType='pin';
     try{
-      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note),data=response&&response.data||response||{};
+      var factorResponse=await ML_API.auth.adminTotpStatus(),factor=factorResponse&&factorResponse.data||{};
+      if(factor.enabled){
+        credentialType='totp';
+        credential=window.prompt('Two-factor authentication is enabled. Enter the current 6-digit authenticator code to '+(decision==='verified'?'approve':'reject')+' this remittance:');
+        if(credential===null)return;
+        credential=String(credential||'').trim();
+        if(!/^\d{6}$/.test(credential)){toast('A valid 6-digit authenticator code is required. No decision was submitted.','error');return;}
+      }else{
+        credential=window.prompt('Enter your 4-digit MarketLink Admin PIN to '+(decision==='verified'?'approve':'reject')+' this remittance:');
+        if(credential===null)return;
+        credential=String(credential||'').trim();
+        if(!/^\d{4}$/.test(credential)){toast('A valid 4-digit Admin PIN is required. No decision was submitted.','error');return;}
+      }
+      var response=await ML_API.payments.reviewCodRemittance(remittanceId,decision,note,credential,credentialType),data=response&&response.data||response||{};
       var settlement=data.settlement;
       if(decision==='verified'&&settlement&&settlement.settled===false){
         toast('Deposit verified, but order settlement needs Admin review: '+String(settlement.reason||'Settlement pending')+'.','warning');
       }else if(decision==='verified'){
-        toast('Deposit verified. Vendor, rider, affiliate and platform settlement processed through DAHA.','success');
+        toast('Deposit verified. Eligible vendor, rider, affiliate and platform settlement processed through DAHA.','success');
       }else{
         toast('Cash remittance rejected. The rider can review the note and submit a corrected reference.','success');
       }
@@ -3382,6 +3404,24 @@
     }catch(e){root.innerHTML='<div class="ml-empty"><b>Revenue report unavailable</b><span>'+esc(e.error||e.message||'Could not load the live finance report.')+'</span><button class="ml-btn ml-btn-primary" style="margin-top:10px" onclick="window.ML_Premium.refreshAdminRevenue()">Retry</button></div>';}
   }
 
+  async function promptAdminFinancialFactor(actionLabel){
+    try{
+      var statusResponse=await ML_API.auth.adminTotpStatus(),status=statusResponse&&statusResponse.data||{};
+      if(status.enabled){
+        var code=window.prompt('Two-factor authentication is enabled. Enter the current 6-digit authenticator code to '+actionLabel+':');
+        if(code===null)return null;
+        code=String(code||'').trim();
+        if(!/^\d{6}$/.test(code)){toast('A valid 6-digit authenticator code is required.','error');return null;}
+        return {totpCode:code};
+      }
+      var pin=window.prompt('Enter your 4-digit Admin PIN to '+actionLabel+':');
+      if(pin===null)return null;
+      pin=String(pin||'').trim();
+      if(!/^\d{4}$/.test(pin)){toast('A valid 4-digit Admin PIN is required.','error');return null;}
+      return {pin:pin};
+    }catch(error){toast(error.error||error.message||'Could not check the Admin security setting.','error');return null;}
+  }
+
   // Admin DAHA withdrawal actions. These deliberately call the protected backend;
   // payout initiation remains blocked server-side until configured payout-provider credentials and
   // webhook verification are configured.
@@ -3392,8 +3432,9 @@
       toast('The secure Admin payout endpoint is unavailable. No payout was sent.','error');return;
     }
     if(!window.confirm(retrySameRequest?'The provider response for this payout is unknown. Retry the same withdrawal using its original idempotency key so the provider can return the original transfer instead of creating a second payout? Check the recipient and amount first.':'Approve this DAHA withdrawal? This requests a real mobile-money transfer through the payout provider. Do not continue until the recipient details and amount have been checked.'))return;
+    var factor=await promptAdminFinancialFactor('approve this payout');if(!factor)return;
     try{
-      var result=await ML_API.admin.approveWithdrawal(id);
+      var result=await ML_API.admin.approveWithdrawal(id,factor);
       var data=result&&result.data||{};
       var status=String(data.status||'').toLowerCase();
       if(status==='payout_pending'){
@@ -3415,8 +3456,9 @@
       toast('The secure Admin rejection endpoint is unavailable. No record was changed.','error');return;
     }
     if(!window.confirm('Reject this withdrawal request? This is only allowed before a payout has entered provider processing.'))return;
+    var factor=await promptAdminFinancialFactor('reject this withdrawal');if(!factor)return;
     try{
-      var result=await ML_API.admin.rejectWithdrawal(id);
+      var result=await ML_API.admin.rejectWithdrawal(id,factor);
       toast(result&&result.message||'Withdrawal request rejected. No money was sent.','success');
       await renderLiveAdminPayouts();
     }catch(e){
@@ -3432,8 +3474,9 @@
       toast('The secure provider reconciliation endpoint is unavailable. No payout was initiated.','error');return;
     }
     if(!window.confirm('Check the existing payment-provider transfer status for this withdrawal? This is a read-only lookup. It will not send another transfer or release reserved funds unless the provider confirms a terminal result.'))return;
+    var factor=await promptAdminFinancialFactor('reconcile this payout status');if(!factor)return;
     try{
-      var result=await ML_API.admin.reconcileWithdrawal(id);
+      var result=await ML_API.admin.reconcileWithdrawal(id,factor);
       var data=result&&result.data||{};
       var providerStatus=String(data.provider_status||'unknown').replace(/_/g,' ');
       if(String(data.status||'').toLowerCase()==='completed'){
@@ -3483,8 +3526,9 @@
     if(!window.confirm('Retry the settlement for '+String(orderReference||'this order')+'? This runs the existing locked, idempotent settlement routine. It will not override ledger mismatches or missing payout recipients.'))return;
     var reason=window.prompt('Enter the reason for this Admin settlement retry (for example, verified cash receipt):','');
     if(!reason||!reason.trim())return;
+    var factor=await promptAdminFinancialFactor('retry this financial settlement');if(!factor)return;
     try{
-      var result=await ML_API.admin.retryFinancialSettlement(orderId,{confirmation:'RETRY_SETTLEMENT',reason:reason.trim()});
+      var result=await ML_API.admin.retryFinancialSettlement(orderId,Object.assign({confirmation:'RETRY_SETTLEMENT',reason:reason.trim()},factor));
       toast(result&&result.message||'Settlement retry completed.','success');
     }catch(e){
       toast(e.error||e.message||'Settlement retry was not completed. No unsafe repair was attempted.','error');
