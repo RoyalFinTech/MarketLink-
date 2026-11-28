@@ -96,3 +96,24 @@ Therefore, the settlement code and reconciliation controls are deployed, but the
 - Supabase health advisor returned no health lints at the time of review.
 - Security advisor reports informational RLS-enabled/no-policy findings on existing tables; the new tables added in this release explicitly deny direct anonymous/authenticated access and are accessed through the backend service role.
 - No user/provider secrets are included in this document.
+
+
+## Application form redesign and social-profile capture — 2026-11-28
+
+- Reworked Affiliate Marketer legal-name and residential-address fields with explicit labels, consistent input sizing, readable placeholders, accessible focus states, and theme-aware colours. Corrected the pale section headings and supporting text that were difficult to read in daylight mode.
+- Standardized vendor and rider onboarding field typography, contrast, borders, input height, and focus treatment for both daylight (`.lm`) and dark mode.
+- Added optional Facebook, Instagram, TikTok, YouTube and website fields to vendor and rider onboarding. Vendor WhatsApp contact remains a required contact field; rider WhatsApp contact remains part of rider onboarding.
+- Added `social_links JSONB NOT NULL DEFAULT '{}'` to both `vendors` and `riders` in migration `049_vendor_rider_social_profiles`. The migration is applied in production and verified in `information_schema`.
+- API routes validate social profile URLs; services retain only the five supported URL keys and require HTTP(S). The application payloads send the links to the backend.
+- Vendor social links are included in approved public vendor profile/list responses. Rider social links are included in Admin review data only; they are not exposed in public rider profiles.
+- Admin vendor/rider application cards now display submitted social profiles.
+- Production database currently has zero vendor rows and zero rider rows, so no historical application records required backfill.
+
+### Deployment verification for form update
+
+- Render backend: deploy `dep-dc5gesvdtqpc73d4qblg`, `live`, commit `71951f2`.
+- Render customer frontend: deploy `dep-dc5gf8oae00c73epmqtg`, `live`, commit `e43ab51`.
+- Render Admin frontend: deploy `dep-dc5gf8oae00c73epmqrg`, `live`, commit `e43ab51`.
+- Vercel production: `READY`, commit `e43ab51`; Vercel status check passed.
+- Supabase migration history includes `049_vendor_rider_social_profiles`; both `vendors.social_links` and `riders.social_links` exist as non-null JSONB columns.
+- No real applications or sample applicant data were created during verification.
