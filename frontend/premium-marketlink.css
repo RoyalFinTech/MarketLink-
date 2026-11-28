@@ -2378,3 +2378,30 @@ body.ml-photo-viewer-open{overflow:hidden}
 .ml-payment-option .ico:has(.ml-payment-daha-eagle){width:42px;height:42px;display:grid;place-items:center;background:rgba(220,184,111,.09);border:1px solid rgba(220,184,111,.2);border-radius:12px;}
 @media(max-width:700px){.ml-affiliate-channel-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:420px){.ml-affiliate-channel-section,.ml-affiliate-social-section{padding:12px;}.ml-affiliate-channel{min-height:54px;padding:8px;gap:7px;}.ml-affiliate-channel-icon{width:30px;height:30px;}.ml-affiliate-social-fields{grid-template-columns:1fr;}}
+
+/* Compact affiliate application controls: keep brand marks and emojis balanced on mobile. */
+.ml-affiliate-channel-section,.ml-affiliate-social-section{gap:10px;padding:13px;border-radius:15px;}
+.ml-affiliate-form-heading{gap:9px;}
+.ml-affiliate-form-heading b{font-size:12px;}
+.ml-affiliate-form-heading small{font-size:10px;}
+.ml-affiliate-step{width:26px;height:26px;border-radius:8px;font-size:10px;}
+.ml-affiliate-channel-grid{gap:7px;}
+.ml-affiliate-channel{min-height:44px;padding:7px 8px;gap:7px;border-radius:10px;font-size:10.5px;}
+.ml-affiliate-channel-icon{width:24px;height:24px;border-radius:7px;}
+.ml-affiliate-channel-icon .ml-affiliate-social-icon{width:16px;height:16px;}
+.ml-affiliate-channel .ml-affiliate-social-emoji{font-size:13px;}
+.ml-affiliate-social-fields{gap:8px;}
+.ml-affiliate-social-card{gap:8px;padding:10px;border-radius:12px;}
+.ml-affiliate-social-card-head{grid-template-columns:21px auto 1fr;gap:7px;font-size:11px;}
+.ml-affiliate-social-card-head .ml-affiliate-social-icon{width:16px;height:16px;}
+.ml-affiliate-social-card-head .ml-affiliate-social-emoji{font-size:14px;}
+.ml-affiliate-social-card-head small{font-size:9px;}
+.ml-affiliate-social-card input{padding:9px 10px;border-radius:9px;font-size:11px;}
+@media(max-width:700px){.ml-affiliate-channel-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:420px){.ml-affiliate-channel-section,.ml-affiliate-social-section{padding:10px;}.ml-affiliate-channel{min-height:40px;padding:6px;gap:6px;font-size:10px;}.ml-affiliate-channel-icon{width:22px;height:22px;}.ml-affiliate-social-fields{grid-template-columns:1fr;}}
+
+/* DAHA Wallet balance privacy control. */
+.ml-daha-balance-row{display:flex;align-items:center;justify-content:center;gap:12px;min-width:0;}
+.ml-daha-balance-row strong{min-width:0;overflow-wrap:anywhere;}
+.ml-daha-balance-toggle{display:inline-grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(255,255,255,.12);color:#fff;font-size:16px;line-height:1;cursor:pointer;}
+.ml-daha-balance-toggle:focus-visible{outline:2px solid #f5b83d;outline-offset:3px;}
